@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../app_theme/app_colors.dart';
+// import '../auth/login_screen.dart';
 
-import '../../screens/onboarding_screens//onboarding3.dart';
-class OnboardingScreen2 extends StatelessWidget {
-  const OnboardingScreen2({super.key});
+class OnboardingScreen3 extends StatelessWidget {
+  const OnboardingScreen3({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,6 +14,7 @@ class OnboardingScreen2 extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Column(
             children: [
+              // Back Button
               Align(
                 alignment: Alignment.centerLeft,
                 child: IconButton(
@@ -24,16 +25,17 @@ class OnboardingScreen2 extends StatelessWidget {
 
               const Spacer(),
 
+              // Image
               Image.asset(
-                'assets/logo/onboarding2.png',
+                'assets/logo/onboarding3.png',
                 height: 280,
                 fit: BoxFit.contain,
               ),
-
               const SizedBox(height: 30),
 
+              // Title
               const Text(
-                "Small Actions",
+                "Join the EcoLoop",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 28,
@@ -43,8 +45,9 @@ class OnboardingScreen2 extends StatelessWidget {
 
               const SizedBox(height: 12),
 
+              // Subtitle
               const Text(
-                "Together, we can build a greener tomorrow.",
+                "Buy, sell, donate, and recycle with a community that cares for our planet.",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
@@ -54,23 +57,30 @@ class OnboardingScreen2 extends StatelessWidget {
 
               const SizedBox(height: 25),
 
+              // Page Indicator
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _dot(false),
-                  _dot(true),
                   _dot(false),
+                  _dot(true),
                 ],
               ),
 
               const Spacer(),
 
+              // Buttons
               Row(
                 children: [
                   Expanded(
                     child: TextButton(
                       onPressed: () {
-                        // TODO: Navigate to Login Screen if Skip is pressed
+                        // Navigator.pushReplacement(
+                        //   context,
+                        //   MaterialPageRoute(
+                        //     builder: (context) => const LoginScreen(),
+                        //   ),
+                        // );
                       },
                       child: const Text("Skip"),
                     ),
@@ -81,18 +91,19 @@ class OnboardingScreen2 extends StatelessWidget {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const OnboardingScreen3(),
-                          ),
-                        );
+                        // Navigator.pushReplacement(
+                        //   context,
+                        //   MaterialPageRoute(
+                        //     builder: (context) => const LoginScreen(),
+                        //   ),
+                        // );
                       },
-                      child: const Text("Next"),
+                      child: const Text("Get Started"),
                     ),
                   ),
                 ],
               ),
+
               const SizedBox(height: 20),
             ],
           ),
