@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../app_theme/app_colors.dart';
+import '/app_theme/app_colors.dart';
 // import '../auth/login_screen.dart';
 
 class OnboardingScreen3 extends StatelessWidget {
