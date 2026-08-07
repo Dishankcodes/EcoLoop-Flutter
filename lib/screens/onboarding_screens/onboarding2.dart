@@ -1,115 +1,52 @@
 import 'package:flutter/material.dart';
-import '../../app_theme/app_colors.dart';
 
-import '../../screens/onboarding_screens//onboarding3.dart';
+import '../../widgets/onboarding_widget.dart';
+import 'onboarding1.dart';
+import '../welcome_screen.dart';
+
 class OnboardingScreen2 extends StatelessWidget {
   const OnboardingScreen2({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back),
-                ),
-              ),
+    return OnboardingWidget(
+      image: "assets/logo/onboarding2.png",
 
-              const Spacer(),
+      title: "Small Actions",
 
-              Image.asset(
-                'assets/logo/onboarding2.png',
-                height: 280,
-                fit: BoxFit.contain,
-              ),
+      description:
+      "Together, we can build a greener tomorrow through simple everyday sustainable choices.",
 
-              const SizedBox(height: 30),
+      currentPage: 1,
 
-              const Text(
-                "Small Actions",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+      showBackButton: true,
 
-              const SizedBox(height: 12),
-
-              const Text(
-                "Together, we can build a greener tomorrow.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-              ),
-
-              const SizedBox(height: 25),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _dot(false),
-                  _dot(true),
-                  _dot(false),
-                ],
-              ),
-
-              const Spacer(),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () {
-                        // TODO: Navigate to Login Screen if Skip is pressed
-                      },
-                      child: const Text("Skip"),
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const OnboardingScreen3(),
-                          ),
-                        );
-                      },
-                      child: const Text("Next"),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
+      onBack: () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const OnboardingScreen(),
           ),
-        ),
-      ),
-    );
-  }
+        );
+      },
 
-  Widget _dot(bool isActive) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      width: isActive ? 10 : 6,
-      height: isActive ? 10 : 6,
-      decoration: BoxDecoration(
-        color: isActive ? AppColors.primary : Colors.grey.shade400,
-        shape: BoxShape.circle,
-      ),
+      onNext: () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const WelcomeScreen(),
+          ),
+        );
+      },
+
+      onSkip: () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const WelcomeScreen(),
+          ),
+        );
+      },
     );
   }
 }
