@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_theme/app_colors.dart';
 import '../app_theme/app_text_styles.dart';
+import 'back_button.dart';
 
 class OnboardingWidget extends StatelessWidget {
   final String image;
@@ -53,28 +54,9 @@ class OnboardingWidget extends StatelessWidget {
                           width: double.infinity,
                           height: 44,
                           child: showBackButton
-                              ? Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: GestureDetector(
-                                    onTap: onBack,
-                                    behavior: HitTestBehavior.opaque,
-                                    child: const SizedBox(
-                                      width: 44,
-                                      height: 44,
-                                      child: Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Icon(
-                                          Icons.arrow_back_ios_new,
-                                          size: 22,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                )
+                              ? AppBackButton(onPressed: onBack)
                               : const SizedBox.shrink(),
                         ),
-
                         const SizedBox(height: 12),
 
                         SizedBox(
@@ -102,9 +84,6 @@ class OnboardingWidget extends StatelessWidget {
 
                         const SizedBox(height: 28),
 
-                        // ==========================================
-                        // PAGE INDICATOR
-                        // ==========================================
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -136,11 +115,7 @@ class OnboardingWidget extends StatelessWidget {
                           ],
                         ),
 
-                        // ==========================================
-                        // RESPONSIVE SPACE
-                        // ==========================================
                         const Spacer(),
-
                         // ==========================================
                         // BOTTOM BUTTONS
                         // ==========================================

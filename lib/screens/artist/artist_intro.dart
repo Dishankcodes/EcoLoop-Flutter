@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
 import 'login.dart';
-
+import '/widgets/back_button.dart';
 class ArtistIntro extends StatelessWidget {
   const ArtistIntro({super.key});
 
@@ -45,29 +45,8 @@ class ArtistIntro extends StatelessWidget {
                         SizedBox(
                           width: double.infinity,
                           height: 44,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: GestureDetector(
-                              onTap: () {
-                                Navigator.pop(context);
-                              },
-                              behavior: HitTestBehavior.opaque,
-                              child: const SizedBox(
-                                width: 44,
-                                height: 44,
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Icon(
-                                    Icons.arrow_back_ios_new,
-                                    size: 22,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                          child: const AppBackButton(),
                         ),
-
                         const SizedBox(height: 8),
 
                         Text(
