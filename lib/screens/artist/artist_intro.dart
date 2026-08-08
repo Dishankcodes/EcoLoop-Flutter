@@ -45,7 +45,7 @@ class ArtistIntro extends StatelessWidget {
 
               const SizedBox(height: 25),
               Image.asset(
-                "assets/logo/artist_set_3.jpg",
+                "assets/logo/artist_set_3.png",
                 height: 260,
                 fit: BoxFit.contain,
               ),
