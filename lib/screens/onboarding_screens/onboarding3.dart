@@ -27,7 +27,7 @@ class OnboardingScreen3 extends StatelessWidget {
 
               // Image
               Image.asset(
-                'assets/logo/onboarding3.png',
+                'assets/logo/onboarding2.png',
                 height: 280,
                 fit: BoxFit.contain,
               ),
