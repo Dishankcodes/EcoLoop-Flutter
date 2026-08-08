@@ -1,24 +1,345 @@
 import 'package:flutter/material.dart';
 
-class ArtistLogin extends StatelessWidget {
+import '../../app_theme/app_colors.dart';
+import '../../app_theme/app_text_styles.dart';
+import '../../widgets/back_button.dart';
+import 'register.dart';
+import '../user/login.dart';
+
+class ArtistLogin extends StatefulWidget {
   const ArtistLogin({super.key, required this.title});
 
   final String title;
 
   @override
+  State<ArtistLogin> createState() => _ArtistLoginState();
+}
+
+class _ArtistLoginState extends State<ArtistLogin> {
+  final TextEditingController _emailController = TextEditingController();
+
+  final TextEditingController _passwordController = TextEditingController();
+
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        centerTitle: true,
-      ),
-      body: const Center(
-        child: Text(
-          "Artist Login Screen\n(Coming Soon)",
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+      backgroundColor: AppColors.background,
+
+      body: SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ==========================================
+              // BACK BUTTON
+              // Same as User Login
+              // ==========================================
+              const AppBackButton(),
+
+              const SizedBox(height: 20),
+
+              // ==========================================
+              // TITLE
+              // ==========================================
+              Center(
+                child: Text(
+                  "Welcome Artist!",
+                  style: AppTextStyles.heading,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // ==========================================
+              // SUBTITLE
+              // ==========================================
+              Center(
+                child: Text(
+                  "Login to continue your creative journey",
+                  style: AppTextStyles.body,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              const SizedBox(height: 35),
+
+              // ==========================================
+              // EMAIL
+              // ==========================================
+              Text(
+                "Email",
+                style: AppTextStyles.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  hintText: "Enter your email",
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ==========================================
+              // PASSWORD
+              // ==========================================
+              Text(
+                "Password",
+                style: AppTextStyles.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              TextField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
+                  hintText: "Enter your password",
+                  prefixIcon: const Icon(Icons.lock_outline),
+
+                  suffixIcon: IconButton(
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                    ),
+                  ),
+                ),
+              ),
+
+              // ==========================================
+              // FORGOT PASSWORD
+              // ==========================================
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {},
+                  child: Text(
+                    "Forgot Password?",
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // ==========================================
+              // LOGIN BUTTON
+              // ==========================================
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: Size.zero,
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text("Login", style: AppTextStyles.button),
+                ),
+              ),
+
+              const SizedBox(height: 25),
+
+              // ==========================================
+              // OR
+              // ==========================================
+              Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.grey.shade300)),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text("OR", style: AppTextStyles.caption),
+                  ),
+
+                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                ],
+              ),
+
+              const SizedBox(height: 25),
+
+              // ==========================================
+              // GOOGLE LOGIN
+              // ==========================================
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: OutlinedButton(
+                  onPressed: () {},
+
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: AppColors.surface,
+                    foregroundColor: Colors.black87,
+                    side: BorderSide(color: Colors.grey.shade300),
+                    minimumSize: Size.zero,
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        "G",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      Text(
+                        "Continue with Google",
+                        style: AppTextStyles.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 25),
+
+              // ==========================================
+              // CREATE ACCOUNT
+              // ==========================================
+              Center(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      "Don't have an account?",
+                      style: AppTextStyles.caption.copyWith(fontSize: 14),
+                    ),
+
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ArtistRegister(
+                              title: "Artist Registration",
+                            ),
+                          ),
+                        );
+                      },
+
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 8,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+
+                      child: Text(
+                        "Create Account",
+                        style: AppTextStyles.body.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 15),
+
+              // ==========================================
+              // BECOME A USER
+              // Same position as User Login's Artist link
+              // ==========================================
+              Center(
+                child: Column(
+                  children: [
+                    Text(
+                      "Want to continue as a user?",
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.caption.copyWith(fontSize: 14),
+                    ),
+
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const UserLogin(title: "User Login"),
+                          ),
+                        );
+                      },
+
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+
+                      child: Text(
+                        "Become a User →",
+                        style: AppTextStyles.body.copyWith(
+                          color: AppColors.primary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+            ],
           ),
         ),
       ),
