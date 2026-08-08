@@ -10,7 +10,6 @@ class OnboardingWidget extends StatelessWidget {
 
   final bool showBackButton;
   final int currentPage;
-
   final VoidCallback onNext;
   final VoidCallback onSkip;
   final VoidCallback? onBack;
@@ -33,154 +32,178 @@ class OnboardingWidget extends StatelessWidget {
       backgroundColor: AppColors.background,
 
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
 
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // ------------------------------------------------
-              // TOP BAR
-              // ------------------------------------------------
-              SizedBox(
-                height: 48,
-                width: double.infinity,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: showBackButton
-                      ? IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new),
-                          onPressed: onBack,
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ),
-
-              const SizedBox(height: 15),
-
-              // ------------------------------------------------
-              // ILLUSTRATION
-              // ------------------------------------------------
-              SizedBox(
-                width: double.infinity,
-                child: Image.asset(image, height: 300, fit: BoxFit.contain),
-              ),
-
-              const SizedBox(height: 35),
-
-              // ------------------------------------------------
-              // TITLE
-              // ------------------------------------------------
-              SizedBox(
-                width: double.infinity,
-                child: Text(
-                  title,
-                  style: AppTextStyles.heading,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // ------------------------------------------------
-              // DESCRIPTION
-              // ------------------------------------------------
-              SizedBox(
-                width: double.infinity,
-                child: Text(
-                  description,
-                  style: AppTextStyles.body,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-              const SizedBox(height: 35),
-
-              // ------------------------------------------------
-              // PAGE INDICATOR
-              // ------------------------------------------------
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    height: 8,
-                    width: 8,
-                    decoration: BoxDecoration(
-                      color: currentPage == 0
-                          ? AppColors.primary
-                          : Colors.grey.shade300,
-                      shape: BoxShape.circle,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
                     ),
-                  ),
 
-                  const SizedBox(width: 8),
-
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    height: 8,
-                    width: 8,
-                    decoration: BoxDecoration(
-                      color: currentPage == 1
-                          ? AppColors.primary
-                          : Colors.grey.shade300,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 45),
-
-              // ------------------------------------------------
-              // BOTTOM BUTTONS
-              // ------------------------------------------------
-              Row(
-                children: [
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton(
-                        onPressed: onSkip,
-                        child: const Text(
-                          "Skip",
-                          style: TextStyle(fontSize: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          height: 44,
+                          child: showBackButton
+                              ? Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: GestureDetector(
+                                    onTap: onBack,
+                                    behavior: HitTestBehavior.opaque,
+                                    child: const SizedBox(
+                                      width: 44,
+                                      height: 44,
+                                      child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Icon(
+                                          Icons.arrow_back_ios_new,
+                                          size: 22,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
                         ),
-                      ),
-                    ),
-                  ),
 
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: ElevatedButton(
-                        onPressed: onNext,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 28,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        const SizedBox(height: 12),
+
+                        SizedBox(
+                          width: double.infinity,
+                          height: MediaQuery.of(context).size.height * 0.32,
+                          child: Image.asset(image, fit: BoxFit.contain),
+                        ),
+
+                        const SizedBox(height: 28),
+                        Text(
+                          title,
+                          style: AppTextStyles.heading,
+                          textAlign: TextAlign.center,
+                        ),
+
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: Text(
+                            description,
+                            style: AppTextStyles.body,
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                        child: const Text(
-                          "Next",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
+
+                        const SizedBox(height: 28),
+
+                        // ==========================================
+                        // PAGE INDICATOR
+                        // ==========================================
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              height: 8,
+                              width: 8,
+                              decoration: BoxDecoration(
+                                color: currentPage == 0
+                                    ? AppColors.primary
+                                    : Colors.grey.shade300,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+
+                            const SizedBox(width: 8),
+
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              height: 8,
+                              width: 8,
+                              decoration: BoxDecoration(
+                                color: currentPage == 1
+                                    ? AppColors.primary
+                                    : Colors.grey.shade300,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+
+                        // ==========================================
+                        // RESPONSIVE SPACE
+                        // ==========================================
+                        const Spacer(),
+
+                        // ==========================================
+                        // BOTTOM BUTTONS
+                        // ==========================================
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // ------------------------------
+                            // SKIP
+                            // ------------------------------
+                            TextButton(
+                              onPressed: onSkip,
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 12,
+                                ),
+                                minimumSize: const Size(0, 48),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                "Skip",
+                                style: AppTextStyles.body.copyWith(
+                                  fontSize: 16,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+
+                            // ------------------------------
+                            // NEXT
+                            // ------------------------------
+                            SizedBox(
+                              width: 169,
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: onNext,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: Size.zero,
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: Text(
+                                  "Next",
+                                  style: AppTextStyles.button,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 8),
+                      ],
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

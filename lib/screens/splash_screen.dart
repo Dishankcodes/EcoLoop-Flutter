@@ -87,36 +87,41 @@ class _SplashScreenState extends State<SplashScreen>
             /// Center Content
             SafeArea(
               child: Center(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
+                child: Transform.translate(
+                  offset: const Offset(0, -15), // right, upward
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: ScaleTransition(
+                      scale: _scaleAnimation,
 
-                  child: ScaleTransition(
-                    scale: _scaleAnimation,
 
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
 
-                      children: [
-                        /// Logo
-                        Image.asset(
-                          "assets/logo/ecoloop_logo.png",
-                          height: 120,
-                        ),
+                        children: [
+                          /// Logo
+                          Image.asset(
+                            "assets/logo/ecoloop_logo.png",
+                            width: (MediaQuery.of(context).size.width * 0.48)
+                                .clamp(175.0, 230.0),
+                            fit: BoxFit.contain,
+                          ),
 
-                        const SizedBox(height: 30),
+                          const SizedBox(height: 20),
 
-                        /// App Name
-                        Text("EcoLoop", style: AppTextStyles.heading),
+                          /// App Name
+                          Text("EcoLoop", style: AppTextStyles.heading),
 
-                        const SizedBox(height: 12),
+                          const SizedBox(height: 12),
 
-                        /// Tagline
-                        Text(
-                          "Small Actions.\nBig Impact.",
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.body,
-                        ),
-                      ],
+                          /// Tagline
+                          Text(
+                            "Small Actions.\nBig Impact.",
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.body,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

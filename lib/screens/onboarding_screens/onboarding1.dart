@@ -16,13 +16,14 @@ class OnboardingScreen extends StatelessWidget {
           "Give pre-loved items a new life by buying, selling, donating, or exchanging with the EcoLoop community.",
       currentPage: 0,
       showBackButton: false,
+
       onNext: () {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const OnboardingScreen2()),
         );
       },
-
+      // if user can skop then redirect tto welcome
       onSkip: () {
         Navigator.pushReplacement(
           context,

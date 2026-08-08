@@ -13,108 +13,194 @@ class ArtistIntro extends StatelessWidget {
       backgroundColor: AppColors.background,
 
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final screenHeight = constraints.maxHeight;
+            final screenWidth = constraints.maxWidth;
 
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  icon: const Icon(Icons.arrow_back_ios_new),
-                ),
-              ),
+            final horizontalPadding = screenWidth < 360 ? 18.0 : 20.0;
 
-              const SizedBox(height: 10),
-              Text(
-                "Become an Artist",
-                style: AppTextStyles.heading,
-                textAlign: TextAlign.center,
-              ),
+            final illustrationHeight = (screenHeight * 0.30).clamp(
+              210.0,
+              270.0,
+            );
 
-              const SizedBox(height: 8),
-              Text(
-                "Showcase your creativity\nand sell your upcycled products.",
-                style: AppTextStyles.body,
-                textAlign: TextAlign.center,
-              ),
+            return CustomScrollView(
+              physics: const BouncingScrollPhysics(),
 
-              const SizedBox(height: 25),
-              Image.asset(
-                "assets/logo/artist_set_3.png",
-                height: 260,
-                fit: BoxFit.contain,
-              ),
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
 
-              const SizedBox(height: 30),
-              _buildFeature(
-                icon: Icons.person_outline,
-                text: "Build your profile",
-              ),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: 12,
+                    ),
 
-              const SizedBox(height: 15),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
 
-              _buildFeature(icon: Icons.image_outlined, text: "Show your work"),
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          height: 44,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.pop(context);
+                              },
+                              behavior: HitTestBehavior.opaque,
+                              child: const SizedBox(
+                                width: 44,
+                                height: 44,
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Icon(
+                                    Icons.arrow_back_ios_new,
+                                    size: 22,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
 
-              const SizedBox(height: 15),
+                        const SizedBox(height: 8),
 
-              _buildFeature(icon: Icons.sell_outlined, text: "Sell & earn"),
+                        Text(
+                          "Become an Artist",
+                          style: AppTextStyles.heading.copyWith(
+                            fontSize: screenWidth < 360 ? 24 : 26,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
 
-              const SizedBox(height: 40),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            const ArtistLogin(title: "Artist Login"),
-                      ),
-                    );
-                  },
+                        const SizedBox(height: 8),
 
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
+                        Text(
+                          "Showcase your creativity\n"
+                          "and sell your upcycled products.",
+                          style: AppTextStyles.body,
+                          textAlign: TextAlign.center,
+                        ),
 
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                        SizedBox(
+                          height: illustrationHeight,
+                          width: double.infinity,
+                          child: Image.asset(
+                            "assets/logo/artist_set_3.png",
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        _buildFeature(
+                          icon: Icons.person_outline,
+                          text: "Build your profile",
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _buildFeature(
+                          icon: Icons.image_outlined,
+                          text: "Showcase your work",
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _buildFeature(
+                          icon: Icons.sell_outlined,
+                          text: "Sell & earn",
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _buildFeature(
+                          icon: Icons.bar_chart_outlined,
+                          text: "Track your earnings",
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _buildFeature(
+                          icon: Icons.star_outline,
+                          text: "Get customer reviews",
+                        ),
+
+                        const Spacer(),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const ArtistLogin(title: "Artist Login"),
+                                ),
+                              );
+                            },
+
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+
+                              minimumSize: Size.zero,
+                              padding: EdgeInsets.zero,
+
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+
+                            child: Text(
+                              "Get Started",
+                              style: AppTextStyles.button.copyWith(
+                                fontSize: screenWidth < 360 ? 15 : 16,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 8),
+                      ],
                     ),
                   ),
-
-                  child: const Text(
-                    "Get Started",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
                 ),
-              ),
-
-              const SizedBox(height: 20),
-            ],
-          ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
   Widget _buildFeature({required IconData icon, required String text}) {
-    return Row(
-      children: [
-        Icon(icon, size: 22, color: AppColors.primary),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: AppColors.primary),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.body.copyWith(
+                fontSize: 15,
+                color: AppColors.textPrimary,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
