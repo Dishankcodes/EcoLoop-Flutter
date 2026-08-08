@@ -5,7 +5,7 @@ import '../../app_theme/app_text_styles.dart';
 
 import 'user/login.dart';
 import 'user/register.dart';
-import 'artist/login.dart';
+import 'artist/artist_intro.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -118,10 +118,7 @@ class WelcomeScreen extends StatelessWidget {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            const ArtistLogin(title: "Artist Login"),
-                      ),
+                      MaterialPageRoute(builder: (_) => const ArtistIntro()),
                     );
                   },
 

@@ -11,14 +11,10 @@ class OnboardingScreen2 extends StatelessWidget {
   Widget build(BuildContext context) {
     return OnboardingWidget(
       image: "assets/logo/onboarding2.png",
-
-      title: "Small Actions",
-
+      title: "Small Actions.\nBig Impact.",
       description:
       "Together, we can build a greener tomorrow through simple everyday sustainable choices.",
-
       currentPage: 1,
-
       showBackButton: true,
 
       onBack: () {
