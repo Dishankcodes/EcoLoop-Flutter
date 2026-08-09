@@ -17,23 +17,14 @@ class ArtistRegister extends StatefulWidget {
 
 class _ArtistRegisterState extends State<ArtistRegister> {
   final TextEditingController _nameController = TextEditingController();
-
   final TextEditingController _emailController = TextEditingController();
-
   final TextEditingController _phoneController = TextEditingController();
-
   final TextEditingController _addressController = TextEditingController();
-
   final TextEditingController _cityController = TextEditingController();
-
   final TextEditingController _bioController = TextEditingController();
-
   final TextEditingController _skillsController = TextEditingController();
-
   final TextEditingController _experienceController = TextEditingController();
-
   final TextEditingController _passwordController = TextEditingController();
-
   String? _selectedState;
 
   bool _obscurePassword = true;
@@ -91,16 +82,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ==========================================
-              // BACK BUTTON
-              // ==========================================
               const AppBackButton(),
-
               const SizedBox(height: 20),
 
-              // ==========================================
-              // TITLE
-              // ==========================================
               Center(
                 child: Text(
                   "Artist Registration",
@@ -111,9 +95,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
               const SizedBox(height: 8),
 
-              // ==========================================
-              // SUBTITLE
-              // ==========================================
               Center(
                 child: Text(
                   "Tell us about your creativity",
@@ -124,9 +105,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
               const SizedBox(height: 28),
 
-              // ==========================================
-              // PROFILE PHOTO
-              // ==========================================
               Center(
                 child: Column(
                   children: [
@@ -161,14 +139,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
               ),
 
               const SizedBox(height: 28),
-
-              // ==========================================
-              // NAME
-              // ==========================================
               _buildLabel("Your Name"),
-
               const SizedBox(height: 8),
-
               TextField(
                 controller: _nameController,
                 textCapitalization: TextCapitalization.words,
@@ -198,9 +170,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
               const SizedBox(height: 20),
 
-              // ==========================================
-              // PHONE
-              // ==========================================
+
               _buildLabel("Phone Number"),
 
               const SizedBox(height: 8),
@@ -216,9 +186,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
               const SizedBox(height: 20),
 
-              // ==========================================
-              // ADDRESS
-              // ==========================================
               _buildLabel("Address"),
 
               const SizedBox(height: 8),
@@ -237,10 +204,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
               ),
 
               const SizedBox(height: 20),
-
-              // ==========================================
-              // CITY
-              // ==========================================
               _buildLabel("City"),
 
               const SizedBox(height: 8),
@@ -256,11 +219,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
               const SizedBox(height: 20),
 
-              // ==========================================
-              // STATE
-              // ==========================================
               _buildLabel("State"),
-
               const SizedBox(height: 8),
 
               DropdownButtonFormField<String>(
@@ -287,10 +246,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
               ),
 
               const SizedBox(height: 20),
-
-              // ==========================================
-              // BIO
-              // ==========================================
               _buildLabel("Bio"),
 
               const SizedBox(height: 8),
@@ -327,10 +282,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
               ),
 
               const SizedBox(height: 20),
-
-              // ==========================================
-              // EXPERIENCE
-              // ==========================================
               _buildLabel("Experience"),
 
               const SizedBox(height: 8),
@@ -346,10 +297,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
               ),
 
               const SizedBox(height: 20),
-
-              // ==========================================
-              // CERTIFICATION
-              // ==========================================
               _buildLabel("Certification"),
 
               const SizedBox(height: 8),
@@ -372,12 +319,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
               ),
 
               const SizedBox(height: 20),
-
-              // ==========================================
-              // PASSWORD
-              // ==========================================
               _buildLabel("Password"),
-
               const SizedBox(height: 8),
 
               TextField(
@@ -407,9 +349,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
               const SizedBox(height: 30),
 
-              // ==========================================
-              // CREATE ACCOUNT
-              // ==========================================
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -435,10 +374,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
               ),
 
               const SizedBox(height: 18),
-
-              // ==========================================
-              // LOGIN
-              // ==========================================
               Center(
                 child: Wrap(
                   alignment: WrapAlignment.center,
@@ -483,9 +418,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
               const SizedBox(height: 4),
 
-              // ==========================================
-              // BECOME USER
-              // ==========================================
               Center(
                 child: TextButton(
                   onPressed: () {
@@ -517,9 +449,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                 ),
               ),
 
-              // ==========================================
-              // SMALL FINAL BOTTOM SPACE
-              // ==========================================
               const SizedBox(height: 8),
             ],
           ),
@@ -527,10 +456,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
       ),
     );
   }
-
-  // ==========================================================
-  // FORM LABEL
-  // ==========================================================
 
   Widget _buildLabel(String text) {
     return Text(
