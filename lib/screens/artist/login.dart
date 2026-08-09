@@ -188,10 +188,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                 ),
 
                 const SizedBox(height: 25),
-
-                // ==========================================
-                // OR
-                // ==========================================
                 Row(
                   children: [
                     Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -206,10 +202,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                 ),
 
                 const SizedBox(height: 25),
-
-                // ==========================================
-                // GOOGLE LOGIN
-                // ==========================================
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -298,11 +290,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                 ),
 
                 const SizedBox(height: 15),
-
-                // ==========================================
-                // BECOME A USER
-                // Same position as User Login's Artist link
-                // ==========================================
                 Center(
                   child: Column(
                     children: [

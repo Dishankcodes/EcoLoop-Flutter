@@ -94,7 +94,6 @@ class _SplashScreenState extends State<SplashScreen>
                     child: ScaleTransition(
                       scale: _scaleAnimation,
 
-
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
 

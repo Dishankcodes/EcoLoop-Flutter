@@ -13,34 +13,28 @@ class OnboardingScreen2 extends StatelessWidget {
       image: "assets/logo/onboarding2.png",
       title: "Small Actions.\nBig Impact.",
       description:
-      "Together, we can build a greener tomorrow through simple everyday sustainable choices.",
+          "Together, we can build a greener tomorrow through simple everyday sustainable choices.",
       currentPage: 1,
       showBackButton: true,
 
       onBack: () {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => const OnboardingScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
         );
       },
 
       onNext: () {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => const WelcomeScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
         );
       },
 
       onSkip: () {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => const WelcomeScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
         );
       },
     );

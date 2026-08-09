@@ -18,7 +18,6 @@ class WelcomeScreen extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-
             final screenHeight = constraints.maxHeight;
             final screenWidth = constraints.maxWidth;
             final logoSize = (screenHeight * 0.24).clamp(170.0, 220.0);
@@ -40,14 +39,8 @@ class WelcomeScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.center,
 
                       children: [
-                        // ==========================================
-                        // TOP SPACE
-                        // ==========================================
                         SizedBox(height: screenHeight < 700 ? 8 : 20),
 
-                        // ==========================================
-                        // LOGO
-                        // ==========================================
                         Image.asset(
                           "assets/logo/ecoloop_logo.png",
                           width: logoSize,
@@ -55,9 +48,6 @@ class WelcomeScreen extends StatelessWidget {
                           fit: BoxFit.contain,
                         ),
 
-                        // ==========================================
-                        // APP NAME
-                        // ==========================================
                         SizedBox(height: screenHeight < 700 ? 12 : 18),
 
                         Text(
@@ -134,7 +124,7 @@ class WelcomeScreen extends StatelessWidget {
                                 width: 1,
                               ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                             child: Text(
@@ -195,7 +185,6 @@ class WelcomeScreen extends StatelessWidget {
                             ),
                           ),
                         ),
-
                         SizedBox(height: screenHeight < 700 ? 8 : 12),
                       ],
                     ),
