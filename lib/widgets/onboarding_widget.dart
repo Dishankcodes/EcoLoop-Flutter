@@ -116,16 +116,10 @@ class OnboardingWidget extends StatelessWidget {
                         ),
 
                         const Spacer(),
-                        // ==========================================
-                        // BOTTOM BUTTONS
-                        // ==========================================
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // ------------------------------
-                            // SKIP
-                            // ------------------------------
                             TextButton(
                               onPressed: onSkip,
                               style: TextButton.styleFrom(

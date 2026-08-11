@@ -13,7 +13,8 @@ class AppTextStyles {
     letterSpacing: 0.2,
   );
 
-  // Section Titles (e.g. "Become an Artist")
+
+  // Section Titles
   static final TextStyle title = GoogleFonts.poppins(
     fontSize: 20,
     fontWeight: FontWeight.w600,
