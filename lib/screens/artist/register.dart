@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
+import '../../shared_preferences_util.dart';
 import '../../widgets/back_button.dart';
 import '../user/login.dart';
 import 'artist_dashboard.dart';
@@ -76,7 +77,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     if (value == null || value.trim().isEmpty) {
       return "Please enter your $fieldName";
     }
-
     return null;
   }
 
@@ -88,11 +88,10 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     if (value.length < 6) {
       return "Password must be at least 6 characters";
     }
-
     return null;
   }
 
-  void _createArtistAccount() {
+  Future<void> _createArtistAccount() async {
     FocusScope.of(context).unfocus();
 
     if (!_formKey.currentState!.validate()) {
@@ -105,6 +104,13 @@ class _ArtistRegisterState extends State<ArtistRegister> {
       ).showSnackBar(const SnackBar(content: Text("Please select your state")));
       return;
     }
+
+    await Prefs.setBool('isLoggedIn', true);
+    await Prefs.setString('userRole', 'artist');
+    await Prefs.setString('artistName', _nameController.text.trim());
+    await Prefs.setString('artistEmail', _emailController.text.trim());
+
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -137,9 +143,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const AppBackButton(),
-
                 const SizedBox(height: 20),
-
                 Center(
                   child: Text(
                     "Artist Registration",
@@ -147,9 +151,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-
                 const SizedBox(height: 8),
-
                 Center(
                   child: Text(
                     "Tell us about your creativity",
@@ -157,9 +159,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-
                 const SizedBox(height: 28),
-
                 Center(
                   child: Column(
                     children: [
@@ -174,9 +174,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           color: AppColors.primary,
                         ),
                       ),
-
                       const SizedBox(height: 10),
-
                       OutlinedButton.icon(
                         onPressed: () {},
                         icon: const Icon(Icons.add_a_photo_outlined, size: 18),
@@ -192,13 +190,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 28),
-
                 _buildLabel("Your Name"),
-
                 const SizedBox(height: 8),
-
                 TextFormField(
                   controller: _nameController,
                   textCapitalization: TextCapitalization.words,
@@ -208,11 +202,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                 ),
-
                 const SizedBox(height: 20),
                 _buildLabel("Email"),
                 const SizedBox(height: 8),
-
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -222,13 +214,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 _buildLabel("Phone Number"),
-
                 const SizedBox(height: 8),
-
                 TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
@@ -239,13 +227,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     prefixIcon: Icon(Icons.phone_outlined),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 _buildLabel("Address"),
-
                 const SizedBox(height: 8),
-
                 TextFormField(
                   controller: _addressController,
                   maxLines: 3,
@@ -259,13 +243,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 _buildLabel("City"),
-
                 const SizedBox(height: 8),
-
                 TextFormField(
                   controller: _cityController,
                   textCapitalization: TextCapitalization.words,
@@ -275,13 +255,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     prefixIcon: Icon(Icons.location_city_outlined),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 _buildLabel("State"),
-
                 const SizedBox(height: 8),
-
                 DropdownButtonFormField<String>(
                   initialValue: _selectedState,
                   isExpanded: true,
@@ -289,7 +265,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     if (value == null || value.isEmpty) {
                       return "Please select your state";
                     }
-
                     return null;
                   },
                   decoration: const InputDecoration(
@@ -308,13 +283,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     });
                   },
                 ),
-
                 const SizedBox(height: 20),
-
                 _buildLabel("Bio"),
-
                 const SizedBox(height: 8),
-
                 TextFormField(
                   controller: _bioController,
                   maxLines: 4,
@@ -327,13 +298,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 _buildLabel("Skills"),
-
                 const SizedBox(height: 8),
-
                 TextFormField(
                   controller: _skillsController,
                   maxLines: 2,
@@ -342,13 +309,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     prefixIcon: Icon(Icons.palette_outlined),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 _buildLabel("Experience"),
-
                 const SizedBox(height: 8),
-
                 TextFormField(
                   controller: _experienceController,
                   keyboardType: TextInputType.number,
@@ -358,13 +321,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     suffixText: "Years",
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 _buildLabel("Certification"),
-
                 const SizedBox(height: 8),
-
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -381,13 +340,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 _buildLabel("Password"),
-
                 const SizedBox(height: 8),
-
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
@@ -409,9 +364,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 30),
-
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -432,9 +385,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 18),
-
                 Center(
                   child: Wrap(
                     alignment: WrapAlignment.center,
@@ -444,7 +395,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                         "Already have an account?",
                         style: AppTextStyles.caption.copyWith(fontSize: 14),
                       ),
-
                       TextButton(
                         onPressed: () {
                           Navigator.pushReplacement(
@@ -474,9 +424,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 4),
-
                 Center(
                   child: TextButton(
                     onPressed: () {
@@ -505,7 +453,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 8),
               ],
             ),

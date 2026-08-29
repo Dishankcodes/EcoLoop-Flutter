@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
+// purpose of page is same theme and font in whole platform.
 class AppTheme {
   AppTheme._();
 
@@ -41,9 +42,7 @@ class AppTheme {
         foregroundColor: Colors.white,
         elevation: 0,
         minimumSize: const Size(double.infinity, 52),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: GoogleFonts.poppins(
           fontSize: 15,
           fontWeight: FontWeight.w600,
@@ -51,12 +50,11 @@ class AppTheme {
       ),
     ),
 
-    // Input Fields (THIS is important)
+    // Input Fields
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppColors.surface,
-      contentPadding:
-      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
 
       hintStyle: GoogleFonts.poppins(
         fontSize: 14,
@@ -75,9 +73,7 @@ class AppTheme {
 
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: AppColors.primary.withOpacity(0.4),
-        ),
+        borderSide: BorderSide(color: AppColors.primary.withOpacity(0.4)),
       ),
     ),
   );

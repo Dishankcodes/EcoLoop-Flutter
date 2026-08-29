@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../shared_preferences_util.dart';
 import '../../widgets/onboarding_widget.dart';
-import 'onboarding2.dart';
 import '../welcome_screen.dart';
+import 'onboarding2.dart';
 
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
@@ -16,15 +17,16 @@ class OnboardingScreen extends StatelessWidget {
           "Give pre-loved items a new life by buying, selling, donating, or exchanging with the EcoLoop community.",
       currentPage: 0,
       showBackButton: false,
-
       onNext: () {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const OnboardingScreen2()),
         );
       },
-      // if user can skop then redirect tto welcome
-      onSkip: () {
+      onSkip: () async {
+        await Prefs.setBool('isFirstTime', false);
+
+        if (!context.mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const WelcomeScreen()),

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../shared_preferences_util.dart';
 import '../../widgets/onboarding_widget.dart';
-import 'onboarding1.dart';
 import '../welcome_screen.dart';
+import 'onboarding1.dart';
 
 class OnboardingScreen2 extends StatelessWidget {
   const OnboardingScreen2({super.key});
@@ -16,22 +17,25 @@ class OnboardingScreen2 extends StatelessWidget {
           "Together, we can build a greener tomorrow through simple everyday sustainable choices.",
       currentPage: 1,
       showBackButton: true,
-
       onBack: () {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const OnboardingScreen()),
         );
       },
+      onNext: () async {
+        await Prefs.setBool('isFirstTime', false);
 
-      onNext: () {
+        if (!context.mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const WelcomeScreen()),
         );
       },
+      onSkip: () async {
+        await Prefs.setBool('isFirstTime', false);
 
-      onSkip: () {
+        if (!context.mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const WelcomeScreen()),

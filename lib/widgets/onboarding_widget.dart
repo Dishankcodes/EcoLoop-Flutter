@@ -31,7 +31,6 @@ class OnboardingWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -40,13 +39,11 @@ class OnboardingWidget extends StatelessWidget {
               slivers: [
                 SliverFillRemaining(
                   hasScrollBody: false,
-
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24,
                       vertical: 12,
                     ),
-
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -58,20 +55,17 @@ class OnboardingWidget extends StatelessWidget {
                               : const SizedBox.shrink(),
                         ),
                         const SizedBox(height: 12),
-
                         SizedBox(
                           width: double.infinity,
                           height: MediaQuery.of(context).size.height * 0.32,
                           child: Image.asset(image, fit: BoxFit.contain),
                         ),
-
                         const SizedBox(height: 28),
                         Text(
                           title,
                           style: AppTextStyles.heading,
                           textAlign: TextAlign.center,
                         ),
-
                         const SizedBox(height: 12),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -81,9 +75,7 @@ class OnboardingWidget extends StatelessWidget {
                             textAlign: TextAlign.center,
                           ),
                         ),
-
                         const SizedBox(height: 28),
-
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -98,9 +90,7 @@ class OnboardingWidget extends StatelessWidget {
                                 shape: BoxShape.circle,
                               ),
                             ),
-
                             const SizedBox(width: 8),
-
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 250),
                               height: 8,
@@ -114,7 +104,6 @@ class OnboardingWidget extends StatelessWidget {
                             ),
                           ],
                         ),
-
                         const Spacer(),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -138,10 +127,6 @@ class OnboardingWidget extends StatelessWidget {
                                 ),
                               ),
                             ),
-
-                            // ------------------------------
-                            // NEXT
-                            // ------------------------------
                             SizedBox(
                               width: 169,
                               height: 56,
@@ -164,7 +149,6 @@ class OnboardingWidget extends StatelessWidget {
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 8),
                       ],
                     ),

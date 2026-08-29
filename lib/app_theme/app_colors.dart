@@ -12,11 +12,11 @@ class AppColors {
   static const Color background = Color(0xFFF4F7F2);
   static const Color surface = Colors.white;
 
-  // Text (more natural, less harsh)
+  // Text (more natural )
   static const Color textPrimary = Color(0xFF1B5E20);
   static const Color textSecondary = Color(0xFF5F6F64);
 
-  // Status
+  // messages purpose
   static const Color success = Color(0xFF4CAF50);
   static const Color error = Color(0xFFE53935);
 }

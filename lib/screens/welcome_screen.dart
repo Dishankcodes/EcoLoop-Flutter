@@ -1,21 +1,31 @@
 import 'package:flutter/material.dart';
 
-import '../../app_theme/app_colors.dart';
-import '../../app_theme/app_text_styles.dart';
-
+import '../app_theme/app_colors.dart';
+import '../app_theme/app_text_styles.dart';
+import '../shared_preferences_util.dart';
+import '../widgets/more_menu.dart';
+import 'artist/artist_intro.dart';
 import 'user/login.dart';
 import 'user/register.dart';
-import 'artist/artist_intro.dart';
-import '../widgets/more_menu.dart';
 
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Prefs.setBool('isFirstTime', false);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-
       body: SafeArea(
         child: Stack(
           children: [
@@ -27,47 +37,37 @@ class WelcomeScreen extends StatelessWidget {
                 final horizontalPadding = screenWidth < 360 ? 20.0 : 24.0;
                 return CustomScrollView(
                   physics: const BouncingScrollPhysics(),
-
                   slivers: [
                     SliverFillRemaining(
                       hasScrollBody: false,
-
                       child: Padding(
                         padding: EdgeInsets.symmetric(
                           horizontal: horizontalPadding,
                           vertical: 16,
                         ),
-
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
-
                           children: [
                             SizedBox(height: screenHeight < 700 ? 8 : 20),
-
                             Image.asset(
                               "assets/logo/ecoloop_logo.png",
                               width: logoSize,
                               height: logoSize,
                               fit: BoxFit.contain,
                             ),
-
                             SizedBox(height: screenHeight < 700 ? 12 : 18),
-
                             Text(
                               "EcoLoop",
                               style: AppTextStyles.heading.copyWith(
                                 fontSize: screenWidth < 360 ? 24 : 26,
                               ),
                             ),
-
                             const SizedBox(height: 8),
-
                             Text(
                               "Small Actions.\nBig Impact.",
                               textAlign: TextAlign.center,
                               style: AppTextStyles.body,
                             ),
-
                             const Spacer(),
                             SizedBox(
                               width: double.infinity,
@@ -85,10 +85,8 @@ class WelcomeScreen extends StatelessWidget {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
-
                                   minimumSize: Size.zero,
                                   padding: EdgeInsets.zero,
-
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -101,7 +99,6 @@ class WelcomeScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-
                             const SizedBox(height: 18),
                             SizedBox(
                               width: double.infinity,
@@ -121,7 +118,6 @@ class WelcomeScreen extends StatelessWidget {
                                   foregroundColor: AppColors.primary,
                                   minimumSize: Size.zero,
                                   padding: EdgeInsets.zero,
-
                                   side: const BorderSide(
                                     color: Colors.black,
                                     width: 1,
@@ -139,7 +135,6 @@ class WelcomeScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-
                             SizedBox(height: screenHeight < 700 ? 28 : 38),
                             Text(
                               "Become an Artist",
@@ -159,9 +154,7 @@ class WelcomeScreen extends StatelessWidget {
                                 fontSize: screenWidth < 360 ? 14 : 15,
                               ),
                             ),
-
                             const SizedBox(height: 10),
-
                             TextButton.icon(
                               onPressed: () {
                                 Navigator.push(
@@ -171,7 +164,6 @@ class WelcomeScreen extends StatelessWidget {
                                   ),
                                 );
                               },
-
                               style: TextButton.styleFrom(
                                 foregroundColor: AppColors.primary,
                                 padding: const EdgeInsets.symmetric(

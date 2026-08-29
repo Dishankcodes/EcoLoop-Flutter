@@ -1,12 +1,13 @@
-import 'package:ecoloop/widgets/more_menu.dart';
 import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
+import '../../shared_preferences_util.dart';
 import '../../widgets/back_button.dart';
-import 'register.dart';
+import '../../widgets/more_menu.dart';
 import '../user/login.dart';
-import '../artist/artist_dashboard.dart';
+import 'artist_dashboard.dart';
+import 'register.dart';
 
 class ArtistLogin extends StatefulWidget {
   const ArtistLogin({super.key, required this.title});
@@ -36,7 +37,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
     if (value == null || value.trim().isEmpty) {
       return "Please enter your email";
     }
-
     return null;
   }
 
@@ -51,10 +51,17 @@ class _ArtistLoginState extends State<ArtistLogin> {
     return null;
   }
 
-  void _login() {
+  Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
+    await Prefs.setBool('isLoggedIn', true);
+    await Prefs.setString('userRole', 'artist');
+    await Prefs.setString('artistEmail', _emailController.text.trim());
+
+    if (!mounted) return;
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const ArtistDashboard()),
@@ -65,7 +72,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-
       body: SafeArea(
         child: Stack(
           children: [
@@ -77,7 +83,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                   horizontal: 24,
                   vertical: 16,
                 ),
-
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -90,9 +95,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
                         textAlign: TextAlign.center,
                       ),
                     ),
-
                     const SizedBox(height: 8),
-
                     Center(
                       child: Text(
                         "Login to continue your creative journey",
@@ -100,9 +103,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
                         textAlign: TextAlign.center,
                       ),
                     ),
-
                     const SizedBox(height: 35),
-
                     Text(
                       "Email",
                       style: AppTextStyles.body.copyWith(
@@ -110,9 +111,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-
                     const SizedBox(height: 8),
-
                     TextFormField(
                       controller: _emailController,
                       validator: _validateEmail,
@@ -122,9 +121,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
                     ),
-
                     const SizedBox(height: 20),
-
                     Text(
                       "Password",
                       style: AppTextStyles.body.copyWith(
@@ -132,9 +129,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-
                     const SizedBox(height: 8),
-
                     TextFormField(
                       controller: _passwordController,
                       validator: _validatePassword,
@@ -142,14 +137,12 @@ class _ArtistLoginState extends State<ArtistLogin> {
                       decoration: InputDecoration(
                         hintText: "Enter your password",
                         prefixIcon: const Icon(Icons.lock_outline),
-
                         suffixIcon: IconButton(
                           onPressed: () {
                             setState(() {
                               _obscurePassword = !_obscurePassword;
                             });
                           },
-
                           icon: Icon(
                             _obscurePassword
                                 ? Icons.visibility_off_outlined
@@ -158,7 +151,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                         ),
                       ),
                     ),
-
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
@@ -172,9 +164,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
                     SizedBox(
                       width: double.infinity,
                       height: 56,
@@ -192,28 +182,23 @@ class _ArtistLoginState extends State<ArtistLogin> {
                         child: Text("Login", style: AppTextStyles.button),
                       ),
                     ),
-
                     const SizedBox(height: 25),
                     Row(
                       children: [
                         Expanded(child: Divider(color: Colors.grey.shade300)),
-
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text("OR", style: AppTextStyles.caption),
                         ),
-
                         Expanded(child: Divider(color: Colors.grey.shade300)),
                       ],
                     ),
-
                     const SizedBox(height: 25),
                     SizedBox(
                       width: double.infinity,
                       height: 56,
                       child: OutlinedButton(
                         onPressed: () {},
-
                         style: OutlinedButton.styleFrom(
                           backgroundColor: AppColors.surface,
                           foregroundColor: Colors.black87,
@@ -224,7 +209,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -235,9 +219,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-
                             const SizedBox(width: 12),
-
                             Text(
                               "Continue with Google",
                               style: AppTextStyles.body.copyWith(
@@ -249,9 +231,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 25),
-
                     Center(
                       child: Wrap(
                         alignment: WrapAlignment.center,
@@ -261,7 +241,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                             "Don't have an account?",
                             style: AppTextStyles.caption.copyWith(fontSize: 14),
                           ),
-
                           TextButton(
                             onPressed: () {
                               Navigator.push(
@@ -273,7 +252,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                                 ),
                               );
                             },
-
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 6,
@@ -282,7 +260,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-
                             child: Text(
                               "Create Account",
                               style: AppTextStyles.body.copyWith(
@@ -294,7 +271,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 15),
                     Center(
                       child: Column(
@@ -304,7 +280,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                             textAlign: TextAlign.center,
                             style: AppTextStyles.caption.copyWith(fontSize: 14),
                           ),
-
                           TextButton(
                             onPressed: () {
                               Navigator.pushReplacement(
@@ -315,7 +290,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                                 ),
                               );
                             },
-
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -324,7 +298,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-
                             child: Text(
                               "Become a User →",
                               style: AppTextStyles.body.copyWith(
@@ -337,7 +310,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 12),
                   ],
                 ),

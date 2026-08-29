@@ -1,12 +1,13 @@
-import 'package:ecoloop/screens/user/user_dashboard.dart';
 import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
+import '../../shared_preferences_util.dart';
 import '../../widgets/back_button.dart';
+import '../../widgets/more_menu.dart';
 import '../artist/artist_intro.dart';
 import 'register.dart';
-import '../../widgets/more_menu.dart';
+import 'user_dashboard.dart';
 
 class UserLogin extends StatefulWidget {
   const UserLogin({super.key, required this.title});
@@ -50,10 +51,16 @@ class _UserLoginState extends State<UserLogin> {
     return null;
   }
 
-  void _login() {
+  Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
+    await Prefs.setBool('isLoggedIn', true);
+    await Prefs.setString('userRole', 'user');
+    await Prefs.setString('userEmail', _emailController.text.trim());
+
+    if (!mounted) return;
 
     Navigator.pushReplacement(
       context,
@@ -76,12 +83,10 @@ class _UserLoginState extends State<UserLogin> {
                   horizontal: 24,
                   vertical: 16,
                 ),
-
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const AppBackButton(),
-
                     const SizedBox(height: 20),
                     Center(
                       child: Text(
@@ -90,7 +95,6 @@ class _UserLoginState extends State<UserLogin> {
                         textAlign: TextAlign.center,
                       ),
                     ),
-
                     const SizedBox(height: 8),
                     Center(
                       child: Text(
@@ -99,9 +103,7 @@ class _UserLoginState extends State<UserLogin> {
                         textAlign: TextAlign.center,
                       ),
                     ),
-
                     const SizedBox(height: 35),
-
                     Text(
                       "Email",
                       style: AppTextStyles.body.copyWith(
@@ -119,7 +121,6 @@ class _UserLoginState extends State<UserLogin> {
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
                     ),
-
                     const SizedBox(height: 20),
                     Text(
                       "Password",
@@ -129,7 +130,6 @@ class _UserLoginState extends State<UserLogin> {
                       ),
                     ),
                     const SizedBox(height: 8),
-
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
@@ -151,7 +151,6 @@ class _UserLoginState extends State<UserLogin> {
                         ),
                       ),
                     ),
-
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
@@ -165,9 +164,7 @@ class _UserLoginState extends State<UserLogin> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
                     SizedBox(
                       width: double.infinity,
                       height: 56,
@@ -185,9 +182,7 @@ class _UserLoginState extends State<UserLogin> {
                         child: Text("Login", style: AppTextStyles.button),
                       ),
                     ),
-
                     const SizedBox(height: 25),
-
                     Row(
                       children: [
                         Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -198,7 +193,6 @@ class _UserLoginState extends State<UserLogin> {
                         Expanded(child: Divider(color: Colors.grey.shade300)),
                       ],
                     ),
-
                     const SizedBox(height: 25),
                     SizedBox(
                       width: double.infinity,
@@ -237,7 +231,6 @@ class _UserLoginState extends State<UserLogin> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 25),
                     Center(
                       child: Wrap(
@@ -248,7 +241,6 @@ class _UserLoginState extends State<UserLogin> {
                             "Don't have an account?",
                             style: AppTextStyles.caption.copyWith(fontSize: 14),
                           ),
-
                           TextButton(
                             onPressed: () {
                               Navigator.push(
@@ -279,9 +271,7 @@ class _UserLoginState extends State<UserLogin> {
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 15),
-
                     Center(
                       child: Column(
                         children: [
@@ -290,7 +280,6 @@ class _UserLoginState extends State<UserLogin> {
                             textAlign: TextAlign.center,
                             style: AppTextStyles.caption.copyWith(fontSize: 14),
                           ),
-
                           TextButton(
                             onPressed: () {
                               Navigator.push(
@@ -325,11 +314,7 @@ class _UserLoginState extends State<UserLogin> {
                 ),
               ),
             ),
-            const Positioned(
-              top: 5,
-              right: 12,
-              child: MoreMenu(),
-            ),
+            const Positioned(top: 5, right: 12, child: MoreMenu()),
           ],
         ),
       ),
