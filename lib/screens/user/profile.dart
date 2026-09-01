@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
 import '../../widgets/user_more_menu.dart';
+import 'settings.dart';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});
@@ -155,7 +156,10 @@ class Profile extends StatelessWidget {
           title: 'Settings',
           subtitle: 'App preferences and account settings',
           onTap: () {
-            _showComingSoon(context, 'Settings');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Settings()),
+            );
           },
         ),
 
