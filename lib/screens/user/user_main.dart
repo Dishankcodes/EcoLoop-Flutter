@@ -4,6 +4,7 @@ import '../../widgets/bottom_navigation.dart';
 import 'user_home.dart';
 import 'marketplace.dart';
 import 'profile.dart';
+import 'add_product.dart';
 
 class UserMain extends StatefulWidget {
   const UserMain({super.key});
@@ -40,11 +41,9 @@ class _UserMainState extends State<UserMain> {
   }
 
   void _onAddProduct() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Add Product screen is coming in the next phase.'),
-        behavior: SnackBarBehavior.floating,
-      ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddProduct()),
     );
   }
 
