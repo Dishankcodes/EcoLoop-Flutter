@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/bottom_navigation.dart';
 import 'user_home.dart';
 import 'marketplace.dart';
+import 'profile.dart';
 
 class UserMain extends StatefulWidget {
   const UserMain({super.key});
@@ -23,8 +24,12 @@ class _UserMainState extends State<UserMain> {
     _pages = [
       const UserHome(),
       const Marketplace(),
+
+      // Orders - temporary
       const _ComingSoonPage(title: 'Orders', icon: Icons.receipt_long_rounded),
-      const _ComingSoonPage(title: 'Profile', icon: Icons.person_rounded),
+
+      // Profile - REAL PAGE
+      const Profile(),
     ];
   }
 
@@ -47,6 +52,7 @@ class _UserMainState extends State<UserMain> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _pages),
+
       bottomNavigationBar: UserBottomNavigation(
         currentIndex: _currentIndex,
         onItemSelected: _onNavigationSelected,
