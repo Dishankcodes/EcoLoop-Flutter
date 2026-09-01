@@ -2,35 +2,31 @@ import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
-import 'donate_item.dart';
 
-class AddProduct extends StatefulWidget {
-  const AddProduct({super.key});
+class DonateItem extends StatefulWidget {
+  const DonateItem({super.key});
 
   @override
-  State<AddProduct> createState() => _AddProductState();
+  State<DonateItem> createState() => _DonateItemState();
 }
 
-class _AddProductState extends State<AddProduct> {
+class _DonateItemState extends State<DonateItem> {
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController titleController = TextEditingController();
 
   final TextEditingController descriptionController = TextEditingController();
 
-  final TextEditingController priceController = TextEditingController();
-
   String? selectedCategory;
   String? selectedCondition;
 
   final List<String> categories = [
     'Furniture',
+    'Decor',
     'Electronics',
-    'Home & Decor',
+    'Materials',
+    'Fashion',
     'Books',
-    'Clothing',
-    'Kitchen',
-    'Sports',
     'Other',
   ];
 
@@ -46,7 +42,6 @@ class _AddProductState extends State<AddProduct> {
   void dispose() {
     titleController.dispose();
     descriptionController.dispose();
-    priceController.dispose();
     super.dispose();
   }
 
@@ -67,7 +62,7 @@ class _AddProductState extends State<AddProduct> {
             color: AppColors.textPrimary,
           ),
         ),
-        title: Text('Sell an Item', style: AppTextStyles.title),
+        title: Text('Donate an Item', style: AppTextStyles.title),
       ),
 
       body: Form(
@@ -80,7 +75,7 @@ class _AddProductState extends State<AddProduct> {
 
             const SizedBox(height: 24),
 
-            _buildSectionTitle('Product Photos'),
+            _buildSectionTitle('Item Photos'),
 
             const SizedBox(height: 10),
 
@@ -88,18 +83,18 @@ class _AddProductState extends State<AddProduct> {
 
             const SizedBox(height: 25),
 
-            _buildSectionTitle('Product Details'),
+            _buildSectionTitle('Item Details'),
 
             const SizedBox(height: 10),
 
             _buildTextField(
               controller: titleController,
-              label: 'Product Name',
-              hint: 'e.g. Wooden Study Table',
+              label: 'Item Name',
+              hint: 'e.g. Wooden Chair',
               icon: Icons.inventory_2_outlined,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Please enter product name';
+                  return 'Please enter item name';
                 }
 
                 return null;
@@ -139,26 +134,9 @@ class _AddProductState extends State<AddProduct> {
             const SizedBox(height: 14),
 
             _buildTextField(
-              controller: priceController,
-              label: 'Expected Price',
-              hint: 'Enter your expected price',
-              icon: Icons.currency_rupee_rounded,
-              keyboardType: TextInputType.number,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter expected price';
-                }
-
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 14),
-
-            _buildTextField(
               controller: descriptionController,
               label: 'Description',
-              hint: 'Tell buyers about your item...',
+              hint: 'Tell us about the item...',
               icon: Icons.description_outlined,
               maxLines: 5,
               validator: (value) {
@@ -170,13 +148,17 @@ class _AddProductState extends State<AddProduct> {
               },
             ),
 
+            const SizedBox(height: 22),
+
+            _buildPickupInfo(),
+
+            const SizedBox(height: 14),
+
+            _buildRewardInfo(),
+
             const SizedBox(height: 28),
 
-            _buildSellButton(),
-
-            const SizedBox(height: 18),
-
-            _buildDonationOption(),
+            _buildDonateButton(),
           ],
         ),
       ),
@@ -205,7 +187,10 @@ class _AddProductState extends State<AddProduct> {
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.eco_outlined, color: AppColors.primary),
+            child: const Icon(
+              Icons.volunteer_activism_outlined,
+              color: AppColors.primary,
+            ),
           ),
 
           const SizedBox(width: 12),
@@ -215,17 +200,15 @@ class _AddProductState extends State<AddProduct> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Give your item a new orbit',
+                  'Give your item a new life',
                   style: AppTextStyles.body.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-
                 const SizedBox(height: 4),
-
                 Text(
-                  'Sell your unused item and give it a second life with a new owner.',
+                  'Donate unused items and help them reach someone who needs them.',
                   style: AppTextStyles.caption,
                 ),
               ],
@@ -286,7 +269,7 @@ class _AddProductState extends State<AddProduct> {
             const SizedBox(height: 10),
 
             Text(
-              'Add Product Photos',
+              'Add Item Photos',
               style: AppTextStyles.body.copyWith(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w600,
@@ -295,7 +278,10 @@ class _AddProductState extends State<AddProduct> {
 
             const SizedBox(height: 3),
 
-            Text('Add clear photos of your item', style: AppTextStyles.caption),
+            Text(
+              'Add clear photos of your donation',
+              style: AppTextStyles.caption,
+            ),
           ],
         ),
       ),
@@ -311,7 +297,6 @@ class _AddProductState extends State<AddProduct> {
     required String label,
     required String hint,
     required IconData icon,
-    TextInputType? keyboardType,
     int maxLines = 1,
     String? Function(String?)? validator,
   }) {
@@ -330,7 +315,6 @@ class _AddProductState extends State<AddProduct> {
 
         TextFormField(
           controller: controller,
-          keyboardType: keyboardType,
           maxLines: maxLines,
           validator: validator,
           decoration: InputDecoration(
@@ -370,10 +354,6 @@ class _AddProductState extends State<AddProduct> {
         DropdownButtonFormField<String>(
           value: value,
           hint: Text(hint, style: AppTextStyles.hint),
-          icon: const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: AppColors.textSecondary,
-          ),
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: AppColors.primary, size: 21),
           ),
@@ -394,10 +374,103 @@ class _AddProductState extends State<AddProduct> {
   }
 
   // ==========================================================
-  // SELL BUTTON
+  // FREE PICKUP
   // ==========================================================
 
-  Widget _buildSellButton() {
+  Widget _buildPickupInfo() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.accent.withOpacity(0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.local_shipping_outlined,
+            color: AppColors.primary,
+            size: 25,
+          ),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Free Pickup',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'EcoLoop provides free pickup for donated items.',
+                  style: AppTextStyles.caption,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================
+  // REWARD
+  // ==========================================================
+
+  Widget _buildRewardInfo() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: AppColors.light,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.card_giftcard_outlined,
+            color: AppColors.primary,
+            size: 25,
+          ),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Donation Reward',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Eligible donations may receive an EcoLoop gift.',
+                  style: AppTextStyles.caption,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================
+  // DONATE BUTTON
+  // ==========================================================
+
+  Widget _buildDonateButton() {
     return ElevatedButton.icon(
       onPressed: () {
         if (!_formKey.currentState!.validate()) {
@@ -407,86 +480,14 @@ class _AddProductState extends State<AddProduct> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Product listing will be connected in the next phase.',
+              'Donation submission will be connected in the next phase.',
             ),
             behavior: SnackBarBehavior.floating,
           ),
         );
       },
-      icon: const Icon(Icons.sell_outlined),
-      label: const Text('List Item for Sale'),
-    );
-  }
-
-  // ==========================================================
-  // DONATE OPTION
-  // ==========================================================
-
-  Widget _buildDonationOption() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.light,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.accent.withOpacity(0.45)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.volunteer_activism_outlined,
-              color: AppColors.primary,
-              size: 25,
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          Text(
-            'Want to donate instead?',
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-
-          const SizedBox(height: 4),
-
-          Text(
-            'Give your unused item to the community with free pickup.',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.caption,
-          ),
-
-          const SizedBox(height: 12),
-
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DonateItem()),
-              );
-            },
-            icon: const Icon(Icons.volunteer_activism_outlined, size: 18),
-            label: const Text('Donate This Item'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: const BorderSide(color: AppColors.primary),
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-        ],
-      ),
+      icon: const Icon(Icons.volunteer_activism_outlined),
+      label: const Text('Donate Item'),
     );
   }
 }

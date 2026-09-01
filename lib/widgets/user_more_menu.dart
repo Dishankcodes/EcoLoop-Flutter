@@ -1,6 +1,8 @@
+import 'package:ecoloop/screens/user/settings.dart';
 import 'package:flutter/material.dart';
 
 import '../app_theme/app_colors.dart';
+import '../screens/user/donate_item.dart';
 
 class UserMoreMenu extends StatelessWidget {
   const UserMoreMenu({super.key});
@@ -17,12 +19,19 @@ class UserMoreMenu extends StatelessWidget {
             _showComingSoon(context, 'Wishlist');
             break;
 
-          case 'notifications':
-            _showComingSoon(context, 'Notifications');
+
+          case "donate":
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DonateItem()),
+            );
             break;
 
-          case 'messages':
-            _showComingSoon(context, 'Messages');
+          case "settings":
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Settings()),
+            );
             break;
         }
       },
@@ -37,23 +46,25 @@ class UserMoreMenu extends StatelessWidget {
             ],
           ),
         ),
+
         PopupMenuItem<String>(
-          value: 'notifications',
+          value: "donate",
           child: Row(
             children: [
-              Icon(Icons.notifications_none_rounded, color: AppColors.primary),
+              Icon(Icons.volunteer_activism_outlined, color: AppColors.primary),
               SizedBox(width: 12),
-              Text('Notifications'),
+              Text("Donate an Item"),
             ],
           ),
         ),
+
         PopupMenuItem<String>(
-          value: 'messages',
+          value: "settings",
           child: Row(
             children: [
-              Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primary),
+              Icon(Icons.settings_outlined, color: AppColors.primary),
               SizedBox(width: 12),
-              Text('Messages'),
+              Text("Settings"),
             ],
           ),
         ),

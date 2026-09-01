@@ -4,6 +4,7 @@ import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
 import '../../widgets/user_more_menu.dart';
 import 'settings.dart';
+import 'donate_item.dart';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});
@@ -139,6 +140,32 @@ class Profile extends StatelessWidget {
             _showComingSoon(context, 'Wishlist');
           },
         ),
+
+        _ProfileTile(
+          icon: Icons.volunteer_activism_outlined,
+          title: 'Donate an Item',
+          subtitle: 'Give your unused item a new life',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DonateItem()),
+            );
+          },
+        ),
+
+        _ProfileTile(
+          icon: Icons.redeem_outlined,
+          title: 'Rewards',
+          subtitle: 'Check and claimed your rewards',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DonateItem()),
+            );
+          },
+        ),
+
+
       ],
     );
   }
