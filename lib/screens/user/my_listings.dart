@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
+import 'edit_listing.dart';
 
 class MyListings extends StatefulWidget {
   const MyListings({super.key});
@@ -622,17 +623,16 @@ class _MyListingsState extends State<MyListings>
     );
   }
 
-  // ============================================================
   // EDIT
-  // ============================================================
 
   void _editListing(Map<String, dynamic> listing) {
-    _showMessage('Edit Listing screen will be connected next.');
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => EditListing(listing: listing)),
+    );
   }
 
-  // ============================================================
   // SOLD DETAILS
-  // ============================================================
 
   void _showSoldDetails(Map<String, dynamic> listing) {
     showModalBottomSheet(
