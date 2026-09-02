@@ -6,6 +6,7 @@ import '../../widgets/user_more_menu.dart';
 import 'settings.dart';
 import 'donate_item.dart';
 import 'orders.dart';
+import 'my_listings.dart';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});
@@ -120,7 +121,10 @@ class Profile extends StatelessWidget {
           title: 'My Listings',
           subtitle: 'Manage products you are selling',
           onTap: () {
-            _showComingSoon(context, 'My Listings');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyListings()),
+            );
           },
         ),
 

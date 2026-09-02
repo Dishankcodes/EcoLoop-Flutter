@@ -29,18 +29,21 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        children: [
-          _buildHeader(),
-          _buildTabs(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [_buildBuyingOrders(), _buildSellingOrders()],
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            _buildTabs(),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [_buildBuyingOrders(), _buildSellingOrders()],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -50,10 +53,25 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
   // ============================================================
 
   Widget _buildHeader() {
+    final canGoBack = Navigator.of(context).canPop();
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
       child: Row(
         children: [
+          if (canGoBack) ...[
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,6 +180,7 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
 
     return _buildOrderList(
       orders,
+      isSelling: false,
       emptyTitle: 'No purchases yet',
       emptyDescription: 'Items you buy from the marketplace will appear here.',
     );
@@ -208,6 +227,7 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
         Expanded(
           child: _buildOrderList(
             orders,
+            isSelling: true,
             emptyTitle: 'No sales yet',
             emptyDescription:
                 'Orders received for your listed items will appear here.',
@@ -297,6 +317,7 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
 
   Widget _buildOrderList(
     List<Map<String, dynamic>> orders, {
+    required bool isSelling,
     required String emptyTitle,
     required String emptyDescription,
   }) {
@@ -309,7 +330,7 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
       itemCount: orders.length,
       separatorBuilder: (_, __) => const SizedBox(height: 14),
       itemBuilder: (context, index) {
-        return _buildOrderCard(orders[index]);
+        return _buildOrderCard(orders[index], isSelling: isSelling);
       },
     );
   }
@@ -318,9 +339,10 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
   // ORDER CARD
   // ============================================================
 
-  Widget _buildOrderCard(Map<String, dynamic> order) {
-    final isSelling = _tabController.index == 1;
-
+  Widget _buildOrderCard(
+    Map<String, dynamic> order, {
+    required bool isSelling,
+  }) {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
