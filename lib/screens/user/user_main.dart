@@ -1,3 +1,4 @@
+import 'package:ecoloop/screens/user/orders.dart';
 import 'package:flutter/material.dart';
 
 import '../../widgets/bottom_navigation.dart';
@@ -25,11 +26,7 @@ class _UserMainState extends State<UserMain> {
     _pages = [
       const UserHome(),
       const Marketplace(),
-
-      // Orders - temporary
-      const _ComingSoonPage(title: 'Orders', icon: Icons.receipt_long_rounded),
-
-      // Profile - REAL PAGE
+      const Orders(),
       const Profile(),
     ];
   }
@@ -61,37 +58,3 @@ class _UserMainState extends State<UserMain> {
   }
 }
 
-class _ComingSoonPage extends StatelessWidget {
-  final String title;
-  final IconData icon;
-
-  const _ComingSoonPage({required this.title, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 55, color: const Color(0xFF1B5E20)),
-            const SizedBox(height: 14),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1B5E20),
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Coming in the next phase.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF5F6F64)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

@@ -5,6 +5,7 @@ import '../../app_theme/app_text_styles.dart';
 import '../../widgets/user_more_menu.dart';
 import 'settings.dart';
 import 'donate_item.dart';
+import 'orders.dart';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});
@@ -128,7 +129,10 @@ class Profile extends StatelessWidget {
           title: 'My Orders',
           subtitle: 'View your purchases',
           onTap: () {
-            _showComingSoon(context, 'My Orders');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Orders()),
+            );
           },
         ),
 
@@ -164,8 +168,6 @@ class Profile extends StatelessWidget {
             );
           },
         ),
-
-
       ],
     );
   }
