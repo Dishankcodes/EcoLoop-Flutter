@@ -1,3 +1,4 @@
+import 'wishlist.dart';
 import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
@@ -145,8 +146,11 @@ class Profile extends StatelessWidget {
           title: 'Wishlist',
           subtitle: 'Products you saved',
           onTap: () {
-            _showComingSoon(context, 'Wishlist');
-          },
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Wishlist()),
+            );
+            },
         ),
 
         _ProfileTile(

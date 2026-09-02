@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../app_theme/app_colors.dart';
 import '../screens/user/donate_item.dart';
+import '../screens/user/wishlist.dart';
 
 class UserMoreMenu extends StatelessWidget {
   const UserMoreMenu({super.key});
@@ -16,9 +17,11 @@ class UserMoreMenu extends StatelessWidget {
       onSelected: (value) {
         switch (value) {
           case 'wishlist':
-            _showComingSoon(context, 'Wishlist');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Wishlist()),
+            );
             break;
-
 
           case "donate":
             Navigator.push(
@@ -69,15 +72,6 @@ class UserMoreMenu extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  void _showComingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature will be implemented soon.'),
-        behavior: SnackBarBehavior.floating,
-      ),
     );
   }
 }
