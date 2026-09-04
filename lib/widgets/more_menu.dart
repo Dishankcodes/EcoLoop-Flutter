@@ -28,7 +28,7 @@ class MoreMenu extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const FAQPage(),
+                builder: (_) => const FAQ(),
               ),
             );
             break;

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
-import '../../app_theme/app_text_styles.dart';
-import '../../widgets/back_button.dart';
 
 class AboutEcoLoop extends StatelessWidget {
   const AboutEcoLoop({super.key});
@@ -11,217 +9,281 @@ class AboutEcoLoop extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const AppBackButton(),
-
-              const SizedBox(height: 20),
-
-              Center(
-                child: Text(
-                  "About EcoLoop",
-                  style: AppTextStyles.heading,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              Center(
-                child: Text(
-                  "Small Actions. Big Impact.",
-                  style: AppTextStyles.body.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              _sectionTitle("What is EcoLoop?"),
-
-              const SizedBox(height: 10),
-
-              _bodyText(
-                "EcoLoop is a sustainability-focused platform designed to give "
-                "pre-loved and reusable items a new purpose. It provides a "
-                "community where users can buy, sell, donate, and exchange "
-                "items instead of simply throwing them away.",
-              ),
-
-              const SizedBox(height: 24),
-
-              _sectionTitle("Our Purpose"),
-
-              const SizedBox(height: 10),
-
-              _bodyText(
-                "The purpose of EcoLoop is to encourage people to make "
-                "sustainable choices in their everyday lives. By extending "
-                "the useful life of products and connecting users with "
-                "creative artists, EcoLoop helps reduce unnecessary disposal "
-                "and promotes reuse.",
-              ),
-
-              const SizedBox(height: 24),
-
-              _sectionTitle("Connecting Users and Artists"),
-
-              const SizedBox(height: 10),
-
-              _bodyText(
-                "EcoLoop brings users and artists together in one platform. "
-                "Users can provide reusable items, while artists can use "
-                "their creativity and skills to transform materials into "
-                "new and valuable products.",
-              ),
-
-              const SizedBox(height: 24),
-
-              _sectionTitle("Why the Name EcoLoop?"),
-
-              const SizedBox(height: 10),
-
-              _bodyText(
-                "The word 'Eco' represents sustainability and responsible "
-                "use of resources. 'Loop' represents keeping products and "
-                "materials in use for longer instead of allowing them to "
-                "become unnecessary waste. Together, EcoLoop represents the "
-                "idea of creating a continuous cycle of reuse.",
-              ),
-
-              const SizedBox(height: 24),
-
-              _sectionTitle("Our Tagline"),
-
-              const SizedBox(height: 10),
-
-              _infoCard(
-                icon: Icons.eco_outlined,
-                title: "Small Actions. Big Impact.",
-                description:
-                    "EcoLoop believes that small sustainable choices made "
-                    "by individuals can create a meaningful collective impact "
-                    "on the environment and society.",
-              ),
-
-              const SizedBox(height: 24),
-
-              _sectionTitle("Our Vision"),
-
-              const SizedBox(height: 10),
-
-              _bodyText(
-                "To build a community where reuse, creativity, and "
-                "sustainability become a natural part of everyday life.",
-              ),
-
-              const SizedBox(height: 24),
-
-              _sectionTitle("Our Mission"),
-
-              const SizedBox(height: 10),
-
-              _bodyText(
-                "EcoLoop aims to encourage responsible consumption, support "
-                "creative reuse, connect users with artists, and provide a "
-                "platform that makes sustainable participation simple and "
-                "accessible.",
-              ),
-
-              const SizedBox(height: 35),
-
-              Center(
-                child: Text(
-                  "EcoLoop",
-                  style: AppTextStyles.title.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 5),
-
-              Center(
-                child: Text(
-                  "Small Actions. Big Impact.",
-                  style: AppTextStyles.caption,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-            ],
-          ),
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+        title: const Text(
+          'About EcoLoop',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 30),
+        child: Column(
+          children: [
+            _buildHero(),
+            _buildMission(),
+            _buildHowItWorks(),
+            _buildValues(),
+            _buildCommunity(),
+            _buildVersion(),
+          ],
         ),
       ),
     );
   }
 
-  Widget _sectionTitle(String title) {
-    return Text(
-      title,
-      style: AppTextStyles.title.copyWith(
-        fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
-      ),
-    );
-  }
-
-  Widget _bodyText(String text) {
-    return Text(
-      text,
-      style: AppTextStyles.body.copyWith(
-        height: 1.6,
-        color: AppColors.textSecondary,
-      ),
-    );
-  }
-
-  Widget _infoCard({
-    required IconData icon,
-    required String title,
-    required String description,
-  }) {
+  Widget _buildHero() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+      color: AppColors.surface,
+      padding: const EdgeInsets.fromLTRB(25, 28, 25, 30),
+      child: Column(
+        children: [
+          Container(
+            height: 82,
+            width: 82,
+            decoration: BoxDecoration(
+              color: AppColors.light,
+              borderRadius: BorderRadius.circular(27),
+            ),
+            child: const Icon(
+              Icons.eco_rounded,
+              size: 46,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'EcoLoop',
+            style: TextStyle(
+              fontSize: 27,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 7),
+          const Text(
+            'Give unused things a new life.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildMission() {
+    return _section(
+      title: 'Our Mission',
+      child: const Text(
+        'EcoLoop is a community marketplace built to help people '
+        'sell, buy, reuse and donate items that still have value. '
+        'Instead of letting useful products become waste, EcoLoop '
+        'helps connect them with people who can use them again.',
+        style: TextStyle(
+          fontSize: 13,
+          height: 1.65,
+          color: AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHowItWorks() {
+    return _section(
+      title: 'How EcoLoop Works',
+      child: Column(
+        children: [
+          _step(
+            '01',
+            Icons.sell_outlined,
+            'List an Item',
+            'Sell your unused items by creating a simple listing.',
+          ),
+          _step(
+            '02',
+            Icons.search_rounded,
+            'Find Something Useful',
+            'Explore items listed by people and creators in the community.',
+          ),
+          _step(
+            '03',
+            Icons.recycling_rounded,
+            'Reuse & Recycle',
+            'Give products, materials and useful items another purpose.',
+          ),
+          _step(
+            '04',
+            Icons.volunteer_activism_outlined,
+            'Donate',
+            'Donate items that can help someone else instead of throwing them away.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _step(String number, IconData icon, String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 19),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppColors.primary, size: 28),
-          const SizedBox(width: 14),
+          Container(
+            height: 45,
+            width: 45,
+            decoration: BoxDecoration(
+              color: AppColors.light,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 22),
+          ),
+          const SizedBox(width: 13),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: AppTextStyles.body.copyWith(
+                  style: const TextStyle(
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   description,
-                  style: AppTextStyles.caption.copyWith(height: 1.5),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    height: 1.45,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildValues() {
+    return _section(
+      title: 'What We Believe In',
+      child: Wrap(
+        spacing: 9,
+        runSpacing: 9,
+        children: [
+          _tag(Icons.recycling, 'Reuse'),
+          _tag(Icons.eco_outlined, 'Sustainability'),
+          _tag(Icons.people_outline, 'Community'),
+          _tag(Icons.favorite_border, 'Responsibility'),
+          _tag(Icons.auto_awesome_outlined, 'Creativity'),
+        ],
+      ),
+    );
+  }
+
+  Widget _tag(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.light,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommunity() {
+    return _section(
+      title: 'Built for the Community',
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: AppColors.light.withOpacity(0.65),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.groups_outlined, color: AppColors.primary, size: 25),
+            SizedBox(width: 11),
+            Expanded(
+              child: Text(
+                'Every item reused is one less item going to waste. '
+                'Together, small actions can create a bigger impact.',
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.5,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVersion() {
+    return const Padding(
+      padding: EdgeInsets.only(top: 12),
+      child: Column(
+        children: [
+          Text(
+            'EcoLoop',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primary,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Version 1.0.0',
+            style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _section({required String title, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(20),
+      color: AppColors.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 15),
+          child,
         ],
       ),
     );

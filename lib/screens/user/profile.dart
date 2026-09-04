@@ -5,6 +5,7 @@ import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
 import '../../shared_preferences_util.dart';
 import '../../widgets/user_more_menu.dart';
+import '../common/help_support.dart';
 import '../welcome_screen.dart';
 import 'donate_item.dart';
 import 'edit_profile.dart';
@@ -236,7 +237,10 @@ class Profile extends StatelessWidget {
           title: 'Help & Support',
           subtitle: 'Get help with EcoLoop',
           onTap: () {
-            _showComingSoon(context, 'Help & Support');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const HelpSupport()),
+            );
           },
         ),
       ],
@@ -365,7 +369,6 @@ class _ProfileSection extends StatelessWidget {
     );
   }
 }
-
 
 class _ProfileTile extends StatelessWidget {
   const _ProfileTile({

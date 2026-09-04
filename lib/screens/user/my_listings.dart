@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
 import 'edit_listing.dart';
+import 'listing_details.dart';
 
 class MyListings extends StatefulWidget {
   const MyListings({super.key});
@@ -234,211 +235,220 @@ class _MyListingsState extends State<MyListings>
   Widget _buildListingCard(Map<String, dynamic> listing) {
     final status = listing['status'];
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.accent.withOpacity(0.4)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.035),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ------------------------------------------------
-                // IMAGE
-                // ------------------------------------------------
-                Container(
-                  height: 105,
-                  width: 105,
-                  decoration: BoxDecoration(
-                    color: AppColors.light,
-                    borderRadius: BorderRadius.circular(15),
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ListingDetails(listing: listing)),
+        );
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.accent.withOpacity(0.4)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.035),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ------------------------------------------------
+                  // IMAGE
+                  // ------------------------------------------------
+                  Container(
+                    height: 105,
+                    width: 105,
+                    decoration: BoxDecoration(
+                      color: AppColors.light,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Icon(
+                      listing['icon'],
+                      size: 45,
+                      color: AppColors.primary,
+                    ),
                   ),
-                  child: Icon(
-                    listing['icon'],
-                    size: 45,
-                    color: AppColors.primary,
-                  ),
-                ),
 
-                const SizedBox(width: 14),
+                  const SizedBox(width: 14),
 
-                // ------------------------------------------------
-                // DETAILS
-                // ------------------------------------------------
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              listing['title'],
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
+                  // ------------------------------------------------
+                  // DETAILS
+                  // ------------------------------------------------
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                listing['title'],
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 5),
-                          GestureDetector(
-                            onTap: () {
-                              _showListingActions(listing);
-                            },
-                            child: const Icon(
-                              Icons.more_vert_rounded,
-                              size: 20,
-                              color: AppColors.textSecondary,
+                            const SizedBox(width: 5),
+                            GestureDetector(
+                              onTap: () {
+                                _showListingActions(listing);
+                              },
+                              child: const Icon(
+                                Icons.more_vert_rounded,
+                                size: 20,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 7),
-
-                      Text(
-                        listing['price'],
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
+                          ],
                         ),
-                      ),
 
-                      const SizedBox(height: 5),
+                        const SizedBox(height: 7),
 
-                      Text(
-                        '${listing['condition']} • ${listing['category']}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-
-                      const SizedBox(height: 9),
-
-                      _buildStatusChip(status),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ------------------------------------------------------
-          // BOTTOM INFORMATION
-          // ------------------------------------------------------
-          Container(
-            padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
-            decoration: BoxDecoration(
-              color: AppColors.light.withOpacity(0.45),
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(18),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  status == 'Sold'
-                      ? Icons.check_circle_outline
-                      : status == 'Draft'
-                      ? Icons.edit_note_rounded
-                      : Icons.visibility_outlined,
-                  size: 16,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  status == 'Draft' ? listing['date'] : listing['views'],
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-
-                const Spacer(),
-
-                if (status == 'Active')
-                  TextButton(
-                    onPressed: () {
-                      _editListing(listing);
-                    },
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text(
-                      'Edit Listing',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-
-                if (status == 'Sold')
-                  TextButton(
-                    onPressed: () {
-                      _showSoldDetails(listing);
-                    },
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Row(
-                      children: [
                         Text(
-                          'View Sale',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                          listing['price'],
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
                           ),
                         ),
-                        SizedBox(width: 4),
-                        Icon(Icons.arrow_forward_rounded, size: 15),
+
+                        const SizedBox(height: 5),
+
+                        Text(
+                          '${listing['condition']} • ${listing['category']}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+
+                        const SizedBox(height: 9),
+
+                        _buildStatusChip(status),
                       ],
                     ),
                   ),
+                ],
+              ),
+            ),
 
-                if (status == 'Draft')
-                  TextButton(
-                    onPressed: () {
-                      _editListing(listing);
-                    },
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text(
-                      'Continue Editing',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+            // ------------------------------------------------------
+            // BOTTOM INFORMATION
+            // ------------------------------------------------------
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+              decoration: BoxDecoration(
+                color: AppColors.light.withOpacity(0.45),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(18),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    status == 'Sold'
+                        ? Icons.check_circle_outline
+                        : status == 'Draft'
+                        ? Icons.edit_note_rounded
+                        : Icons.visibility_outlined,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    status == 'Draft' ? listing['date'] : listing['views'],
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
                     ),
                   ),
-              ],
+
+                  const Spacer(),
+
+                  if (status == 'Active')
+                    TextButton(
+                      onPressed: () {
+                        _editListing(listing);
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Edit Listing',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+
+                  if (status == 'Sold')
+                    TextButton(
+                      onPressed: () {
+                        _showSoldDetails(listing);
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Row(
+                        children: [
+                          Text(
+                            'View Sale',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(Icons.arrow_forward_rounded, size: 15),
+                        ],
+                      ),
+                    ),
+
+                  if (status == 'Draft')
+                    TextButton(
+                      onPressed: () {
+                        _editListing(listing);
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Continue Editing',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
