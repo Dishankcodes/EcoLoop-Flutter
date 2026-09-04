@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../api/api_manager.dart';
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
+import '../../models/auth/user_login_model.dart';
 import '../../shared_preferences_util.dart';
 import '../../widgets/back_button.dart';
 import '../../widgets/more_menu.dart';
@@ -45,27 +47,65 @@ class _UserLoginState extends State<UserLogin> {
       return "Please enter your password";
     }
 
-    if (value.length < 6) {
-      return "Password must be at least 6 characters";
-    }
     return null;
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    await Prefs.setBool('isLoggedIn', true);
-    await Prefs.setString('userRole', 'user');
-    await Prefs.setString('userEmail', _emailController.text.trim());
-
-    if (!mounted) return;
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const UserDashboard()),
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
+
+    try {
+      final response = await ApiManager().client.loginUser(
+        '/auth/login',
+        LoginRequest(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          role: 'user',
+        ).toJson(),
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+
+      if (response.success == true && response.data != null) {
+        final data = response.data!;
+        final account = data.account;
+
+        // Save user session details safely
+        await Prefs.setBool('isLoggedIn', true);
+        await Prefs.setString('userRole', data.role ?? 'user');
+        await Prefs.setString('authToken', data.token ?? '');
+        await Prefs.setString('userEmail', account?.email ?? '');
+
+        final firstName = account?.firstName ?? '';
+        final lastName = account?.lastName ?? '';
+        await Prefs.setString('userName', '$firstName $lastName'.trim());
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const UserDashboard()),
+        );
+      } else {
+        // Safe access to response.error instead of response.message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response.error ?? "Invalid login credentials."),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
+    }
   }
 
   @override

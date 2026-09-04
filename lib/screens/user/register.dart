@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../api/api_manager.dart';
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
+import '../../models/auth/user_register_model.dart';
 import '../../shared_preferences_util.dart';
 import '../../widgets/back_button.dart';
 import '../artist/artist_intro.dart';
@@ -77,17 +79,6 @@ class _RegisterPageState extends State<RegisterPage> {
     return null;
   }
 
-  String? _validatePassword(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return "Please enter your password";
-    }
-
-    if (value.length < 6) {
-      return "Password must be at least 6 characters";
-    }
-    return null;
-  }
-
   String? _validateGender() {
     if (_selectedGender == null) {
       return "Please select your gender";
@@ -105,9 +96,7 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _createAccount() async {
     FocusScope.of(context).unfocus();
 
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     final genderError = _validateGender();
     if (genderError != null) {
@@ -125,31 +114,68 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    await Prefs.setBool('isLoggedIn', true);
-    await Prefs.setString('userRole', 'user');
-    await Prefs.setString('userEmail', _emailController.text.trim());
-    await Prefs.setString(
-      'userName',
-      "${_firstNameController.text.trim()} ${_lastNameController.text.trim()}",
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Account created successfully"),
-        duration: Duration(seconds: 2),
-      ),
-    );
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const UserDashboard()),
+    try {
+      final userModel = RegisterUserRequest(
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        gender: _selectedGender!,
+        address: _addressController.text.trim(),
+        city: _cityController.text.trim(),
+        state: _selectedState!,
+        password: _passwordController.text,
       );
-    });
+
+      final response = await ApiManager().client.registerUser(
+        '/auth/register/user',
+        userModel.toJson(),
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+
+      if (response.success == true && response.data != null) {
+        final data = response.data!;
+        final account = data.account;
+
+        // Save user session safely without using !
+        await Prefs.setBool('isLoggedIn', true);
+        await Prefs.setString('userRole', data.role ?? 'user');
+        await Prefs.setString('authToken', data.token ?? '');
+        await Prefs.setString('userEmail', account?.email ?? '');
+
+        final firstName = account?.firstName ?? '';
+        final lastName = account?.lastName ?? '';
+        await Prefs.setString('userName', '$firstName $lastName'.trim());
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Account created successfully!")),
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const UserDashboard()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.error ?? "Registration failed.")),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
+    }
   }
 
   @override
@@ -330,7 +356,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  validator: _validatePassword,
+                  validator: (value) => _validateRequired(value, "password"),
                   decoration: InputDecoration(
                     hintText: "Create a password",
                     prefixIcon: const Icon(Icons.lock_outline),
