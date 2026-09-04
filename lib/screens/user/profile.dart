@@ -1,13 +1,16 @@
-import 'wishlist.dart';
 import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
+import '../../shared_preferences_util.dart';
 import '../../widgets/user_more_menu.dart';
-import 'settings.dart';
+import '../welcome_screen.dart';
 import 'donate_item.dart';
-import 'orders.dart';
+import 'edit_profile.dart';
 import 'my_listings.dart';
+import 'orders.dart';
+import 'settings.dart';
+import 'wishlist.dart';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});
@@ -26,7 +29,7 @@ class Profile extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
         child: Column(
           children: [
-            _buildProfileHeader(),
+            _buildProfileHeader(context),
             const SizedBox(height: 24),
 
             _buildAccountSection(context),
@@ -48,7 +51,7 @@ class Profile extends StatelessWidget {
   // PROFILE HEADER
   // ----------------------------------------------------------
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
@@ -89,7 +92,10 @@ class Profile extends StatelessWidget {
 
           OutlinedButton(
             onPressed: () {
-              // Edit Profile will be implemented later.
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EditProfile()),
+              );
             },
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
@@ -150,7 +156,7 @@ class Profile extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (_) => const Wishlist()),
             );
-            },
+          },
         ),
 
         _ProfileTile(
@@ -269,26 +275,37 @@ class Profile extends StatelessWidget {
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Logout'),
           content: const Text('Are you sure you want to logout?'),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
               },
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
+              onPressed: () async {
+                // Close dialog first
+                Navigator.pop(dialogContext);
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Logout will be connected later.'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                // Clear login/session data
+                await Prefs.setBool('isLoggedIn', false);
+                await Prefs.setString('authToken', '');
+                await Prefs.setString('userRole', '');
+                await Prefs.setString('userEmail', '');
+                await Prefs.setString('userName', '');
+
+                if (!context.mounted) return;
+
+                // Go back to Welcome screen and remove
+                // all logged-in screens from navigation stack.
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                  (route) => false,
                 );
               },
               child: const Text('Logout'),

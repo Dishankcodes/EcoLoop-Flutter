@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
+import 'checkout.dart';
+import 'seller_profile.dart';
 
 class ProductDetails extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -18,6 +20,25 @@ class _ProductDetailsState extends State<ProductDetails> {
   bool _isWishlisted = true;
 
   int _quantity = 1;
+
+  void _openSellerProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SellerProfile(
+          seller: {
+            'name': seller,
+            'location': location,
+            'rating': '4.8',
+            'reviews': '42',
+            'listings': '127',
+            'sold': '42',
+            'positive': '98%',
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -436,57 +457,89 @@ class _ProductDetailsState extends State<ProductDetails> {
 
           Row(
             children: [
-              Container(
-                height: 52,
-                width: 52,
-                decoration: BoxDecoration(
-                  color: AppColors.light,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  color: AppColors.primary,
-                  size: 28,
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                child: InkWell(
+                  onTap: _openSellerProfile,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 4,
+                      horizontal: 2,
+                    ),
+                    child: Row(
                       children: [
-                        Text(
-                          seller,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                        // Seller image/avatar
+                        Container(
+                          height: 52,
+                          width: 52,
+                          decoration: BoxDecoration(
+                            color: AppColors.light,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.person_rounded,
+                            color: AppColors.primary,
+                            size: 28,
                           ),
                         ),
-                        const SizedBox(width: 5),
+
+                        const SizedBox(width: 12),
+
+                        // Seller name + rating
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      seller,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 5),
+
+                                  const Icon(
+                                    Icons.verified_rounded,
+                                    size: 16,
+                                    color: AppColors.success,
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 4),
+
+                              const Text(
+                                'EcoLoop member • 4.8 ★',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Arrow indicating clickable profile
                         const Icon(
-                          Icons.verified_rounded,
-                          size: 16,
-                          color: AppColors.success,
+                          Icons.arrow_forward_ios_rounded,
+                          size: 14,
+                          color: AppColors.textSecondary,
                         ),
                       ],
                     ),
-
-                    const SizedBox(height: 4),
-
-                    const Text(
-                      'EcoLoop member • 4.8 ★',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
+
+              const SizedBox(width: 10),
 
               OutlinedButton(
                 onPressed: _contactSeller,
@@ -1014,7 +1067,12 @@ class _ProductDetailsState extends State<ProductDetails> {
   // ============================================================
 
   void _buyNow() {
-    _showMessage('Checkout will be connected next.');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Checkout(product: widget.product, quantity: _quantity),
+      ),
+    );
   }
 
   // ============================================================
