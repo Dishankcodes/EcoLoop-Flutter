@@ -5,7 +5,7 @@ import '../app_theme/app_text_styles.dart';
 import '../shared_preferences_util.dart';
 import 'artist/artist_dashboard.dart';
 import 'onboarding_screens/onboarding1.dart';
-import 'user/user_dashboard.dart';
+import 'user/user_home.dart';
 import 'welcome_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -66,7 +66,7 @@ class _SplashScreenState extends State<SplashScreen>
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const UserDashboard()),
+          MaterialPageRoute(builder: (_) => const UserHome()),
         );
       }
     } else {

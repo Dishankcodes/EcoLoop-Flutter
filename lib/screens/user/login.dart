@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/api_manager.dart';
@@ -5,11 +6,12 @@ import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
 import '../../models/auth/user_login_model.dart';
 import '../../shared_preferences_util.dart';
+import '../../widgets/app_message.dart';
 import '../../widgets/back_button.dart';
 import '../../widgets/more_menu.dart';
 import '../artist/artist_intro.dart';
 import 'register.dart';
-import 'user_dashboard.dart';
+import 'user_home.dart';
 
 class UserLogin extends StatefulWidget {
   const UserLogin({super.key, required this.title});
@@ -27,6 +29,72 @@ class _UserLoginState extends State<UserLogin> {
   bool _obscurePassword = true;
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  String? _message;
+  String? _messageTitle;
+  AppMessageType? _messageType;
+
+  void _showMessage({
+    required String title,
+    required String message,
+    required AppMessageType type,
+  }) {
+    if (!mounted) return;
+
+    setState(() {
+      _messageTitle = title;
+      _message = message;
+      _messageType = type;
+    });
+  }
+
+  void _clearMessage() {
+    if (!mounted) return;
+
+    setState(() {
+      _messageTitle = null;
+      _message = null;
+      _messageType = null;
+    });
+  }
+
+  String _getReadableError(Object error) {
+    if (error is DioException) {
+      if (error.type == DioExceptionType.connectionTimeout) {
+        return 'Connection timed out. Please check your internet connection.';
+      }
+
+      if (error.type == DioExceptionType.receiveTimeout) {
+        return 'The server took too long to respond. Please try again.';
+      }
+
+      if (error.type == DioExceptionType.connectionError) {
+        return 'Unable to connect to the server. Please check your internet connection.';
+      }
+
+      final responseData = error.response?.data;
+
+      if (responseData is Map<String, dynamic>) {
+        final errorData = responseData['error'];
+
+        if (errorData is Map<String, dynamic>) {
+          final message = errorData['message'];
+
+          if (message != null && message.toString().isNotEmpty) {
+            return message.toString();
+          }
+        }
+
+        if (responseData['message'] != null) {
+          return responseData['message'].toString();
+        }
+      }
+
+      return 'Unable to complete login. Please try again.';
+    }
+
+    return 'Something went wrong. Please try again.';
+  }
 
   @override
   void dispose() {
@@ -51,9 +119,14 @@ class _UserLoginState extends State<UserLogin> {
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
 
-    // Show loading indicator
+    _clearMessage();
+
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -87,24 +160,29 @@ class _UserLoginState extends State<UserLogin> {
         final lastName = account?.lastName ?? '';
         await Prefs.setString('userName', '$firstName $lastName'.trim());
 
+        if (!mounted) return;
+
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const UserDashboard()),
+          MaterialPageRoute(builder: (_) => const UserHome()),
         );
       } else {
-        // Safe access to response.error instead of response.message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response.error ?? "Invalid login credentials."),
-          ),
+        _showMessage(
+          title: 'Login failed',
+          message: response.error ?? 'Invalid login credentials.',
+          type: AppMessageType.error,
         );
       }
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // Close loading dialog
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
+
+      Navigator.pop(context);
+
+      _showMessage(
+        title: 'Something went wrong',
+        message: _getReadableError(e),
+        type: AppMessageType.error,
+      );
     }
   }
 
@@ -143,6 +221,19 @@ class _UserLoginState extends State<UserLogin> {
                         textAlign: TextAlign.center,
                       ),
                     ),
+                    if (_message != null &&
+                        _messageTitle != null &&
+                        _messageType != null) ...[
+                      const SizedBox(height: 24),
+
+                      AppMessage(
+                        title: _messageTitle!,
+                        message: _message!,
+                        type: _messageType!,
+                        onClose: _clearMessage,
+                      ),
+                    ],
+
                     const SizedBox(height: 35),
                     Text(
                       "Email",

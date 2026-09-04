@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/api_manager.dart';
@@ -5,10 +6,11 @@ import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
 import '../../models/auth/user_register_model.dart';
 import '../../shared_preferences_util.dart';
+import '../../widgets/app_message.dart';
 import '../../widgets/back_button.dart';
 import '../artist/artist_intro.dart';
 import 'login.dart';
-import 'user_dashboard.dart';
+import 'user_home.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key, required this.title});
@@ -27,6 +29,72 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _cityController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+
+  String? _message;
+  String? _messageTitle;
+  AppMessageType? _messageType;
+
+  void _showMessage({
+    required String title,
+    required String message,
+    required AppMessageType type,
+  }) {
+    if (!mounted) return;
+
+    setState(() {
+      _messageTitle = title;
+      _message = message;
+      _messageType = type;
+    });
+  }
+
+  void _clearMessage() {
+    if (!mounted) return;
+
+    setState(() {
+      _messageTitle = null;
+      _message = null;
+      _messageType = null;
+    });
+  }
+
+  String _getReadableError(Object error) {
+    if (error is DioException) {
+      if (error.type == DioExceptionType.connectionTimeout) {
+        return 'Connection timed out. Please check your internet connection.';
+      }
+
+      if (error.type == DioExceptionType.receiveTimeout) {
+        return 'The server took too long to respond. Please try again.';
+      }
+
+      if (error.type == DioExceptionType.connectionError) {
+        return 'Unable to connect to the server. Please check your internet connection.';
+      }
+
+      final responseData = error.response?.data;
+
+      if (responseData is Map<String, dynamic>) {
+        final errorData = responseData['error'];
+
+        if (errorData is Map<String, dynamic>) {
+          final message = errorData['message'];
+
+          if (message != null && message.toString().isNotEmpty) {
+            return message.toString();
+          }
+        }
+
+        if (responseData['message'] != null) {
+          return responseData['message'].toString();
+        }
+      }
+
+      return 'Unable to complete Register. Please try again.';
+    }
+
+    return 'Something went wrong. Please try again.';
+  }
 
   String? _selectedGender;
   String? _selectedState;
@@ -96,25 +164,34 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _createAccount() async {
     FocusScope.of(context).unfocus();
 
-    if (!_formKey.currentState!.validate()) return;
+    _clearMessage();
+
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
     final genderError = _validateGender();
+
     if (genderError != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(genderError)));
+      _showMessage(
+        title: 'Missing information',
+        message: genderError,
+        type: AppMessageType.warning,
+      );
       return;
     }
 
     final stateError = _validateState();
+
     if (stateError != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(stateError)));
+      _showMessage(
+        title: 'Missing information',
+        message: stateError,
+        type: AppMessageType.warning,
+      );
       return;
     }
 
-    // Show loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -140,41 +217,57 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       if (!mounted) return;
-      Navigator.pop(context); // Close loading dialog
+
+      Navigator.pop(context);
 
       if (response.success == true && response.data != null) {
         final data = response.data!;
         final account = data.account;
 
-        // Save user session safely without using !
+        // ----------------------------------------------------------
+        // SAVE USER SESSION
+        // ----------------------------------------------------------
+
         await Prefs.setBool('isLoggedIn', true);
+
         await Prefs.setString('userRole', data.role ?? 'user');
+
         await Prefs.setString('authToken', data.token ?? '');
+
         await Prefs.setString('userEmail', account?.email ?? '');
 
         final firstName = account?.firstName ?? '';
         final lastName = account?.lastName ?? '';
+
         await Prefs.setString('userName', '$firstName $lastName'.trim());
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Account created successfully!")),
-        );
+        // ----------------------------------------------------------
+        // GO TO HOME
+        // ----------------------------------------------------------
+
+        if (!mounted) return;
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const UserDashboard()),
+          MaterialPageRoute(builder: (_) => const UserHome()),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.error ?? "Registration failed.")),
+        _showMessage(
+          title: 'Registration failed',
+          message: response.error ?? 'Unable to create your account.',
+          type: AppMessageType.error,
         );
       }
     } catch (e) {
       if (!mounted) return;
+
       Navigator.pop(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
+
+      _showMessage(
+        title: 'Something went wrong',
+        message: _getReadableError(e),
+        type: AppMessageType.error,
+      );
     }
   }
 
@@ -208,6 +301,18 @@ class _RegisterPageState extends State<RegisterPage> {
                     textAlign: TextAlign.center,
                   ),
                 ),
+                if (_message != null &&
+                    _messageTitle != null &&
+                    _messageType != null) ...[
+                  const SizedBox(height: 24),
+
+                  AppMessage(
+                    title: _messageTitle!,
+                    message: _message!,
+                    type: _messageType!,
+                    onClose: _clearMessage,
+                  ),
+                ],
                 const SizedBox(height: 28),
                 Center(
                   child: Column(
