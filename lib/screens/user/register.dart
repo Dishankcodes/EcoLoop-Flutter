@@ -1,16 +1,19 @@
 import 'package:dio/dio.dart';
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/api_manager.dart';
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
 import '../../models/auth/user_register_model.dart';
+import '../../models/location/city_model.dart';
+import '../../models/location/state_model.dart';
 import '../../shared_preferences_util.dart';
 import '../../widgets/app_message.dart';
 import '../../widgets/back_button.dart';
 import '../artist/artist_intro.dart';
 import 'login.dart';
-import 'user_home.dart';
+import 'user_main.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key, required this.title});
@@ -22,17 +25,52 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  // Form Key & Text Controllers
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _cityController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
+  // Application Message Notification State
   String? _message;
   String? _messageTitle;
   AppMessageType? _messageType;
+
+  // Selected Form Fields
+  String? _selectedGender;
+  StateModel? _selectedState;
+  CityModel? _selectedCity;
+
+  // Location Data State
+  List<StateModel> _states = [];
+  List<CityModel> _cities = [];
+  bool _isLoadingStates = false;
+  bool _isLoadingCities = false;
+
+  // City Caching & Concurrency Management
+  final Map<String, List<CityModel>> _citiesCache = {};
+  final Map<String, Future<List<CityModel>>> _cityLoadingFutures = {};
+
+  // Form Controls
+  bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStates();
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   void _showMessage({
     required String title,
@@ -40,7 +78,6 @@ class _RegisterPageState extends State<RegisterPage> {
     required AppMessageType type,
   }) {
     if (!mounted) return;
-
     setState(() {
       _messageTitle = title;
       _message = message;
@@ -50,7 +87,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
   void _clearMessage() {
     if (!mounted) return;
-
     setState(() {
       _messageTitle = null;
       _message = null;
@@ -58,88 +94,188 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
+  /// Extracts user-friendly error messages from API or network failures.
   String _getReadableError(Object error) {
     if (error is DioException) {
       if (error.type == DioExceptionType.connectionTimeout) {
         return 'Connection timed out. Please check your internet connection.';
       }
-
+      if (error.type == DioExceptionType.sendTimeout) {
+        return 'The request took too long to send. Please try again.';
+      }
       if (error.type == DioExceptionType.receiveTimeout) {
         return 'The server took too long to respond. Please try again.';
       }
-
       if (error.type == DioExceptionType.connectionError) {
         return 'Unable to connect to the server. Please check your internet connection.';
       }
 
       final responseData = error.response?.data;
-
       if (responseData is Map<String, dynamic>) {
         final errorData = responseData['error'];
-
         if (errorData is Map<String, dynamic>) {
           final message = errorData['message'];
-
           if (message != null && message.toString().isNotEmpty) {
             return message.toString();
           }
         }
-
         if (responseData['message'] != null) {
           return responseData['message'].toString();
         }
       }
-
-      return 'Unable to complete Register. Please try again.';
+      return 'Unable to complete registration. Please try again.';
     }
-
     return 'Something went wrong. Please try again.';
   }
 
-  String? _selectedGender;
-  String? _selectedState;
+  /// Loads available states from the backend and initiates background prefetching for cities.
+  Future<void> _loadStates() async {
+    if (!mounted) return;
+    setState(() => _isLoadingStates = true);
 
-  bool _obscurePassword = true;
+    try {
+      final response = await ApiManager().client.getStates('/locations/states');
+      if (!mounted) return;
 
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-
-  final List<String> _states = [
-    "Andhra Pradesh",
-    "Assam",
-    "Bihar",
-    "Chhattisgarh",
-    "Delhi",
-    "Goa",
-    "Gujarat",
-    "Haryana",
-    "Himachal Pradesh",
-    "Jharkhand",
-    "Karnataka",
-    "Kerala",
-    "Madhya Pradesh",
-    "Maharashtra",
-    "Odisha",
-    "Punjab",
-    "Rajasthan",
-    "Tamil Nadu",
-    "Telangana",
-    "Uttar Pradesh",
-    "Uttarakhand",
-    "West Bengal",
-  ];
-
-  @override
-  void dispose() {
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _addressController.dispose();
-    _cityController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+      if (response.success == true && response.data != null) {
+        setState(() {
+          _states = response.data!;
+          _isLoadingStates = false;
+        });
+        _prefetchCitiesInBackground();
+      } else {
+        setState(() => _isLoadingStates = false);
+        _showMessage(
+          title: 'Unable to load states',
+          message: response.error ?? 'Please try again.',
+          type: AppMessageType.error,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoadingStates = false);
+      _showMessage(
+        title: 'Unable to load states',
+        message: _getReadableError(e),
+        type: AppMessageType.error,
+      );
+    }
   }
 
+  /// Retrieves cities for a given state code using cache or in-flight futures if available.
+  Future<List<CityModel>> _fetchCitiesForState(String stateCode) {
+    if (_citiesCache.containsKey(stateCode)) {
+      return Future.value(_citiesCache[stateCode]!);
+    }
+    if (_cityLoadingFutures.containsKey(stateCode)) {
+      return _cityLoadingFutures[stateCode]!;
+    }
+
+    final future = _requestCities(stateCode);
+    _cityLoadingFutures[stateCode] = future;
+    return future;
+  }
+
+  /// Executes the network request to fetch cities for a specific state code.
+  Future<List<CityModel>> _requestCities(String stateCode) async {
+    try {
+      final response = await ApiManager().client.getCities(
+        '/locations/cities',
+        stateCode,
+      );
+
+      if (response.success == true && response.data != null) {
+        final cities = response.data!;
+        _citiesCache[stateCode] = cities;
+        return cities;
+      }
+      return [];
+    } catch (_) {
+      return [];
+    } finally {
+      _cityLoadingFutures.remove(stateCode);
+    }
+  }
+
+  /// Prefetches city data in small batches to optimize performance without overloading network requests.
+  Future<void> _prefetchCitiesInBackground() async {
+    if (_states.isEmpty) return;
+    const batchSize = 4;
+
+    for (int i = 0; i < _states.length; i += batchSize) {
+      if (!mounted) return;
+      final batch = _states.skip(i).take(batchSize);
+
+      await Future.wait(
+        batch.map((state) => _fetchCitiesForState(state.stateCode)),
+      );
+
+      if (mounted && _selectedState != null) {
+        final selectedCode = _selectedState!.stateCode;
+        if (_citiesCache.containsKey(selectedCode)) {
+          setState(() {
+            _cities = _citiesCache[selectedCode]!;
+            _isLoadingCities = false;
+          });
+        }
+      }
+    }
+  }
+
+  /// Fetches and displays cities based on the user's selected state.
+  Future<void> _loadCities(String stateCode) async {
+    if (!mounted) return;
+
+    final cachedCities = _citiesCache[stateCode];
+    if (cachedCities != null) {
+      setState(() {
+        _cities = cachedCities;
+        _selectedCity = null;
+        _isLoadingCities = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _cities = [];
+      _selectedCity = null;
+      _isLoadingCities = true;
+    });
+
+    try {
+      final cities = await _fetchCitiesForState(stateCode);
+      if (!mounted) return;
+
+      if (_selectedState?.stateCode != stateCode) return;
+
+      if (cities.isNotEmpty) {
+        setState(() {
+          _cities = cities;
+          _isLoadingCities = false;
+        });
+      } else {
+        setState(() {
+          _cities = [];
+          _isLoadingCities = false;
+        });
+        _showMessage(
+          title: 'No cities available',
+          message: 'No cities are currently available for this state.',
+          type: AppMessageType.warning,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoadingCities = false);
+      _showMessage(
+        title: 'Unable to load cities',
+        message: _getReadableError(e),
+        type: AppMessageType.error,
+      );
+    }
+  }
+
+  // Field Validation Helpers
   String? _validateRequired(String? value, String fieldName) {
     if (value == null || value.trim().isEmpty) {
       return "Please enter your $fieldName";
@@ -147,31 +283,23 @@ class _RegisterPageState extends State<RegisterPage> {
     return null;
   }
 
-  String? _validateGender() {
-    if (_selectedGender == null) {
-      return "Please select your gender";
-    }
-    return null;
-  }
+  String? _validateGender() =>
+      _selectedGender == null ? "Please select your gender" : null;
 
-  String? _validateState() {
-    if (_selectedState == null) {
-      return "Please select your state";
-    }
-    return null;
-  }
+  String? _validateState() =>
+      _selectedState == null ? "Please select your state" : null;
 
+  String? _validateCity() =>
+      _selectedCity == null ? "Please select your city" : null;
+
+  /// Validates input and triggers account registration API request.
   Future<void> _createAccount() async {
     FocusScope.of(context).unfocus();
-
     _clearMessage();
 
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     final genderError = _validateGender();
-
     if (genderError != null) {
       _showMessage(
         title: 'Missing information',
@@ -182,7 +310,6 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     final stateError = _validateState();
-
     if (stateError != null) {
       _showMessage(
         title: 'Missing information',
@@ -191,6 +318,18 @@ class _RegisterPageState extends State<RegisterPage> {
       );
       return;
     }
+
+    final cityError = _validateCity();
+    if (cityError != null) {
+      _showMessage(
+        title: 'Missing information',
+        message: cityError,
+        type: AppMessageType.warning,
+      );
+      return;
+    }
+
+    if (_selectedState == null || _selectedCity == null) return;
 
     showDialog(
       context: context,
@@ -205,9 +344,9 @@ class _RegisterPageState extends State<RegisterPage> {
         email: _emailController.text.trim(),
         phone: _phoneController.text.trim(),
         gender: _selectedGender!,
-        address: _addressController.text.trim(),
-        city: _cityController.text.trim(),
-        state: _selectedState!,
+        city: _selectedCity!.cityName,
+        state: _selectedState!.stateName,
+        stateCode: _selectedState!.stateCode,
         password: _passwordController.text,
       );
 
@@ -217,39 +356,25 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       if (!mounted) return;
-
       Navigator.pop(context);
 
       if (response.success == true && response.data != null) {
         final data = response.data!;
         final account = data.account;
 
-        // ----------------------------------------------------------
-        // SAVE USER SESSION
-        // ----------------------------------------------------------
-
         await Prefs.setBool('isLoggedIn', true);
-
         await Prefs.setString('userRole', data.role ?? 'user');
-
         await Prefs.setString('authToken', data.token ?? '');
-
         await Prefs.setString('userEmail', account?.email ?? '');
 
         final firstName = account?.firstName ?? '';
         final lastName = account?.lastName ?? '';
-
         await Prefs.setString('userName', '$firstName $lastName'.trim());
 
-        // ----------------------------------------------------------
-        // GO TO HOME
-        // ----------------------------------------------------------
-
         if (!mounted) return;
-
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const UserHome()),
+          MaterialPageRoute(builder: (_) => const UserMain()),
         );
       } else {
         _showMessage(
@@ -260,9 +385,7 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       if (!mounted) return;
-
       Navigator.pop(context);
-
       _showMessage(
         title: 'Something went wrong',
         message: _getReadableError(e),
@@ -305,7 +428,6 @@ class _RegisterPageState extends State<RegisterPage> {
                     _messageTitle != null &&
                     _messageType != null) ...[
                   const SizedBox(height: 24),
-
                   AppMessage(
                     title: _messageTitle!,
                     message: _message!,
@@ -400,60 +522,191 @@ class _RegisterPageState extends State<RegisterPage> {
                 _buildGenderOption("Female"),
                 _buildGenderOption("Other"),
                 const SizedBox(height: 20),
-                _buildLabel("Address"),
+                _buildLabel("State"),
                 const SizedBox(height: 8),
-                TextFormField(
-                  controller: _addressController,
-                  maxLines: 3,
-                  textCapitalization: TextCapitalization.sentences,
-                  validator: (value) => _validateRequired(value, "address"),
-                  decoration: const InputDecoration(
-                    hintText: "Enter your address",
-                    prefixIcon: Padding(
-                      padding: EdgeInsets.only(bottom: 35),
-                      child: Icon(Icons.location_on_outlined),
+                DropdownSearch<StateModel>(
+                  selectedItem: _selectedState,
+                  enabled: !_isLoadingStates && _states.isNotEmpty,
+                  items: (filter, loadProps) => _states,
+                  itemAsString: (StateModel state) => state.stateName,
+                  compareFn: (StateModel a, StateModel b) =>
+                      a.stateCode == b.stateCode,
+                  onSelected: (StateModel? value) {
+                    if (value == null) return;
+                    setState(() {
+                      _selectedState = value;
+                      _selectedCity = null;
+                      final cached = _citiesCache[value.stateCode];
+                      if (cached != null) {
+                        _cities = cached;
+                        _isLoadingCities = false;
+                      } else {
+                        _cities = [];
+                        _isLoadingCities = true;
+                      }
+                    });
+                    _loadCities(value.stateCode);
+                  },
+                  validator: (value) =>
+                      value == null ? "Please select your state" : null,
+                  decoratorProps: DropDownDecoratorProps(
+                    decoration: InputDecoration(
+                      hintText: _isLoadingStates
+                          ? "Loading states..."
+                          : "Select your state",
+                      prefixIcon: const Icon(Icons.map_outlined),
+                      suffixIcon: _isLoadingStates
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : null,
                     ),
+                  ),
+                  popupProps: PopupProps.modalBottomSheet(
+                    showSearchBox: true,
+                    searchDelay: Duration.zero,
+                    title: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                      child: Text(
+                        "Select State",
+                        style: AppTextStyles.body.copyWith(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    searchFieldProps: TextFieldProps(
+                      decoration: InputDecoration(
+                        hintText: "Search state...",
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    itemBuilder: (context, state, isDisabled, isSelected) {
+                      return ListTile(
+                        leading: Icon(
+                          Icons.map_outlined,
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
+                        title: Text(
+                          state.stateName,
+                          style: AppTextStyles.body.copyWith(
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(
+                                Icons.check_rounded,
+                                color: AppColors.primary,
+                              )
+                            : null,
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 20),
                 _buildLabel("City"),
                 const SizedBox(height: 8),
-                TextFormField(
-                  controller: _cityController,
-                  textCapitalization: TextCapitalization.words,
-                  validator: (value) => _validateRequired(value, "city"),
-                  decoration: const InputDecoration(
-                    hintText: "Enter your city",
-                    prefixIcon: Icon(Icons.location_city_outlined),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _buildLabel("State"),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedState,
-                  isExpanded: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return "Please select your state";
-                    }
-                    return null;
+                DropdownSearch<CityModel>(
+                  selectedItem: _selectedCity,
+                  enabled:
+                      _selectedState != null &&
+                      !_isLoadingCities &&
+                      _cities.isNotEmpty,
+                  items: (filter, loadProps) => _cities,
+                  itemAsString: (CityModel city) => city.cityName,
+                  compareFn: (CityModel a, CityModel b) => a.cityId == b.cityId,
+                  onSelected: (CityModel? value) {
+                    setState(() => _selectedCity = value);
                   },
-                  decoration: const InputDecoration(
-                    hintText: "Select your state",
-                    prefixIcon: Icon(Icons.map_outlined),
+                  validator: (value) =>
+                      value == null ? "Please select your city" : null,
+                  decoratorProps: DropDownDecoratorProps(
+                    decoration: InputDecoration(
+                      hintText: _selectedState == null
+                          ? "Select state first"
+                          : _isLoadingCities
+                          ? "Loading cities..."
+                          : _cities.isEmpty
+                          ? "No cities available"
+                          : "Select your city",
+                      prefixIcon: const Icon(Icons.location_city_outlined),
+                      suffixIcon: _isLoadingCities
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
                   ),
-                  items: _states.map((state) {
-                    return DropdownMenuItem<String>(
-                      value: state,
-                      child: Text(state),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedState = value;
-                    });
-                  },
+                  popupProps: PopupProps.modalBottomSheet(
+                    showSearchBox: true,
+                    searchDelay: Duration.zero,
+                    title: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                      child: Text(
+                        _selectedState == null
+                            ? "Select City"
+                            : "Select City in ${_selectedState!.stateName}",
+                        style: AppTextStyles.body.copyWith(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    searchFieldProps: TextFieldProps(
+                      decoration: InputDecoration(
+                        hintText: "Search city...",
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    itemBuilder: (context, city, isDisabled, isSelected) {
+                      return ListTile(
+                        leading: Icon(
+                          Icons.location_city_outlined,
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
+                        title: Text(
+                          city.cityName,
+                          style: AppTextStyles.body.copyWith(
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(
+                                Icons.check_rounded,
+                                color: AppColors.primary,
+                              )
+                            : null,
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 20),
                 _buildLabel("Password"),
@@ -467,9 +720,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
+                        setState(() => _obscurePassword = !_obscurePassword);
                       },
                       icon: Icon(
                         _obscurePassword
@@ -601,9 +852,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         activeColor: AppColors.primary,
         onChanged: (selectedValue) {
-          setState(() {
-            _selectedGender = selectedValue;
-          });
+          setState(() => _selectedGender = selectedValue);
         },
       ),
     );

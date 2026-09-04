@@ -2,9 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/auth/user_data.dart';
-import '../models/auth/user_login_model.dart';
-import '../models/auth/user_register_model.dart';
 import '../models/base_response.dart';
+import '../models/location/city_model.dart';
+import '../models/location/state_model.dart';
 
 part 'client.g.dart';
 
@@ -26,4 +26,15 @@ abstract class RestClient {
     @Query('path') String path,
     @Body() Map<String, dynamic> request,
   );
+
+  @GET('')
+  Future<BaseResponse<List<StateModel>>> getStates(
+      @Query('path') String path,
+      );
+
+  @GET('')
+  Future<BaseResponse<List<CityModel>>> getCities(
+      @Query('path') String path,
+      @Query('stateCode') String stateCode,
+      );
 }

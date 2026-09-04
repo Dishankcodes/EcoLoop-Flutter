@@ -4,9 +4,9 @@ class RegisterUserRequest {
   final String email;
   final String phone;
   final String gender;
-  final String address;
   final String city;
   final String state;
+  final String stateCode;
   final String password;
 
   final String? profilePhotoBase64;
@@ -19,9 +19,9 @@ class RegisterUserRequest {
     required this.email,
     required this.phone,
     required this.gender,
-    required this.address,
     required this.city,
     required this.state,
+    required this.stateCode,
     required this.password,
     this.profilePhotoBase64,
     this.profilePhotoFileName,
@@ -35,13 +35,16 @@ class RegisterUserRequest {
       'email': email,
       'phone': phone,
       'gender': gender,
-      'address': address,
       'city': city,
       'state': state,
+      'stateCode': stateCode,
       'password': password,
+
       if (profilePhotoBase64 != null) 'profilePhotoBase64': profilePhotoBase64,
+
       if (profilePhotoFileName != null)
         'profilePhotoFileName': profilePhotoFileName,
+
       if (profilePhotoMimeType != null)
         'profilePhotoMimeType': profilePhotoMimeType,
     };
@@ -54,9 +57,9 @@ class RegisterUserRequest {
       email: json['email']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
       gender: json['gender']?.toString() ?? '',
-      address: json['address']?.toString() ?? '',
       city: json['city']?.toString() ?? '',
       state: json['state']?.toString() ?? '',
+      stateCode: json['stateCode']?.toString() ?? '',
       password: json['password']?.toString() ?? '',
       profilePhotoBase64: json['profilePhotoBase64']?.toString(),
       profilePhotoFileName: json['profilePhotoFileName']?.toString(),

@@ -11,7 +11,7 @@ import '../../widgets/back_button.dart';
 import '../../widgets/more_menu.dart';
 import '../artist/artist_intro.dart';
 import 'register.dart';
-import 'user_home.dart';
+import 'user_main.dart';
 
 class UserLogin extends StatefulWidget {
   const UserLogin({super.key, required this.title});
@@ -164,7 +164,7 @@ class _UserLoginState extends State<UserLogin> {
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const UserHome()),
+          MaterialPageRoute(builder: (_) => const UserMain()),
         );
       } else {
         _showMessage(
