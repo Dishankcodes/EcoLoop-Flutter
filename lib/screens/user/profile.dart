@@ -1,3 +1,4 @@
+import 'package:ecoloop/screens/user/donation_history.dart';
 import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
@@ -8,6 +9,7 @@ import '../welcome_screen.dart';
 import 'donate_item.dart';
 import 'edit_profile.dart';
 import 'my_listings.dart';
+import 'notifications.dart';
 import 'orders.dart';
 import 'settings.dart';
 import 'wishlist.dart';
@@ -172,6 +174,17 @@ class Profile extends StatelessWidget {
         ),
 
         _ProfileTile(
+          icon: Icons.receipt_long_outlined,
+          title: 'Donation History',
+          subtitle: 'View your donated items and pickups',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DonationHistory()),
+            );
+          },
+        ),
+        _ProfileTile(
           icon: Icons.redeem_outlined,
           title: 'Rewards',
           subtitle: 'Check and claimed your rewards',
@@ -211,7 +224,10 @@ class Profile extends StatelessWidget {
           title: 'Notifications',
           subtitle: 'Manage your notifications',
           onTap: () {
-            _showComingSoon(context, 'Notifications');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Notifications()),
+            );
           },
         ),
 
@@ -350,9 +366,6 @@ class _ProfileSection extends StatelessWidget {
   }
 }
 
-// ============================================================
-// PROFILE TILE
-// ============================================================
 
 class _ProfileTile extends StatelessWidget {
   const _ProfileTile({

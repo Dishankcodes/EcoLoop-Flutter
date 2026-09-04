@@ -1,3 +1,4 @@
+import '../screens/user/notifications.dart';
 import 'package:ecoloop/screens/user/settings.dart';
 import 'package:flutter/material.dart';
 
@@ -16,6 +17,14 @@ class UserMoreMenu extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       onSelected: (value) {
         switch (value) {
+
+          case 'notification':
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Notifications()),
+            );
+            break;
+
           case 'wishlist':
             Navigator.push(
               context,
@@ -39,6 +48,18 @@ class UserMoreMenu extends StatelessWidget {
         }
       },
       itemBuilder: (context) => const [
+
+        PopupMenuItem<String>(
+          value: 'notification',
+          child: Row(
+            children: [
+              Icon(Icons.notifications_outlined, color: AppColors.primary),
+              SizedBox(width: 12),
+              Text('Notifications'),
+            ],
+          ),
+        ),
+
         PopupMenuItem<String>(
           value: 'wishlist',
           child: Row(
