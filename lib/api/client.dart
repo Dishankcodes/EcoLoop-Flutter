@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
-import '../models/auth/user_data.dart';
+import '../models/user/user_data.dart';
 import '../models/base_response.dart';
 import '../models/location/city_model.dart';
 import '../models/location/state_model.dart';

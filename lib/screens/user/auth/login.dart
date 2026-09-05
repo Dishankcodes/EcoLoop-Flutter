@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../api/api_manager.dart';
 import '../../../app_theme/app_colors.dart';
 import '../../../app_theme/app_text_styles.dart';
-import '../../../models/auth/user_login_model.dart';
+import '../../../models/auth/user/user_login_model.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/app_message.dart';
 import '../../../widgets/back_button.dart';
