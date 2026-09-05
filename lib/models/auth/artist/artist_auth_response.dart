@@ -1,24 +1,6 @@
 import '../../artist/artist_data.dart';
 
 class ArtistAuthResponse {
-  final bool? success;
-  final ArtistAuthData? data;
-
-  ArtistAuthResponse({this.success, this.data});
-
-  factory ArtistAuthResponse.fromJson(dynamic json) {
-    return ArtistAuthResponse(
-      success: json['success'],
-      data: json['data'] != null ? ArtistAuthData.fromJson(json['data']) : null,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {'success': success, 'data': data?.toJson()};
-  }
-}
-
-class ArtistAuthData {
   final String? token;
   final String? tokenType;
   final String? expiresAt;
@@ -26,7 +8,7 @@ class ArtistAuthData {
   final num? accountId;
   final ArtistData? account;
 
-  ArtistAuthData({
+  ArtistAuthResponse({
     this.token,
     this.tokenType,
     this.expiresAt,
@@ -35,17 +17,41 @@ class ArtistAuthData {
     this.account,
   });
 
-  factory ArtistAuthData.fromJson(dynamic json) {
-    return ArtistAuthData(
-      token: json['token'],
-      tokenType: json['tokenType'],
-      expiresAt: json['expiresAt'],
-      role: json['role'],
-      accountId: json['accountId'],
+  factory ArtistAuthResponse.fromJson(dynamic json) {
+    if (json == null) {
+      return ArtistAuthResponse();
+    }
+
+    return ArtistAuthResponse(
+      // Convert everything that should be a String safely.
+      token: json['token']?.toString(),
+
+      tokenType: json['tokenType']?.toString(),
+
+      expiresAt: json['expiresAt']?.toString(),
+
+      role: json['role']?.toString(),
+
+      // Handle accountId whether Apps Script returns
+      // an int, double, or numeric string.
+      accountId: _parseNum(json['accountId']),
+
       account: json['account'] != null
           ? ArtistData.fromJson(json['account'])
           : null,
     );
+  }
+
+  static num? _parseNum(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is num) {
+      return value;
+    }
+
+    return num.tryParse(value.toString());
   }
 
   Map<String, dynamic> toJson() {

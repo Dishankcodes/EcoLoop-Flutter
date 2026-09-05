@@ -36,23 +36,28 @@ class ArtistData {
   }
 
   ArtistData.fromJson(dynamic json) {
-    _artistId = json['artistId'];
-    _userName = json['userName'];
-    _email = json['email'];
+    if (json == null) {
+      return;
+    }
+    _artistId = _parseNum(json['artistId']);
+    _userName = json['userName']?.toString();
+    _email = json['email']?.toString();
     _phone = json['phone']?.toString();
-    _city = json['city'];
-    _state = json['state'];
-    _stateCode = json['stateCode'];
-    _profilePhotoUrl = json['profilePhotoUrl'];
-    _bio = json['bio'];
-    _skills = json['skills'];
-    _experience = json['experience'];
-    _certificationUrl = json['certificationUrl'];
-    _role = json['role'];
-    _status = json['status'];
-    _createdAt = json['createdAt'];
-    _updatedAt = json['updatedAt'];
+    _city = json['city']?.toString();
+    _state = json['state']?.toString();
+    _stateCode = json['stateCode']?.toString();
+    _profilePhotoUrl = json['profilePhotoUrl']?.toString();
+    _bio = json['bio']?.toString();
+    _skills = json['skills']?.toString();
+    _experience = json['experience']?.toString();
+    _certificationUrl = json['certificationUrl']?.toString();
+    _role = json['role']?.toString();
+    _status = json['status']?.toString();
+    _createdAt = json['createdAt']?.toString();
+    _updatedAt = json['updatedAt']?.toString();
   }
+
+  // FIELDS
 
   num? _artistId;
   String? _userName;
@@ -71,6 +76,7 @@ class ArtistData {
   String? _createdAt;
   String? _updatedAt;
 
+  // COPY WITH
   ArtistData copyWith({
     num? artistId,
     String? userName,
@@ -107,23 +113,40 @@ class ArtistData {
     updatedAt: updatedAt ?? _updatedAt,
   );
 
+  // GETTERS
   num? get artistId => _artistId;
+
   String? get userName => _userName;
+
   String? get email => _email;
+
   String? get phone => _phone;
+
   String? get city => _city;
+
   String? get state => _state;
+
   String? get stateCode => _stateCode;
+
   String? get profilePhotoUrl => _profilePhotoUrl;
+
   String? get bio => _bio;
+
   String? get skills => _skills;
+
   String? get experience => _experience;
+
   String? get certificationUrl => _certificationUrl;
+
   String? get role => _role;
+
   String? get status => _status;
+
   String? get createdAt => _createdAt;
+
   String? get updatedAt => _updatedAt;
 
+  // TO JSON
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
@@ -146,5 +169,19 @@ class ArtistData {
     map['updatedAt'] = _updatedAt;
 
     return map;
+  }
+
+  // SAFE NUMBER PARSER
+
+  static num? _parseNum(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is num) {
+      return value;
+    }
+
+    return num.tryParse(value.toString());
   }
 }
