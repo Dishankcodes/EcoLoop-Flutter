@@ -27,10 +27,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
   String? _errorMessage;
   String? _successMessage;
 
-  // ============================================================
-  // DISPOSE
-  // ============================================================
-
   @override
   void dispose() {
     _emailController.dispose();
@@ -51,9 +47,9 @@ class _ArtistLoginState extends State<ArtistLogin> {
 
     final email = _emailController.text.trim();
 
-    // ==========================================================
-    // VALIDATION
-    // ==========================================================
+    // ------------------------------------------------------------
+    // VALIDATE EMAIL
+    // ------------------------------------------------------------
 
     if (email.isEmpty) {
       setState(() {
@@ -69,10 +65,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
       return;
     }
 
-    // ==========================================================
-    // LOADING
-    // ==========================================================
-
     setState(() {
       _isLoading = true;
     });
@@ -85,9 +77,9 @@ class _ArtistLoginState extends State<ArtistLogin> {
 
       if (!mounted) return;
 
-      // ========================================================
-      // ARTIST EXISTS → OTP SENT
-      // ========================================================
+      // ==========================================================
+      // SUCCESS → OPEN OTP
+      // ==========================================================
 
       if (response.success == true && response.data?.sent == true) {
         setState(() {
@@ -109,18 +101,61 @@ class _ArtistLoginState extends State<ArtistLogin> {
         return;
       }
 
-      // ========================================================
-      // BACKEND RETURNED AN ERROR
-      // ========================================================
+      // ==========================================================
+      // NORMAL API ERROR
+      //
+      // Example:
+      // success = false
+      // error = "You don't have an artist account..."
+      //
+      // IMPORTANT:
+      // DO NOT OPEN OTP
+      // ==========================================================
+
+      final error = response.error?.trim();
 
       setState(() {
-        _errorMessage =
-            response.error ??
-            "You don't have an artist account. "
-                "Please create an account first.";
+        _errorMessage = error != null && error.isNotEmpty
+            ? error
+            : "You don't have an artist account. "
+                  "Please create an account first.";
       });
     } on DioException catch (e) {
       if (!mounted) return;
+
+      final statusCode = e.response?.statusCode;
+
+      // ==========================================================
+      // ACCOUNT DOES NOT EXIST
+      // ==========================================================
+
+      if (statusCode == 404) {
+        setState(() {
+          _errorMessage =
+              "You don't have an artist account. "
+              "Please create an account first.";
+        });
+
+        return;
+      }
+
+      // ==========================================================
+      // ACCOUNT EXISTS BUT NOT ACTIVE
+      // ==========================================================
+
+      if (statusCode == 403) {
+        setState(() {
+          _errorMessage =
+              'Your artist account is not active. '
+              'Please contact support.';
+        });
+
+        return;
+      }
+
+      // ==========================================================
+      // OTHER DIO ERROR
+      // ==========================================================
 
       setState(() {
         _errorMessage = _getDioErrorMessage(e);
@@ -155,29 +190,15 @@ class _ArtistLoginState extends State<ArtistLogin> {
   String _getDioErrorMessage(DioException error) {
     final responseData = error.response?.data;
 
-    // ----------------------------------------------------------
-    // Backend response
-    // ----------------------------------------------------------
-
     if (responseData is Map) {
       final backendError = responseData['error'];
 
-      // Example:
-      //
-      // "error": "You don't have an artist account..."
-      //
-
+      // error: "message"
       if (backendError is String && backendError.trim().isNotEmpty) {
         return backendError.trim();
       }
 
-      // Example:
-      //
-      // "error": {
-      //   "message": "..."
-      // }
-      //
-
+      // error: { message: "..." }
       if (backendError is Map) {
         final message = backendError['message']?.toString();
 
@@ -186,8 +207,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
         }
       }
 
-      // Some APIs may return message directly.
-
+      // message: "..."
       final directMessage = responseData['message']?.toString();
 
       if (directMessage != null && directMessage.trim().isNotEmpty) {
@@ -195,18 +215,18 @@ class _ArtistLoginState extends State<ArtistLogin> {
       }
     }
 
-    // ----------------------------------------------------------
-    // Network
-    // ----------------------------------------------------------
+    // ------------------------------------------------------------
+    // CONNECTION ERROR
+    // ------------------------------------------------------------
 
     if (error.type == DioExceptionType.connectionError) {
       return 'No internet connection. '
           'Please check your network.';
     }
 
-    // ----------------------------------------------------------
-    // Timeout
-    // ----------------------------------------------------------
+    // ------------------------------------------------------------
+    // TIMEOUT
+    // ------------------------------------------------------------
 
     if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.sendTimeout ||
@@ -215,13 +235,13 @@ class _ArtistLoginState extends State<ArtistLogin> {
           'Please try again.';
     }
 
-    // ----------------------------------------------------------
-    // Server error
-    // ----------------------------------------------------------
+    // ------------------------------------------------------------
+    // SERVER ERROR
+    // ------------------------------------------------------------
 
-    if (error.response?.statusCode != null) {
-      final statusCode = error.response!.statusCode!;
+    final statusCode = error.response?.statusCode;
 
+    if (statusCode != null) {
       if (statusCode == 404) {
         return "You don't have an artist account. "
             "Please create an account first.";
@@ -243,7 +263,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
   }
 
   // ============================================================
-  // GENERAL ERROR MESSAGE
+  // GENERAL ERROR
   // ============================================================
 
   String _getGeneralErrorMessage(dynamic error) {
@@ -264,13 +284,13 @@ class _ArtistLoginState extends State<ArtistLogin> {
   }
 
   // ============================================================
-  // OPEN ARTIST REGISTRATION
+  // OPEN REGISTRATION
   // ============================================================
 
   void _openRegistration() {
     if (_isLoading) return;
 
-    Navigator.push(
+    Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (_) => const ArtistRegister(title: 'Artist Registration'),
@@ -279,7 +299,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
   }
 
   // ============================================================
-  // DUMMY GOOGLE LOGIN
+  // GOOGLE BUTTON
   // ============================================================
 
   void _continueWithGoogle() {
@@ -317,16 +337,14 @@ class _ArtistLoginState extends State<ArtistLogin> {
               // ==================================================
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-
                 crossAxisAlignment: CrossAxisAlignment.center,
-
                 children: const [AppBackButton(), MoreMenu()],
               ),
 
               const SizedBox(height: 30),
 
               // ==================================================
-              // HEADER ICON
+              // ARTIST ICON
               // ==================================================
               Center(
                 child: Container(
@@ -361,9 +379,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
 
               const SizedBox(height: 10),
 
-              // ==================================================
-              // SUBTITLE
-              // ==================================================
               Center(
                 child: Text(
                   'Login to manage your artwork and products.',
@@ -381,6 +396,39 @@ class _ArtistLoginState extends State<ArtistLogin> {
                 _messageBox(message: _errorMessage!, isError: true),
 
                 const SizedBox(height: 16),
+
+                // ------------------------------------------------
+                // CREATE ACCOUNT WHEN ACCOUNT DOES NOT EXIST
+                // ------------------------------------------------
+                if (_isAccountNotFoundMessage(_errorMessage!)) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton(
+                      onPressed: _isLoading ? null : _openRegistration,
+
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+
+                        side: BorderSide(color: AppColors.primary),
+
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+
+                      child: Text(
+                        'Create Account',
+                        style: AppTextStyles.body.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+                ],
               ],
 
               // ==================================================
@@ -471,7 +519,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
               // ==================================================
               SizedBox(
                 width: double.infinity,
-
                 height: 54,
 
                 child: ElevatedButton(
@@ -497,6 +544,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
                       ? const SizedBox(
                           width: 22,
                           height: 22,
+
                           child: CircularProgressIndicator(
                             strokeWidth: 2.5,
                             color: Colors.white,
@@ -509,7 +557,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
               const SizedBox(height: 22),
 
               // ==================================================
-              // CREATE ACCOUNT
+              // REGISTER
               // ==================================================
               Center(
                 child: Wrap(
@@ -545,7 +593,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
               const SizedBox(height: 12),
 
               // ==================================================
-              // OR DIVIDER
+              // OR
               // ==================================================
               Row(
                 children: [
@@ -585,7 +633,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
               // ==================================================
               SizedBox(
                 width: double.infinity,
-
                 height: 54,
 
                 child: OutlinedButton(
@@ -609,7 +656,6 @@ class _ArtistLoginState extends State<ArtistLogin> {
                     mainAxisAlignment: MainAxisAlignment.center,
 
                     children: [
-                      // GOOGLE LETTER
                       Container(
                         width: 22,
                         height: 22,
@@ -642,7 +688,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
               const SizedBox(height: 22),
 
               // ==================================================
-              // SECURITY INFORMATION
+              // SECURITY TEXT
               // ==================================================
               Center(
                 child: Row(
@@ -674,6 +720,18 @@ class _ArtistLoginState extends State<ArtistLogin> {
         ),
       ),
     );
+  }
+
+  // ============================================================
+  // ACCOUNT NOT FOUND CHECK
+  // ============================================================
+
+  bool _isAccountNotFoundMessage(String message) {
+    final text = message.toLowerCase();
+
+    return text.contains("don't have an artist account") ||
+        text.contains('artist account not found') ||
+        text.contains('account not found');
   }
 
   // ============================================================

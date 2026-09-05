@@ -260,7 +260,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
   Future<void> _loadCities(String stateCode) async {
     if (!mounted) return;
+
     // CHECK CACHE FIRST
+
     final cachedCities = _citiesCache[stateCode];
 
     if (cachedCities != null) {
@@ -287,6 +289,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
       if (!mounted) return;
 
       // State may have changed while request was running.
+
       if (_selectedState?.stateCode != stateCode) {
         return;
       }
@@ -454,21 +457,13 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
       final registrationData = <String, dynamic>{
         'userName': _nameController.text.trim(),
-
         'email': email,
-
         'phone': _phoneController.text.trim(),
-
         'city': _selectedCity!.cityName,
-
         'state': _selectedState!.stateName,
-
         'stateCode': _selectedState!.stateCode,
-
         'bio': _bioController.text.trim(),
-
         'skills': _skillsController.text.trim(),
-
         'experience': _experienceController.text.trim(),
       };
 
@@ -546,22 +541,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                   ),
                 ),
 
-                // ------------------------------------------------
-                // MESSAGE
-                // ------------------------------------------------
-                if (_message != null &&
-                    _messageTitle != null &&
-                    _messageType != null) ...[
-                  const SizedBox(height: 24),
-
-                  AppMessage(
-                    title: _messageTitle!,
-                    message: _message!,
-                    type: _messageType!,
-                    onClose: _clearMessage,
-                  ),
-                ],
-
                 const SizedBox(height: 28),
 
                 // ------------------------------------------------
@@ -605,7 +584,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 28),
 
+                // ------------------------------------------------
                 // NAME
+                // ------------------------------------------------
                 _buildLabel('Your Name'),
 
                 const SizedBox(height: 8),
@@ -622,7 +603,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 20),
 
+                // ------------------------------------------------
                 // EMAIL
+                // ------------------------------------------------
                 _buildLabel('Email'),
 
                 const SizedBox(height: 8),
@@ -639,7 +622,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 20),
 
+                // ------------------------------------------------
                 // PHONE
+                // ------------------------------------------------
                 _buildLabel('Phone Number'),
 
                 const SizedBox(height: 8),
@@ -658,7 +643,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 20),
 
+                // ------------------------------------------------
                 // STATE
+                // ------------------------------------------------
                 _buildLabel('State'),
 
                 const SizedBox(height: 8),
@@ -764,6 +751,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                               ? AppColors.primary
                               : AppColors.textSecondary,
                         ),
+
                         title: Text(
                           state.stateName,
                           style: AppTextStyles.body.copyWith(
@@ -772,6 +760,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                                 : FontWeight.w400,
                           ),
                         ),
+
                         trailing: isSelected
                             ? const Icon(
                                 Icons.check_rounded,
@@ -785,7 +774,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 20),
 
+                // ------------------------------------------------
                 // CITY
+                // ------------------------------------------------
                 _buildLabel('City'),
 
                 const SizedBox(height: 8),
@@ -881,6 +872,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                               ? AppColors.primary
                               : AppColors.textSecondary,
                         ),
+
                         title: Text(
                           city.cityName,
                           style: AppTextStyles.body.copyWith(
@@ -889,6 +881,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                                 : FontWeight.w400,
                           ),
                         ),
+
                         trailing: isSelected
                             ? const Icon(
                                 Icons.check_rounded,
@@ -902,7 +895,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 20),
 
+                // ------------------------------------------------
                 // BIO
+                // ------------------------------------------------
                 _buildLabel('Bio'),
 
                 const SizedBox(height: 8),
@@ -922,7 +917,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 20),
 
+                // ------------------------------------------------
                 // SKILLS
+                // ------------------------------------------------
                 _buildLabel('Skills'),
 
                 const SizedBox(height: 8),
@@ -939,7 +936,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 20),
 
+                // ------------------------------------------------
                 // EXPERIENCE
+                // ------------------------------------------------
                 _buildLabel('Experience'),
 
                 const SizedBox(height: 8),
@@ -957,7 +956,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 30),
 
+                // ------------------------------------------------
                 // SEND OTP BUTTON
+                // ------------------------------------------------
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -993,24 +994,33 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                   ),
                 ),
 
+                // ------------------------------------------------
+                // MESSAGE
+                // ------------------------------------------------
+                if (_message != null &&
+                    _messageTitle != null &&
+                    _messageType != null) ...[
+                  const SizedBox(height: 16),
+
+                  AppMessage(
+                    title: _messageTitle!,
+                    message: _message!,
+                    type: _messageType!,
+                    onClose: _clearMessage,
+                  ),
+                ],
+
                 const SizedBox(height: 18),
 
+                // ------------------------------------------------
                 // LOGIN
+                // ------------------------------------------------
                 Center(
                   child: Column(
                     children: [
                       Text(
                         'Already registered?',
                         style: AppTextStyles.caption.copyWith(fontSize: 14),
-                        textAlign: TextAlign.center,
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      Text(
-                        'Your artist account is already registered. '
-                        'You can login directly.',
-                        style: AppTextStyles.caption.copyWith(fontSize: 13),
                         textAlign: TextAlign.center,
                       ),
 
@@ -1059,6 +1069,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
   }
 
   // LABEL
+
   Widget _buildLabel(String text) {
     return Text(
       text,
