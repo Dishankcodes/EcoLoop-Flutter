@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
+import '../../widgets/floating_cart_bar.dart';
 import '../../widgets/user_more_menu.dart';
 import 'add_product.dart';
 import 'donate_item.dart';
@@ -151,102 +152,111 @@ class _UserHomeState extends State<UserHome> {
     return Material(
       color: AppColors.background,
       child: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // ======================================================
-            // HEADER
-            // ======================================================
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              sliver: SliverToBoxAdapter(child: _buildHeader()),
-            ),
-
-            // ======================================================
-            // GREETING
-            // ======================================================
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
-              sliver: SliverToBoxAdapter(child: _buildGreeting()),
-            ),
-
-            // ======================================================
-            // SEARCH
-            // ======================================================
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-              sliver: SliverToBoxAdapter(child: _buildSearchBar()),
-            ),
-
-            // ======================================================
-            // QUICK ACTIONS
-            // ======================================================
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-              sliver: SliverToBoxAdapter(child: _buildQuickActions()),
-            ),
-
-            // ======================================================
-            // EXPLORE CATEGORIES HEADER
-            // ======================================================
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: _buildSectionHeader(
-                  'Explore Categories',
-                  onTap: () {
-                    _openMarketplace();
-                  },
+        child: Stack(
+          children: [
+            CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // ======================================================
+                // HEADER
+                // ======================================================
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                  sliver: SliverToBoxAdapter(child: _buildHeader()),
                 ),
-              ),
-            ),
 
-            // ======================================================
-            // CATEGORIES
-            // ======================================================
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              sliver: SliverToBoxAdapter(child: _buildCategories()),
-            ),
-
-            // ======================================================
-            // SELL BANNER
-            // ======================================================
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
-              sliver: SliverToBoxAdapter(child: _buildSellBanner()),
-            ),
-
-            // ======================================================
-            // DONATE BANNER
-            // ======================================================
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              sliver: SliverToBoxAdapter(child: _buildDonateBanner()),
-            ),
-
-            // ======================================================
-            // RECOMMENDED HEADER
-            // ======================================================
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 27, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: _buildSectionHeader(
-                  'Recommended For You',
-                  onTap: () {
-                    _openMarketplace();
-                  },
+                // ======================================================
+                // GREETING
+                // ======================================================
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+                  sliver: SliverToBoxAdapter(child: _buildGreeting()),
                 ),
-              ),
+
+                // ======================================================
+                // SEARCH
+                // ======================================================
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                  sliver: SliverToBoxAdapter(child: _buildSearchBar()),
+                ),
+
+                // ======================================================
+                // QUICK ACTIONS
+                // ======================================================
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                  sliver: SliverToBoxAdapter(child: _buildQuickActions()),
+                ),
+
+                // ======================================================
+                // EXPLORE CATEGORIES HEADER
+                // ======================================================
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: _buildSectionHeader(
+                      'Explore Categories',
+                      onTap: () {
+                        _openMarketplace();
+                      },
+                    ),
+                  ),
+                ),
+
+                // ======================================================
+                // CATEGORIES
+                // ======================================================
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  sliver: SliverToBoxAdapter(child: _buildCategories()),
+                ),
+
+                // ======================================================
+                // SELL BANNER
+                // ======================================================
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
+                  sliver: SliverToBoxAdapter(child: _buildSellBanner()),
+                ),
+
+                // ======================================================
+                // DONATE BANNER
+                // ======================================================
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  sliver: SliverToBoxAdapter(child: _buildDonateBanner()),
+                ),
+
+                // ======================================================
+                // RECOMMENDED HEADER
+                // ======================================================
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 27, 20, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: _buildSectionHeader(
+                      'Recommended For You',
+                      onTap: () {
+                        _openMarketplace();
+                      },
+                    ),
+                  ),
+                ),
+
+                // ======================================================
+                // RECOMMENDED PRODUCTS
+                // ======================================================
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 95),
+                  sliver: SliverToBoxAdapter(child: _buildProducts()),
+                ),
+              ],
             ),
 
             // ======================================================
-            // RECOMMENDED PRODUCTS
+            // FLOATING CART BAR
             // ======================================================
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 35),
-              sliver: SliverToBoxAdapter(child: _buildProducts()),
-            ),
+            const FloatingCartBar(),
           ],
         ),
       ),
@@ -329,10 +339,10 @@ class _UserHomeState extends State<UserHome> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: AppColors.accent.withOpacity(0.55)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.55)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.025),
+            color: Colors.black.withValues(alpha: 0.025),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -522,10 +532,12 @@ class _UserHomeState extends State<UserHome> {
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: AppColors.accent.withOpacity(0.55)),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.55),
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.018),
+                    color: Colors.black.withValues(alpha: 0.018),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -683,7 +695,7 @@ class _UserHomeState extends State<UserHome> {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.accent.withOpacity(0.55)),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.55)),
         ),
         child: Row(
           children: [
@@ -778,11 +790,6 @@ class _UserHomeState extends State<UserHome> {
   // ============================================================
 
   void _openMarketplace({String? search, String? category}) {
-    // ------------------------------------------------------------
-    // Clean empty values so Marketplace doesn't receive
-    // empty search/category strings.
-    // ------------------------------------------------------------
-
     final cleanSearch = search?.trim().isEmpty == true ? null : search?.trim();
 
     final cleanCategory = category?.trim().isEmpty == true
@@ -857,10 +864,10 @@ class _QuickAction extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: AppColors.accent.withOpacity(0.45)),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.45)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.018),
+              color: Colors.black.withValues(alpha: 0.018),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -940,10 +947,10 @@ class _HomeProductCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: AppColors.accent.withOpacity(0.42)),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.42)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.035),
+              color: Colors.black.withValues(alpha: 0.035),
               blurRadius: 9,
               offset: const Offset(0, 4),
             ),
@@ -1010,7 +1017,7 @@ class _HomeProductCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.92),
+                        color: Colors.white.withValues(alpha: 0.92),
                         borderRadius: BorderRadius.circular(7),
                       ),
                       child: Text(
@@ -1036,7 +1043,7 @@ class _HomeProductCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.55),
+                        color: Colors.black.withValues(alpha: 0.55),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(

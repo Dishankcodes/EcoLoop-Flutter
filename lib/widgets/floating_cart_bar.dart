@@ -1,0 +1,119 @@
+import 'package:flutter/material.dart';
+
+import '../app_theme/app_colors.dart';
+import '../screens/user/cart.dart';
+import '../services/cart_manager.dart';
+
+class FloatingCartBar extends StatelessWidget {
+  const FloatingCartBar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: CartManager.instance,
+      builder: (context, _) {
+        final items = CartManager.instance.items;
+
+        if (items.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final totalItems = items.fold<int>(
+          0,
+          (sum, item) => sum + item.quantity,
+        );
+
+        final totalPrice = items.fold<double>(
+          0,
+          (sum, item) => sum + (item.price * item.quantity),
+        );
+
+        return Positioned(
+          left: 16,
+          right: 16,
+          bottom: MediaQuery.of(context).padding.bottom + 12,
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(16),
+            color: AppColors.primary,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const Cart()),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.shopping_bag_outlined,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$totalItems ${totalItems == 1 ? 'item' : 'items'} in cart',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            '₹${totalPrice.toInt()}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'View Cart',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          color: Colors.white,
+                          size: 13,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

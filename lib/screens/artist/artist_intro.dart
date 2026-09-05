@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
 import '../../widgets/back_button.dart';
-import 'login.dart';
+import 'auth/login.dart';
 
 class ArtistIntro extends StatelessWidget {
   const ArtistIntro({super.key});

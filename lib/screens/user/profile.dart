@@ -14,6 +14,7 @@ import 'notifications.dart';
 import 'orders.dart';
 import 'settings.dart';
 import 'wishlist.dart';
+import 'cart.dart ';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});
@@ -162,6 +163,19 @@ class Profile extends StatelessWidget {
           },
         ),
 
+        _ProfileTile(
+          icon: Icons.shopping_cart_outlined,
+          title: 'My Cart',
+          subtitle: 'Items ready for checkout',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const Cart(),
+              ),
+            );
+          },
+        ),
         _ProfileTile(
           icon: Icons.volunteer_activism_outlined,
           title: 'Donate an Item',
