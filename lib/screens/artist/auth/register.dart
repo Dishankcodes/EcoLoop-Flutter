@@ -66,12 +66,16 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
   bool _isSendingOtp = false;
 
+  // INIT
+
   @override
   void initState() {
     super.initState();
 
     _loadStates();
   }
+
+  // DISPOSE
 
   @override
   void dispose() {
@@ -115,22 +119,27 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
   String _getReadableError(Object error) {
     if (error is DioException) {
+      // Connection timeout
       if (error.type == DioExceptionType.connectionTimeout) {
         return 'Connection timed out. Please check your internet connection.';
       }
 
+      // Send timeout
       if (error.type == DioExceptionType.sendTimeout) {
         return 'The request took too long to send. Please try again.';
       }
 
+      // Receive timeout
       if (error.type == DioExceptionType.receiveTimeout) {
         return 'The server took too long to respond. Please try again.';
       }
 
+      // Connection error
       if (error.type == DioExceptionType.connectionError) {
         return 'Unable to connect to the server. Please check your internet connection.';
       }
 
+      // Server response
       final responseData = error.response?.data;
 
       if (responseData is Map<String, dynamic>) {
@@ -139,13 +148,17 @@ class _ArtistRegisterState extends State<ArtistRegister> {
         if (errorData is Map<String, dynamic>) {
           final message = errorData['message'];
 
-          if (message != null && message.toString().isNotEmpty) {
+          if (message != null && message.toString().trim().isNotEmpty) {
             return message.toString();
           }
         }
 
         if (responseData['message'] != null) {
-          return responseData['message'].toString();
+          final message = responseData['message'].toString().trim();
+
+          if (message.isNotEmpty) {
+            return message;
+          }
         }
       }
 
@@ -181,8 +194,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
           _isLoadingStates = false;
         });
 
-        // We don't need to download every city's data here.
-        // Cities are loaded when the user selects a state.
+        // We don't download every city's data here.
+        // Cities are loaded only when the user selects a state.
       } else {
         setState(() {
           _isLoadingStates = false;
@@ -209,7 +222,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     }
   }
 
-  // FETCH CITIES
+  // FETCH CITIES FOR STATE
 
   Future<List<CityModel>> _fetchCitiesForState(String stateCode) {
     // CACHE
@@ -232,6 +245,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
     return future;
   }
+
+  // REQUEST CITIES
 
   Future<List<CityModel>> _requestCities(String stateCode) async {
     try {
@@ -289,7 +304,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
       if (!mounted) return;
 
       // State may have changed while request was running.
-
       if (_selectedState?.stateCode != stateCode) {
         return;
       }
@@ -336,6 +350,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     return null;
   }
 
+  // EMAIL VALIDATION
+
   String? _validateEmail(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Please enter your email';
@@ -352,6 +368,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     return null;
   }
 
+  // PHONE VALIDATION
+
   String? _validatePhone(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Please enter your phone number';
@@ -365,6 +383,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
     return null;
   }
+
+  // EXPERIENCE VALIDATION
 
   String? _validateExperience(String? value) {
     if (value == null || value.trim().isEmpty) {
@@ -389,11 +409,16 @@ class _ArtistRegisterState extends State<ArtistRegister> {
   Future<void> _createArtistAccount() async {
     FocusScope.of(context).unfocus();
 
+    // Clear previous server message
     _clearMessage();
+
+    // FORM VALIDATION
 
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
+    // STATE VALIDATION
 
     if (_selectedState == null) {
       _showMessage(
@@ -405,6 +430,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
       return;
     }
 
+    // CITY VALIDATION
+
     if (_selectedCity == null) {
       _showMessage(
         title: 'Missing information',
@@ -415,22 +442,33 @@ class _ArtistRegisterState extends State<ArtistRegister> {
       return;
     }
 
+    // PREVENT DOUBLE CLICK
+
     if (_isSendingOtp) {
       return;
     }
 
     final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
 
     setState(() {
       _isSendingOtp = true;
     });
 
     try {
-      // --------------------------------------------------------
       // SEND OTP
-      // --------------------------------------------------------
+      //
+      // IMPORTANT:
+      // We send BOTH email and phone here.
+      //
+      // Backend checks:
+      // 1. Email already exists
+      // 2. Phone already exists
+      //
+      // If either exists, response.success will be false
+      // and we DO NOT navigate to OTP.
 
-      final request = ArtistSendOtpRequest(email: email);
+      final request = ArtistSendOtpRequest(email: email, phone: phone);
 
       final response = await ApiManager().client.artistRegisterSendOtp(
         '/auth/artist/register/send-otp',
@@ -439,9 +477,14 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
       if (!mounted) return;
 
+      // SERVER REJECTED REGISTRATION
+      //
+      // IMPORTANT:
+      // return prevents opening OTP screen.
+
       if (response.success != true || response.data?.sent != true) {
         _showMessage(
-          title: 'Unable to send OTP',
+          title: 'Unable to continue',
           message:
               response.error ??
               'We could not send the verification code. Please try again.',
@@ -451,14 +494,12 @@ class _ArtistRegisterState extends State<ArtistRegister> {
         return;
       }
 
-      // --------------------------------------------------------
-      // KEEP ALL REGISTRATION DATA IN MEMORY
-      // --------------------------------------------------------
+      // KEEP REGISTRATION DATA IN MEMORY
 
       final registrationData = <String, dynamic>{
         'userName': _nameController.text.trim(),
         'email': email,
-        'phone': _phoneController.text.trim(),
+        'phone': phone,
         'city': _selectedCity!.cityName,
         'state': _selectedState!.stateName,
         'stateCode': _selectedState!.stateCode,
@@ -467,9 +508,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
         'experience': _experienceController.text.trim(),
       };
 
-      // --------------------------------------------------------
-      // OPEN OTP SCREEN
-      // --------------------------------------------------------
+      // ONLY NOW OPEN OTP SCREEN
 
       Navigator.push(
         context,
@@ -504,25 +543,26 @@ class _ArtistRegisterState extends State<ArtistRegister> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+
       body: SafeArea(
         child: Form(
           key: _formKey,
+
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
+
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+
               children: [
-                // ------------------------------------------------
-                // BACK
-                // ------------------------------------------------
+                // BACK BUTTON
                 const AppBackButton(),
 
                 const SizedBox(height: 20),
 
-                // ------------------------------------------------
                 // TITLE
-                // ------------------------------------------------
                 Center(
                   child: Text(
                     'Artist Registration',
@@ -543,17 +583,17 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 28),
 
-                // ------------------------------------------------
                 // PROFILE ICON
-                // ------------------------------------------------
                 Center(
                   child: Column(
                     children: [
                       CircleAvatar(
                         radius: 48,
+
                         backgroundColor: AppColors.primary.withValues(
                           alpha: 0.10,
                         ),
+
                         child: const Icon(
                           Icons.person_outline,
                           size: 48,
@@ -568,11 +608,16 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           // Profile photo upload
                           // will be connected later.
                         },
+
                         icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+
                         label: const Text('Add Photo'),
+
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
+
                           side: const BorderSide(color: AppColors.primary),
+
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -584,68 +629,74 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 28),
 
-                // ------------------------------------------------
                 // NAME
-                // ------------------------------------------------
                 _buildLabel('Your Name'),
 
                 const SizedBox(height: 8),
 
                 TextFormField(
                   controller: _nameController,
+
                   textCapitalization: TextCapitalization.words,
+
                   validator: (value) => _validateRequired(value, 'name'),
+
                   decoration: const InputDecoration(
                     hintText: 'Enter your name',
+
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
-                // ------------------------------------------------
                 // EMAIL
-                // ------------------------------------------------
                 _buildLabel('Email'),
 
                 const SizedBox(height: 8),
 
                 TextFormField(
                   controller: _emailController,
+
                   keyboardType: TextInputType.emailAddress,
+
                   validator: _validateEmail,
+
                   decoration: const InputDecoration(
                     hintText: 'Enter your email',
+
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
-                // ------------------------------------------------
                 // PHONE
-                // ------------------------------------------------
                 _buildLabel('Phone Number'),
 
                 const SizedBox(height: 8),
 
                 TextFormField(
                   controller: _phoneController,
+
                   keyboardType: TextInputType.phone,
+
                   maxLength: 10,
+
                   validator: _validatePhone,
+
                   decoration: const InputDecoration(
                     hintText: 'Enter your 10-digit phone number',
+
                     prefixIcon: Icon(Icons.phone_outlined),
+
                     counterText: '',
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
-                // ------------------------------------------------
                 // STATE
-                // ------------------------------------------------
                 _buildLabel('State'),
 
                 const SizedBox(height: 8),
@@ -676,9 +727,11 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                       if (cached != null) {
                         _cities = cached;
+
                         _isLoadingCities = false;
                       } else {
                         _cities = [];
+
                         _isLoadingCities = true;
                       }
                     });
@@ -705,9 +758,11 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                       suffixIcon: _isLoadingStates
                           ? const Padding(
                               padding: EdgeInsets.all(12),
+
                               child: SizedBox(
                                 width: 18,
                                 height: 18,
+
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                 ),
@@ -724,8 +779,10 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                     title: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+
                       child: Text(
                         'Select State',
+
                         style: AppTextStyles.body.copyWith(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -736,7 +793,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                     searchFieldProps: TextFieldProps(
                       decoration: InputDecoration(
                         hintText: 'Search state...',
+
                         prefixIcon: const Icon(Icons.search_rounded),
+
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -747,6 +806,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                       return ListTile(
                         leading: Icon(
                           Icons.map_outlined,
+
                           color: isSelected
                               ? AppColors.primary
                               : AppColors.textSecondary,
@@ -754,6 +814,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                         title: Text(
                           state.stateName,
+
                           style: AppTextStyles.body.copyWith(
                             fontWeight: isSelected
                                 ? FontWeight.w600
@@ -774,9 +835,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 20),
 
-                // ------------------------------------------------
                 // CITY
-                // ------------------------------------------------
                 _buildLabel('City'),
 
                 const SizedBox(height: 8),
@@ -824,9 +883,11 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                       suffixIcon: _isLoadingCities
                           ? const Padding(
                               padding: EdgeInsets.all(12),
+
                               child: SizedBox(
                                 width: 18,
                                 height: 18,
+
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                 ),
@@ -838,9 +899,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                   popupProps: PopupProps.modalBottomSheet(
                     showSearchBox: true,
-
                     searchDelay: Duration.zero,
-
                     title: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
                       child: Text(
@@ -868,6 +927,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                       return ListTile(
                         leading: Icon(
                           Icons.location_city_outlined,
+
                           color: isSelected
                               ? AppColors.primary
                               : AppColors.textSecondary,
@@ -875,13 +935,13 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                         title: Text(
                           city.cityName,
+
                           style: AppTextStyles.body.copyWith(
                             fontWeight: isSelected
                                 ? FontWeight.w600
                                 : FontWeight.w400,
                           ),
                         ),
-
                         trailing: isSelected
                             ? const Icon(
                                 Icons.check_rounded,
@@ -895,11 +955,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 20),
 
-                // ------------------------------------------------
                 // BIO
-                // ------------------------------------------------
                 _buildLabel('Bio'),
-
                 const SizedBox(height: 8),
 
                 TextFormField(
@@ -917,62 +974,72 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                 const SizedBox(height: 20),
 
-                // ------------------------------------------------
                 // SKILLS
-                // ------------------------------------------------
                 _buildLabel('Skills'),
 
                 const SizedBox(height: 8),
 
                 TextFormField(
                   controller: _skillsController,
+
                   maxLines: 2,
+
                   textCapitalization: TextCapitalization.sentences,
+
                   decoration: const InputDecoration(
                     hintText: 'Example: Painting, Pottery, Woodwork',
+
                     prefixIcon: Icon(Icons.palette_outlined),
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
-                // ------------------------------------------------
                 // EXPERIENCE
-                // ------------------------------------------------
                 _buildLabel('Experience'),
 
                 const SizedBox(height: 8),
 
                 TextFormField(
                   controller: _experienceController,
+
                   keyboardType: TextInputType.number,
+
                   validator: _validateExperience,
+
                   decoration: const InputDecoration(
                     hintText: 'Experience in years',
+
                     prefixIcon: Icon(Icons.work_outline),
+
                     suffixText: 'Years',
                   ),
                 ),
 
                 const SizedBox(height: 30),
 
-                // ------------------------------------------------
                 // SEND OTP BUTTON
-                // ------------------------------------------------
                 SizedBox(
                   width: double.infinity,
+
                   height: 56,
+
                   child: ElevatedButton(
                     onPressed: _isSendingOtp ? null : _createArtistAccount,
 
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
+
                       foregroundColor: Colors.white,
+
                       disabledBackgroundColor: AppColors.primary.withValues(
                         alpha: 0.5,
                       ),
+
                       minimumSize: Size.zero,
+
                       padding: EdgeInsets.zero,
+
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -982,6 +1049,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                         ? const SizedBox(
                             width: 24,
                             height: 24,
+
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
                               color: Colors.white,
@@ -994,9 +1062,12 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                   ),
                 ),
 
-                // ------------------------------------------------
                 // MESSAGE
-                // ------------------------------------------------
+                //
+                // IMPORTANT:
+                // This is BELOW the button.
+                //
+                // Existing email / phone errors will appear HERE.
                 if (_message != null &&
                     _messageTitle != null &&
                     _messageType != null) ...[
@@ -1004,23 +1075,37 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
                   AppMessage(
                     title: _messageTitle!,
+
                     message: _message!,
+
                     type: _messageType!,
+
                     onClose: _clearMessage,
                   ),
                 ],
 
-                const SizedBox(height: 18),
+                const SizedBox(height: 22),
 
-                // ------------------------------------------------
                 // LOGIN
-                // ------------------------------------------------
                 Center(
                   child: Column(
                     children: [
                       Text(
                         'Already registered?',
+
                         style: AppTextStyles.caption.copyWith(fontSize: 14),
+
+                        textAlign: TextAlign.center,
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      Text(
+                        'Your artist account is already registered. '
+                        'You can login directly.',
+
+                        style: AppTextStyles.caption.copyWith(fontSize: 13),
+
                         textAlign: TextAlign.center,
                       ),
 
@@ -1032,6 +1117,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                             : () {
                                 Navigator.pushReplacement(
                                   context,
+
                                   MaterialPageRoute(
                                     builder: (_) => const ArtistLogin(
                                       title: 'Artist Login',
@@ -1039,18 +1125,24 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                                   ),
                                 );
                               },
+
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 8,
                           ),
+
                           minimumSize: Size.zero,
+
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
+
                         child: Text(
                           'Login Here',
+
                           style: AppTextStyles.body.copyWith(
                             color: AppColors.primary,
+
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1073,9 +1165,12 @@ class _ArtistRegisterState extends State<ArtistRegister> {
   Widget _buildLabel(String text) {
     return Text(
       text,
+
       style: AppTextStyles.body.copyWith(
         fontSize: 14,
+
         fontWeight: FontWeight.w600,
+
         color: AppColors.textPrimary,
       ),
     );
