@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
 import 'buying_order_details.dart';
-import 'selling_order_details.dart';
+import 'selling_orders.dart';
 
 class Orders extends StatefulWidget {
   const Orders({super.key});
@@ -11,22 +11,7 @@ class Orders extends StatefulWidget {
   State<Orders> createState() => _OrdersState();
 }
 
-class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
+class _OrdersState extends State<Orders> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -35,11 +20,16 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
         child: Column(
           children: [
             _buildHeader(),
-            _buildTabs(),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [_buildBuyingOrders(), _buildSellingOrders()],
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+                children: [
+                  _buildSectionHeader(),
+                  const SizedBox(height: 12),
+                  _buildBuyingOrders(),
+                  const SizedBox(height: 24),
+                  _buildSellingHistoryCard(),
+                ],
               ),
             ),
           ],
@@ -54,8 +44,9 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
 
   Widget _buildHeader() {
     final canGoBack = Navigator.of(context).canPop();
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
       child: Row(
         children: [
           if (canGoBack) ...[
@@ -85,7 +76,7 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  'Track your purchases and sales',
+                  'Track your purchases',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -111,40 +102,42 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
   }
 
   // ============================================================
-  // TABS
+  // SECTION HEADER
   // ============================================================
 
-  Widget _buildTabs() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: AppColors.light,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: TabBar(
-        controller: _tabController,
-        dividerColor: Colors.transparent,
-        indicator: BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: Colors.white,
-        unselectedLabelColor: AppColors.textSecondary,
-        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        tabs: const [
-          Tab(
-            icon: Icon(Icons.shopping_bag_outlined, size: 19),
-            text: 'Buying',
+  Widget _buildSectionHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Your Purchases',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
           ),
-          Tab(icon: Icon(Icons.sell_outlined, size: 19), text: 'Selling'),
-        ],
-      ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.light,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Text(
+            '3 Orders',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   // ============================================================
-  // BUYING
+  // BUYING ORDERS
   // ============================================================
 
   Widget _buildBuyingOrders() {
@@ -178,160 +171,17 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
       },
     ];
 
-    return _buildOrderList(
-      orders,
-      isSelling: false,
-      emptyTitle: 'No purchases yet',
-      emptyDescription: 'Items you buy from the marketplace will appear here.',
-    );
-  }
-
-  // ============================================================
-  // SELLING
-  // ============================================================
-
-  Widget _buildSellingOrders() {
-    final orders = [
-      {
-        'product': 'Old Wooden Chair',
-        'price': '₹1,200',
-        'date': '27 Aug 2026',
-        'status': 'Completed',
-        'statusColor': AppColors.success,
-        'icon': Icons.chair_outlined,
-        'orderId': '#EL1008',
-      },
-      {
-        'product': 'Desk Lamp',
-        'price': '₹650',
-        'date': '31 Aug 2026',
-        'status': 'Processing',
-        'statusColor': Colors.orange,
-        'icon': Icons.light_outlined,
-        'orderId': '#EL1029',
-      },
-      {
-        'product': 'Canvas Art Frame',
-        'price': '₹900',
-        'date': '01 Sep 2026',
-        'status': 'New Order',
-        'statusColor': AppColors.primary,
-        'icon': Icons.image_outlined,
-        'orderId': '#EL1034',
-      },
-    ];
-
-    return Column(
-      children: [
-        _buildEarningsCard(),
-        Expanded(
-          child: _buildOrderList(
-            orders,
-            isSelling: true,
-            emptyTitle: 'No sales yet',
-            emptyDescription:
-                'Orders received for your listed items will appear here.',
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // EARNINGS
-  // ============================================================
-
-  Widget _buildEarningsCard() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primary.withOpacity(0.85)],
-        ),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Total Earnings',
-                style: TextStyle(fontSize: 13, color: Colors.white70),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  'Seller Hub',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            '₹2,750',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Divider(color: Colors.white.withOpacity(0.2)),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
-                'Completed  ₹1,200',
-                style: TextStyle(fontSize: 12, color: Colors.white70),
-              ),
-              Text(
-                'Pending  ₹1,550',
-                style: TextStyle(fontSize: 12, color: Colors.white70),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // ORDER LIST
-  // ============================================================
-
-  Widget _buildOrderList(
-    List<Map<String, dynamic>> orders, {
-    required bool isSelling,
-    required String emptyTitle,
-    required String emptyDescription,
-  }) {
     if (orders.isEmpty) {
-      return _buildEmptyState(title: emptyTitle, description: emptyDescription);
+      return _buildEmptyState();
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
-      itemCount: orders.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 14),
-      itemBuilder: (context, index) {
-        return _buildOrderCard(orders[index], isSelling: isSelling);
-      },
+    return Column(
+      children: orders.map((order) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: _buildOrderCard(order),
+        );
+      }).toList(),
     );
   }
 
@@ -339,10 +189,7 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
   // ORDER CARD
   // ============================================================
 
-  Widget _buildOrderCard(
-    Map<String, dynamic> order, {
-    required bool isSelling,
-  }) {
+  Widget _buildOrderCard(Map<String, dynamic> order) {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -360,7 +207,9 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
       child: Column(
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Product Icon
               Container(
                 height: 64,
                 width: 64,
@@ -370,7 +219,10 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
                 ),
                 child: Icon(order['icon'], size: 30, color: AppColors.primary),
               ),
+
               const SizedBox(width: 14),
+
+              // Product Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -404,6 +256,10 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
                   ],
                 ),
               ),
+
+              const SizedBox(width: 8),
+
+              // Price
               Text(
                 order['price'],
                 style: const TextStyle(
@@ -423,6 +279,7 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
 
           Row(
             children: [
+              // Status
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -433,6 +290,7 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       height: 7,
@@ -457,25 +315,25 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
 
               const Spacer(),
 
+              // View Details
               TextButton(
                 onPressed: () {
-                  if (isSelling) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => SellingOrderDetails(order: order),
-                      ),
-                    );
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => BuyingOrderDetails(order: order),
-                      ),
-                    );
-                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BuyingOrderDetails(order: order),
+                    ),
+                  );
                 },
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 4,
+                  ),
+                ),
                 child: const Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       'View Details',
@@ -497,53 +355,180 @@ class _OrdersState extends State<Orders> with SingleTickerProviderStateMixin {
   }
 
   // ============================================================
+  // SELLING HISTORY CARD
+  // ============================================================
+
+  Widget _buildSellingHistoryCard() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.accent.withOpacity(0.55)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                height: 46,
+                width: 46,
+                decoration: BoxDecoration(
+                  color: AppColors.light,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.storefront_outlined,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Selling on EcoLoop?',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Check orders received from your buyers.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SellingOrders()),
+                );
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary, width: 1.2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.sell_outlined, size: 19),
+                  SizedBox(width: 8),
+                  Text(
+                    'View Selling Order History',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  SizedBox(width: 6),
+                  Icon(Icons.arrow_forward_rounded, size: 17),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
   // EMPTY STATE
   // ============================================================
 
-  Widget _buildEmptyState({
-    required String title,
-    required String description,
-  }) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(35),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              height: 90,
-              width: 90,
-              decoration: BoxDecoration(
-                color: AppColors.light,
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: const Icon(
-                Icons.receipt_long_outlined,
-                size: 42,
-                color: AppColors.primary,
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 40),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.accent.withOpacity(0.4)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            height: 84,
+            width: 84,
+            decoration: BoxDecoration(
+              color: AppColors.light,
+              borderRadius: BorderRadius.circular(26),
+            ),
+            child: const Icon(
+              Icons.shopping_bag_outlined,
+              size: 40,
+              color: AppColors.primary,
+            ),
+          ),
+
+          const SizedBox(height: 18),
+
+          const Text(
+            'No purchases yet',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          const Text(
+            'Items you buy from the marketplace '
+            'will appear here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+          ),
+
+          const SizedBox(height: 18),
+
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-            const SizedBox(height: 20),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              description,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                height: 1.5,
-              ),
-            ),
-          ],
-        ),
+            child: const Text('Browse Marketplace'),
+          ),
+        ],
       ),
     );
   }

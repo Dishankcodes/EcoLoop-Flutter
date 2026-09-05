@@ -15,8 +15,6 @@ class CartPopup {
   static Timer? _dismissTimer;
   static GlobalKey<_CartPopupOverlayState>? _overlayKey;
 
-  // SHOW
-  
   static void show(BuildContext context, {List<Map<String, dynamic>>? items}) {
     final itemList =
         items ??
@@ -37,9 +35,7 @@ class CartPopup {
             )
             .toList();
 
-    if (itemList.isEmpty) {
-      return;
-    }
+    if (itemList.isEmpty) return;
 
     _removeCurrentImmediate();
 
@@ -100,10 +96,6 @@ class CartPopup {
     });
   }
 
-  // ============================================================
-  // ANIMATED DISMISS
-  // ============================================================
-
   static void dismiss() {
     _dismissTimer?.cancel();
     _dismissTimer = null;
@@ -125,10 +117,6 @@ class CartPopup {
     _overlayKey = null;
   }
 }
-
-// =================================================================
-// POPUP OVERLAY
-// =================================================================
 
 class _CartPopupOverlay extends StatefulWidget {
   final List<Map<String, dynamic>> items;
@@ -170,7 +158,6 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
       curve: Curves.easeOut,
     );
 
-    // Entrance slide down from top
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, -1.0), end: Offset.zero).animate(
           CurvedAnimation(
@@ -182,17 +169,13 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
     _animationController.forward();
   }
 
-  /// Triggers downward exit animation prior to overlay removal
   void dismissWithAnimation(VoidCallback onComplete) {
     if (_isExitingDown) return;
 
     setState(() {
       _isExitingDown = true;
       _slideAnimation =
-          Tween<Offset>(
-            begin: Offset.zero,
-            end: const Offset(0, 2.5), // Slide downwards past screen elements
-          ).animate(
+          Tween<Offset>(begin: Offset.zero, end: const Offset(0, 2.5)).animate(
             CurvedAnimation(
               parent: _animationController,
               curve: Curves.easeInCubic,
@@ -210,10 +193,6 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
     _animationController.dispose();
     super.dispose();
   }
-
-  // ============================================================
-  // DATA
-  // ============================================================
 
   Map<String, dynamic> get product => widget.items.last;
 
@@ -255,10 +234,6 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
     }
     return total;
   }
-
-  // ============================================================
-  // BUILD
-  // ============================================================
 
   @override
   Widget build(BuildContext context) {
