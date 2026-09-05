@@ -15,10 +15,8 @@ class CartPopup {
   static Timer? _dismissTimer;
   static GlobalKey<_CartPopupOverlayState>? _overlayKey;
 
-  // ============================================================
   // SHOW
-  // ============================================================
-
+  
   static void show(BuildContext context, {List<Map<String, dynamic>>? items}) {
     final itemList =
         items ??

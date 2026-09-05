@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
+import 'order_success.dart';
 
 class Payment extends StatefulWidget {
   const Payment({
@@ -322,9 +323,26 @@ class _PaymentState extends State<Payment> {
                     onPressed: () {
                       Navigator.pop(sheetContext);
 
-                      // UI-only for now.
-                      // Later this will navigate to OrderSuccess.
-                      Navigator.pop(context);
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => OrderSuccess(
+                            totalAmount: widget.totalAmount,
+                            itemCount: widget.items?.length ?? 1,
+                            paymentMethod: _selectedMethod == 'upi'
+                                ? 'UPI'
+                                : _selectedMethod == 'card'
+                                ? 'Credit / Debit Card'
+                                : _selectedMethod == 'netbanking'
+                                ? 'Net Banking'
+                                : _selectedMethod == 'wallet'
+                                ? 'Wallet'
+                                : 'Cash on Delivery',
+                            address: widget.address,
+                            deliveryMethod: widget.deliveryMethod,
+                          ),
+                        ),
+                      );
                     },
                     child: const Text('Done'),
                   ),
