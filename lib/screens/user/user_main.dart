@@ -1,11 +1,11 @@
-import 'package:ecoloop/screens/user/orders.dart';
 import 'package:flutter/material.dart';
 
 import '../../widgets/bottom_navigation.dart';
+import 'sell_products/add_product.dart';
+import 'buy_products/marketplace.dart';
+import 'buy_products/orders.dart';
+import 'profile/profile.dart';
 import 'user_home.dart';
-import 'marketplace.dart';
-import 'profile.dart';
-import 'add_product.dart';
 
 class UserMain extends StatefulWidget {
   const UserMain({super.key});
@@ -57,4 +57,3 @@ class _UserMainState extends State<UserMain> {
     );
   }
 }
-

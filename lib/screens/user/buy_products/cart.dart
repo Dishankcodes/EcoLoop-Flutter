@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../app_theme/app_colors.dart';
-import '../../app_theme/app_text_styles.dart';
+import '../../../app_theme/app_colors.dart';
+import '../../../app_theme/app_text_styles.dart';
 import 'checkout.dart';
 
 class Cart extends StatefulWidget {
@@ -29,7 +29,7 @@ class _CartState extends State<Cart> {
 
   // UI-only points for now.
   // This will come from GET /rewards later.
-  int _ecoPoints = 120;
+  final int _ecoPoints = 120;
 
   @override
   void initState() {
@@ -47,9 +47,6 @@ class _CartState extends State<Cart> {
     for (final item in incoming) {
       _addOrMergeItem(item);
     }
-
-    // Demo cart data is intentionally NOT added automatically.
-    // The cart remains empty until a product is added.
   }
 
   void _addOrMergeItem(Map<String, dynamic> incoming) {
@@ -266,7 +263,6 @@ class _CartState extends State<Cart> {
       return 0;
     }
 
-    // EcoLoop free delivery above ₹999.
     if (_subtotal >= 999) {
       return 0;
     }
@@ -283,7 +279,6 @@ class _CartState extends State<Cart> {
       return 0;
     }
 
-    // 10 points = ₹1.
     final possibleDiscount = _ecoPoints / 10;
 
     return possibleDiscount > _subtotal ? _subtotal : possibleDiscount;
@@ -685,12 +680,15 @@ class _CartState extends State<Cart> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                    Flexible(
+                      child: Text(
+                        title,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -830,28 +828,15 @@ class _CartState extends State<Cart> {
       return;
     }
 
-    /*
-     * Current Checkout in your project still accepts:
-     *
-     * Checkout(
-     *   product: product,
-     *   quantity: quantity,
-     * )
-     *
-     * We therefore pass the first cart item here for the current UI flow.
-     *
-     * When we update checkout.dart next, it will accept the complete
-     * cart list so multiple products can be checked out together.
-     */
-
-    final firstItem = Map<String, dynamic>.from(_cartItems.first);
-
-    final quantity = _toInt(firstItem['quantity'], fallback: 1);
-
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => Checkout(product: firstItem, quantity: quantity),
+        builder: (_) => Checkout(
+          items: List<Map<String, dynamic>>.from(_cartItems),
+          initialCouponCode: _appliedCoupon,
+          initialCouponDiscount: _couponDiscount,
+          initialEcoPointDiscount: _ecoPointDiscount,
+        ),
       ),
     );
   }
@@ -940,7 +925,7 @@ class _CartState extends State<Cart> {
             Container(
               width: 120,
               height: 120,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.light,
                 shape: BoxShape.circle,
               ),
@@ -1219,8 +1204,11 @@ class _CartState extends State<Cart> {
           const SizedBox(height: 10),
           Row(
             children: [
-              Text('Quantity', style: AppTextStyles.caption),
-              const SizedBox(width: 10),
+              const Text(
+                'Qty',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+              const SizedBox(width: 6),
               _buildQuantitySelector(
                 quantity: quantity,
                 maxQuantity: maxQuantity,
@@ -1231,21 +1219,28 @@ class _CartState extends State<Cart> {
                   _increaseQuantity(index);
                 },
               ),
-              const Spacer(),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('Item total', style: AppTextStyles.caption),
-                  const SizedBox(height: 2),
-                  Text(
-                    _formatPrice(lineTotal),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Item total',
+                      style: AppTextStyles.caption.copyWith(fontSize: 10),
                     ),
-                  ),
-                ],
+                    Text(
+                      _formatPrice(lineTotal),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1256,17 +1251,23 @@ class _CartState extends State<Cart> {
                 onPressed: () {
                   _saveForLater(index);
                 },
-                icon: const Icon(Icons.bookmark_border_rounded, size: 18),
-                label: const Text('Save for later'),
+                icon: const Icon(Icons.bookmark_border_rounded, size: 16),
+                label: const Text(
+                  'Save for later',
+                  style: TextStyle(fontSize: 12),
+                ),
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 38),
+                  minimumSize: const Size(0, 32),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
               const Spacer(),
               if (maxQuantity > 1)
-                Text('$maxQuantity available', style: AppTextStyles.caption),
+                Text(
+                  '$maxQuantity available',
+                  style: AppTextStyles.caption.copyWith(fontSize: 11),
+                ),
             ],
           ),
         ],
@@ -1285,10 +1286,10 @@ class _CartState extends State<Cart> {
     required VoidCallback onIncrease,
   }) {
     return Container(
-      height: 38,
+      height: 34,
       decoration: BoxDecoration(
         color: AppColors.background,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: Row(
@@ -1296,12 +1297,12 @@ class _CartState extends State<Cart> {
         children: [
           _quantityButton(icon: Icons.remove_rounded, onPressed: onDecrease),
           SizedBox(
-            width: 32,
+            width: 28,
             child: Center(
               child: Text(
                 '$quantity',
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
@@ -1322,13 +1323,13 @@ class _CartState extends State<Cart> {
     required VoidCallback? onPressed,
   }) {
     return SizedBox(
-      width: 34,
-      height: 36,
+      width: 28,
+      height: 34,
       child: IconButton(
         onPressed: onPressed,
         padding: EdgeInsets.zero,
-        iconSize: 17,
-        splashRadius: 18,
+        iconSize: 15,
+        splashRadius: 16,
         icon: Icon(icon),
         color: onPressed == null ? Colors.grey.shade400 : AppColors.primary,
       ),
@@ -2000,13 +2001,17 @@ class _CartState extends State<Cart> {
                   height: 50,
                   child: ElevatedButton(
                     onPressed: _proceedToCheckout,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('Proceed to Checkout'),
-                        const SizedBox(width: 7),
-                        const Icon(Icons.arrow_forward_rounded, size: 19),
-                      ],
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Proceed to Checkout'),
+                          SizedBox(width: 6),
+                          Icon(Icons.arrow_forward_rounded, size: 18),
+                        ],
+                      ),
                     ),
                   ),
                 ),

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../app_theme/app_colors.dart';
-import '../../app_theme/app_text_styles.dart';
-import 'donate_item.dart';
+import '../../../app_theme/app_colors.dart';
+import '../../../app_theme/app_text_styles.dart';
+import '../donations/donate_item.dart';
 
 class AddProduct extends StatefulWidget {
   const AddProduct({super.key});

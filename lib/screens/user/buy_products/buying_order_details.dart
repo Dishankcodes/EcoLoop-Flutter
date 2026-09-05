@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../app_theme/app_colors.dart';
+import '../../../app_theme/app_colors.dart';
+import 'order_tracking.dart';
 
 class BuyingOrderDetails extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -1094,7 +1095,10 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   // ============================================================
 
   void _trackOrder() {
-    _showMessage('Detailed tracking page will be connected next.');
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => OrderTracking(order: widget.order)),
+    );
   }
 
   void _cancelOrder() {

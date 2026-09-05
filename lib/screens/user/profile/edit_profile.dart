@@ -2,12 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 
-import '../../api/api_manager.dart';
-import '../../app_theme/app_colors.dart';
-import '../../app_theme/app_text_styles.dart';
-import '../../models/location/city_model.dart';
-import '../../models/location/state_model.dart';
-import '../../widgets/app_message.dart';
+import '../../../api/api_manager.dart';
+import '../../../app_theme/app_colors.dart';
+import '../../../app_theme/app_text_styles.dart';
+import '../../../models/location/city_model.dart';
+import '../../../models/location/state_model.dart';
+import '../../../widgets/app_message.dart';
 
 class EditProfile extends StatefulWidget {
   const EditProfile({super.key});

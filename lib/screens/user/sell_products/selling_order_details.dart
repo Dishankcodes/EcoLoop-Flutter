@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../app_theme/app_colors.dart';
+import '../../../app_theme/app_colors.dart';
+import 'selling_order_status.dart';
 
 class SellingOrderDetails extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -12,15 +13,6 @@ class SellingOrderDetails extends StatefulWidget {
 }
 
 class _SellingOrderDetailsState extends State<SellingOrderDetails> {
-  late String _status;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _status = widget.order['status']?.toString() ?? 'New Order';
-  }
-
   // ============================================================
   // DATA
   // ============================================================
@@ -34,7 +26,6 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
 
   String get orderDate => widget.order['date']?.toString() ?? '01 Sep 2026';
 
-  // Supports both old and new map structures.
   String get buyerName =>
       widget.order['buyerName']?.toString() ??
       widget.order['buyer']?.toString() ??
@@ -47,12 +38,15 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   String get deliveryMethod =>
       widget.order['deliveryMethod']?.toString() ?? 'EcoLoop Delivery';
 
+  String get currentStatus => widget.order['status']?.toString() ?? 'New Order';
+
   IconData get productIcon =>
       widget.order['icon'] as IconData? ?? Icons.inventory_2_outlined;
 
-  bool get isCompleted => _status == 'Completed';
+  bool get isCancelled => currentStatus == 'Cancelled';
 
-  bool get isCancelled => _status == 'Cancelled';
+  bool get isDelivered =>
+      currentStatus == 'Delivered' || currentStatus == 'Completed';
 
   // ============================================================
   // BUILD
@@ -63,37 +57,40 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.only(bottom: isCompleted || isCancelled ? 30 : 105),
+      body: SafeArea(
         child: Column(
           children: [
-            _buildSaleHeader(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  bottom: isCancelled || isDelivered ? 30 : 25,
+                ),
+                child: Column(
+                  children: [
+                    _buildSaleHeader(),
 
-            if (isCancelled) _buildCancelledBanner(),
+                    if (isCancelled) _buildCancelledBanner(),
 
-            if (!isCancelled) _buildStatusSection(),
+                    _buildStatusSection(),
+                    _buildProductSection(),
+                    _buildBuyerSection(),
+                    _buildDeliverySection(),
+                    _buildEarningsSection(),
+                    _buildOrderInformation(),
+                    _buildSellerProtection(),
 
-            _buildProductSection(),
+                    if (isDelivered) _buildCompletedMessage(),
 
-            _buildBuyerSection(),
+                    _buildHelpSection(),
+                  ],
+                ),
+              ),
+            ),
 
-            _buildDeliverySection(),
-
-            _buildEarningsSection(),
-
-            _buildOrderInformation(),
-
-            _buildSellerProtection(),
-
-            if (isCompleted) _buildCompletedMessage(),
-
-            _buildHelpSection(),
+            if (!isCancelled) _buildBottomBar(),
           ],
         ),
       ),
-      bottomNavigationBar: isCompleted || isCancelled
-          ? null
-          : _buildBottomBar(),
     );
   }
 
@@ -126,7 +123,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   }
 
   // ============================================================
-  // HEADER
+  // SALE HEADER
   // ============================================================
 
   Widget _buildSaleHeader() {
@@ -137,8 +134,8 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
       child: Row(
         children: [
           Container(
-            height: 52,
-            width: 52,
+            height: 54,
+            width: 54,
             decoration: BoxDecoration(
               color: AppColors.light,
               borderRadius: BorderRadius.circular(16),
@@ -146,7 +143,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
             child: const Icon(
               Icons.storefront_outlined,
               color: AppColors.primary,
-              size: 26,
+              size: 27,
             ),
           ),
 
@@ -163,13 +160,25 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                     color: AppColors.textSecondary,
                   ),
                 ),
+
                 const SizedBox(height: 4),
+
                 Text(
                   orderDate,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
+                  ),
+                ),
+
+                const SizedBox(height: 3),
+
+                Text(
+                  'Buyer: $buyerName',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -185,7 +194,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                 'Order ID',
                 style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
               ),
+
               const SizedBox(height: 4),
+
               Text(
                 orderId,
                 style: const TextStyle(
@@ -219,7 +230,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.cancel_outlined, color: AppColors.error, size: 23),
+
           SizedBox(width: 11),
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,7 +245,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                     color: AppColors.error,
                   ),
                 ),
+
                 SizedBox(height: 5),
+
                 Text(
                   'This sale is no longer active.',
                   style: TextStyle(
@@ -270,6 +285,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                   ),
                 ),
               ),
+
               _statusChip(),
             ],
           ),
@@ -280,16 +296,24 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
             icon: Icons.shopping_bag_rounded,
             title: 'Order Received',
             subtitle: 'Someone purchased your item',
+            completed: _isStepCompleted(0),
+            active: currentStatus == 'New Order',
+          ),
+
+          _timelineItem(
+            icon: Icons.check_circle_outline_rounded,
+            title: 'Order Confirmed',
+            subtitle: 'You confirmed the buyer\'s order',
             completed: _isStepCompleted(1),
-            active: _status == 'New Order',
+            active: currentStatus == 'Confirmed',
           ),
 
           _timelineItem(
             icon: Icons.inventory_2_rounded,
-            title: 'Preparing Item',
+            title: 'Item Packed',
             subtitle: 'Get the item ready for delivery',
             completed: _isStepCompleted(2),
-            active: _status == 'Processing',
+            active: currentStatus == 'Packed',
           ),
 
           _timelineItem(
@@ -297,19 +321,28 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
             title: 'Shipped',
             subtitle: 'Item has been handed over for delivery',
             completed: _isStepCompleted(3),
-            active: _status == 'Shipped',
+            active: currentStatus == 'Shipped',
+          ),
+
+          _timelineItem(
+            icon: Icons.delivery_dining_rounded,
+            title: 'Out for Delivery',
+            subtitle: 'Package is on its way to the buyer',
+            completed: _isStepCompleted(4),
+            active: currentStatus == 'Out for Delivery',
           ),
 
           _timelineItem(
             icon: Icons.check_circle_rounded,
-            title: 'Sale Completed',
+            title: 'Delivered',
             subtitle: 'Buyer received the item',
-            completed: _isStepCompleted(4),
-            active: _status == 'Completed',
+            completed: _isStepCompleted(5),
+            active:
+                currentStatus == 'Delivered' || currentStatus == 'Completed',
             isLast: true,
           ),
 
-          const SizedBox(height: 5),
+          const SizedBox(height: 7),
 
           Container(
             width: double.infinity,
@@ -322,17 +355,20 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons.local_shipping_outlined,
+                  Icons.info_outline_rounded,
                   size: 18,
                   color: AppColors.primary,
                 ),
+
                 SizedBox(width: 9),
+
                 Expanded(
                   child: Text(
-                    'Shipment tracking will be available '
-                    'here once delivery tracking is connected.',
+                    'Keep the order status updated so '
+                    'the buyer can follow the progress '
+                    'of their purchase.',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 10.5,
                       height: 1.4,
                       color: AppColors.textSecondary,
                     ),
@@ -346,22 +382,39 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  bool _isStepCompleted(int step) {
-    switch (_status) {
-      case 'New Order':
-        return step <= 1;
+  // ============================================================
+  // STATUS STEP
+  // ============================================================
 
-      case 'Processing':
-        return step <= 2;
+  bool _isStepCompleted(int step) {
+    final index = _statusIndex(currentStatus);
+
+    return index >= step;
+  }
+
+  int _statusIndex(String status) {
+    switch (status) {
+      case 'New Order':
+        return 0;
+
+      case 'Confirmed':
+        return 1;
+
+      case 'Packed':
+        return 2;
 
       case 'Shipped':
-        return step <= 3;
+        return 3;
 
+      case 'Out for Delivery':
+        return 4;
+
+      case 'Delivered':
       case 'Completed':
-        return true;
+        return 5;
 
       default:
-        return false;
+        return 0;
     }
   }
 
@@ -373,10 +426,10 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     required bool active,
     bool isLast = false,
   }) {
-    final color = completed
-        ? AppColors.success
-        : active
+    final Color color = active
         ? AppColors.primary
+        : completed
+        ? AppColors.success
         : AppColors.accent;
 
     return Row(
@@ -392,8 +445,19 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.10),
                   shape: BoxShape.circle,
+                  border: active
+                      ? Border.all(color: AppColors.primary, width: 1.5)
+                      : null,
                 ),
-                child: Icon(icon, size: 17, color: color),
+                child: Icon(
+                  active
+                      ? Icons.radio_button_checked_rounded
+                      : completed
+                      ? Icons.check_rounded
+                      : icon,
+                  size: 17,
+                  color: color,
+                ),
               ),
 
               if (!isLast)
@@ -416,23 +480,51 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: active || completed
-                        ? FontWeight.w700
-                        : FontWeight.w500,
-                    color: active || completed
-                        ? AppColors.textPrimary
-                        : AppColors.textSecondary,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: active || completed
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: active || completed
+                              ? AppColors.textPrimary
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+
+                    if (active)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.09),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'CURRENT',
+                          style: TextStyle(
+                            fontSize: 7,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
+
                 const SizedBox(height: 3),
+
                 Text(
                   subtitle,
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -444,20 +536,30 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
+  // ============================================================
+  // STATUS CHIP
+  // ============================================================
+
   Widget _statusChip() {
     Color color;
 
-    switch (_status) {
+    switch (currentStatus) {
+      case 'Delivered':
       case 'Completed':
         color = AppColors.success;
         break;
 
       case 'Shipped':
+      case 'Out for Delivery':
         color = AppColors.primary;
         break;
 
-      case 'Processing':
+      case 'Packed':
         color = Colors.orange;
+        break;
+
+      case 'Cancelled':
+        color = AppColors.error;
         break;
 
       default:
@@ -470,13 +572,26 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
         color: color.withOpacity(0.10),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
-        _status,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 6,
+            width: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+
+          const SizedBox(width: 5),
+
+          Text(
+            currentStatus,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -604,7 +719,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                         color: AppColors.textPrimary,
                       ),
                     ),
+
                     const SizedBox(height: 4),
+
                     const Text(
                       'EcoLoop Buyer',
                       style: TextStyle(
@@ -649,12 +766,16 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     return Row(
       children: [
         Icon(icon, size: 18, color: AppColors.primary),
+
         const SizedBox(width: 9),
+
         Text(
           title,
           style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
+
         const Spacer(),
+
         Flexible(
           child: Text(
             value,
@@ -697,7 +818,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                   color: AppColors.primary,
                   size: 22,
                 ),
+
                 SizedBox(width: 10),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -709,7 +832,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                           color: AppColors.textSecondary,
                         ),
                       ),
+
                       SizedBox(height: 4),
+
                       Text(
                         'Buyer delivery address',
                         style: TextStyle(
@@ -718,7 +843,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                           color: AppColors.textPrimary,
                         ),
                       ),
+
                       SizedBox(height: 4),
+
                       Text(
                         'Delivery address will be shown '
                         'here for the seller.',
@@ -792,7 +919,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                   size: 15,
                   color: AppColors.textSecondary,
                 ),
+
                 SizedBox(width: 6),
+
                 Expanded(
                   child: Text(
                     'Earnings will be credited after '
@@ -827,6 +956,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
               ),
             ),
           ),
+
           Text(
             value,
             style: TextStyle(
@@ -857,9 +987,11 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
 
           _informationRow('Order date', orderDate),
 
+          _informationRow('Quantity', quantity),
+
           _informationRow('Payment', payment),
 
-          _informationRow('Status', _status, isLast: true),
+          _informationRow('Status', currentStatus, isLast: true),
         ],
       ),
     );
@@ -881,6 +1013,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
               ),
             ),
           ),
+
           Expanded(
             child: Text(
               value,
@@ -918,7 +1051,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
               color: AppColors.primary,
               size: 24,
             ),
+
             SizedBox(width: 11),
+
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -931,10 +1066,13 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                       color: AppColors.textPrimary,
                     ),
                   ),
+
                   SizedBox(height: 5),
+
                   Text(
                     'Keep your order information and '
-                    'shipment details updated for a smooth sale.',
+                    'shipment details updated for a '
+                    'smooth and transparent sale.',
                     style: TextStyle(
                       fontSize: 11,
                       height: 1.45,
@@ -951,7 +1089,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   }
 
   // ============================================================
-  // COMPLETED MESSAGE
+  // COMPLETED
   // ============================================================
 
   Widget _buildCompletedMessage() {
@@ -970,7 +1108,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
               color: AppColors.success,
               size: 23,
             ),
+
             SizedBox(width: 10),
+
             Expanded(
               child: Text(
                 'Sale completed successfully. '
@@ -1016,7 +1156,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
               child: const Row(
                 children: [
                   Icon(Icons.support_agent_rounded, color: AppColors.primary),
+
                   SizedBox(width: 11),
+
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1029,7 +1171,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                             color: AppColors.textPrimary,
                           ),
                         ),
+
                         SizedBox(height: 3),
+
                         Text(
                           'Get help with this sale',
                           style: TextStyle(
@@ -1040,6 +1184,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                       ],
                     ),
                   ),
+
                   Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 14,
@@ -1055,7 +1200,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   }
 
   // ============================================================
-  // BOTTOM ACTIONS
+  // BOTTOM BAR
   // ============================================================
 
   Widget _buildBottomBar() {
@@ -1095,9 +1240,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
 
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: _updateStatus,
-                icon: const Icon(Icons.arrow_forward_rounded, size: 17),
-                label: Text(_nextActionLabel()),
+                onPressed: _openStatusPage,
+                icon: const Icon(Icons.sync_alt_rounded, size: 17),
+                label: const Text('Update Status'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
@@ -1115,53 +1260,26 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  String _nextActionLabel() {
-    switch (_status) {
-      case 'New Order':
-        return 'Start Processing';
+  // ============================================================
+  // OPEN STATUS PAGE
+  // ============================================================
 
-      case 'Processing':
-        return 'Mark as Shipped';
-
-      case 'Shipped':
-        return 'Complete Sale';
-
-      default:
-        return 'Update Status';
-    }
+  void _openStatusPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SellingOrderStatus(order: widget.order),
+      ),
+    ).then((_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   // ============================================================
-  // ACTIONS
+  // CONTACT BUYER
   // ============================================================
-
-  void _updateStatus() {
-    switch (_status) {
-      case 'New Order':
-        setState(() {
-          _status = 'Processing';
-        });
-
-        _showMessage('Order moved to Processing.');
-        break;
-
-      case 'Processing':
-        setState(() {
-          _status = 'Shipped';
-        });
-
-        _showMessage('Order marked as Shipped.');
-        break;
-
-      case 'Shipped':
-        setState(() {
-          _status = 'Completed';
-        });
-
-        _showMessage('Sale marked as Completed.');
-        break;
-    }
-  }
 
   void _contactBuyer() {
     _showMessage('Buyer messaging will be connected later.');
@@ -1192,6 +1310,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                   _showMessage('Sale receipt will be available later.');
                 },
               ),
+
               _bottomSheetOption(
                 icon: Icons.share_outlined,
                 title: 'Share Sale',
@@ -1201,6 +1320,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                   _showMessage('Sale sharing will be connected later.');
                 },
               ),
+
               _bottomSheetOption(
                 icon: Icons.help_outline_rounded,
                 title: 'Get Help',
@@ -1210,6 +1330,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                   _showMessage('Seller support will be connected later.');
                 },
               ),
+
               const SizedBox(height: 12),
             ],
           ),
@@ -1254,7 +1375,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     return Row(
       children: [
         Icon(icon, size: 20, color: AppColors.primary),
+
         const SizedBox(width: 8),
+
         Text(
           title,
           style: const TextStyle(
@@ -1271,12 +1394,16 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     return Row(
       children: [
         Icon(icon, size: 19, color: AppColors.primary),
+
         const SizedBox(width: 10),
+
         Text(
           title,
           style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
+
         const Spacer(),
+
         Flexible(
           child: Text(
             value,

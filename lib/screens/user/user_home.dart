@@ -4,10 +4,10 @@ import '../../app_theme/app_colors.dart';
 import '../../app_theme/app_text_styles.dart';
 import '../../widgets/floating_cart_bar.dart';
 import '../../widgets/user_more_menu.dart';
-import 'add_product.dart';
-import 'donate_item.dart';
-import 'marketplace.dart';
-import 'product_details.dart';
+import 'sell_products/add_product.dart';
+import 'donations/donate_item.dart';
+import 'buy_products/marketplace.dart';
+import 'buy_products/product_details.dart';
 
 class UserHome extends StatefulWidget {
   const UserHome({super.key});

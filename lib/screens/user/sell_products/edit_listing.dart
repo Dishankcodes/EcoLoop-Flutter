@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../app_theme/app_colors.dart';
+import '../../../app_theme/app_colors.dart';
 
 class EditListing extends StatefulWidget {
   final Map<String, dynamic> listing;

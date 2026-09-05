@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../app_theme/app_colors.dart';
-import '../../app_theme/app_text_styles.dart';
-import '../common/about_ecoloop.dart';
-import '../common/help_support.dart';
-import '../common/terms_conditions.dart';
+import '../../../app_theme/app_colors.dart';
+import '../../../app_theme/app_text_styles.dart';
+import '../../common/about_ecoloop.dart';
+import '../../common/help_support.dart';
+import '../../common/terms_conditions.dart';
 import 'edit_profile.dart';
 
 class Settings extends StatefulWidget {

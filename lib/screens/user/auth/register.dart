@@ -2,18 +2,18 @@ import 'package:dio/dio.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 
-import '../../api/api_manager.dart';
-import '../../app_theme/app_colors.dart';
-import '../../app_theme/app_text_styles.dart';
-import '../../models/auth/user_register_model.dart';
-import '../../models/location/city_model.dart';
-import '../../models/location/state_model.dart';
-import '../../shared_preferences_util.dart';
-import '../../widgets/app_message.dart';
-import '../../widgets/back_button.dart';
-import '../artist/artist_intro.dart';
+import '../../../api/api_manager.dart';
+import '../../../app_theme/app_colors.dart';
+import '../../../app_theme/app_text_styles.dart';
+import '../../../models/auth/user_register_model.dart';
+import '../../../models/location/city_model.dart';
+import '../../../models/location/state_model.dart';
+import '../../../shared_preferences_util.dart';
+import '../../../widgets/app_message.dart';
+import '../../../widgets/back_button.dart';
+import '../../artist/artist_intro.dart';
 import 'login.dart';
-import 'user_main.dart';
+import '../user_main.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key, required this.title});

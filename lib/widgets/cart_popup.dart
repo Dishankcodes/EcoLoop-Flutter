@@ -4,9 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../app_theme/app_colors.dart';
 import '../app_theme/app_text_styles.dart';
-import '../screens/user/cart.dart';
-import '../screens/user/checkout.dart';
-import '../services/cart_manager.dart';
+import '../screens/user/buy_products/cart.dart';
+import '../screens/user/buy_products/checkout.dart';
 
 class CartPopup {
   CartPopup._();
@@ -15,27 +14,11 @@ class CartPopup {
   static Timer? _dismissTimer;
   static GlobalKey<_CartPopupOverlayState>? _overlayKey;
 
-  static void show(BuildContext context, {List<Map<String, dynamic>>? items}) {
-    final itemList =
-        items ??
-        CartManager.instance.items
-            .map(
-              (item) => {
-                'id': item.id,
-                'title': item.title,
-                'price': item.price,
-                'quantity': item.quantity,
-                'condition': item.condition,
-                'category': item.category,
-                'seller': item.seller,
-                'location': item.location,
-                'image': item.image,
-                'availableQuantity': item.availableQuantity,
-              },
-            )
-            .toList();
-
-    if (itemList.isEmpty) return;
+  static void show(
+    BuildContext context, {
+    required List<Map<String, dynamic>> items,
+  }) {
+    if (items.isEmpty) return;
 
     _removeCurrentImmediate();
 
@@ -48,40 +31,20 @@ class CartPopup {
       builder: (overlayContext) {
         return _CartPopupOverlay(
           key: _overlayKey,
-          items: itemList,
+          items: items,
           onClose: dismiss,
           onViewCart: () {
             dismiss();
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => Cart(initialItems: itemList)),
+              MaterialPageRoute(builder: (_) => Cart(initialItems: items)),
             );
           },
           onCheckout: () {
             dismiss();
-            final List<Map<String, dynamic>> checkoutItems =
-                CartManager.instance.items.isNotEmpty
-                ? CartManager.instance.items
-                      .map(
-                        (item) => {
-                          'id': item.id,
-                          'title': item.title,
-                          'price': item.price,
-                          'quantity': item.quantity,
-                          'condition': item.condition,
-                          'category': item.category,
-                          'seller': item.seller,
-                          'location': item.location,
-                          'image': item.image,
-                          'availableQuantity': item.availableQuantity,
-                        },
-                      )
-                      .toList()
-                : itemList;
-
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => Checkout(items: checkoutItems)),
+              MaterialPageRoute(builder: (_) => Checkout(items: items)),
             );
           },
         );

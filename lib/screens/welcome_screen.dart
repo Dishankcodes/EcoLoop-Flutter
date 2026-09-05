@@ -5,8 +5,8 @@ import '../app_theme/app_text_styles.dart';
 import '../shared_preferences_util.dart';
 import '../widgets/more_menu.dart';
 import 'artist/artist_intro.dart';
-import 'user/login.dart';
-import 'user/register.dart';
+import 'user/auth/login.dart';
+import 'user/auth/register.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});

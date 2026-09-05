@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../app_theme/app_colors.dart';
-import '../../app_theme/app_text_styles.dart';
+import '../../../app_theme/app_colors.dart';
+import '../../../app_theme/app_text_styles.dart';
 import 'order_success.dart';
 
 class Payment extends StatefulWidget {

@@ -1,20 +1,20 @@
-import 'package:ecoloop/screens/user/donation_history.dart';
+import 'package:ecoloop/screens/user/donations/donation_history.dart';
 import 'package:flutter/material.dart';
 
-import '../../app_theme/app_colors.dart';
-import '../../app_theme/app_text_styles.dart';
-import '../../shared_preferences_util.dart';
-import '../../widgets/user_more_menu.dart';
-import '../common/help_support.dart';
-import '../welcome_screen.dart';
-import 'donate_item.dart';
+import '../../../app_theme/app_colors.dart';
+import '../../../app_theme/app_text_styles.dart';
+import '../../../shared_preferences_util.dart';
+import '../../../widgets/user_more_menu.dart';
+import '../../common/help_support.dart';
+import '../../welcome_screen.dart';
+import '../donations/donate_item.dart';
 import 'edit_profile.dart';
-import 'my_listings.dart';
+import '../sell_products/my_listings.dart';
 import 'notifications.dart';
-import 'orders.dart';
+import '../buy_products/orders.dart';
 import 'settings.dart';
-import 'wishlist.dart';
-import 'cart.dart ';
+import '../buy_products/wishlist.dart';
+import '../cart.dart ';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});

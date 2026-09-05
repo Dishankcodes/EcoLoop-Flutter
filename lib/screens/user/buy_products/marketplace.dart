@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../app_theme/app_colors.dart';
-import '../../app_theme/app_text_styles.dart';
-import '../../widgets/user_more_menu.dart';
+import '../../../app_theme/app_colors.dart';
+import '../../../app_theme/app_text_styles.dart';
+import '../../../widgets/user_more_menu.dart';
 import 'product_details.dart';
 import 'wishlist.dart';
 

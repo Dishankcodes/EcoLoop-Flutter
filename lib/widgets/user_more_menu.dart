@@ -1,10 +1,10 @@
-import '../screens/user/notifications.dart';
-import 'package:ecoloop/screens/user/settings.dart';
+import '../screens/user/profile/notifications.dart';
+import 'package:ecoloop/screens/user/profile/settings.dart';
 import 'package:flutter/material.dart';
 
 import '../app_theme/app_colors.dart';
-import '../screens/user/donate_item.dart';
-import '../screens/user/wishlist.dart';
+import '../screens/user/donations/donate_item.dart';
+import '../screens/user/buy_products/wishlist.dart';
 
 class UserMoreMenu extends StatelessWidget {
   const UserMoreMenu({super.key});

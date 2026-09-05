@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../app_theme/app_colors.dart';
+import '../../../app_theme/app_colors.dart';
 import 'buying_order_details.dart';
-import 'selling_orders.dart';
+import '../sell_products/selling_orders.dart';
 
 class Orders extends StatefulWidget {
   const Orders({super.key});
