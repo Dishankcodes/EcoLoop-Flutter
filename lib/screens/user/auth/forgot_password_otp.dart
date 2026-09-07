@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../api/api_manager.dart';
-import '../../../widgets/app_message.dart';
+import '../../../models/auth/user/forget_password/forgot_password_request.dart';
 import '../../../models/auth/user/forget_password/verify_forgot_password_otp_request.dart';
+import '../../../widgets/app_message.dart';
 import 'reset_password.dart';
 
 class ForgotPasswordOtp extends StatefulWidget {
@@ -23,11 +26,43 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
 
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
 
+  Timer? _expiryTimer;
+  Timer? _resendTimer;
+
   bool _isLoading = false;
+  bool _isResending = false;
+
+  int _remainingSeconds = 600;
+  int _resendRemainingSeconds = 30;
+
+  bool _canResend = false;
+  bool _otpExpired = false;
 
   String? _messageTitle;
   String? _message;
   AppMessageType? _messageType;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _startExpiryTimer();
+    _startResendTimer();
+
+    // Rebuild when focus changes so the active OTP box
+    // can update its border.
+    for (final node in _focusNodes) {
+      node.addListener(() {
+        if (mounted) {
+          setState(() {});
+        }
+      });
+    }
+  }
+
+  // ============================================================
+  // MESSAGE
+  // ============================================================
 
   void _showMessage({
     required String title,
@@ -53,26 +88,67 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     });
   }
 
+  // ============================================================
+  // ERROR HANDLING
+  // ============================================================
+
+  String _getReadableError(dynamic error) {
+    final message = error.toString().toLowerCase();
+
+    if (message.contains('socketexception') || message.contains('connection')) {
+      return 'Unable to connect to the server. Please check your internet connection.';
+    }
+
+    if (message.contains('timeout')) {
+      return 'The request took too long. Please try again.';
+    }
+
+    if (message.contains('expired')) {
+      return 'The OTP has expired. Please request a new OTP.';
+    }
+
+    if (message.contains('invalid') || message.contains('incorrect')) {
+      return 'The OTP you entered is incorrect. Please try again.';
+    }
+
+    return 'Something went wrong while verifying the OTP. Please try again.';
+  }
+
+  // ============================================================
+  // OTP
+  // ============================================================
+
   String get _otp {
     return _otpControllers.map((controller) => controller.text).join();
+  }
+
+  bool get _isOtpComplete {
+    return _otp.length == 6;
   }
 
   void _onOtpChanged(String value, int index) {
     _clearMessage();
 
+    if (_otpExpired) {
+      return;
+    }
+
+    // Handle pasted OTP
     if (value.length > 1) {
       final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
 
-      if (digits.isEmpty) return;
+      if (digits.isEmpty) {
+        return;
+      }
 
       for (int i = 0; i < digits.length && index + i < 6; i++) {
         _otpControllers[index + i].text = digits[i];
       }
 
-      final nextIndex = index + digits.length;
+      final lastIndex = index + digits.length - 1;
 
-      if (nextIndex < 6) {
-        _focusNodes[nextIndex].requestFocus();
+      if (lastIndex < 5) {
+        _focusNodes[lastIndex + 1].requestFocus();
       } else {
         _focusNodes[5].unfocus();
       }
@@ -81,29 +157,130 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
       return;
     }
 
+    // Move forward automatically
     if (value.isNotEmpty && index < 5) {
       _focusNodes[index + 1].requestFocus();
-    }
-
-    if (value.isEmpty && index > 0) {
-      _focusNodes[index - 1].requestFocus();
     }
 
     setState(() {});
   }
 
-  void _onOtpKeyPressed(RawKeyEvent event, int index) {
-    if (event is RawKeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.backspace &&
-        _otpControllers[index].text.isEmpty &&
-        index > 0) {
-      _focusNodes[index - 1].requestFocus();
+  void _handleBackspace(KeyEvent event, int index) {
+    if (event is! KeyDownEvent) {
+      return;
+    }
+
+    if (event.logicalKey != LogicalKeyboardKey.backspace) {
+      return;
+    }
+
+    if (_otpControllers[index].text.isEmpty && index > 0) {
       _otpControllers[index - 1].clear();
+      _focusNodes[index - 1].requestFocus();
+
+      setState(() {});
     }
   }
 
+  void _clearOtp() {
+    for (final controller in _otpControllers) {
+      controller.clear();
+    }
+
+    _focusNodes[0].requestFocus();
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  // ============================================================
+  // OTP EXPIRY TIMER
+  // ============================================================
+
+  void _startExpiryTimer() {
+    _expiryTimer?.cancel();
+
+    _remainingSeconds = 600;
+    _otpExpired = false;
+
+    _expiryTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      if (_remainingSeconds <= 0) {
+        timer.cancel();
+
+        setState(() {
+          _otpExpired = true;
+        });
+
+        return;
+      }
+
+      setState(() {
+        _remainingSeconds--;
+      });
+    });
+  }
+
+  String _formatTime(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+
+    return '${minutes.toString().padLeft(2, '0')}:'
+        '${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  // ============================================================
+  // RESEND TIMER
+  // ============================================================
+
+  void _startResendTimer() {
+    _resendTimer?.cancel();
+
+    _resendRemainingSeconds = 30;
+    _canResend = false;
+
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      if (_resendRemainingSeconds <= 0) {
+        timer.cancel();
+
+        setState(() {
+          _canResend = true;
+        });
+
+        return;
+      }
+
+      setState(() {
+        _resendRemainingSeconds--;
+      });
+    });
+  }
+
+  // ============================================================
+  // VERIFY OTP
+  // ============================================================
+
   Future<void> _verifyOtp() async {
     _clearMessage();
+
+    if (_otpExpired) {
+      _showMessage(
+        title: 'OTP expired',
+        message: 'This OTP has expired. Please request a new OTP.',
+        type: AppMessageType.error,
+      );
+      return;
+    }
 
     final otp = _otp;
 
@@ -113,6 +290,10 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
         message: 'Please enter the complete 6-digit OTP.',
         type: AppMessageType.error,
       );
+      return;
+    }
+
+    if (_isLoading) {
       return;
     }
 
@@ -144,8 +325,13 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
                 'OTP was verified, but the password reset session could not be created. Please try again.',
             type: AppMessageType.error,
           );
+
           return;
         }
+
+        // Stop timers because OTP verification succeeded.
+        _expiryTimer?.cancel();
+        _resendTimer?.cancel();
 
         Navigator.pushReplacement(
           context,
@@ -155,20 +341,50 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
           ),
         );
       } else {
+        final errorMessage = (response.error ?? '').trim().toLowerCase();
+
+        if (errorMessage.contains('expired')) {
+          setState(() {
+            _otpExpired = true;
+          });
+
+          _showMessage(
+            title: 'OTP expired',
+            message: 'This OTP has expired. Please request a new OTP.',
+            type: AppMessageType.error,
+          );
+        } else {
+          _showMessage(
+            title: 'Invalid OTP',
+            message:
+                response.error ??
+                'The OTP you entered is incorrect. Please try again.',
+            type: AppMessageType.error,
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      final errorMessage = e.toString().toLowerCase();
+
+      if (errorMessage.contains('expired')) {
+        setState(() {
+          _otpExpired = true;
+        });
+
         _showMessage(
-          title: 'Invalid OTP',
-          message:
-              response.error ??
-              'The OTP you entered is invalid or has expired. Please try again.',
+          title: 'OTP expired',
+          message: 'This OTP has expired. Please request a new OTP.',
+          type: AppMessageType.error,
+        );
+      } else {
+        _showMessage(
+          title: 'Verification failed',
+          message: _getReadableError(e),
           type: AppMessageType.error,
         );
       }
-    } catch (e) {
-      _showMessage(
-        title: 'Verification failed',
-        message: _getReadableError(e),
-        type: AppMessageType.error,
-      );
     } finally {
       if (mounted) {
         setState(() {
@@ -178,22 +394,88 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     }
   }
 
-  String _getReadableError(dynamic error) {
-    final message = error.toString().toLowerCase();
+  // ============================================================
+  // RESEND OTP
+  // ============================================================
 
-    if (message.contains('socketexception') || message.contains('connection')) {
-      return 'Unable to connect to the server. Please check your internet connection.';
+  Future<void> _resendOtp() async {
+    _clearMessage();
+
+    if (!_canResend || _isResending || _isLoading) {
+      return;
     }
 
-    if (message.contains('timeout')) {
-      return 'The request took too long. Please try again.';
-    }
+    setState(() {
+      _isResending = true;
+    });
 
-    return 'Something went wrong while verifying the OTP. Please try again.';
+    try {
+      final response = await ApiManager().client.forgotPassword(
+        '/auth/forgot-password',
+        ForgotPasswordRequest(email: widget.email, role: 'user'),
+      );
+
+      if (!mounted) return;
+
+      if (response.success == true &&
+          response.data != null &&
+          response.data!.sent == true) {
+        _clearOtp();
+
+        _startExpiryTimer();
+        _startResendTimer();
+
+        _showMessage(
+          title: 'OTP sent',
+          message: 'A new OTP has been sent to your registered email address.',
+          type: AppMessageType.success,
+        );
+      } else {
+        final errorMessage = (response.error ?? '').trim().toLowerCase();
+
+        if (errorMessage.contains('not registered')) {
+          _showMessage(
+            title: 'Email not registered',
+            message:
+                'This email is not registered. Please go back and enter your registered email address.',
+            type: AppMessageType.error,
+          );
+        } else {
+          _showMessage(
+            title: 'Unable to resend OTP',
+            message:
+                response.error ??
+                'Unable to resend OTP. Please try again later.',
+            type: AppMessageType.error,
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      _showMessage(
+        title: 'Unable to resend OTP',
+        message: _getReadableError(e),
+        type: AppMessageType.error,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResending = false;
+        });
+      }
+    }
   }
+
+  // ============================================================
+  // DISPOSE
+  // ============================================================
 
   @override
   void dispose() {
+    _expiryTimer?.cancel();
+    _resendTimer?.cancel();
+
     for (final controller in _otpControllers) {
       controller.dispose();
     }
@@ -205,66 +487,86 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     super.dispose();
   }
 
+  // ============================================================
+  // UI
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    final isComplete = _isOtpComplete;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('OTP Verification')),
+      appBar: AppBar(title: const Text('OTP Verification'), elevation: 0),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
-              // OTP ICON
+              // ==================================================
+              // ICON
+              // ==================================================
               Container(
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withOpacity(0.10),
+                  color: primaryColor.withOpacity(0.10),
                 ),
                 child: Icon(
                   Icons.mark_email_read_outlined,
-                  size: 42,
-                  color: Theme.of(context).colorScheme.primary,
+                  size: 40,
+                  color: primaryColor,
                 ),
               ),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
+              // ==================================================
+              // TITLE
+              // ==================================================
               const Text(
                 'Verify Your Email',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
 
-              const Text(
-                'We have sent a 6-digit verification code to',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, height: 1.5),
-              ),
-
-              const SizedBox(height: 6),
-
-              Text(
-                widget.email,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+              // ==================================================
+              // EMAIL TEXT
+              // ==================================================
+              Text.rich(
+                TextSpan(
+                  text: 'We have sent a 6-digit verification code to\n',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: Colors.black54,
+                  ),
+                  children: [
+                    TextSpan(
+                      text: widget.email,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
                 ),
+                textAlign: TextAlign.center,
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
 
-              // MESSAGE
-              if (_message != null)
+              // ==================================================
+              // APP MESSAGE
+              // ==================================================
+              if (_message != null) ...[
                 Align(
                   alignment: Alignment.centerLeft,
                   child: AppMessage(
@@ -274,64 +576,160 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
                     onClose: _clearMessage,
                   ),
                 ),
+                const SizedBox(height: 20),
+              ],
 
-              if (_message != null) const SizedBox(height: 20),
-
+              // ==================================================
               // OTP BOXES
+              // ==================================================
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(6, (index) {
-                  return SizedBox(
-                    width: 46,
-                    height: 58,
-                    child: RawKeyboardListener(
-                      focusNode: FocusNode(),
-                      onKey: (event) {
-                        _onOtpKeyPressed(event, index);
-                      },
-                      child: TextField(
-                        controller: _otpControllers[index],
-                        focusNode: _focusNodes[index],
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        maxLength: 1,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
+                  final isFocused = _focusNodes[index].hasFocus;
+
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: AspectRatio(
+                        aspectRatio: 0.85,
+                        child: KeyboardListener(
+                          focusNode: FocusNode(),
+                          onKeyEvent: (event) {
+                            _handleBackspace(event, index);
+                          },
+                          child: TextField(
+                            controller: _otpControllers[index],
+                            focusNode: _focusNodes[index],
+                            enabled: !_otpExpired && !_isLoading,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            maxLength: 1,
+                            textInputAction: index == 5
+                                ? TextInputAction.done
+                                : TextInputAction.next,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            decoration: InputDecoration(
+                              counterText: '',
+                              contentPadding: EdgeInsets.zero,
+                              filled: _otpExpired,
+                              fillColor: _otpExpired
+                                  ? Colors.grey.shade100
+                                  : null,
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                  width: 1.5,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(
+                                  color: primaryColor,
+                                  width: 2,
+                                ),
+                              ),
+                              disabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              _onOtpChanged(value, index);
+                            },
+                            onSubmitted: (_) {
+                              if (index == 5 && !_isLoading && !_otpExpired) {
+                                _verifyOtp();
+                              }
+                            },
+                          ),
                         ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        decoration: const InputDecoration(
-                          counterText: '',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) {
-                          _onOtpChanged(value, index);
-                        },
                       ),
                     ),
                   );
                 }),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
 
+              // ==================================================
+              // COUNTDOWN
+              // ==================================================
+              if (!_otpExpired)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.timer_outlined, size: 18, color: primaryColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      'OTP expires in ${_formatTime(_remainingSeconds)}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 18,
+                      color: Colors.red.shade600,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'OTP has expired',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+
+              const SizedBox(height: 28),
+
+              // ==================================================
               // VERIFY BUTTON
+              // ==================================================
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 50,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _verifyOtp,
+                  onPressed: (_isLoading || _otpExpired || !isComplete)
+                      ? null
+                      : _verifyOtp,
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                   child: _isLoading
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
-                      : const Text(
-                          'Verify OTP',
-                          style: TextStyle(
+                      : Text(
+                          _otpExpired ? 'OTP Expired' : 'Verify OTP',
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
@@ -341,9 +739,49 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
 
               const SizedBox(height: 18),
 
+              // ==================================================
+              // RESEND OTP
+              // ==================================================
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    "Didn't receive the OTP?",
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(width: 5),
+                  TextButton(
+                    onPressed: (_canResend && !_isResending && !_isLoading)
+                        ? _resendOtp
+                        : null,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: _isResending
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            _canResend
+                                ? 'Resend OTP'
+                                : 'Resend in ${_resendRemainingSeconds}s',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              // ==================================================
               // CHANGE EMAIL
+              // ==================================================
               TextButton(
-                onPressed: _isLoading
+                onPressed: (_isLoading || _isResending)
                     ? null
                     : () {
                         Navigator.pop(context);
@@ -353,18 +791,33 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
 
               const SizedBox(height: 10),
 
-              // OTP EXPIRY INFO
+              // ==================================================
+              // INFO
+              // ==================================================
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.info_outline, size: 16),
-                  SizedBox(width: 6),
-                  Text(
-                    'OTP is valid for 10 minutes',
-                    style: TextStyle(fontSize: 13),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: Colors.grey.shade600,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      'For security, the OTP is valid for 10 minutes.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
                   ),
                 ],
               ),
+
+              const SizedBox(height: 20),
             ],
           ),
         ),
