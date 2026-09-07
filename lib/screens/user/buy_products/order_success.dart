@@ -1,3 +1,4 @@
+import 'package:ecoloop/screens/user/buy_products/marketplace.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/app_colors.dart';
@@ -109,7 +110,10 @@ class _OrderSuccessState extends State<OrderSuccess>
   }
 
   void _continueShopping() {
-    Navigator.popUntil(context, (route) => route.isFirst);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const Marketplace()),
+    );
   }
 
   void _viewOrder() {

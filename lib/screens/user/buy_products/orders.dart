@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/app_colors.dart';
-import 'buying_order_details.dart';
 import '../sell_products/selling_orders.dart';
+import 'buying_order_details.dart';
 
 class Orders extends StatefulWidget {
   const Orders({super.key});
@@ -38,9 +38,7 @@ class _OrdersState extends State<Orders> {
     );
   }
 
-  // ============================================================
   // HEADER
-  // ============================================================
 
   Widget _buildHeader() {
     final canGoBack = Navigator.of(context).canPop();
@@ -101,9 +99,7 @@ class _OrdersState extends State<Orders> {
     );
   }
 
-  // ============================================================
   // SECTION HEADER
-  // ============================================================
 
   Widget _buildSectionHeader() {
     return Row(
@@ -136,9 +132,7 @@ class _OrdersState extends State<Orders> {
     );
   }
 
-  // ============================================================
   // BUYING ORDERS
-  // ============================================================
 
   Widget _buildBuyingOrders() {
     final orders = [
@@ -185,9 +179,7 @@ class _OrdersState extends State<Orders> {
     );
   }
 
-  // ============================================================
   // ORDER CARD
-  // ============================================================
 
   Widget _buildOrderCard(Map<String, dynamic> order) {
     return Container(
@@ -354,9 +346,7 @@ class _OrdersState extends State<Orders> {
     );
   }
 
-  // ============================================================
   // SELLING HISTORY CARD
-  // ============================================================
 
   Widget _buildSellingHistoryCard() {
     return Container(
@@ -460,9 +450,7 @@ class _OrdersState extends State<Orders> {
     );
   }
 
-  // ============================================================
   // EMPTY STATE
-  // ============================================================
 
   Widget _buildEmptyState() {
     return Container(

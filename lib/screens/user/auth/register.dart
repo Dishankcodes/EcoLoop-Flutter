@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../api/api_manager.dart';
 import '../../../app_theme/app_colors.dart';
@@ -12,8 +13,8 @@ import '../../../shared_preferences_util.dart';
 import '../../../widgets/app_message.dart';
 import '../../../widgets/back_button.dart';
 import '../../artist/artist_intro.dart';
-import 'login.dart';
 import '../user_main.dart';
+import 'login.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key, required this.title});
@@ -100,41 +101,52 @@ class _RegisterPageState extends State<RegisterPage> {
       if (error.type == DioExceptionType.connectionTimeout) {
         return 'Connection timed out. Please check your internet connection.';
       }
+
       if (error.type == DioExceptionType.sendTimeout) {
         return 'The request took too long to send. Please try again.';
       }
+
       if (error.type == DioExceptionType.receiveTimeout) {
         return 'The server took too long to respond. Please try again.';
       }
+
       if (error.type == DioExceptionType.connectionError) {
         return 'Unable to connect to the server. Please check your internet connection.';
       }
 
       final responseData = error.response?.data;
+
       if (responseData is Map<String, dynamic>) {
         final errorData = responseData['error'];
+
         if (errorData is Map<String, dynamic>) {
           final message = errorData['message'];
+
           if (message != null && message.toString().isNotEmpty) {
             return message.toString();
           }
         }
+
         if (responseData['message'] != null) {
           return responseData['message'].toString();
         }
       }
+
       return 'Unable to complete registration. Please try again.';
     }
+
     return 'Something went wrong. Please try again.';
   }
 
   /// Loads available states from the backend and initiates background prefetching for cities.
   Future<void> _loadStates() async {
     if (!mounted) return;
+
     setState(() => _isLoadingStates = true);
 
     try {
       final response = await ApiManager().client.getStates('/locations/states');
+
       if (!mounted) return;
 
       if (response.success == true && response.data != null) {
@@ -142,9 +154,11 @@ class _RegisterPageState extends State<RegisterPage> {
           _states = response.data!;
           _isLoadingStates = false;
         });
+
         _prefetchCitiesInBackground();
       } else {
         setState(() => _isLoadingStates = false);
+
         _showMessage(
           title: 'Unable to load states',
           message: response.error ?? 'Please try again.',
@@ -153,7 +167,9 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       if (!mounted) return;
+
       setState(() => _isLoadingStates = false);
+
       _showMessage(
         title: 'Unable to load states',
         message: _getReadableError(e),
@@ -167,12 +183,14 @@ class _RegisterPageState extends State<RegisterPage> {
     if (_citiesCache.containsKey(stateCode)) {
       return Future.value(_citiesCache[stateCode]!);
     }
+
     if (_cityLoadingFutures.containsKey(stateCode)) {
       return _cityLoadingFutures[stateCode]!;
     }
 
     final future = _requestCities(stateCode);
     _cityLoadingFutures[stateCode] = future;
+
     return future;
   }
 
@@ -189,6 +207,7 @@ class _RegisterPageState extends State<RegisterPage> {
         _citiesCache[stateCode] = cities;
         return cities;
       }
+
       return [];
     } catch (_) {
       return [];
@@ -200,10 +219,12 @@ class _RegisterPageState extends State<RegisterPage> {
   /// Prefetches city data in small batches to optimize performance without overloading network requests.
   Future<void> _prefetchCitiesInBackground() async {
     if (_states.isEmpty) return;
+
     const batchSize = 4;
 
     for (int i = 0; i < _states.length; i += batchSize) {
       if (!mounted) return;
+
       final batch = _states.skip(i).take(batchSize);
 
       await Future.wait(
@@ -212,6 +233,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (mounted && _selectedState != null) {
         final selectedCode = _selectedState!.stateCode;
+
         if (_citiesCache.containsKey(selectedCode)) {
           setState(() {
             _cities = _citiesCache[selectedCode]!;
@@ -227,6 +249,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!mounted) return;
 
     final cachedCities = _citiesCache[stateCode];
+
     if (cachedCities != null) {
       setState(() {
         _cities = cachedCities;
@@ -244,6 +267,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final cities = await _fetchCitiesForState(stateCode);
+
       if (!mounted) return;
 
       if (_selectedState?.stateCode != stateCode) return;
@@ -258,6 +282,7 @@ class _RegisterPageState extends State<RegisterPage> {
           _cities = [];
           _isLoadingCities = false;
         });
+
         _showMessage(
           title: 'No cities available',
           message: 'No cities are currently available for this state.',
@@ -266,7 +291,9 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       if (!mounted) return;
+
       setState(() => _isLoadingCities = false);
+
       _showMessage(
         title: 'Unable to load cities',
         message: _getReadableError(e),
@@ -280,6 +307,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (value == null || value.trim().isEmpty) {
       return "Please enter your $fieldName";
     }
+
     return null;
   }
 
@@ -300,6 +328,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_formKey.currentState!.validate()) return;
 
     final genderError = _validateGender();
+
     if (genderError != null) {
       _showMessage(
         title: 'Missing information',
@@ -310,6 +339,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     final stateError = _validateState();
+
     if (stateError != null) {
       _showMessage(
         title: 'Missing information',
@@ -320,6 +350,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     final cityError = _validateCity();
+
     if (cityError != null) {
       _showMessage(
         title: 'Missing information',
@@ -356,6 +387,7 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       if (!mounted) return;
+
       Navigator.pop(context);
 
       if (response.success == true && response.data != null) {
@@ -369,23 +401,67 @@ class _RegisterPageState extends State<RegisterPage> {
 
         final firstName = account?.firstName ?? '';
         final lastName = account?.lastName ?? '';
+
         await Prefs.setString('userName', '$firstName $lastName'.trim());
 
         if (!mounted) return;
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const UserMain()),
         );
       } else {
+        // Only message handling added here.
+        // No OTP or flow changes.
+        final errorMessage = (response.error ?? '').trim().toLowerCase();
+
+        String title = 'Registration failed';
+        String message;
+
+        // Both email and phone already exist.
+        if (errorMessage.contains('email') &&
+            errorMessage.contains('phone') &&
+            (errorMessage.contains('already') ||
+                errorMessage.contains('exist') ||
+                errorMessage.contains('registered'))) {
+          title = 'Account already exists';
+          message =
+              'This email or phone number is already registered. Please login instead.';
+        }
+        // Email already exists.
+        else if (errorMessage.contains('email') &&
+            (errorMessage.contains('already') ||
+                errorMessage.contains('exist') ||
+                errorMessage.contains('registered'))) {
+          title = 'Email already registered';
+          message =
+              'This email is already registered. Please use another email or login.';
+        }
+        // Phone already exists.
+        else if (errorMessage.contains('phone') &&
+            (errorMessage.contains('already') ||
+                errorMessage.contains('exist') ||
+                errorMessage.contains('registered'))) {
+          title = 'Phone number already registered';
+          message =
+              'This phone number is already registered. Please use another number or login.';
+        }
+        // Other backend errors remain unchanged.
+        else {
+          message = response.error ?? 'Unable to create your account.';
+        }
+
         _showMessage(
-          title: 'Registration failed',
-          message: response.error ?? 'Unable to create your account.',
+          title: title,
+          message: message,
           type: AppMessageType.error,
         );
       }
     } catch (e) {
       if (!mounted) return;
+
       Navigator.pop(context);
+
       _showMessage(
         title: 'Something went wrong',
         message: _getReadableError(e),
@@ -409,6 +485,7 @@ class _RegisterPageState extends State<RegisterPage> {
               children: [
                 const AppBackButton(),
                 const SizedBox(height: 16),
+
                 Center(
                   child: Text(
                     "Create Account",
@@ -416,7 +493,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     textAlign: TextAlign.center,
                   ),
                 ),
+
                 const SizedBox(height: 8),
+
                 Center(
                   child: Text(
                     "Join the EcoLoop community",
@@ -424,6 +503,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     textAlign: TextAlign.center,
                   ),
                 ),
+
                 if (_message != null &&
                     _messageTitle != null &&
                     _messageType != null) ...[
@@ -435,7 +515,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     onClose: _clearMessage,
                   ),
                 ],
+
                 const SizedBox(height: 28),
+
                 Center(
                   child: Column(
                     children: [
@@ -450,7 +532,9 @@ class _RegisterPageState extends State<RegisterPage> {
                           color: AppColors.primary,
                         ),
                       ),
+
                       const SizedBox(height: 10),
+
                       OutlinedButton.icon(
                         onPressed: () {},
                         icon: const Icon(Icons.add_a_photo_outlined, size: 18),
@@ -466,9 +550,12 @@ class _RegisterPageState extends State<RegisterPage> {
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 28),
+
                 _buildLabel("First Name"),
                 const SizedBox(height: 8),
+
                 TextFormField(
                   controller: _firstNameController,
                   textCapitalization: TextCapitalization.words,
@@ -478,9 +565,12 @@ class _RegisterPageState extends State<RegisterPage> {
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                 ),
+
                 const SizedBox(height: 20),
+
                 _buildLabel("Last Name"),
                 const SizedBox(height: 8),
+
                 TextFormField(
                   controller: _lastNameController,
                   textCapitalization: TextCapitalization.words,
@@ -490,9 +580,12 @@ class _RegisterPageState extends State<RegisterPage> {
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                 ),
+
                 const SizedBox(height: 20),
+
                 _buildLabel("Email"),
                 const SizedBox(height: 8),
+
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -502,28 +595,52 @@ class _RegisterPageState extends State<RegisterPage> {
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
                 ),
+
                 const SizedBox(height: 20),
+
                 _buildLabel("Phone Number"),
                 const SizedBox(height: 8),
+
                 TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
-                  validator: (value) =>
-                      _validateRequired(value, "phone number"),
+                  maxLength: 10,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return "Please enter your phone number";
+                    }
+
+                    if (value.trim().length != 10) {
+                      return "Phone number must be exactly 10 digits";
+                    }
+
+                    return null;
+                  },
                   decoration: const InputDecoration(
                     hintText: "Enter your phone number",
                     prefixIcon: Icon(Icons.phone_outlined),
+                    counterText: "",
                   ),
                 ),
+
                 const SizedBox(height: 24),
+
                 _buildLabel("Gender"),
                 const SizedBox(height: 6),
+
                 _buildGenderOption("Male"),
                 _buildGenderOption("Female"),
                 _buildGenderOption("Other"),
+
                 const SizedBox(height: 20),
+
                 _buildLabel("State"),
                 const SizedBox(height: 8),
+
                 DropdownSearch<StateModel>(
                   selectedItem: _selectedState,
                   enabled: !_isLoadingStates && _states.isNotEmpty,
@@ -533,10 +650,13 @@ class _RegisterPageState extends State<RegisterPage> {
                       a.stateCode == b.stateCode,
                   onSelected: (StateModel? value) {
                     if (value == null) return;
+
                     setState(() {
                       _selectedState = value;
                       _selectedCity = null;
+
                       final cached = _citiesCache[value.stateCode];
+
                       if (cached != null) {
                         _cities = cached;
                         _isLoadingCities = false;
@@ -545,6 +665,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         _isLoadingCities = true;
                       }
                     });
+
                     _loadCities(value.stateCode);
                   },
                   validator: (value) =>
@@ -617,9 +738,12 @@ class _RegisterPageState extends State<RegisterPage> {
                     },
                   ),
                 ),
+
                 const SizedBox(height: 20),
+
                 _buildLabel("City"),
                 const SizedBox(height: 8),
+
                 DropdownSearch<CityModel>(
                   selectedItem: _selectedCity,
                   enabled:
@@ -708,9 +832,12 @@ class _RegisterPageState extends State<RegisterPage> {
                     },
                   ),
                 ),
+
                 const SizedBox(height: 20),
+
                 _buildLabel("Password"),
                 const SizedBox(height: 8),
+
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
@@ -720,7 +847,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
                       },
                       icon: Icon(
                         _obscurePassword
@@ -730,7 +859,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 30),
+
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -748,7 +879,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     child: Text("Create Account", style: AppTextStyles.button),
                   ),
                 ),
+
                 const SizedBox(height: 18),
+
                 Center(
                   child: Wrap(
                     alignment: WrapAlignment.center,
@@ -787,7 +920,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 8),
+
                 Center(
                   child: TextButton(
                     onPressed: () {
@@ -814,6 +949,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 12),
               ],
             ),
