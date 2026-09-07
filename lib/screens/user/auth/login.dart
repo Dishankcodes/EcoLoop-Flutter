@@ -11,6 +11,7 @@ import '../../../widgets/back_button.dart';
 import '../../../widgets/more_menu.dart';
 import '../../artist/artist_intro.dart';
 import '../user_main.dart';
+import 'forgot_password.dart';
 import 'register.dart';
 
 class UserLogin extends StatefulWidget {
@@ -312,7 +313,7 @@ class _UserLoginState extends State<UserLogin> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const ForgotPasswordPage(),
+                              builder: (_) => const ForgotPassword(),
                             ),
                           );
                         },
