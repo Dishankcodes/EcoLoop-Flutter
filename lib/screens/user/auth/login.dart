@@ -10,8 +10,8 @@ import '../../../widgets/app_message.dart';
 import '../../../widgets/back_button.dart';
 import '../../../widgets/more_menu.dart';
 import '../../artist/artist_intro.dart';
-import 'register.dart';
 import '../user_main.dart';
+import 'register.dart';
 
 class UserLogin extends StatefulWidget {
   const UserLogin({super.key, required this.title});
@@ -167,9 +167,32 @@ class _UserLoginState extends State<UserLogin> {
           MaterialPageRoute(builder: (_) => const UserMain()),
         );
       } else {
+        final errorMessage = (response.error ?? '').trim().toLowerCase();
+
+        String title = 'Login failed';
+        String message;
+
+        if (errorMessage.contains('account not found') ||
+            errorMessage.contains('create an account')) {
+          title = 'Account not found';
+          message =
+              'You don\'t have an account yet. Please create an account first.';
+        } else if (errorMessage.contains('incorrect password') ||
+            errorMessage.contains('wrong password')) {
+          title = 'Incorrect password';
+          message = 'The password you entered is incorrect. Please try again.';
+        } else if (errorMessage.contains('not active')) {
+          title = 'Account not active';
+          message =
+              response.error ??
+              'Your account is not active. Please contact support.';
+        } else {
+          message = response.error ?? 'Unable to login. Please try again.';
+        }
+
         _showMessage(
-          title: 'Login failed',
-          message: response.error ?? 'Invalid login credentials.',
+          title: title,
+          message: message,
           type: AppMessageType.error,
         );
       }
