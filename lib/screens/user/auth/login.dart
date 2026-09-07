@@ -308,7 +308,14 @@ class _UserLoginState extends State<UserLogin> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ForgotPasswordPage(),
+                            ),
+                          );
+                        },
                         child: Text(
                           "Forgot Password?",
                           style: AppTextStyles.body.copyWith(
