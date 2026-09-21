@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/app_colors.dart';
 import '../../../app_theme/app_text_styles.dart';
+import '../profile/add_address.dart';
 import 'marketplace.dart';
 import 'payment.dart';
 
@@ -38,15 +39,11 @@ class Checkout extends StatefulWidget {
 }
 
 class _CheckoutState extends State<Checkout> {
-  // ===========================================================================
   // CHECKOUT ITEMS
-  // ===========================================================================
 
   final List<Map<String, dynamic>> _items = [];
 
-  // ===========================================================================
   // ADDRESS
-  // ===========================================================================
 
   final List<Map<String, dynamic>> _addresses = [
     {
@@ -77,35 +74,25 @@ class _CheckoutState extends State<Checkout> {
 
   String _selectedAddressId = 'home';
 
-  // ===========================================================================
   // DELIVERY
-  // ===========================================================================
 
   String _selectedDelivery = 'standard';
 
-  // ===========================================================================
   // COUPON
-  // ===========================================================================
 
   String? _couponCode;
   double _couponDiscount = 0;
 
-  // ===========================================================================
   // ECO POINTS
-  // ===========================================================================
 
   final int _ecoPoints = 120;
   bool _useEcoPoints = false;
 
-  // ===========================================================================
   // UI STATE
-  // ===========================================================================
 
   bool _isProcessing = false;
 
-  // ===========================================================================
   // INIT
-  // ===========================================================================
 
   @override
   void initState() {
@@ -160,9 +147,7 @@ class _CheckoutState extends State<Checkout> {
     return copy;
   }
 
-  // ===========================================================================
   // HELPERS
-  // ===========================================================================
 
   int _toInt(dynamic value, {int fallback = 0}) {
     if (value is int) {
@@ -274,9 +259,7 @@ class _CheckoutState extends State<Checkout> {
     return (item['category'] ?? 'Recycled').toString();
   }
 
-  // ===========================================================================
   // TOTALS
-  // ===========================================================================
 
   int get _totalQuantity {
     var total = 0;
@@ -345,9 +328,7 @@ class _CheckoutState extends State<Checkout> {
     return _couponDiscount + _ecoPointDiscount;
   }
 
-  // ===========================================================================
   // SELECTED ADDRESS
-  // ===========================================================================
 
   Map<String, dynamic>? get _selectedAddress {
     for (final address in _addresses) {
@@ -359,9 +340,7 @@ class _CheckoutState extends State<Checkout> {
     return null;
   }
 
-  // ===========================================================================
   // ADDRESS SELECTOR
-  // ===========================================================================
 
   void _openAddressSelector() {
     showModalBottomSheet(
@@ -398,7 +377,7 @@ class _CheckoutState extends State<Checkout> {
                             _openAddAddress();
                           },
                           icon: const Icon(Icons.add_rounded, size: 18),
-                          label: const Text('Add New'),
+                          label: const Text('New Address'),
                         ),
                       ],
                     ),
@@ -531,11 +510,7 @@ class _CheckoutState extends State<Checkout> {
                   const SizedBox(height: 3),
 
                   Text(
-                    '${address['address']}, '
-                    '${address['area']}, '
-                    '${address['city']}, '
-                    '${address['state']} - '
-                    '${address['pincode']}',
+                    _formatCheckoutAddress(address),
                     style: AppTextStyles.caption.copyWith(height: 1.45),
                   ),
 
@@ -563,270 +538,88 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // ADD ADDRESS
-  // ===========================================================================
+  //
+  // Checkout uses the same AddAddress page used by My Addresses.
+  // AddAddress returns the newly entered address as a Map, so the checkout
+  // page can immediately select it for this order.
+  //
 
-  void _openAddAddress() {
-    final nameController = TextEditingController();
-
-    final phoneController = TextEditingController();
-
-    final addressController = TextEditingController();
-
-    final areaController = TextEditingController();
-
-    final cityController = TextEditingController();
-
-    final stateController = TextEditingController();
-
-    final pincodeController = TextEditingController();
-
-    String selectedLabel = 'Home';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-      ),
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                12,
-                20,
-                MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _sheetHandle(),
-
-                    const SizedBox(height: 18),
-
-                    Text('Add New Address', style: AppTextStyles.title),
-
-                    const SizedBox(height: 5),
-
-                    Text(
-                      'Enter the address where your '
-                      'EcoLoop order should be delivered.',
-                      style: AppTextStyles.body,
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    Row(
-                      children: [
-                        _addressLabelChip(
-                          label: 'Home',
-                          icon: Icons.home_outlined,
-                          selected: selectedLabel == 'Home',
-                          onTap: () {
-                            setSheetState(() {
-                              selectedLabel = 'Home';
-                            });
-                          },
-                        ),
-                        const SizedBox(width: 10),
-                        _addressLabelChip(
-                          label: 'Work',
-                          icon: Icons.work_outline_rounded,
-                          selected: selectedLabel == 'Work',
-                          onTap: () {
-                            setSheetState(() {
-                              selectedLabel = 'Work';
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    _textField(
-                      controller: nameController,
-                      label: 'Full Name',
-                      icon: Icons.person_outline_rounded,
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    _textField(
-                      controller: phoneController,
-                      label: 'Phone Number',
-                      icon: Icons.phone_outlined,
-                      keyboardType: TextInputType.phone,
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    _textField(
-                      controller: addressController,
-                      label: 'House / Building / Street',
-                      icon: Icons.location_on_outlined,
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    _textField(
-                      controller: areaController,
-                      label: 'Area / Locality',
-                      icon: Icons.map_outlined,
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _textField(
-                            controller: cityController,
-                            label: 'City',
-                            icon: Icons.location_city_outlined,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _textField(
-                            controller: stateController,
-                            label: 'State',
-                            icon: Icons.map_outlined,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    _textField(
-                      controller: pincodeController,
-                      label: 'Pincode',
-                      icon: Icons.pin_drop_outlined,
-                      keyboardType: TextInputType.number,
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (nameController.text.trim().isEmpty ||
-                              phoneController.text.trim().isEmpty ||
-                              addressController.text.trim().isEmpty ||
-                              cityController.text.trim().isEmpty ||
-                              stateController.text.trim().isEmpty ||
-                              pincodeController.text.trim().isEmpty) {
-                            _showMessage(
-                              'Please fill all required '
-                              'address fields.',
-                            );
-                            return;
-                          }
-
-                          final newId =
-                              'address_${DateTime.now().millisecondsSinceEpoch}';
-
-                          setState(() {
-                            _addresses.add({
-                              'id': newId,
-                              'label': selectedLabel,
-                              'name': nameController.text.trim(),
-                              'phone': phoneController.text.trim(),
-                              'address': addressController.text.trim(),
-                              'area': areaController.text.trim(),
-                              'city': cityController.text.trim(),
-                              'state': stateController.text.trim(),
-                              'pincode': pincodeController.text.trim(),
-                              'isDefault': false,
-                            });
-
-                            _selectedAddressId = newId;
-                          });
-
-                          Navigator.pop(sheetContext);
-
-                          _showMessage('Address added successfully.');
-                        },
-                        child: const Text('Save Address'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+  Future<void> _openAddAddress() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddAddress()),
     );
+
+    if (!mounted || result is! Map) {
+      return;
+    }
+
+    final newAddress = Map<String, dynamic>.from(result);
+
+    final newId =
+        newAddress['id']?.toString() ??
+        'address_${DateTime.now().millisecondsSinceEpoch}';
+
+    final checkoutAddress = {
+      'id': newId,
+      'label': newAddress['type']?.toString() ?? 'Home',
+      'name': newAddress['name']?.toString() ?? '',
+      'phone': newAddress['phone']?.toString() ?? '',
+      'address': newAddress['house']?.toString() ?? '',
+      'street': newAddress['street']?.toString() ?? '',
+      'area': newAddress['area']?.toString() ?? '',
+      'landmark': newAddress['landmark']?.toString() ?? '',
+      'city': newAddress['city']?.toString() ?? '',
+      'state': newAddress['state']?.toString() ?? '',
+      'pincode': newAddress['pincode']?.toString() ?? '',
+      'isDefault': newAddress['isDefault'] == true,
+    };
+
+    setState(() {
+      // If the new address is marked as default, make it the only default
+      // address in this checkout session.
+      if (checkoutAddress['isDefault'] == true) {
+        for (final address in _addresses) {
+          address['isDefault'] = false;
+        }
+      }
+
+      _addresses.add(checkoutAddress);
+      _selectedAddressId = newId;
+    });
+
+    _showMessage('New delivery address added.');
   }
 
-  Widget _addressLabelChip({
-    required String label,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.light : AppColors.background,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? AppColors.primary : Colors.grey.shade200,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: AppColors.primary),
-              const SizedBox(width: 7),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: selected ? AppColors.primary : AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  String _formatCheckoutAddress(Map<String, dynamic> address) {
+    final parts = <String>[];
+
+    final house = address['address']?.toString().trim() ?? '';
+    final street = address['street']?.toString().trim() ?? '';
+    final area = address['area']?.toString().trim() ?? '';
+    final landmark = address['landmark']?.toString().trim() ?? '';
+    final city = address['city']?.toString().trim() ?? '';
+    final state = address['state']?.toString().trim() ?? '';
+    final pincode = address['pincode']?.toString().trim() ?? '';
+
+    if (house.isNotEmpty) parts.add(house);
+    if (street.isNotEmpty) parts.add(street);
+    if (area.isNotEmpty) parts.add(area);
+    if (landmark.isNotEmpty) parts.add(landmark);
+    if (city.isNotEmpty) parts.add(city);
+    if (state.isNotEmpty && pincode.isNotEmpty) {
+      parts.add('$state - $pincode');
+    } else if (state.isNotEmpty) {
+      parts.add(state);
+    } else if (pincode.isNotEmpty) {
+      parts.add(pincode);
+    }
+
+    return parts.join(', ');
   }
 
-  Widget _textField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType? keyboardType,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      style: const TextStyle(fontSize: 13),
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, size: 20),
-      ),
-    );
-  }
-
-  // ===========================================================================
   // DELIVERY
-  // ===========================================================================
 
   void _openDeliveryOptions() {
     showModalBottomSheet(
@@ -965,9 +758,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // COUPONS
-  // ===========================================================================
 
   void _openCoupons() {
     showModalBottomSheet(
@@ -1152,9 +943,7 @@ class _CheckoutState extends State<Checkout> {
     _showMessage('Coupon removed.');
   }
 
-  // ===========================================================================
   // ECO POINTS
-  // ===========================================================================
 
   void _toggleEcoPoints() {
     if (_ecoPoints <= 0) {
@@ -1167,9 +956,7 @@ class _CheckoutState extends State<Checkout> {
     });
   }
 
-  // ===========================================================================
   // ITEM QUANTITY
-  // ===========================================================================
 
   void _increaseItemQuantity(int index) {
     if (index < 0 || index >= _items.length) {
@@ -1230,9 +1017,7 @@ class _CheckoutState extends State<Checkout> {
     }
   }
 
-  // ===========================================================================
   // EDIT ITEM
-  // ===========================================================================
 
   void _editCheckoutItem(int index) {
     if (index < 0 || index >= _items.length) {
@@ -1488,9 +1273,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // ADD PRODUCT TO CHECKOUT
-  // ===========================================================================
 
   void _addProductToCheckout(Map<String, dynamic> product) {
     final productId = product['productId'] ?? product['id'];
@@ -1533,9 +1316,7 @@ class _CheckoutState extends State<Checkout> {
     _showMessage('${newItem['title']} added to checkout.');
   }
 
-  // ===========================================================================
   // MORE PRODUCTS
-  // ===========================================================================
 
   final List<Map<String, dynamic>> _moreItems = [
     {
@@ -1795,9 +1576,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // PRODUCT SECTION
-  // ===========================================================================
 
   Widget _buildProductSection() {
     return _sectionCard(
@@ -2049,9 +1828,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // COUPON SECTION
-  // ===========================================================================
 
   Widget _buildCouponSection() {
     final applied = _couponCode != null;
@@ -2153,9 +1930,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // ECO POINTS SECTION
-  // ===========================================================================
 
   Widget _buildEcoPointsSection() {
     return Container(
@@ -2215,9 +1990,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // PRICE DETAILS
-  // ===========================================================================
 
   Widget _buildPriceDetails() {
     return _sectionCard(
@@ -2329,9 +2102,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // TRUST SECTION
-  // ===========================================================================
 
   Widget _buildTrustSection() {
     return Container(
@@ -2398,9 +2169,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // CONTINUE TO PAYMENT
-  // ===========================================================================
 
   void _continueToPayment() {
     if (_items.isEmpty) {
@@ -2431,9 +2200,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // MESSAGE
-  // ===========================================================================
 
   void _showMessage(String message) {
     if (!mounted) {
@@ -2454,9 +2221,7 @@ class _CheckoutState extends State<Checkout> {
       );
   }
 
-  // ===========================================================================
   // BUILD
-  // ===========================================================================
 
   @override
   Widget build(BuildContext context) {
@@ -2489,9 +2254,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // EMPTY CHECKOUT
-  // ===========================================================================
 
   Widget _buildEmptyCheckout() {
     return SafeArea(
@@ -2546,9 +2309,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // CHECKOUT BODY
-  // ===========================================================================
 
   Widget _buildCheckoutBody() {
     return SafeArea(
@@ -2598,9 +2359,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // STEP INDICATOR
-  // ===========================================================================
 
   Widget _buildStepIndicator() {
     return Container(
@@ -2677,9 +2436,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // ADDRESS SECTION
-  // ===========================================================================
 
   Widget _buildAddressSection() {
     final address = _selectedAddress;
@@ -2797,11 +2554,7 @@ class _CheckoutState extends State<Checkout> {
                 const SizedBox(height: 3),
 
                 Text(
-                  '${address['address']}, '
-                  '${address['area']}, '
-                  '${address['city']}, '
-                  '${address['state']} - '
-                  '${address['pincode']}',
+                  _formatCheckoutAddress(address),
                   style: AppTextStyles.caption.copyWith(height: 1.4),
                 ),
 
@@ -2850,9 +2603,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // DELIVERY SECTION
-  // ===========================================================================
 
   Widget _buildDeliverySection() {
     final isFree = _deliveryFee == 0;
@@ -2949,9 +2700,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // BOTTOM BAR
-  // ===========================================================================
 
   Widget _buildBottomBar() {
     return Positioned(
@@ -3045,9 +2794,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // COMMON UI
-  // ===========================================================================
 
   Widget _sectionCard({required Widget child}) {
     return Container(
@@ -3087,9 +2834,7 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ===========================================================================
   // IMAGE HANDLING
-  // ===========================================================================
 
   Widget _productImageWidget(String image, double width, double height) {
     if (image.trim().isNotEmpty) {
