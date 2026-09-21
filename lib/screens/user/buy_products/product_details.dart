@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/app_colors.dart';
 import '../../../app_theme/app_text_styles.dart';
 import '../../../widgets/cart_popup.dart';
+import '../reviews/product_reviews.dart';
+import '../reviews/write_review.dart';
 import 'checkout.dart';
 import 'seller_profile.dart';
 
@@ -38,9 +40,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     super.dispose();
   }
 
-  // ============================================================
   // PRODUCT DATA
-  // ============================================================
 
   String get title =>
       widget.product['title']?.toString() ?? 'Wooden Study Table';
@@ -128,9 +128,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     ];
   }
 
-  // ============================================================
   // BUILD
-  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -166,9 +164,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // APP BAR
-  // ============================================================
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -205,9 +201,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // IMAGE GALLERY
-  // ============================================================
 
   Widget _buildImageGallery() {
     return Container(
@@ -342,9 +336,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // PRODUCT HEADER
-  // ============================================================
 
   Widget _buildProductHeader() {
     return _section(
@@ -527,9 +519,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // SELLER
-  // ============================================================
 
   Widget _buildSellerSection() {
     return _section(
@@ -687,9 +677,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // LOCATION
-  // ============================================================
 
   Widget _buildLocationSection() {
     return _section(
@@ -744,9 +732,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // DESCRIPTION
-  // ============================================================
 
   Widget _buildDescriptionSection() {
     return _section(
@@ -803,9 +789,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // ITEM INFORMATION
-  // ============================================================
 
   Widget _buildItemInformation() {
     return _section(
@@ -884,9 +868,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // REVIEWS
-  // ============================================================
 
   Widget _buildReviewsSection() {
     return _section(
@@ -1173,9 +1155,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // ECOLOOP INFORMATION
-  // ============================================================
 
   Widget _buildEcoLoopInfo() {
     return _section(
@@ -1270,9 +1250,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // SIMILAR PRODUCTS
-  // ============================================================
 
   Widget _buildSimilarProducts() {
     final products = _similarProducts;
@@ -1414,9 +1392,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // DUMMY RELATED PRODUCTS
-  // ============================================================
 
   List<Map<String, dynamic>> get _similarProducts {
     return [
@@ -1471,9 +1447,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     ];
   }
 
-  // ============================================================
   // BOTTOM PURCHASE BAR
-  // ============================================================
 
   Widget _buildBottomBar() {
     return Positioned(
@@ -1617,9 +1591,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // QUANTITY
-  // ============================================================
 
   void _increaseQuantity() {
     if (_quantity < availableQuantity) {
@@ -1633,9 +1605,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
   }
 
-  // ============================================================
   // ADD TO CART
-  // ============================================================
 
   void _addToCart() {
     if (availableQuantity <= 0) {
@@ -1679,9 +1649,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     CartPopup.show(context, items: [cartProduct]);
   }
 
-  // ============================================================
   // BUY NOW
-  // ============================================================
 
   void _buyNow() {
     if (availableQuantity <= 0) {
@@ -1697,9 +1665,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // WISHLIST
-  // ============================================================
 
   void _toggleWishlist() {
     setState(() {
@@ -1711,9 +1677,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // SELLER PROFILE
-  // ============================================================
 
   void _openSellerProfile() {
     Navigator.push(
@@ -1734,132 +1698,31 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // REVIEWS ACTIONS
-  // ============================================================
 
   void _openAllReviews() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductReviews(product: widget.product),
       ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.82,
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 10, 10),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Reviews',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(sheetContext),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                ),
-
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 5, 20, 20),
-                    children: [
-                      _buildRatingSummary(),
-
-                      const SizedBox(height: 18),
-
-                      _buildReviewCard(
-                        name: 'Priya S.',
-                        rating: 5,
-                        date: '2 weeks ago',
-                        review:
-                            'Great quality! Exactly as shown. Very sturdy and easy to assemble.',
-                        imageCount: 2,
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      _buildReviewCard(
-                        name: 'Amit K.',
-                        rating: 4,
-                        date: '1 month ago',
-                        review:
-                            'Good product for the price. Minor scratches but overall great.',
-                        imageCount: 1,
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      _buildReviewCard(
-                        name: 'Neha P.',
-                        rating: 5,
-                        date: '2 months ago',
-                        review:
-                            'Seller was helpful and the item was packed properly.',
-                        imageCount: 0,
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      _buildReviewCard(
-                        name: 'Vivek R.',
-                        rating: 4,
-                        date: '3 months ago',
-                        review:
-                            'Nice pre-owned item. Description was accurate.',
-                        imageCount: 0,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 
   void _writeReview() {
-    _showMessage('You can review this product after your order is delivered.');
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => WriteReview(product: widget.product)),
+    );
   }
 
-  // ============================================================
   // SHARE
-  // ============================================================
 
   void _shareProduct() {
     _showMessage('Product sharing will be connected later.');
   }
 
-  // ============================================================
   // MORE OPTIONS
-  // ============================================================
 
   void _showMoreOptions() {
     showModalBottomSheet(
@@ -1947,9 +1810,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // REPORT
-  // ============================================================
 
   Widget _buildReportSection() {
     return Padding(
@@ -2080,9 +1941,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ============================================================
   // HELPERS
-  // ============================================================
 
   int _extractNumericPrice(String value) {
     final cleaned = value.replaceAll('₹', '').replaceAll(',', '').trim();
