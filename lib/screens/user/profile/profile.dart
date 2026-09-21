@@ -6,15 +6,18 @@ import '../../../shared_preferences_util.dart';
 import '../../../widgets/user_more_menu.dart';
 import '../../common/help_support.dart';
 import '../../welcome_screen.dart';
+import '../buy_products/cart.dart';
 import '../buy_products/orders.dart';
 import '../buy_products/wishlist.dart';
-import '../buy_products/cart.dart';
 import '../donations/donate_item.dart';
 import '../donations/donation_history.dart';
 import '../sell_products/my_listings.dart';
 import '../sell_products/selling_orders.dart';
+import 'address_list.dart';
+import 'eco_impact.dart';
 import 'edit_profile.dart';
 import 'notifications.dart';
+import 'rewards.dart';
 import 'settings.dart';
 
 class Profile extends StatelessWidget {
@@ -40,31 +43,18 @@ class Profile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildProfileHeader(context),
-
               const SizedBox(height: 18),
-
               _buildQuickStats(context),
-
               const SizedBox(height: 24),
-
               _buildAccountSection(context),
-
               const SizedBox(height: 22),
-
               _buildSellingSection(context),
-
               const SizedBox(height: 22),
-
               _buildDonationSection(context),
-
               const SizedBox(height: 22),
-
               _buildPreferencesSection(context),
-
               const SizedBox(height: 22),
-
               _buildLogoutButton(context),
-
               const SizedBox(height: 14),
 
               Center(
@@ -82,9 +72,7 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ============================================================
   // PROFILE HEADER
-  // ============================================================
 
   Widget _buildProfileHeader(BuildContext context) {
     return Container(
@@ -104,7 +92,6 @@ class Profile extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Profile image
           Container(
             width: 88,
             height: 88,
@@ -145,7 +132,9 @@ class Profile extends StatelessWidget {
                 size: 15,
                 color: AppColors.success,
               ),
+
               const SizedBox(width: 4),
+
               Text(
                 'EcoLoop Member',
                 style: AppTextStyles.caption.copyWith(
@@ -187,9 +176,7 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ============================================================
   // QUICK STATS
-  // ============================================================
 
   Widget _buildQuickStats(BuildContext context) {
     return Row(
@@ -243,14 +230,13 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ============================================================
-  // ACCOUNT
-  // ============================================================
+  // MY ACCOUNT
 
   Widget _buildAccountSection(BuildContext context) {
     return _ProfileSection(
       title: 'My Account',
       children: [
+        // CART
         _ProfileTile(
           icon: Icons.shopping_cart_outlined,
           title: 'My Cart',
@@ -266,6 +252,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
+        // ORDERS
         _ProfileTile(
           icon: Icons.receipt_long_outlined,
           title: 'My Orders',
@@ -280,6 +267,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
+        // WISHLIST
         _ProfileTile(
           icon: Icons.favorite_border_rounded,
           title: 'Wishlist',
@@ -294,6 +282,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
+        // MY LISTINGS
         _ProfileTile(
           icon: Icons.inventory_2_outlined,
           title: 'My Listings',
@@ -305,18 +294,32 @@ class Profile extends StatelessWidget {
             );
           },
         ),
+
+        _ProfileDivider(),
+
+        // ADDRESSES
+        _ProfileTile(
+          icon: Icons.location_on_outlined,
+          title: 'My Addresses',
+          subtitle: 'Manage your delivery addresses',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AddressList()),
+            );
+          },
+        ),
       ],
     );
   }
 
-  // ============================================================
   // SELLING
-  // ============================================================
 
   Widget _buildSellingSection(BuildContext context) {
     return _ProfileSection(
       title: 'Selling',
       children: [
+        // MY LISTINGS
         _ProfileTile(
           icon: Icons.sell_outlined,
           title: 'My Listings',
@@ -331,6 +334,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
+        // SELLING ORDERS
         _ProfileTile(
           icon: Icons.local_shipping_outlined,
           title: 'Selling Orders',
@@ -345,6 +349,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
+        // SELLING EARNINGS
         _ProfileTile(
           icon: Icons.account_balance_wallet_outlined,
           title: 'Selling Earnings',
@@ -362,14 +367,13 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ============================================================
-  // DONATIONS
-  // ============================================================
+  // DONATIONS & REWARDS
 
   Widget _buildDonationSection(BuildContext context) {
     return _ProfileSection(
       title: 'Donations & Rewards',
       children: [
+        // DONATE
         _ProfileTile(
           icon: Icons.volunteer_activism_outlined,
           title: 'Donate an Item',
@@ -384,6 +388,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
+        // DONATION HISTORY
         _ProfileTile(
           icon: Icons.history_rounded,
           title: 'Donation History',
@@ -398,37 +403,44 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
+        // REWARDS
         _ProfileTile(
           icon: Icons.redeem_outlined,
           title: 'Rewards',
           subtitle: 'View your Eco Points and rewards',
           onTap: () {
-            _showComingSoon(context, 'Rewards');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Rewards()),
+            );
           },
         ),
 
         _ProfileDivider(),
 
+        // ECO IMPACT
         _ProfileTile(
           icon: Icons.eco_outlined,
           title: 'Eco Impact',
           subtitle: 'See how much waste you helped reduce',
           onTap: () {
-            _showComingSoon(context, 'Eco Impact');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const EcoImpact()),
+            );
           },
         ),
       ],
     );
   }
 
-  // ============================================================
-  // PREFERENCES
-  // ============================================================
+  // PREFERENCES & SUPPORT
 
   Widget _buildPreferencesSection(BuildContext context) {
     return _ProfileSection(
       title: 'Preferences & Support',
       children: [
+        // SETTINGS
         _ProfileTile(
           icon: Icons.settings_outlined,
           title: 'Settings',
@@ -443,6 +455,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
+        // NOTIFICATIONS
         _ProfileTile(
           icon: Icons.notifications_none_rounded,
           title: 'Notifications',
@@ -457,6 +470,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
+        // HELP & SUPPORT
         _ProfileTile(
           icon: Icons.help_outline_rounded,
           title: 'Help & Support',
@@ -472,9 +486,7 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ============================================================
   // LOGOUT
-  // ============================================================
 
   Widget _buildLogoutButton(BuildContext context) {
     return SizedBox(
@@ -504,9 +516,7 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ============================================================
   // BADGE
-  // ============================================================
 
   Widget _buildBadge(String value) {
     return Container(
@@ -526,9 +536,7 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ============================================================
-  // COMING SOON
-  // ============================================================
+  // COMING SOON MESSAGE
 
   void _showComingSoon(BuildContext context, String page) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -540,9 +548,7 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ============================================================
   // LOGOUT DIALOG
-  // ============================================================
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
@@ -550,6 +556,7 @@ class Profile extends StatelessWidget {
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: AppColors.surface,
+          surfaceTintColor: Colors.transparent,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
@@ -573,16 +580,13 @@ class Profile extends StatelessWidget {
                 Navigator.pop(dialogContext);
 
                 await Prefs.setBool('isLoggedIn', false);
-
                 await Prefs.setString('authToken', '');
-
                 await Prefs.setString('userRole', '');
-
                 await Prefs.setString('userEmail', '');
-
                 await Prefs.setString('userName', '');
-
-                if (!context.mounted) return;
+                if (!context.mounted) {
+                  return;
+                }
 
                 Navigator.pushAndRemoveUntil(
                   context,
@@ -607,9 +611,7 @@ class Profile extends StatelessWidget {
   }
 }
 
-// ============================================================
 // PROFILE SECTION
-// ============================================================
 
 class _ProfileSection extends StatelessWidget {
   const _ProfileSection({required this.title, required this.children});
@@ -640,9 +642,7 @@ class _ProfileSection extends StatelessWidget {
   }
 }
 
-// ============================================================
 // PROFILE TILE
-// ============================================================
 
 class _ProfileTile extends StatelessWidget {
   const _ProfileTile({
@@ -719,9 +719,7 @@ class _ProfileTile extends StatelessWidget {
   }
 }
 
-// ============================================================
-// DIVIDER
-// ============================================================
+// PROFILE DIVIDER
 
 class _ProfileDivider extends StatelessWidget {
   @override
@@ -737,9 +735,7 @@ class _ProfileDivider extends StatelessWidget {
   }
 }
 
-// ============================================================
 // QUICK STAT CARD
-// ============================================================
 
 class _QuickStatCard extends StatelessWidget {
   const _QuickStatCard({
