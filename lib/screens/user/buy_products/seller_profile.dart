@@ -5,7 +5,6 @@ import '../../../app_theme/app_text_styles.dart';
 import '../reviews/seller_reviews.dart';
 import 'product_details.dart';
 
-/// Screen displaying the detailed profile, statistics, active listings, and reviews for a seller.
 class SellerProfile extends StatefulWidget {
   const SellerProfile({super.key, required this.seller});
 
@@ -22,7 +21,7 @@ class _SellerProfileState extends State<SellerProfile> {
   @override
   void initState() {
     super.initState();
-    // Initialize mock listing data associated with the current seller.
+
     _listings = [
       {
         'id': 101,
@@ -106,6 +105,7 @@ class _SellerProfileState extends State<SellerProfile> {
   @override
   Widget build(BuildContext context) {
     final sellerName = widget.seller['name']?.toString() ?? 'Rahul';
+    final sellerImage = widget.seller['image']?.toString();
     final location =
         widget.seller['location']?.toString() ?? 'Ahmedabad, Gujarat';
     final rating = widget.seller['rating']?.toString() ?? '4.8';
@@ -152,6 +152,7 @@ class _SellerProfileState extends State<SellerProfile> {
             children: [
               _buildSellerHeader(
                 sellerName: sellerName,
+                sellerImage: sellerImage,
                 location: location,
                 rating: rating,
                 reviews: reviews,
@@ -165,6 +166,7 @@ class _SellerProfileState extends State<SellerProfile> {
               const SizedBox(height: 18),
               _buildReviewsSection(
                 sellerName: sellerName,
+                sellerImage: sellerImage,
                 location: location,
                 rating: rating,
                 reviews: reviews,
@@ -180,13 +182,15 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Builds the top section with avatar, verification status, rating, and location.
   Widget _buildSellerHeader({
     required String sellerName,
+    required String? sellerImage,
     required String location,
     required String rating,
     required String reviews,
   }) {
+    final hasImage = sellerImage != null && sellerImage.trim().isNotEmpty;
+
     return Center(
       child: Column(
         children: [
@@ -201,16 +205,19 @@ class _SellerProfileState extends State<SellerProfile> {
                   shape: BoxShape.circle,
                   border: Border.all(color: AppColors.accent, width: 3),
                 ),
-                child: Center(
-                  child: Text(
-                    sellerName.isNotEmpty ? sellerName[0].toUpperCase() : 'R',
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+                child: hasImage
+                    ? ClipOval(
+                        child: Image.network(
+                          sellerImage,
+                          width: 94,
+                          height: 94,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildSellerInitial(sellerName);
+                          },
+                        ),
+                      )
+                    : _buildSellerInitial(sellerName),
               ),
               Positioned(
                 right: 1,
@@ -236,9 +243,13 @@ class _SellerProfileState extends State<SellerProfile> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                sellerName,
-                style: AppTextStyles.title.copyWith(fontSize: 20),
+              Flexible(
+                child: Text(
+                  sellerName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.title.copyWith(fontSize: 20),
+                ),
               ),
               const SizedBox(width: 5),
               const Icon(
@@ -252,6 +263,7 @@ class _SellerProfileState extends State<SellerProfile> {
           GestureDetector(
             onTap: () => _openSellerReviews(
               sellerName: sellerName,
+              sellerImage: sellerImage,
               location: location,
               rating: rating,
               reviews: reviews,
@@ -294,7 +306,14 @@ class _SellerProfileState extends State<SellerProfile> {
                 size: 14,
               ),
               const SizedBox(width: 3),
-              Text(location, style: AppTextStyles.caption),
+              Flexible(
+                child: Text(
+                  location,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 6),
@@ -307,7 +326,19 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Builds the follow toggle and contact buttons.
+  Widget _buildSellerInitial(String sellerName) {
+    return Center(
+      child: Text(
+        sellerName.isNotEmpty ? sellerName[0].toUpperCase() : 'R',
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontSize: 36,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
   Widget _buildActionButtons() {
     return Row(
       children: [
@@ -317,6 +348,7 @@ class _SellerProfileState extends State<SellerProfile> {
               setState(() {
                 _isFollowing = !_isFollowing;
               });
+
               _showMessage(
                 _isFollowing
                     ? 'You are now following this seller.'
@@ -361,7 +393,6 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Builds the summary stats row displaying total listings, items sold, and positive feedback percentage.
   Widget _buildStats({
     required String listings,
     required String sold,
@@ -404,7 +435,6 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Helper widget for rendering a single statistic card inside the stats row.
   Widget _statItem({
     required String value,
     required String label,
@@ -421,7 +451,6 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Vertical line separator used between individual statistic items.
   Widget _statDivider() {
     return Container(
       width: 1,
@@ -430,7 +459,6 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Renders the seller's biography and interest tags section.
   Widget _buildAboutSeller() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -469,9 +497,9 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Renders a clickable summary card leading to the seller reviews screen.
   Widget _buildReviewsSection({
     required String sellerName,
+    required String? sellerImage,
     required String location,
     required String rating,
     required String reviews,
@@ -487,6 +515,7 @@ class _SellerProfileState extends State<SellerProfile> {
         GestureDetector(
           onTap: () => _openSellerReviews(
             sellerName: sellerName,
+            sellerImage: sellerImage,
             location: location,
             rating: rating,
             reviews: reviews,
@@ -561,9 +590,9 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Navigates to the full seller reviews screen.
   void _openSellerReviews({
     required String sellerName,
+    required String? sellerImage,
     required String location,
     required String rating,
     required String reviews,
@@ -573,6 +602,7 @@ class _SellerProfileState extends State<SellerProfile> {
       MaterialPageRoute(
         builder: (_) => SellerReviews(
           sellerName: sellerName,
+          sellerImage: sellerImage,
           sellerLocation: location,
           rating: double.tryParse(rating) ?? 4.8,
           reviewCount: int.tryParse(reviews) ?? 42,
@@ -582,7 +612,6 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Chip tag indicating specific seller interests or specialties.
   Widget _interestTag(String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
@@ -601,7 +630,6 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Header row above the product grid containing count and sort options.
   Widget _buildListingsHeader() {
     return Row(
       children: [
@@ -643,7 +671,6 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Grid view rendering active product listings for this seller.
   Widget _buildListings() {
     return GridView.builder(
       shrinkWrap: true,
@@ -657,6 +684,7 @@ class _SellerProfileState extends State<SellerProfile> {
       ),
       itemBuilder: (context, index) {
         final product = _listings[index];
+
         return _SellerProductCard(
           product: product,
           onTap: () {
@@ -672,12 +700,10 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Action placeholder for starting a direct chat with the seller.
   void _contactSeller() {
     _showMessage('Chat with seller will be connected later.');
   }
 
-  /// Displays a modal sheet containing options to report or block the seller.
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
@@ -728,7 +754,6 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Tile item for options listed in the seller actions bottom sheet.
   Widget _sellerOption({
     required IconData icon,
     required String title,
@@ -780,16 +805,15 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  /// Displays a floating snackbar feedback message.
   void _showMessage(String message) {
     if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 }
 
-/// Product card widget displayed in the active listings grid of the seller profile.
 class _SellerProductCard extends StatelessWidget {
   const _SellerProductCard({required this.product, required this.onTap});
 

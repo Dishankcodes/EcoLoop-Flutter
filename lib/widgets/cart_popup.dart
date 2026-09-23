@@ -5,46 +5,47 @@ import 'package:flutter/material.dart';
 import '../app_theme/app_colors.dart';
 import '../app_theme/app_text_styles.dart';
 import '../screens/user/buy_products/cart.dart';
-import '../screens/user/buy_products/checkout.dart';
 
 class CartPopup {
   CartPopup._();
 
   static OverlayEntry? _currentEntry;
-  static Timer? _dismissTimer;
-  static GlobalKey<_CartPopupOverlayState>? _overlayKey;
 
   static void show(
     BuildContext context, {
     required List<Map<String, dynamic>> items,
   }) {
-    if (items.isEmpty) return;
+    if (items.isEmpty) {
+      return;
+    }
 
-    _removeCurrentImmediate();
+    _removeCurrent();
 
     final overlay = Overlay.maybeOf(context);
-    if (overlay == null) return;
 
-    _overlayKey = GlobalKey<_CartPopupOverlayState>();
+    if (overlay == null) {
+      return;
+    }
 
     final entry = OverlayEntry(
-      builder: (overlayContext) {
+      builder: (_) {
         return _CartPopupOverlay(
-          key: _overlayKey,
           items: items,
-          onClose: dismiss,
+          onClose: _removeCurrent,
           onViewCart: () {
-            dismiss();
+            _removeCurrent();
+
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => Cart(initialItems: items)),
             );
           },
           onCheckout: () {
-            dismiss();
+            _removeCurrent();
+
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => Checkout(items: items)),
+              MaterialPageRoute(builder: (_) => Cart(initialItems: items)),
             );
           },
         );
@@ -52,32 +53,17 @@ class CartPopup {
     );
 
     _currentEntry = entry;
-    overlay.insert(entry);
 
-    _dismissTimer = Timer(const Duration(seconds: 5), () {
-      dismiss();
-    });
+    overlay.insert(entry);
+  }
+
+  static void _removeCurrent() {
+    _currentEntry?.remove();
+    _currentEntry = null;
   }
 
   static void dismiss() {
-    _dismissTimer?.cancel();
-    _dismissTimer = null;
-
-    if (_overlayKey?.currentState != null) {
-      _overlayKey!.currentState!.dismissWithAnimation(() {
-        _removeCurrentImmediate();
-      });
-    } else {
-      _removeCurrentImmediate();
-    }
-  }
-
-  static void _removeCurrentImmediate() {
-    _dismissTimer?.cancel();
-    _dismissTimer = null;
-    _currentEntry?.remove();
-    _currentEntry = null;
-    _overlayKey = null;
+    _removeCurrent();
   }
 }
 
@@ -88,7 +74,6 @@ class _CartPopupOverlay extends StatefulWidget {
   final VoidCallback onCheckout;
 
   const _CartPopupOverlay({
-    super.key,
     required this.items,
     required this.onClose,
     required this.onViewCart,
@@ -101,131 +86,164 @@ class _CartPopupOverlay extends StatefulWidget {
 
 class _CartPopupOverlayState extends State<_CartPopupOverlay>
     with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+  late final AnimationController _entranceController;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<Offset> _entranceSlideAnimation;
 
-  bool _isExitingDown = false;
+  Timer? _moveTimer;
+
+  bool _isAtBottom = false;
 
   @override
   void initState() {
     super.initState();
 
-    _animationController = AnimationController(
+    _entranceController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 350),
+      duration: const Duration(milliseconds: 320),
     );
 
     _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
     );
 
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, -1.0), end: Offset.zero).animate(
+    _entranceSlideAnimation =
+        Tween<Offset>(begin: const Offset(0, -0.12), end: Offset.zero).animate(
           CurvedAnimation(
-            parent: _animationController,
+            parent: _entranceController,
             curve: Curves.easeOutCubic,
           ),
         );
 
-    _animationController.forward();
-  }
+    _entranceController.forward();
 
-  void dismissWithAnimation(VoidCallback onComplete) {
-    if (_isExitingDown) return;
-
-    setState(() {
-      _isExitingDown = true;
-      _slideAnimation =
-          Tween<Offset>(begin: Offset.zero, end: const Offset(0, 2.5)).animate(
-            CurvedAnimation(
-              parent: _animationController,
-              curve: Curves.easeInCubic,
-            ),
-          );
-    });
-
-    _animationController.reverse().then((_) {
-      onComplete();
-    });
+    _moveTimer = Timer(const Duration(seconds: 5), _moveToBottom);
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _moveTimer?.cancel();
+    _entranceController.dispose();
     super.dispose();
   }
 
-  Map<String, dynamic> get product => widget.items.last;
+  void _moveToBottom() {
+    if (!mounted) {
+      return;
+    }
 
-  String get title => product['title']?.toString() ?? 'Product';
+    setState(() {
+      _isAtBottom = true;
+    });
+  }
+
+  Map<String, dynamic> get product {
+    return widget.items.first;
+  }
+
+  String get title {
+    return product['title']?.toString() ?? 'Product';
+  }
 
   int get quantity {
     final value = product['quantity'];
-    if (value is num) return value.toInt();
+
+    if (value is num) {
+      return value.toInt();
+    }
+
     return int.tryParse(value?.toString() ?? '1') ?? 1;
   }
 
   int get price {
     final value = product['price'];
-    if (value is num) return value.toInt();
+
+    if (value is num) {
+      return value.toInt();
+    }
+
     return _extractPrice(value?.toString() ?? '0');
   }
 
-  int get total => price * quantity;
+  int get total {
+    return price * quantity;
+  }
 
   String get image {
     final singleImage = product['image']?.toString();
-    if (singleImage != null && singleImage.isNotEmpty) return singleImage;
+
+    if (singleImage != null && singleImage.isNotEmpty) {
+      return singleImage;
+    }
 
     final images = product['images'];
-    if (images is List && images.isNotEmpty) return images.first.toString();
+
+    if (images is List && images.isNotEmpty) {
+      return images.first.toString();
+    }
 
     return '';
   }
 
   int get totalItems {
     int total = 0;
+
     for (final item in widget.items) {
       final value = item['quantity'];
+
       if (value is num) {
         total += value.toInt();
       } else {
         total += int.tryParse(value?.toString() ?? '1') ?? 1;
       }
     }
+
     return total;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: MediaQuery.of(context).padding.top + 8,
-      left: 12,
-      right: 12,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: Material(
-            color: Colors.transparent,
-            child: _buildCard(context),
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
+    return Positioned.fill(
+      child: SafeArea(
+        child: AnimatedAlign(
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeInOutCubic,
+          alignment: _isAtBottom ? Alignment.bottomCenter : Alignment.topCenter,
+          child: AnimatedPadding(
+            duration: const Duration(milliseconds: 700),
+            curve: Curves.easeInOutCubic,
+            padding: EdgeInsets.fromLTRB(
+              12,
+              8,
+              12,
+              _isAtBottom ? bottomInset + 78 : 12,
+            ),
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _entranceSlideAnimation,
+                child: Material(color: Colors.transparent, child: _buildCard()),
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCard(BuildContext context) {
+  Widget _buildCard() {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.55)),
+        border: Border.all(color: AppColors.accent.withOpacity(0.55)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.14),
+            color: Colors.black.withOpacity(0.14),
             blurRadius: 22,
             offset: const Offset(0, 8),
           ),
@@ -234,6 +252,7 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             _buildTopRow(),
             const SizedBox(height: 10),
@@ -263,28 +282,29 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
           ),
         ),
         const SizedBox(width: 9),
-        const Expanded(
+        Expanded(
           child: Text(
             'Added to Cart',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
+            style: AppTextStyles.body.copyWith(
               color: AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
         GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: widget.onClose,
           child: Container(
-            width: 28,
-            height: 28,
+            width: 30,
+            height: 30,
             decoration: const BoxDecoration(
               color: AppColors.background,
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.close_rounded,
-              size: 16,
+              size: 17,
               color: AppColors.textSecondary,
             ),
           ),
@@ -306,10 +326,10 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
                 title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textPrimary,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
                   height: 1.3,
                 ),
               ),
@@ -329,10 +349,9 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
                   const SizedBox(width: 8),
                   Text(
                     '₹${_formatPrice(price)}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                    style: AppTextStyles.caption.copyWith(
                       color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -343,10 +362,10 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
         const SizedBox(width: 8),
         Text(
           '₹${_formatPrice(total)}',
-          style: const TextStyle(
+          style: AppTextStyles.body.copyWith(
+            color: AppColors.primary,
             fontSize: 13,
             fontWeight: FontWeight.w800,
-            color: AppColors.primary,
           ),
         ),
       ],
@@ -387,9 +406,8 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
         Expanded(
           child: Text(
             totalItems == 1 ? '1 item in cart' : '$totalItems items in cart',
-            style: const TextStyle(
+            style: AppTextStyles.caption.copyWith(
               fontSize: 10.5,
-              color: AppColors.textSecondary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -437,17 +455,25 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
 
   int _extractPrice(String value) {
     final cleaned = value.replaceAll('₹', '').replaceAll(',', '').trim();
+
     return int.tryParse(cleaned) ?? 0;
   }
 
   String _formatPrice(int value) {
     final valueString = value.toString();
+
+    if (valueString.length <= 3) {
+      return valueString;
+    }
+
     final chars = valueString.split('');
     final buffer = StringBuffer();
 
     for (int i = 0; i < chars.length; i++) {
       buffer.write(chars[i]);
+
       final position = chars.length - i;
+
       if (position > 1 && position % 3 == 1) {
         buffer.write(',');
       }
