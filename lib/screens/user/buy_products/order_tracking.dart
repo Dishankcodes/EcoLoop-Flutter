@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/app_colors.dart';
 
+/// Screen providing real-time tracking updates, timeline progress, and delivery details for an order.
 class OrderTracking extends StatefulWidget {
   final Map<String, dynamic> order;
 
@@ -12,10 +13,6 @@ class OrderTracking extends StatefulWidget {
 }
 
 class _OrderTrackingState extends State<OrderTracking> {
-  // ============================================================
-  // DATA
-  // ============================================================
-
   String get productName =>
       widget.order['product']?.toString() ?? 'Wooden Study Table';
 
@@ -34,10 +31,6 @@ class _OrderTrackingState extends State<OrderTracking> {
 
   String get expectedDelivery =>
       widget.order['expectedDelivery']?.toString() ?? '03 Sep 2026';
-
-  // ============================================================
-  // BUILD
-  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -61,10 +54,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ============================================================
-  // APP BAR
-  // ============================================================
-
+  /// AppBar with tracking screen title and overflow menu options.
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: AppColors.surface,
@@ -89,10 +79,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ============================================================
-  // TRACKING HEADER
-  // ============================================================
-
+  /// Header widget rendering shipping status icon, title, order ID, and current badge.
   Widget _buildTrackingHeader() {
     return Container(
       width: double.infinity,
@@ -117,9 +104,7 @@ class _OrderTrackingState extends State<OrderTracking> {
               color: AppColors.primary,
             ),
           ),
-
           const SizedBox(height: 14),
-
           const Text(
             'Your order is on the way',
             textAlign: TextAlign.center,
@@ -129,9 +114,7 @@ class _OrderTrackingState extends State<OrderTracking> {
               color: AppColors.textPrimary,
             ),
           ),
-
           const SizedBox(height: 6),
-
           Text(
             'Order $orderId',
             style: const TextStyle(
@@ -139,9 +122,7 @@ class _OrderTrackingState extends State<OrderTracking> {
               color: AppColors.textSecondary,
             ),
           ),
-
           const SizedBox(height: 15),
-
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
             decoration: BoxDecoration(
@@ -176,10 +157,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ============================================================
-  // CURRENT STATUS
-  // ============================================================
-
+  /// Highlight card displaying estimated delivery date.
   Widget _buildCurrentStatus() {
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
@@ -204,9 +182,7 @@ class _OrderTrackingState extends State<OrderTracking> {
               size: 25,
             ),
           ),
-
           const SizedBox(width: 12),
-
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -230,7 +206,6 @@ class _OrderTrackingState extends State<OrderTracking> {
               ],
             ),
           ),
-
           const Icon(
             Icons.calendar_today_outlined,
             size: 19,
@@ -241,10 +216,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ============================================================
-  // TRACKING TIMELINE
-  // ============================================================
-
+  /// Vertical tracking updates timeline displaying current order milestones.
   Widget _buildTrackingTimeline() {
     return _section(
       child: Column(
@@ -258,9 +230,7 @@ class _OrderTrackingState extends State<OrderTracking> {
               color: AppColors.textPrimary,
             ),
           ),
-
           const SizedBox(height: 21),
-
           _buildTimelineItem(
             icon: Icons.shopping_bag_rounded,
             title: 'Order Placed',
@@ -268,7 +238,6 @@ class _OrderTrackingState extends State<OrderTracking> {
             date: orderDate,
             completed: true,
           ),
-
           _buildTimelineItem(
             icon: Icons.verified_rounded,
             title: 'Order Confirmed',
@@ -276,7 +245,6 @@ class _OrderTrackingState extends State<OrderTracking> {
             date: '01 Sep • 10:30 AM',
             completed: true,
           ),
-
           _buildTimelineItem(
             icon: Icons.inventory_2_rounded,
             title: 'Item Packed',
@@ -284,7 +252,6 @@ class _OrderTrackingState extends State<OrderTracking> {
             date: '01 Sep • 04:15 PM',
             completed: true,
           ),
-
           _buildTimelineItem(
             icon: Icons.local_shipping_rounded,
             title: 'Shipped',
@@ -293,7 +260,6 @@ class _OrderTrackingState extends State<OrderTracking> {
             completed: _isStatusAtLeast('Shipped'),
             active: currentStatus == 'Shipped',
           ),
-
           _buildTimelineItem(
             icon: Icons.delivery_dining_rounded,
             title: 'Out for Delivery',
@@ -302,7 +268,6 @@ class _OrderTrackingState extends State<OrderTracking> {
             completed: _isStatusAtLeast('Out for Delivery'),
             active: currentStatus == 'Out for Delivery',
           ),
-
           _buildTimelineItem(
             icon: Icons.home_rounded,
             title: 'Delivered',
@@ -317,6 +282,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
+  /// Evaluates whether current order progress status has reached or passed a target status step.
   bool _isStatusAtLeast(String status) {
     const statuses = [
       'Confirmed',
@@ -336,6 +302,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     return currentIndex >= targetIndex;
   }
 
+  /// Individual timeline item entry in tracking progress list.
   Widget _buildTimelineItem({
     required IconData icon,
     required String title,
@@ -368,7 +335,6 @@ class _OrderTrackingState extends State<OrderTracking> {
                 ),
                 child: Icon(icon, size: 17, color: color),
               ),
-
               if (!isLast)
                 Container(
                   width: 2,
@@ -381,9 +347,7 @@ class _OrderTrackingState extends State<OrderTracking> {
             ],
           ),
         ),
-
         const SizedBox(width: 13),
-
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(bottom: 18),
@@ -410,7 +374,6 @@ class _OrderTrackingState extends State<OrderTracking> {
                               ),
                             ),
                           ),
-
                           if (active) ...[
                             const SizedBox(width: 7),
                             Container(
@@ -434,9 +397,7 @@ class _OrderTrackingState extends State<OrderTracking> {
                           ],
                         ],
                       ),
-
                       const SizedBox(height: 4),
-
                       Text(
                         subtitle,
                         style: const TextStyle(
@@ -448,9 +409,7 @@ class _OrderTrackingState extends State<OrderTracking> {
                     ],
                   ),
                 ),
-
                 const SizedBox(width: 8),
-
                 Text(
                   date,
                   textAlign: TextAlign.right,
@@ -468,19 +427,14 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ============================================================
-  // PRODUCT CARD
-  // ============================================================
-
+  /// Compact item preview card displaying product image icon, name, quantity, and price.
   Widget _buildProductCard() {
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle('Your Item', Icons.shopping_bag_outlined),
-
           const SizedBox(height: 15),
-
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -499,9 +453,7 @@ class _OrderTrackingState extends State<OrderTracking> {
                   ),
                   child: Icon(productIcon, size: 35, color: AppColors.primary),
                 ),
-
                 const SizedBox(width: 12),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -516,9 +468,7 @@ class _OrderTrackingState extends State<OrderTracking> {
                           color: AppColors.textPrimary,
                         ),
                       ),
-
                       const SizedBox(height: 6),
-
                       Text(
                         'Quantity: $quantity',
                         style: const TextStyle(
@@ -526,9 +476,7 @@ class _OrderTrackingState extends State<OrderTracking> {
                           color: AppColors.textSecondary,
                         ),
                       ),
-
                       const SizedBox(height: 4),
-
                       Text(
                         price,
                         style: const TextStyle(
@@ -548,19 +496,14 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ============================================================
-  // DELIVERY CARD
-  // ============================================================
-
+  /// Shipping address summary section.
   Widget _buildDeliveryCard() {
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle('Delivery Address', Icons.location_on_outlined),
-
           const SizedBox(height: 15),
-
           Container(
             padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
@@ -583,9 +526,7 @@ class _OrderTrackingState extends State<OrderTracking> {
                     color: AppColors.primary,
                   ),
                 ),
-
                 const SizedBox(width: 10),
-
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -598,9 +539,7 @@ class _OrderTrackingState extends State<OrderTracking> {
                           color: AppColors.textPrimary,
                         ),
                       ),
-
                       SizedBox(height: 5),
-
                       Text(
                         'Dishank Prajapati',
                         style: TextStyle(
@@ -609,12 +548,9 @@ class _OrderTrackingState extends State<OrderTracking> {
                           color: AppColors.textPrimary,
                         ),
                       ),
-
                       SizedBox(height: 3),
-
                       Text(
-                        '28/4 Jagdish Apartment, '
-                        'Viratnagar Canal Road, Ahmedabad',
+                        '28/4 Jagdish Apartment, Viratnagar Canal Road, Ahmedabad',
                         style: TextStyle(
                           fontSize: 10.5,
                           height: 1.45,
@@ -627,9 +563,7 @@ class _OrderTrackingState extends State<OrderTracking> {
               ],
             ),
           ),
-
           const SizedBox(height: 15),
-
           Row(
             children: [
               const Icon(
@@ -662,33 +596,25 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ============================================================
-  // ORDER INFORMATION
-  // ============================================================
-
+  /// Order metadata details card.
   Widget _buildOrderInformation() {
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle('Order Information', Icons.receipt_long_outlined),
-
           const SizedBox(height: 18),
-
           _infoRow('Order ID', orderId),
-
           _infoRow('Order Date', orderDate),
-
           _infoRow('Quantity', quantity),
-
           _infoRow('Total Paid', price),
-
           _infoRow('Current Status', currentStatus, isLast: true),
         ],
       ),
     );
   }
 
+  /// Helper widget for metadata rows inside order information section.
   Widget _infoRow(String title, String value, {bool isLast = false}) {
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 13),
@@ -719,10 +645,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ============================================================
-  // HELP
-  // ============================================================
-
+  /// Customer support contact card widget.
   Widget _buildHelpCard() {
     return _section(
       child: Container(
@@ -747,9 +670,7 @@ class _OrderTrackingState extends State<OrderTracking> {
                 size: 23,
               ),
             ),
-
             const SizedBox(width: 11),
-
             const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -773,7 +694,6 @@ class _OrderTrackingState extends State<OrderTracking> {
                 ],
               ),
             ),
-
             IconButton(
               onPressed: () {
                 _showMessage('Order support will be connected later.');
@@ -790,10 +710,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ============================================================
-  // MORE OPTIONS
-  // ============================================================
-
+  /// Opens the options bottom sheet menu for tracking actions.
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
@@ -837,6 +754,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
+  /// Option item tile inside tracking options bottom sheet.
   Widget _sheetOption({
     required IconData icon,
     required String title,
@@ -865,10 +783,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ============================================================
-  // COMMON
-  // ============================================================
-
+  /// Container wrapper card used for section layouts.
   Widget _section({required Widget child}) {
     return Container(
       width: double.infinity,
@@ -879,6 +794,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
+  /// Title header row used across section blocks.
   Widget _sectionTitle(String title, IconData icon) {
     return Row(
       children: [
@@ -896,7 +812,9 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
+  /// Displays floating snackbar message feedback.
   void _showMessage(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );

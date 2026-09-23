@@ -44,9 +44,7 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  // ============================================================
   // ITEM HEADER
-  // ============================================================
 
   Widget _buildItemHeader() {
     return Container(
@@ -119,9 +117,7 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  // ============================================================
   // STATUS
-  // ============================================================
 
   Widget _buildStatusSection(String status) {
     final isScheduled = status == 'Pickup Scheduled';
@@ -246,9 +242,7 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  // ============================================================
   // PICKUP
-  // ============================================================
 
   Widget _buildPickupSection() {
     return _section(
@@ -320,9 +314,7 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  // ============================================================
   // DONATION INFORMATION
-  // ============================================================
 
   Widget _buildDonationInformation() {
     return _section(
@@ -368,9 +360,7 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  // ============================================================
   // REWARD
-  // ============================================================
 
   Widget _buildRewardSection() {
     final reward = donation['rewardStatus']?.toString() ?? 'Under Review';
@@ -450,9 +440,7 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  // ============================================================
   // ECOLOOP MESSAGE
-  // ============================================================
 
   Widget _buildEcoLoopMessage() {
     return Padding(
@@ -479,9 +467,7 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  // ============================================================
   // INFO ROW
-  // ============================================================
 
   Widget _infoRow(IconData icon, String title, String value) {
     return Padding(

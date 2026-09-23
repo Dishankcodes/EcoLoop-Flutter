@@ -130,9 +130,7 @@ class _DonationHistoryState extends State<DonationHistory> {
     );
   }
 
-  // ============================================================
   // SUMMARY
-  // ============================================================
 
   Widget _buildHeaderSummary() {
     return Container(
@@ -193,9 +191,7 @@ class _DonationHistoryState extends State<DonationHistory> {
     );
   }
 
-  // ============================================================
   // FILTERS
-  // ============================================================
 
   Widget _buildFilters() {
     const filters = ['All', 'Active', 'Completed'];
@@ -237,9 +233,7 @@ class _DonationHistoryState extends State<DonationHistory> {
     );
   }
 
-  // ============================================================
   // DONATION CARD
-  // ============================================================
 
   Widget _buildDonationCard(Map<String, dynamic> donation) {
     final status = donation['status'].toString();
@@ -345,9 +339,7 @@ class _DonationHistoryState extends State<DonationHistory> {
     );
   }
 
-  // ============================================================
   // STATUS
-  // ============================================================
 
   Widget _buildStatusBadge(String status) {
     final bool active = status == 'Pickup Scheduled';
@@ -382,9 +374,7 @@ class _DonationHistoryState extends State<DonationHistory> {
     );
   }
 
-  // ============================================================
   // EMPTY
-  // ============================================================
 
   Widget _buildEmptyState() {
     return Center(

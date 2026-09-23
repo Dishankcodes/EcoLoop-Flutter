@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/app_colors.dart';
 import '../../../app_theme/app_text_styles.dart';
 
+/// Screen allowing users to list unused items for free donation and pickup.
 class DonateItem extends StatefulWidget {
   const DonateItem({super.key});
 
@@ -14,7 +15,6 @@ class _DonateItemState extends State<DonateItem> {
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController titleController = TextEditingController();
-
   final TextEditingController descriptionController = TextEditingController();
 
   String? selectedCategory;
@@ -49,14 +49,11 @@ class _DonateItemState extends State<DonateItem> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
           icon: const Icon(
             Icons.arrow_back_rounded,
             color: AppColors.textPrimary,
@@ -64,7 +61,6 @@ class _DonateItemState extends State<DonateItem> {
         ),
         title: Text('Donate an Item', style: AppTextStyles.title),
       ),
-
       body: Form(
         key: _formKey,
         child: ListView(
@@ -72,21 +68,13 @@ class _DonateItemState extends State<DonateItem> {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
           children: [
             _buildIntro(),
-
             const SizedBox(height: 24),
-
             _buildSectionTitle('Item Photos'),
-
             const SizedBox(height: 10),
-
             _buildImagePicker(),
-
             const SizedBox(height: 25),
-
             _buildSectionTitle('Item Details'),
-
             const SizedBox(height: 10),
-
             _buildTextField(
               controller: titleController,
               label: 'Item Name',
@@ -96,13 +84,10 @@ class _DonateItemState extends State<DonateItem> {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter item name';
                 }
-
                 return null;
               },
             ),
-
             const SizedBox(height: 14),
-
             _buildDropdown(
               value: selectedCategory,
               label: 'Category',
@@ -115,9 +100,7 @@ class _DonateItemState extends State<DonateItem> {
                 });
               },
             ),
-
             const SizedBox(height: 14),
-
             _buildDropdown(
               value: selectedCondition,
               label: 'Condition',
@@ -130,9 +113,7 @@ class _DonateItemState extends State<DonateItem> {
                 });
               },
             ),
-
             const SizedBox(height: 14),
-
             _buildTextField(
               controller: descriptionController,
               label: 'Description',
@@ -143,21 +124,14 @@ class _DonateItemState extends State<DonateItem> {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please add a description';
                 }
-
                 return null;
               },
             ),
-
             const SizedBox(height: 22),
-
             _buildPickupInfo(),
-
             const SizedBox(height: 14),
-
             _buildRewardInfo(),
-
             const SizedBox(height: 28),
-
             _buildDonateButton(),
           ],
         ),
@@ -165,10 +139,7 @@ class _DonateItemState extends State<DonateItem> {
     );
   }
 
-  // ==========================================================
-  // INTRO
-  // ==========================================================
-
+  /// Informational banner promoting community impact.
   Widget _buildIntro() {
     return Container(
       width: double.infinity,
@@ -192,9 +163,7 @@ class _DonateItemState extends State<DonateItem> {
               color: AppColors.primary,
             ),
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,18 +188,12 @@ class _DonateItemState extends State<DonateItem> {
     );
   }
 
-  // ==========================================================
-  // SECTION TITLE
-  // ==========================================================
-
+  /// Form section title label.
   Widget _buildSectionTitle(String title) {
     return Text(title, style: AppTextStyles.title.copyWith(fontSize: 16));
   }
 
-  // ==========================================================
-  // IMAGE PICKER
-  // ==========================================================
-
+  /// Dashed/bordered box placeholder for selecting item photos.
   Widget _buildImagePicker() {
     return GestureDetector(
       onTap: () {
@@ -265,9 +228,7 @@ class _DonateItemState extends State<DonateItem> {
                 size: 24,
               ),
             ),
-
             const SizedBox(height: 10),
-
             Text(
               'Add Item Photos',
               style: AppTextStyles.body.copyWith(
@@ -275,9 +236,7 @@ class _DonateItemState extends State<DonateItem> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-
             const SizedBox(height: 3),
-
             Text(
               'Add clear photos of your donation',
               style: AppTextStyles.caption,
@@ -288,10 +247,7 @@ class _DonateItemState extends State<DonateItem> {
     );
   }
 
-  // ==========================================================
-  // TEXT FIELD
-  // ==========================================================
-
+  /// Standardized labeled text form field with leading icon.
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -310,9 +266,7 @@ class _DonateItemState extends State<DonateItem> {
             fontWeight: FontWeight.w500,
           ),
         ),
-
         const SizedBox(height: 7),
-
         TextFormField(
           controller: controller,
           maxLines: maxLines,
@@ -326,10 +280,7 @@ class _DonateItemState extends State<DonateItem> {
     );
   }
 
-  // ==========================================================
-  // DROPDOWN
-  // ==========================================================
-
+  /// Standardized dropdown field wrapper.
   Widget _buildDropdown({
     required String? value,
     required String label,
@@ -348,9 +299,7 @@ class _DonateItemState extends State<DonateItem> {
             fontWeight: FontWeight.w500,
           ),
         ),
-
         const SizedBox(height: 7),
-
         DropdownButtonFormField<String>(
           value: value,
           hint: Text(hint, style: AppTextStyles.hint),
@@ -365,7 +314,6 @@ class _DonateItemState extends State<DonateItem> {
             if (value == null || value.isEmpty) {
               return 'Please select $label';
             }
-
             return null;
           },
         ),
@@ -373,10 +321,7 @@ class _DonateItemState extends State<DonateItem> {
     );
   }
 
-  // ==========================================================
-  // FREE PICKUP
-  // ==========================================================
-
+  /// Feature card informing users about doorstep pickup availability.
   Widget _buildPickupInfo() {
     return Container(
       padding: const EdgeInsets.all(15),
@@ -393,9 +338,7 @@ class _DonateItemState extends State<DonateItem> {
             color: AppColors.primary,
             size: 25,
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -420,10 +363,7 @@ class _DonateItemState extends State<DonateItem> {
     );
   }
 
-  // ==========================================================
-  // REWARD
-  // ==========================================================
-
+  /// Feature card detailing EcoLoop donor rewards.
   Widget _buildRewardInfo() {
     return Container(
       padding: const EdgeInsets.all(15),
@@ -439,9 +379,7 @@ class _DonateItemState extends State<DonateItem> {
             color: AppColors.primary,
             size: 25,
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -466,10 +404,7 @@ class _DonateItemState extends State<DonateItem> {
     );
   }
 
-  // ==========================================================
-  // DONATE BUTTON
-  // ==========================================================
-
+  /// Primary submission action button.
   Widget _buildDonateButton() {
     return ElevatedButton.icon(
       onPressed: () {

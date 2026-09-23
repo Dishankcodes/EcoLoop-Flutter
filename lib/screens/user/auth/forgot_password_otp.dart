@@ -9,6 +9,7 @@ import '../../../models/auth/user/forget_password/verify_forgot_password_otp_req
 import '../../../widgets/app_message.dart';
 import 'reset_password.dart';
 
+/// Screen for verifying the 6-digit email OTP sent during the forgot password flow.
 class ForgotPasswordOtp extends StatefulWidget {
   final String email;
 
@@ -45,12 +46,10 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
   @override
   void initState() {
     super.initState();
-
     _startExpiryTimer();
     _startResendTimer();
 
-    // Rebuild when focus changes so the active OTP box
-    // can update its border.
+    // Rebuild when focus changes so the active OTP box updates its border styling
     for (final node in _focusNodes) {
       node.addListener(() {
         if (mounted) {
@@ -60,17 +59,13 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     }
   }
 
-  // ============================================================
-  // MESSAGE
-  // ============================================================
-
+  /// Displays an in-page feedback banner.
   void _showMessage({
     required String title,
     required String message,
     required AppMessageType type,
   }) {
     if (!mounted) return;
-
     setState(() {
       _messageTitle = title;
       _message = message;
@@ -78,9 +73,9 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     });
   }
 
+  /// Clears the active feedback message banner.
   void _clearMessage() {
     if (!mounted) return;
-
     setState(() {
       _messageTitle = null;
       _message = null;
@@ -88,10 +83,7 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     });
   }
 
-  // ============================================================
-  // ERROR HANDLING
-  // ============================================================
-
+  /// Returns user-friendly messages for network or verification failures.
   String _getReadableError(dynamic error) {
     final message = error.toString().toLowerCase();
 
@@ -114,39 +106,26 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     return 'Something went wrong while verifying the OTP. Please try again.';
   }
 
-  // ============================================================
-  // OTP
-  // ============================================================
+  String get _otp =>
+      _otpControllers.map((controller) => controller.text).join();
 
-  String get _otp {
-    return _otpControllers.map((controller) => controller.text).join();
-  }
+  bool get _isOtpComplete => _otp.length == 6;
 
-  bool get _isOtpComplete {
-    return _otp.length == 6;
-  }
-
+  /// Handles sequential numeric focus navigation and paste events for OTP boxes.
   void _onOtpChanged(String value, int index) {
     _clearMessage();
 
-    if (_otpExpired) {
-      return;
-    }
+    if (_otpExpired) return;
 
-    // Handle pasted OTP
     if (value.length > 1) {
       final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-
-      if (digits.isEmpty) {
-        return;
-      }
+      if (digits.isEmpty) return;
 
       for (int i = 0; i < digits.length && index + i < 6; i++) {
         _otpControllers[index + i].text = digits[i];
       }
 
       final lastIndex = index + digits.length - 1;
-
       if (lastIndex < 5) {
         _focusNodes[lastIndex + 1].requestFocus();
       } else {
@@ -157,7 +136,6 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
       return;
     }
 
-    // Move forward automatically
     if (value.isNotEmpty && index < 5) {
       _focusNodes[index + 1].requestFocus();
     }
@@ -165,42 +143,33 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     setState(() {});
   }
 
+  /// Handles backspace key events to automatically move focus backwards.
   void _handleBackspace(KeyEvent event, int index) {
-    if (event is! KeyDownEvent) {
-      return;
-    }
+    if (event is! KeyDownEvent) return;
 
-    if (event.logicalKey != LogicalKeyboardKey.backspace) {
-      return;
-    }
+    if (event.logicalKey != LogicalKeyboardKey.backspace) return;
 
     if (_otpControllers[index].text.isEmpty && index > 0) {
       _otpControllers[index - 1].clear();
       _focusNodes[index - 1].requestFocus();
-
       setState(() {});
     }
   }
 
+  /// Clears all input fields across the 6 OTP boxes and resets focus to the first box.
   void _clearOtp() {
     for (final controller in _otpControllers) {
       controller.clear();
     }
-
     _focusNodes[0].requestFocus();
-
     if (mounted) {
       setState(() {});
     }
   }
 
-  // ============================================================
-  // OTP EXPIRY TIMER
-  // ============================================================
-
+  /// Starts the 10-minute expiry countdown timer for the generated OTP.
   void _startExpiryTimer() {
     _expiryTimer?.cancel();
-
     _remainingSeconds = 600;
     _otpExpired = false;
 
@@ -212,11 +181,9 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
 
       if (_remainingSeconds <= 0) {
         timer.cancel();
-
         setState(() {
           _otpExpired = true;
         });
-
         return;
       }
 
@@ -226,21 +193,17 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     });
   }
 
+  /// Formats seconds into a `MM:SS` string representation.
   String _formatTime(int seconds) {
     final minutes = seconds ~/ 60;
     final remainingSeconds = seconds % 60;
 
-    return '${minutes.toString().padLeft(2, '0')}:'
-        '${remainingSeconds.toString().padLeft(2, '0')}';
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
-  // ============================================================
-  // RESEND TIMER
-  // ============================================================
-
+  /// Starts the 30-second resend cooldown timer.
   void _startResendTimer() {
     _resendTimer?.cancel();
-
     _resendRemainingSeconds = 30;
     _canResend = false;
 
@@ -252,11 +215,9 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
 
       if (_resendRemainingSeconds <= 0) {
         timer.cancel();
-
         setState(() {
           _canResend = true;
         });
-
         return;
       }
 
@@ -266,10 +227,7 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     });
   }
 
-  // ============================================================
-  // VERIFY OTP
-  // ============================================================
-
+  /// Submits the entered OTP code to the server endpoint for verification.
   Future<void> _verifyOtp() async {
     _clearMessage();
 
@@ -283,7 +241,6 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     }
 
     final otp = _otp;
-
     if (otp.length != 6) {
       _showMessage(
         title: 'Invalid OTP',
@@ -293,9 +250,7 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
       return;
     }
 
-    if (_isLoading) {
-      return;
-    }
+    if (_isLoading) return;
 
     setState(() {
       _isLoading = true;
@@ -325,11 +280,9 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
                 'OTP was verified, but the password reset session could not be created. Please try again.',
             type: AppMessageType.error,
           );
-
           return;
         }
 
-        // Stop timers because OTP verification succeeded.
         _expiryTimer?.cancel();
         _resendTimer?.cancel();
 
@@ -347,7 +300,6 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
           setState(() {
             _otpExpired = true;
           });
-
           _showMessage(
             title: 'OTP expired',
             message: 'This OTP has expired. Please request a new OTP.',
@@ -372,7 +324,6 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
         setState(() {
           _otpExpired = true;
         });
-
         _showMessage(
           title: 'OTP expired',
           message: 'This OTP has expired. Please request a new OTP.',
@@ -394,16 +345,11 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     }
   }
 
-  // ============================================================
-  // RESEND OTP
-  // ============================================================
-
+  /// Requests a new OTP code to be sent to the user's email address.
   Future<void> _resendOtp() async {
     _clearMessage();
 
-    if (!_canResend || _isResending || _isLoading) {
-      return;
-    }
+    if (!_canResend || _isResending || _isLoading) return;
 
     setState(() {
       _isResending = true;
@@ -421,7 +367,6 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
           response.data != null &&
           response.data!.sent == true) {
         _clearOtp();
-
         _startExpiryTimer();
         _startResendTimer();
 
@@ -467,10 +412,6 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     }
   }
 
-  // ============================================================
-  // DISPOSE
-  // ============================================================
-
   @override
   void dispose() {
     _expiryTimer?.cancel();
@@ -487,14 +428,9 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
     super.dispose();
   }
 
-  // ============================================================
-  // UI
-  // ============================================================
-
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
-
     final isComplete = _isOtpComplete;
 
     return Scaffold(
@@ -506,10 +442,6 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 12),
-
-              // ==================================================
-              // ICON
-              // ==================================================
               Container(
                 width: 80,
                 height: 80,
@@ -523,23 +455,13 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
                   color: primaryColor,
                 ),
               ),
-
               const SizedBox(height: 24),
-
-              // ==================================================
-              // TITLE
-              // ==================================================
               const Text(
                 'Verify Your Email',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
               ),
-
               const SizedBox(height: 8),
-
-              // ==================================================
-              // EMAIL TEXT
-              // ==================================================
               Text.rich(
                 TextSpan(
                   text: 'We have sent a 6-digit verification code to\n',
@@ -560,12 +482,7 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
                 ),
                 textAlign: TextAlign.center,
               ),
-
               const SizedBox(height: 24),
-
-              // ==================================================
-              // APP MESSAGE
-              // ==================================================
               if (_message != null) ...[
                 Align(
                   alignment: Alignment.centerLeft,
@@ -578,15 +495,9 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
                 ),
                 const SizedBox(height: 20),
               ],
-
-              // ==================================================
-              // OTP BOXES
-              // ==================================================
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(6, (index) {
-                  final isFocused = _focusNodes[index].hasFocus;
-
                   return Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -658,12 +569,7 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
                   );
                 }),
               ),
-
               const SizedBox(height: 24),
-
-              // ==================================================
-              // COUNTDOWN
-              // ==================================================
               if (!_otpExpired)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -700,12 +606,7 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
                     ),
                   ],
                 ),
-
               const SizedBox(height: 28),
-
-              // ==================================================
-              // VERIFY BUTTON
-              // ==================================================
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -736,12 +637,7 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
                         ),
                 ),
               ),
-
               const SizedBox(height: 18),
-
-              // ==================================================
-              // RESEND OTP
-              // ==================================================
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -774,12 +670,7 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 8),
-
-              // ==================================================
-              // CHANGE EMAIL
-              // ==================================================
               TextButton(
                 onPressed: (_isLoading || _isResending)
                     ? null
@@ -788,12 +679,7 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
                       },
                 child: const Text('Change Email'),
               ),
-
               const SizedBox(height: 10),
-
-              // ==================================================
-              // INFO
-              // ==================================================
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -816,7 +702,6 @@ class _ForgotPasswordOtpState extends State<ForgotPasswordOtp> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 20),
             ],
           ),

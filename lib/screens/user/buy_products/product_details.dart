@@ -8,6 +8,7 @@ import '../reviews/write_review.dart';
 import 'checkout.dart';
 import 'seller_profile.dart';
 
+/// Screen displaying full item details, image gallery, seller info, reviews, and purchasing options.
 class ProductDetails extends StatefulWidget {
   final Map<String, dynamic> product;
 
@@ -40,18 +41,14 @@ class _ProductDetailsState extends State<ProductDetails> {
     super.dispose();
   }
 
-  // PRODUCT DATA
-
   String get title =>
       widget.product['title']?.toString() ?? 'Wooden Study Table';
 
   int get priceValue {
     final value = widget.product['price'];
-
     if (value is num) {
       return value.toInt();
     }
-
     return _extractNumericPrice(value?.toString() ?? '2500');
   }
 
@@ -75,38 +72,31 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   int get availableQuantity {
     final value = widget.product['availableQuantity'];
-
     if (value is num) {
       return value.toInt();
     }
-
     return int.tryParse(value?.toString() ?? '') ?? 5;
   }
 
   double get rating {
     final value = widget.product['rating'];
-
     if (value is num) {
       return value.toDouble();
     }
-
     return double.tryParse(value?.toString() ?? '') ?? 4.7;
   }
 
   int get reviewCount {
     final value =
         widget.product['reviewCount'] ?? widget.product['reviews'] ?? 42;
-
     if (value is num) {
       return value.toInt();
     }
-
     return int.tryParse(value.toString()) ?? 42;
   }
 
   List<String> get images {
     final productImages = widget.product['images'];
-
     if (productImages is List && productImages.isNotEmpty) {
       return productImages
           .map((image) => image.toString())
@@ -115,7 +105,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
 
     final singleImage = widget.product['image']?.toString();
-
     if (singleImage != null && singleImage.isNotEmpty) {
       return [singleImage];
     }
@@ -127,8 +116,6 @@ class _ProductDetailsState extends State<ProductDetails> {
       'https://images.unsplash.com/photo-1593642532400-2682810df593?auto=format&fit=crop&w=1200&q=85',
     ];
   }
-
-  // BUILD
 
   @override
   Widget build(BuildContext context) {
@@ -157,35 +144,29 @@ class _ProductDetailsState extends State<ProductDetails> {
               ],
             ),
           ),
-
           _buildBottomBar(),
         ],
       ),
     );
   }
 
-  // APP BAR
-
+  /// AppBar with product screen title, share action, and overflow options.
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: AppColors.surface,
       foregroundColor: AppColors.textPrimary,
       elevation: 0,
       scrolledUnderElevation: 0,
-
       leading: IconButton(
         tooltip: 'Back',
         onPressed: () => Navigator.pop(context),
         icon: const Icon(Icons.arrow_back_rounded),
       ),
-
       title: const Text(
         'Product Details',
         style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
       ),
-
       centerTitle: true,
-
       actions: [
         IconButton(
           tooltip: 'Share',
@@ -201,8 +182,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // IMAGE GALLERY
-
+  /// Interactive product image slider with pagination indicator and wishlist toggle.
   Widget _buildImageGallery() {
     return Container(
       color: AppColors.surface,
@@ -238,10 +218,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                         );
                       },
                       loadingBuilder: (context, child, progress) {
-                        if (progress == null) {
-                          return child;
-                        }
-
+                        if (progress == null) return child;
                         return Container(
                           color: AppColors.light,
                           child: const Center(
@@ -255,8 +232,6 @@ class _ProductDetailsState extends State<ProductDetails> {
                     );
                   },
                 ),
-
-                // Wishlist
                 Positioned(
                   top: 16,
                   right: 16,
@@ -282,8 +257,6 @@ class _ProductDetailsState extends State<ProductDetails> {
                     ),
                   ),
                 ),
-
-                // Image counter
                 Positioned(
                   left: 16,
                   bottom: 16,
@@ -309,7 +282,6 @@ class _ProductDetailsState extends State<ProductDetails> {
               ],
             ),
           ),
-
           if (images.length > 1)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 13),
@@ -317,7 +289,6 @@ class _ProductDetailsState extends State<ProductDetails> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(images.length, (index) {
                   final selected = index == _currentImage;
-
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     margin: const EdgeInsets.symmetric(horizontal: 3),
@@ -336,8 +307,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // PRODUCT HEADER
-
+  /// Top section containing title, price, tags, and stock banner.
   Widget _buildProductHeader() {
     return _section(
       child: Column(
@@ -350,9 +320,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               _buildTag(category, Icons.category_outlined),
             ],
           ),
-
           const SizedBox(height: 14),
-
           Text(
             title,
             style: const TextStyle(
@@ -362,9 +330,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               height: 1.2,
             ),
           ),
-
           const SizedBox(height: 9),
-
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -376,9 +342,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   color: AppColors.primary,
                 ),
               ),
-
               const SizedBox(width: 9),
-
               const Text(
                 'Negotiable',
                 style: TextStyle(
@@ -389,9 +353,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               ),
             ],
           ),
-
           const SizedBox(height: 12),
-
           Row(
             children: [
               const Icon(
@@ -399,9 +361,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 size: 17,
                 color: Color(0xFFFFB300),
               ),
-
               const SizedBox(width: 4),
-
               Text(
                 rating.toStringAsFixed(1),
                 style: const TextStyle(
@@ -410,56 +370,43 @@ class _ProductDetailsState extends State<ProductDetails> {
                   color: AppColors.textPrimary,
                 ),
               ),
-
               const SizedBox(width: 4),
-
               Text('($reviewCount reviews)', style: AppTextStyles.caption),
-
               const SizedBox(width: 16),
-
               const Icon(
                 Icons.visibility_outlined,
                 size: 16,
                 color: AppColors.textSecondary,
               ),
-
               const SizedBox(width: 4),
-
               Text(
                 '${widget.product['views'] ?? 12} views',
                 style: AppTextStyles.caption,
               ),
-
               const SizedBox(width: 16),
-
               const Icon(
                 Icons.favorite_border_rounded,
                 size: 16,
                 color: AppColors.textSecondary,
               ),
-
               const SizedBox(width: 4),
-
               Text(
                 '${widget.product['wishlistCount'] ?? 4} saved',
                 style: AppTextStyles.caption,
               ),
             ],
           ),
-
           const SizedBox(height: 13),
-
           _buildAvailabilityBanner(),
         ],
       ),
     );
   }
 
+  /// Banner indicating remaining stock availability.
   Widget _buildAvailabilityBanner() {
     final available = availableQuantity;
-
     final Color color = available <= 2 ? AppColors.error : AppColors.success;
-
     final String message = available <= 2
         ? 'Only $available left'
         : '$available items available';
@@ -494,6 +441,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Tag chip helper for rendering category and condition labels.
   Widget _buildTag(String text, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
@@ -519,8 +467,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // SELLER
-
+  /// Seller summary card with rating, listings count, and profile navigation link.
   Widget _buildSellerSection() {
     return _section(
       child: Column(
@@ -536,9 +483,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   color: AppColors.textPrimary,
                 ),
               ),
-
               const Spacer(),
-
               TextButton(
                 onPressed: _openSellerProfile,
                 child: const Text(
@@ -548,9 +493,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               ),
             ],
           ),
-
           const SizedBox(height: 9),
-
           InkWell(
             onTap: _openSellerProfile,
             borderRadius: BorderRadius.circular(15),
@@ -576,9 +519,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                       size: 28,
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -596,9 +537,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                                 ),
                               ),
                             ),
-
                             const SizedBox(width: 5),
-
                             const Icon(
                               Icons.verified_rounded,
                               size: 16,
@@ -606,9 +545,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 4),
-
                         Row(
                           children: [
                             const Icon(
@@ -629,14 +566,11 @@ class _ProductDetailsState extends State<ProductDetails> {
                             Text('127 listings', style: AppTextStyles.caption),
                           ],
                         ),
-
                         const SizedBox(height: 3),
-
                         Text('EcoLoop member', style: AppTextStyles.caption),
                       ],
                     ),
                   ),
-
                   const Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 14,
@@ -646,9 +580,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
@@ -677,8 +609,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // LOCATION
-
+  /// Item location detail row widget.
   Widget _buildLocationSection() {
     return _section(
       child: InkWell(
@@ -700,9 +631,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 color: AppColors.primary,
               ),
             ),
-
             const SizedBox(width: 12),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -720,7 +649,6 @@ class _ProductDetailsState extends State<ProductDetails> {
                 ],
               ),
             ),
-
             const Icon(
               Icons.arrow_forward_ios_rounded,
               size: 14,
@@ -732,8 +660,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // DESCRIPTION
-
+  /// Full text description and sustainability impact card.
   Widget _buildDescriptionSection() {
     return _section(
       child: Column(
@@ -747,9 +674,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               color: AppColors.textPrimary,
             ),
           ),
-
           const SizedBox(height: 12),
-
           Text(
             description,
             style: const TextStyle(
@@ -758,9 +683,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               color: AppColors.textSecondary,
             ),
           ),
-
           const SizedBox(height: 14),
-
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
@@ -789,8 +712,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ITEM INFORMATION
-
+  /// Key specifications list including category, condition, and listing date.
   Widget _buildItemInformation() {
     return _section(
       child: Column(
@@ -804,25 +726,19 @@ class _ProductDetailsState extends State<ProductDetails> {
               color: AppColors.textPrimary,
             ),
           ),
-
           const SizedBox(height: 16),
-
           _infoRow(Icons.category_outlined, 'Category', category),
-
           _infoRow(Icons.check_circle_outline, 'Condition', condition),
-
           _infoRow(
             Icons.inventory_2_outlined,
             'Availability',
             '$availableQuantity item${availableQuantity == 1 ? '' : 's'} available',
           ),
-
           _infoRow(
             Icons.calendar_today_outlined,
             'Listed',
             widget.product['date']?.toString() ?? '28 Aug 2026',
           ),
-
           _infoRow(
             Icons.local_shipping_outlined,
             'Delivery',
@@ -833,15 +749,14 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Helper row widget for individual item specification items.
   Widget _infoRow(IconData icon, String title, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: Row(
         children: [
           Icon(icon, size: 19, color: AppColors.primary),
-
           const SizedBox(width: 10),
-
           Text(
             title,
             style: const TextStyle(
@@ -849,9 +764,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               color: AppColors.textSecondary,
             ),
           ),
-
           const Spacer(),
-
           Flexible(
             child: Text(
               value,
@@ -868,8 +781,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // REVIEWS
-
+  /// Rating breakdown, review cards, and review creation trigger.
   Widget _buildReviewsSection() {
     return _section(
       child: Column(
@@ -885,9 +797,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   color: AppColors.textPrimary,
                 ),
               ),
-
               const Spacer(),
-
               TextButton(
                 onPressed: _openAllReviews,
                 child: const Text(
@@ -897,13 +807,9 @@ class _ProductDetailsState extends State<ProductDetails> {
               ),
             ],
           ),
-
           const SizedBox(height: 8),
-
           _buildRatingSummary(),
-
           const SizedBox(height: 16),
-
           _buildReviewCard(
             name: 'Priya S.',
             rating: 5,
@@ -912,9 +818,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 'Great quality! Exactly as shown. Very sturdy and easy to assemble.',
             imageCount: 2,
           ),
-
           const SizedBox(height: 10),
-
           _buildReviewCard(
             name: 'Amit K.',
             rating: 4,
@@ -923,9 +827,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 'Good product for the price. Minor scratches but overall great.',
             imageCount: 1,
           ),
-
           const SizedBox(height: 12),
-
           SizedBox(
             width: double.infinity,
             height: 43,
@@ -943,6 +845,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Summary bar showing average score and distribution chart for star ratings.
   Widget _buildRatingSummary() {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -963,7 +866,6 @@ class _ProductDetailsState extends State<ProductDetails> {
                   color: AppColors.textPrimary,
                 ),
               ),
-
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: List.generate(5, (index) {
@@ -976,15 +878,11 @@ class _ProductDetailsState extends State<ProductDetails> {
                   );
                 }),
               ),
-
               const SizedBox(height: 3),
-
               Text('$reviewCount reviews', style: AppTextStyles.caption),
             ],
           ),
-
           const SizedBox(width: 20),
-
           Expanded(
             child: Column(
               children: [
@@ -1001,6 +899,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Helper bar widget rendering percentage distribution for individual star ratings.
   Widget _ratingBar(int number, double percentage) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -1016,11 +915,8 @@ class _ProductDetailsState extends State<ProductDetails> {
               ),
             ),
           ),
-
           const Icon(Icons.star_rounded, size: 11, color: Color(0xFFFFB300)),
-
           const SizedBox(width: 5),
-
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
@@ -1037,6 +933,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Review item card showing reviewer details, score, text, and user media.
   Widget _buildReviewCard({
     required String name,
     required int rating,
@@ -1069,9 +966,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   color: AppColors.primary,
                 ),
               ),
-
               const SizedBox(width: 9),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1084,9 +979,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-
                     const SizedBox(height: 2),
-
                     Row(
                       children: [
                         ...List.generate(
@@ -1099,16 +992,13 @@ class _ProductDetailsState extends State<ProductDetails> {
                             color: const Color(0xFFFFB300),
                           ),
                         ),
-
                         const SizedBox(width: 6),
-
                         Text(date, style: AppTextStyles.caption),
                       ],
                     ),
                   ],
                 ),
               ),
-
               const Icon(
                 Icons.verified_rounded,
                 size: 16,
@@ -1116,9 +1006,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               ),
             ],
           ),
-
           const SizedBox(height: 9),
-
           Text(
             review,
             style: const TextStyle(
@@ -1127,10 +1015,8 @@ class _ProductDetailsState extends State<ProductDetails> {
               color: AppColors.textSecondary,
             ),
           ),
-
           if (imageCount > 0) ...[
             const SizedBox(height: 9),
-
             Row(
               children: List.generate(imageCount, (index) {
                 return Container(
@@ -1155,8 +1041,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ECOLOOP INFORMATION
-
+  /// Informational section highlighting platform advantages and guarantees.
   Widget _buildEcoLoopInfo() {
     return _section(
       child: Column(
@@ -1170,27 +1055,22 @@ class _ProductDetailsState extends State<ProductDetails> {
               color: AppColors.textPrimary,
             ),
           ),
-
           const SizedBox(height: 16),
-
           _benefitRow(
             Icons.verified_user_outlined,
             'Safer transactions',
             'Keep your purchase protected through EcoLoop.',
           ),
-
           _benefitRow(
             Icons.local_shipping_outlined,
             'Reliable delivery',
             'Delivery options are handled through EcoLoop.',
           ),
-
           _benefitRow(
             Icons.eco_outlined,
             'Give items another life',
             'Every reused item helps reduce unnecessary waste.',
           ),
-
           _benefitRow(
             Icons.support_agent_outlined,
             'EcoLoop support',
@@ -1201,6 +1081,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Benefit row item for platform highlights.
   Widget _benefitRow(IconData icon, String title, String subtitle) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 17),
@@ -1216,9 +1097,7 @@ class _ProductDetailsState extends State<ProductDetails> {
             ),
             child: Icon(icon, size: 19, color: AppColors.primary),
           ),
-
           const SizedBox(width: 11),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1231,9 +1110,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     color: AppColors.textPrimary,
                   ),
                 ),
-
                 const SizedBox(height: 3),
-
                 Text(
                   subtitle,
                   style: const TextStyle(
@@ -1250,8 +1127,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // SIMILAR PRODUCTS
-
+  /// Horizontal scrolling carousel of related product recommendations.
   Widget _buildSimilarProducts() {
     final products = _similarProducts;
 
@@ -1275,7 +1151,6 @@ class _ProductDetailsState extends State<ProductDetails> {
                     ),
                   ),
                 ),
-
                 TextButton(
                   onPressed: () {
                     _showMessage('More products will open later.');
@@ -1288,9 +1163,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               ],
             ),
           ),
-
           const SizedBox(height: 10),
-
           SizedBox(
             height: 190,
             child: ListView.separated(
@@ -1309,6 +1182,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Card item rendered inside the similar products carousel.
   Widget _buildSimilarProductCard(Map<String, dynamic> product) {
     return GestureDetector(
       onTap: () {
@@ -1342,7 +1216,6 @@ class _ProductDetailsState extends State<ProductDetails> {
                     ),
                   ),
                 ),
-
                 Positioned(
                   right: 7,
                   top: 7,
@@ -1362,9 +1235,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 ),
               ],
             ),
-
             const SizedBox(height: 7),
-
             Text(
               product['title'].toString(),
               maxLines: 1,
@@ -1375,9 +1246,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 color: AppColors.textPrimary,
               ),
             ),
-
             const SizedBox(height: 3),
-
             Text(
               '₹${_formatPrice(_extractNumericPrice(product['price'].toString()))}',
               style: const TextStyle(
@@ -1392,8 +1261,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // DUMMY RELATED PRODUCTS
-
+  /// Mock dataset for similar products recommendations.
   List<Map<String, dynamic>> get _similarProducts {
     return [
       {
@@ -1447,8 +1315,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     ];
   }
 
-  // BOTTOM PURCHASE BAR
-
+  /// Persistent bottom purchase bar for quantity selection, cart addition, and instant checkout.
   Widget _buildBottomBar() {
     return Positioned(
       left: 0,
@@ -1470,7 +1337,6 @@ class _ProductDetailsState extends State<ProductDetails> {
           top: false,
           child: Row(
             children: [
-              // Quantity
               Container(
                 height: 48,
                 decoration: BoxDecoration(
@@ -1491,7 +1357,6 @@ class _ProductDetailsState extends State<ProductDetails> {
                       icon: const Icon(Icons.remove_rounded, size: 18),
                       color: AppColors.primary,
                     ),
-
                     SizedBox(
                       width: 20,
                       child: Text(
@@ -1504,7 +1369,6 @@ class _ProductDetailsState extends State<ProductDetails> {
                         ),
                       ),
                     ),
-
                     IconButton(
                       onPressed: _increaseQuantity,
                       icon: const Icon(Icons.add_rounded, size: 18),
@@ -1513,10 +1377,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   ],
                 ),
               ),
-
               const SizedBox(width: 8),
-
-              // Add to cart
               Expanded(
                 child: SizedBox(
                   height: 48,
@@ -1547,10 +1408,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   ),
                 ),
               ),
-
               const SizedBox(width: 8),
-
-              // Buy Now
               Expanded(
                 child: SizedBox(
                   height: 48,
@@ -1591,8 +1449,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // QUANTITY
-
+  /// Increments quantity selection up to maximum available stock.
   void _increaseQuantity() {
     if (_quantity < availableQuantity) {
       setState(() {
@@ -1605,8 +1462,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
   }
 
-  // ADD TO CART
-
+  /// Formats product data and presents the cart popup drawer.
   void _addToCart() {
     if (availableQuantity <= 0) {
       _showMessage('This product is currently unavailable.');
@@ -1642,15 +1498,10 @@ class _ProductDetailsState extends State<ProductDetails> {
       cartProduct['images'] = images;
     }
 
-    // UI-only cart popup.
-    //
-    // The popup will use the same cart data once
-    // CartManager is connected in the next step.
     CartPopup.show(context, items: [cartProduct]);
   }
 
-  // BUY NOW
-
+  /// Directs user immediately to the checkout flow with selected quantity.
   void _buyNow() {
     if (availableQuantity <= 0) {
       _showMessage('This product is currently unavailable.');
@@ -1665,8 +1516,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // WISHLIST
-
+  /// Toggles saved/wishlist state for current product item.
   void _toggleWishlist() {
     setState(() {
       _isWishlisted = !_isWishlisted;
@@ -1677,8 +1527,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // SELLER PROFILE
-
+  /// Opens full profile page for the seller.
   void _openSellerProfile() {
     Navigator.push(
       context,
@@ -1698,8 +1547,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // REVIEWS ACTIONS
-
+  /// Opens the complete list of reviews for this product.
   void _openAllReviews() {
     Navigator.push(
       context,
@@ -1709,6 +1557,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Opens form interface for submitting a new review.
   void _writeReview() {
     Navigator.push(
       context,
@@ -1716,14 +1565,12 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // SHARE
-
+  /// Triggers product sharing option placeholder.
   void _shareProduct() {
     _showMessage('Product sharing will be connected later.');
   }
 
-  // MORE OPTIONS
-
+  /// Displays bottom sheet with secondary actions.
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
@@ -1746,9 +1593,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-
                 const SizedBox(height: 15),
-
                 ListTile(
                   leading: const Icon(
                     Icons.favorite_border_rounded,
@@ -1757,13 +1602,11 @@ class _ProductDetailsState extends State<ProductDetails> {
                   title: const Text('Add to Wishlist'),
                   onTap: () {
                     Navigator.pop(sheetContext);
-
                     if (!_isWishlisted) {
                       _toggleWishlist();
                     }
                   },
                 ),
-
                 ListTile(
                   leading: const Icon(
                     Icons.share_outlined,
@@ -1775,7 +1618,6 @@ class _ProductDetailsState extends State<ProductDetails> {
                     _shareProduct();
                   },
                 ),
-
                 ListTile(
                   leading: const Icon(
                     Icons.rate_review_outlined,
@@ -1787,7 +1629,6 @@ class _ProductDetailsState extends State<ProductDetails> {
                     _openAllReviews();
                   },
                 ),
-
                 ListTile(
                   leading: const Icon(
                     Icons.flag_outlined,
@@ -1810,19 +1651,18 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // REPORT
-
+  /// Footer trigger button for reporting an issue with the product listing.
   Widget _buildReportSection() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 15, 20, 10),
       child: InkWell(
         onTap: _reportProduct,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
+            children: [
               Icon(
                 Icons.flag_outlined,
                 size: 17,
@@ -1844,6 +1684,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Displays bottom sheet form with listing reporting categories.
   void _reportProduct() {
     showModalBottomSheet(
       context: context,
@@ -1869,9 +1710,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 const Text(
                   'Report Listing',
                   style: TextStyle(
@@ -1880,9 +1719,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     color: AppColors.textPrimary,
                   ),
                 ),
-
                 const SizedBox(height: 6),
-
                 const Text(
                   'Why are you reporting this listing?',
                   style: TextStyle(
@@ -1890,27 +1727,22 @@ class _ProductDetailsState extends State<ProductDetails> {
                     color: AppColors.textSecondary,
                   ),
                 ),
-
                 const SizedBox(height: 15),
-
                 _reportOption(
                   'Misleading information',
                   Icons.info_outline,
                   sheetContext,
                 ),
-
                 _reportOption(
                   'Inappropriate content',
                   Icons.block_outlined,
                   sheetContext,
                 ),
-
                 _reportOption(
                   'Suspicious or scam listing',
                   Icons.warning_amber_outlined,
                   sheetContext,
                 ),
-
                 _reportOption('Other', Icons.more_horiz_rounded, sheetContext),
               ],
             ),
@@ -1920,6 +1752,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Option tile item rendered inside the listing report bottom sheet.
   Widget _reportOption(String title, IconData icon, BuildContext sheetContext) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 0),
@@ -1935,30 +1768,25 @@ class _ProductDetailsState extends State<ProductDetails> {
       ),
       onTap: () {
         Navigator.pop(sheetContext);
-
         _showMessage('Report submitted for review.');
       },
     );
   }
 
-  // HELPERS
-
+  /// Helper parsing formatted price strings into integer values.
   int _extractNumericPrice(String value) {
     final cleaned = value.replaceAll('₹', '').replaceAll(',', '').trim();
-
     return int.tryParse(cleaned) ?? 0;
   }
 
+  /// Helper formatting price integers with comma separators.
   String _formatPrice(int value) {
     final valueString = value.toString();
-
     final buffer = StringBuffer();
 
     for (int i = 0; i < valueString.length; i++) {
       final position = valueString.length - i;
-
       buffer.write(valueString[i]);
-
       if (position > 1 && position % 3 == 1) {
         buffer.write(',');
       }
@@ -1967,6 +1795,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     return buffer.toString();
   }
 
+  /// Displays floating snackbar message feedback.
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -1975,6 +1804,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       );
   }
 
+  /// Card container block wrapper for primary detail sections.
   Widget _section({required Widget child}) {
     return Container(
       width: double.infinity,

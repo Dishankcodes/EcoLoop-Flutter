@@ -4,6 +4,7 @@ import '../../../app_theme/app_colors.dart';
 import '../../../app_theme/app_text_styles.dart';
 import 'order_success.dart';
 
+/// Screen managing checkout payment method selection, card/UPI input fields, and payment confirmation.
 class Payment extends StatefulWidget {
   const Payment({
     super.key,
@@ -25,35 +26,16 @@ class Payment extends StatefulWidget {
 }
 
 class _PaymentState extends State<Payment> {
-  // ---------------------------------------------------------------------------
-  // PAYMENT METHOD
-  // ---------------------------------------------------------------------------
-
   String _selectedMethod = 'upi';
-
   String? _selectedUpiApp;
-
   String? _selectedBank;
-
   bool _isProcessing = false;
 
-  // ---------------------------------------------------------------------------
-  // CONTROLLERS
-  // ---------------------------------------------------------------------------
-
   final TextEditingController _upiController = TextEditingController();
-
   final TextEditingController _cardNumberController = TextEditingController();
-
   final TextEditingController _cardNameController = TextEditingController();
-
   final TextEditingController _expiryController = TextEditingController();
-
   final TextEditingController _cvvController = TextEditingController();
-
-  // ---------------------------------------------------------------------------
-  // LIFECYCLE
-  // ---------------------------------------------------------------------------
 
   @override
   void dispose() {
@@ -62,34 +44,27 @@ class _PaymentState extends State<Payment> {
     _cardNameController.dispose();
     _expiryController.dispose();
     _cvvController.dispose();
-
     super.dispose();
   }
 
-  // ---------------------------------------------------------------------------
-  // HELPERS
-  // ---------------------------------------------------------------------------
-
+  /// Formats price values for quick action button labels.
   String _formatPrice(double value) {
     return '₹${value.round()}';
   }
 
+  /// Formats currency values into Indian numbering system layout with commas.
   String _formatIndianPrice(double value) {
     final number = value.round().toString();
-
     if (number.length <= 3) {
       return '₹$number';
     }
 
     final lastThree = number.substring(number.length - 3);
-
     var remaining = number.substring(0, number.length - 3);
-
     final parts = <String>[];
 
     while (remaining.length > 2) {
       parts.insert(0, remaining.substring(remaining.length - 2));
-
       remaining = remaining.substring(0, remaining.length - 2);
     }
 
@@ -100,27 +75,24 @@ class _PaymentState extends State<Payment> {
     return '₹${parts.join(',')},$lastThree';
   }
 
+  /// Extracts image URL from various map key formats in product items.
   String _productImage(Map<String, dynamic> item) {
     final image = item['image'];
-
     if (image is String && image.trim().isNotEmpty) {
       return image;
     }
 
     final imageUrl = item['imageUrl'];
-
     if (imageUrl is String && imageUrl.trim().isNotEmpty) {
       return imageUrl;
     }
 
     final imageUrls = item['imageUrls'];
-
     if (imageUrls is List && imageUrls.isNotEmpty) {
       return imageUrls.first.toString();
     }
 
     final images = item['images'];
-
     if (images is List && images.isNotEmpty) {
       return images.first.toString();
     }
@@ -128,46 +100,36 @@ class _PaymentState extends State<Payment> {
     return '';
   }
 
+  /// Extracts product title string safely from item map.
   String _productTitle(Map<String, dynamic> item) {
     return (item['title'] ?? item['name'] ?? 'EcoLoop Product').toString();
   }
 
+  /// Extracts product quantity safely as an integer.
   int _productQuantity(Map<String, dynamic> item) {
     final quantity = item['quantity'];
-
     if (quantity is int) {
       return quantity;
     }
-
     if (quantity is num) {
       return quantity.toInt();
     }
-
     return int.tryParse(quantity?.toString() ?? '') ?? 1;
   }
 
-  // ---------------------------------------------------------------------------
-  // PAYMENT METHOD SELECTION
-  // ---------------------------------------------------------------------------
-
+  /// Updates active payment mode selection.
   void _selectMethod(String method) {
     setState(() {
       _selectedMethod = method;
-
       if (method != 'upi') {
         _selectedUpiApp = null;
       }
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // PAYMENT ACTION
-  // ---------------------------------------------------------------------------
-
+  /// Validates selected payment option inputs and initiates processing simulation.
   Future<void> _payNow() async {
-    if (_isProcessing) {
-      return;
-    }
+    if (_isProcessing) return;
 
     if (_selectedMethod == 'upi') {
       if (_selectedUpiApp == null && _upiController.text.trim().isEmpty) {
@@ -181,17 +143,14 @@ class _PaymentState extends State<Payment> {
         _showMessage('Please enter a valid card number.');
         return;
       }
-
       if (_cardNameController.text.trim().isEmpty) {
         _showMessage('Please enter the name on your card.');
         return;
       }
-
       if (_expiryController.text.trim().isEmpty) {
         _showMessage('Please enter card expiry.');
         return;
       }
-
       if (_cvvController.text.trim().length < 3) {
         _showMessage('Please enter a valid CVV.');
         return;
@@ -207,15 +166,9 @@ class _PaymentState extends State<Payment> {
       _isProcessing = true;
     });
 
-    // -------------------------------------------------------------------------
-    // UI-ONLY PAYMENT SIMULATION
-    // -------------------------------------------------------------------------
-
     await Future.delayed(const Duration(milliseconds: 1200));
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     setState(() {
       _isProcessing = false;
@@ -224,10 +177,7 @@ class _PaymentState extends State<Payment> {
     _showPaymentSuccess();
   }
 
-  // ---------------------------------------------------------------------------
-  // PAYMENT SUCCESS
-  // ---------------------------------------------------------------------------
-
+  /// Displays payment confirmation modal sheet upon success.
   void _showPaymentSuccess() {
     showModalBottomSheet(
       context: context,
@@ -247,7 +197,7 @@ class _PaymentState extends State<Payment> {
                 Container(
                   width: 74,
                   height: 74,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: AppColors.light,
                     shape: BoxShape.circle,
                   ),
@@ -257,24 +207,18 @@ class _PaymentState extends State<Payment> {
                     color: AppColors.success,
                   ),
                 ),
-
                 const SizedBox(height: 18),
-
                 Text(
                   'Payment Successful',
                   style: AppTextStyles.title.copyWith(fontSize: 21),
                 ),
-
                 const SizedBox(height: 7),
-
                 Text(
                   'Your payment of ${_formatIndianPrice(widget.totalAmount)} has been received.',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.body,
                 ),
-
                 const SizedBox(height: 18),
-
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
@@ -288,9 +232,7 @@ class _PaymentState extends State<Payment> {
                         Icons.receipt_long_outlined,
                         color: AppColors.primary,
                       ),
-
                       const SizedBox(width: 12),
-
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,16 +255,13 @@ class _PaymentState extends State<Payment> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.pop(sheetContext);
-
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
@@ -355,10 +294,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // MESSAGE
-  // ---------------------------------------------------------------------------
-
+  /// Displays a floating snackbar feedback message.
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -369,22 +305,16 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // BUILD
-  // ---------------------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
         title: Text('Payment', style: AppTextStyles.title),
         centerTitle: false,
       ),
-
       body: SafeArea(
         child: Column(
           children: [
@@ -396,34 +326,23 @@ class _PaymentState extends State<Payment> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildSecureBanner(),
-
                     const SizedBox(height: 18),
-
                     _buildOrderSummary(),
-
                     const SizedBox(height: 20),
-
                     Text(
                       'Choose payment method',
                       style: AppTextStyles.title.copyWith(fontSize: 17),
                     ),
-
                     const SizedBox(height: 10),
-
                     _buildPaymentMethods(),
-
                     const SizedBox(height: 20),
-
                     _buildPaymentDetails(),
-
                     const SizedBox(height: 20),
-
                     _buildSecurityCard(),
                   ],
                 ),
               ),
             ),
-
             _buildBottomPaymentBar(),
           ],
         ),
@@ -431,10 +350,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // SECURE BANNER
-  // ---------------------------------------------------------------------------
-
+  /// Security badge banner header.
   Widget _buildSecureBanner() {
     return Container(
       width: double.infinity,
@@ -449,7 +365,7 @@ class _PaymentState extends State<Payment> {
           Container(
             width: 44,
             height: 44,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.surface,
               shape: BoxShape.circle,
             ),
@@ -458,9 +374,7 @@ class _PaymentState extends State<Payment> {
               color: AppColors.primary,
             ),
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -481,7 +395,6 @@ class _PaymentState extends State<Payment> {
               ],
             ),
           ),
-
           const Icon(
             Icons.verified_rounded,
             color: AppColors.success,
@@ -492,10 +405,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // ORDER SUMMARY
-  // ---------------------------------------------------------------------------
-
+  /// Summary section showing checkout order line items and total amount payable.
   Widget _buildOrderSummary() {
     final items = widget.items ?? [];
 
@@ -532,9 +442,7 @@ class _PaymentState extends State<Payment> {
           Row(
             children: [
               _sectionIcon(Icons.shopping_bag_outlined),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Text(
                   'Order summary',
@@ -544,18 +452,14 @@ class _PaymentState extends State<Payment> {
                   ),
                 ),
               ),
-
               Text(
                 '${items.length} item${items.length == 1 ? '' : 's'}',
                 style: AppTextStyles.caption,
               ),
             ],
           ),
-
           const SizedBox(height: 14),
-
           ...items.take(3).map((item) => _buildMiniProduct(item)),
-
           if (items.length > 3)
             Padding(
               padding: const EdgeInsets.only(top: 7),
@@ -570,13 +474,9 @@ class _PaymentState extends State<Payment> {
                 ),
               ),
             ),
-
           const SizedBox(height: 12),
-
           const Divider(height: 1),
-
           const SizedBox(height: 12),
-
           Row(
             children: [
               Text(
@@ -598,6 +498,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
+  /// Helper widget rendering individual product item row inside summary card.
   Widget _buildMiniProduct(Map<String, dynamic> item) {
     final image = _productImage(item);
 
@@ -626,9 +527,7 @@ class _PaymentState extends State<Payment> {
                   )
                 : const Icon(Icons.eco_outlined, color: AppColors.primary),
           ),
-
           const SizedBox(width: 10),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -651,7 +550,6 @@ class _PaymentState extends State<Payment> {
               ],
             ),
           ),
-
           Text(
             _formatIndianPrice(
               _toDouble(item['price']) * _productQuantity(item),
@@ -667,10 +565,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // PAYMENT METHODS
-  // ---------------------------------------------------------------------------
-
+  /// List options for supported payment modes.
   Widget _buildPaymentMethods() {
     return Column(
       children: [
@@ -680,36 +575,28 @@ class _PaymentState extends State<Payment> {
           title: 'UPI',
           subtitle: 'Google Pay, PhonePe, Paytm & more',
         ),
-
         const SizedBox(height: 9),
-
         _paymentMethodTile(
           value: 'card',
           icon: Icons.credit_card_outlined,
           title: 'Credit / Debit Card',
           subtitle: 'Visa, Mastercard, RuPay & more',
         ),
-
         const SizedBox(height: 9),
-
         _paymentMethodTile(
           value: 'netbanking',
           icon: Icons.account_balance_outlined,
           title: 'Net Banking',
           subtitle: 'Pay directly from your bank account',
         ),
-
         const SizedBox(height: 9),
-
         _paymentMethodTile(
           value: 'wallet',
           icon: Icons.account_balance_wallet_rounded,
           title: 'Wallets',
           subtitle: 'Use your preferred digital wallet',
         ),
-
         const SizedBox(height: 9),
-
         _paymentMethodTile(
           value: 'cod',
           icon: Icons.local_shipping_outlined,
@@ -720,6 +607,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
+  /// Selectable tile option for payment methods list.
   Widget _paymentMethodTile({
     required String value,
     required IconData icon,
@@ -729,9 +617,7 @@ class _PaymentState extends State<Payment> {
     final selected = _selectedMethod == value;
 
     return InkWell(
-      onTap: () {
-        _selectMethod(value);
-      },
+      onTap: () => _selectMethod(value),
       borderRadius: BorderRadius.circular(17),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -755,9 +641,7 @@ class _PaymentState extends State<Payment> {
               ),
               child: Icon(icon, color: AppColors.primary, size: 21),
             ),
-
             const SizedBox(width: 12),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -775,7 +659,6 @@ class _PaymentState extends State<Payment> {
                 ],
               ),
             ),
-
             Icon(
               selected
                   ? Icons.radio_button_checked_rounded
@@ -788,36 +671,25 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // PAYMENT DETAILS
-  // ---------------------------------------------------------------------------
-
+  /// Returns active input fields matching selected payment mode.
   Widget _buildPaymentDetails() {
     switch (_selectedMethod) {
       case 'upi':
         return _buildUpiSection();
-
       case 'card':
         return _buildCardSection();
-
       case 'netbanking':
         return _buildNetBankingSection();
-
       case 'wallet':
         return _buildWalletSection();
-
       case 'cod':
         return _buildCodSection();
-
       default:
         return const SizedBox.shrink();
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // UPI
-  // ---------------------------------------------------------------------------
-
+  /// Render UPI app selector options and manual UPI ID text field.
   Widget _buildUpiSection() {
     return _sectionCard(
       child: Column(
@@ -830,9 +702,7 @@ class _PaymentState extends State<Payment> {
               fontWeight: FontWeight.w700,
             ),
           ),
-
           const SizedBox(height: 12),
-
           Row(
             children: [
               _upiApp(
@@ -854,9 +724,7 @@ class _PaymentState extends State<Payment> {
               ),
             ],
           ),
-
           const SizedBox(height: 14),
-
           Row(
             children: [
               Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -867,17 +735,15 @@ class _PaymentState extends State<Payment> {
               Expanded(child: Divider(color: Colors.grey.shade300)),
             ],
           ),
-
           const SizedBox(height: 14),
-
           TextField(
             controller: _upiController,
             keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               labelText: 'UPI ID',
               hintText: 'example@upi',
-              prefixIcon: const Icon(Icons.alternate_email_rounded),
-              suffixIcon: const Icon(
+              prefixIcon: Icon(Icons.alternate_email_rounded),
+              suffixIcon: Icon(
                 Icons.verified_outlined,
                 color: AppColors.success,
               ),
@@ -888,6 +754,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
+  /// App icon selector tile component for UPI applications.
   Widget _upiApp({
     required IconData icon,
     required String title,
@@ -935,10 +802,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // CARD
-  // ---------------------------------------------------------------------------
-
+  /// Card credentials form section.
   Widget _buildCardSection() {
     return _sectionCard(
       child: Column(
@@ -951,9 +815,7 @@ class _PaymentState extends State<Payment> {
               fontWeight: FontWeight.w700,
             ),
           ),
-
           const SizedBox(height: 13),
-
           TextField(
             controller: _cardNumberController,
             keyboardType: TextInputType.number,
@@ -965,9 +827,7 @@ class _PaymentState extends State<Payment> {
               counterText: '',
             ),
           ),
-
           const SizedBox(height: 10),
-
           TextField(
             controller: _cardNameController,
             textCapitalization: TextCapitalization.words,
@@ -976,9 +836,7 @@ class _PaymentState extends State<Payment> {
               prefixIcon: Icon(Icons.person_outline_rounded),
             ),
           ),
-
           const SizedBox(height: 10),
-
           Row(
             children: [
               Expanded(
@@ -993,9 +851,7 @@ class _PaymentState extends State<Payment> {
                   ),
                 ),
               ),
-
               const SizedBox(width: 10),
-
               Expanded(
                 child: TextField(
                   controller: _cvvController,
@@ -1011,9 +867,7 @@ class _PaymentState extends State<Payment> {
               ),
             ],
           ),
-
           const SizedBox(height: 10),
-
           Row(
             children: [
               const Icon(
@@ -1033,10 +887,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // NET BANKING
-  // ---------------------------------------------------------------------------
-
+  /// Netbanking bank selection grid.
   Widget _buildNetBankingSection() {
     final banks = [
       'HDFC Bank',
@@ -1058,9 +909,7 @@ class _PaymentState extends State<Payment> {
               fontWeight: FontWeight.w700,
             ),
           ),
-
           const SizedBox(height: 12),
-
           Wrap(
             spacing: 9,
             runSpacing: 9,
@@ -1107,10 +956,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // WALLET
-  // ---------------------------------------------------------------------------
-
+  /// Digital wallet provider list.
   Widget _buildWalletSection() {
     return _sectionCard(
       child: Column(
@@ -1123,23 +969,18 @@ class _PaymentState extends State<Payment> {
               fontWeight: FontWeight.w700,
             ),
           ),
-
           const SizedBox(height: 12),
-
           _walletOption('Paytm Wallet', Icons.account_balance_wallet_outlined),
-
           const SizedBox(height: 9),
-
           _walletOption('Amazon Pay', Icons.shopping_bag_outlined),
-
           const SizedBox(height: 9),
-
           _walletOption('Other Wallet', Icons.wallet_outlined),
         ],
       ),
     );
   }
 
+  /// Option item for wallet provider list.
   Widget _walletOption(String title, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -1179,10 +1020,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // COD
-  // ---------------------------------------------------------------------------
-
+  /// Information card for Cash on Delivery option.
   Widget _buildCodSection() {
     return _sectionCard(
       child: Row(
@@ -1200,9 +1038,7 @@ class _PaymentState extends State<Payment> {
               color: AppColors.primary,
             ),
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1214,16 +1050,12 @@ class _PaymentState extends State<Payment> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-
                 const SizedBox(height: 4),
-
                 Text(
                   'Pay using cash when your EcoLoop order is delivered.',
                   style: AppTextStyles.caption.copyWith(height: 1.45),
                 ),
-
                 const SizedBox(height: 10),
-
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -1250,10 +1082,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // SECURITY CARD
-  // ---------------------------------------------------------------------------
-
+  /// Card highlighting transaction security features and guarantees.
   Widget _buildSecurityCard() {
     return Container(
       width: double.infinity,
@@ -1284,19 +1113,15 @@ class _PaymentState extends State<Payment> {
               ),
             ],
           ),
-
           const SizedBox(height: 12),
-
           _securityPoint(
             Icons.lock_outline_rounded,
             'Secure payment processing',
           ),
-
           _securityPoint(
             Icons.privacy_tip_outlined,
             'Your payment details stay protected',
           ),
-
           _securityPoint(
             Icons.support_agent_outlined,
             'EcoLoop support available for orders',
@@ -1306,6 +1131,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
+  /// Helper row widget for safety points inside the security card.
   Widget _securityPoint(IconData icon, String text) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
@@ -1319,8 +1145,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // BOTTOM PAYMENT BAR
-
+  /// Fixed bottom navigation bar with live total payable amount and action trigger.
   Widget _buildBottomPaymentBar() {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
@@ -1349,18 +1174,14 @@ class _PaymentState extends State<Payment> {
                     letterSpacing: 0.6,
                   ),
                 ),
-
                 const SizedBox(height: 2),
-
                 Text(
                   _formatIndianPrice(widget.totalAmount),
                   style: AppTextStyles.title.copyWith(fontSize: 19),
                 ),
               ],
             ),
-
             const SizedBox(width: 16),
-
             Expanded(
               child: SizedBox(
                 height: 52,
@@ -1396,8 +1217,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // COMMON SECTION CARD
-
+  /// Container box wrapper used for primary screen section cards.
   Widget _sectionCard({required Widget child}) {
     return Container(
       width: double.infinity,
@@ -1411,6 +1231,7 @@ class _PaymentState extends State<Payment> {
     );
   }
 
+  /// Leading icon box for summary headers.
   Widget _sectionIcon(IconData icon) {
     return Container(
       width: 40,
@@ -1423,21 +1244,17 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  // DOUBLE HELPER
-
+  /// Utility function safely parsing dynamic price values to double.
   double _toDouble(dynamic value) {
     if (value is double) {
       return value;
     }
-
     if (value is num) {
       return value.toDouble();
     }
-
     if (value is String) {
       return double.tryParse(value.replaceAll(',', '')) ?? 0;
     }
-
     return 0;
   }
 }

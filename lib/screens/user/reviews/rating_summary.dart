@@ -3,6 +3,17 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/app_colors.dart';
 import '../../../app_theme/app_text_styles.dart';
 
+/// Reusable rating summary widget.
+///
+/// Displays:
+/// - Overall rating
+/// - Total review count
+/// - 5-star to 1-star distribution
+/// - Percentage bars
+/// - Individual rating counts
+///
+/// UI-only for now.
+/// Real rating data will be supplied by the backend later.
 class RatingSummary extends StatelessWidget {
   final double rating;
   final int totalReviews;
@@ -26,24 +37,59 @@ class RatingSummary extends StatelessWidget {
     this.ratingCounts,
   });
 
+  // SAFE VALUES
+
+  double get _safeRating {
+    if (rating.isNaN || rating.isInfinite) {
+      return 0;
+    }
+
+    return rating.clamp(0.0, 5.0);
+  }
+
+  int get _safeTotalReviews {
+    return totalReviews < 0 ? 0 : totalReviews;
+  }
+
   // GET COUNT
 
-  int _getRatingCount(int rating) {
+  int _getRatingCount(int starRating) {
+    final count = ratingCounts?[starRating] ?? 0;
+
+    if (count < 0) {
+      return 0;
+    }
+
+    return count;
+  }
+
+  // TOTAL DISTRIBUTION COUNT
+
+  int get _distributionTotal {
     if (ratingCounts == null) {
       return 0;
     }
 
-    return ratingCounts![rating] ?? 0;
+    return List.generate(5, (index) {
+      final starRating = 5 - index;
+      return _getRatingCount(starRating);
+    }).fold<int>(0, (sum, count) => sum + count);
   }
 
   // PERCENTAGE
 
-  double _getPercentage(int rating) {
-    if (totalReviews <= 0) {
-      return 0;
+  double _getPercentage(int starRating) {
+    final count = _getRatingCount(starRating);
+
+    // If rating distribution is supplied, use the actual
+    // distribution total. This prevents incorrect percentages
+    // when the distribution and totalReviews don't match.
+    if (_distributionTotal > 0) {
+      return (count / _distributionTotal).clamp(0.0, 1.0);
     }
 
-    return _getRatingCount(rating) / totalReviews;
+    // If there is no distribution data, keep the bars empty.
+    return 0;
   }
 
   // BUILD
@@ -61,13 +107,15 @@ class RatingSummary extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          
           // OVERALL RATING
+          
           SizedBox(
             width: 92,
             child: Column(
               children: [
                 Text(
-                  rating.toStringAsFixed(1),
+                  _safeRating.toStringAsFixed(1),
                   style: AppTextStyles.heading.copyWith(
                     fontSize: 30,
                     fontWeight: FontWeight.w700,
@@ -77,12 +125,13 @@ class RatingSummary extends StatelessWidget {
 
                 const SizedBox(height: 4),
 
-                _buildStars(rating, size: 17),
+                _buildStars(_safeRating, size: 17),
 
                 const SizedBox(height: 6),
 
                 Text(
-                  '$totalReviews reviews',
+                  '${_safeTotalReviews} '
+                  '${_safeTotalReviews == 1 ? 'review' : 'reviews'}',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.caption,
                 ),
@@ -92,7 +141,9 @@ class RatingSummary extends StatelessWidget {
 
           const SizedBox(width: 18),
 
+          
           // RATING DISTRIBUTION
+          
           Expanded(
             child: Column(
               children: [
@@ -119,9 +170,7 @@ class RatingSummary extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          // ------------------------------------------------------
           // STAR NUMBER
-          // ------------------------------------------------------
           SizedBox(
             width: 15,
             child: Text(
@@ -135,16 +184,12 @@ class RatingSummary extends StatelessWidget {
 
           const SizedBox(width: 3),
 
-          // ------------------------------------------------------
           // STAR ICON
-          // ------------------------------------------------------
           const Icon(Icons.star_rounded, size: 14, color: AppColors.primary),
 
           const SizedBox(width: 7),
 
-          // ------------------------------------------------------
           // PROGRESS BAR
-          // ------------------------------------------------------
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
@@ -161,11 +206,9 @@ class RatingSummary extends StatelessWidget {
 
           const SizedBox(width: 7),
 
-          // ------------------------------------------------------
           // PERCENTAGE
-          // ------------------------------------------------------
           SizedBox(
-            width: 34,
+            width: 36,
             child: Text(
               '${(percentage * 100).round()}%',
               textAlign: TextAlign.right,
@@ -178,11 +221,9 @@ class RatingSummary extends StatelessWidget {
 
           const SizedBox(width: 5),
 
-          // ------------------------------------------------------
           // COUNT
-          // ------------------------------------------------------
           SizedBox(
-            width: 20,
+            width: 24,
             child: Text(
               '$count',
               textAlign: TextAlign.right,
