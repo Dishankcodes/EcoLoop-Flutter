@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/app_colors.dart';
 import '../../../app_theme/app_text_styles.dart';
+import '../reviews/seller_reviews.dart';
 import 'product_details.dart';
 
+/// Screen displaying the detailed profile, statistics, active listings, and reviews for a seller.
 class SellerProfile extends StatefulWidget {
   const SellerProfile({super.key, required this.seller});
 
@@ -15,17 +17,12 @@ class SellerProfile extends StatefulWidget {
 
 class _SellerProfileState extends State<SellerProfile> {
   bool _isFollowing = false;
-
-  // ============================================================
-  // SELLER LISTINGS
-  // ============================================================
-
   late final List<Map<String, dynamic>> _listings;
 
   @override
   void initState() {
     super.initState();
-
+    // Initialize mock listing data associated with the current seller.
     _listings = [
       {
         'id': 101,
@@ -39,14 +36,11 @@ class _SellerProfileState extends State<SellerProfile> {
         'wishlistCount': 21,
         'availableQuantity': 1,
         'description':
-            'Solid wooden study table in good condition. '
-            'Suitable for home offices, study rooms and creative spaces.',
+            'Solid wooden study table in good condition. Suitable for home offices, study rooms and creative spaces.',
         'image':
-            'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc'
-            '?auto=format&fit=crop&w=1000&q=85',
+            'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?auto=format&fit=crop&w=1000&q=85',
         'images': [
-          'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc'
-              '?auto=format&fit=crop&w=1200&q=85',
+          'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?auto=format&fit=crop&w=1200&q=85',
         ],
       },
       {
@@ -61,14 +55,11 @@ class _SellerProfileState extends State<SellerProfile> {
         'wishlistCount': 12,
         'availableQuantity': 2,
         'description':
-            'Comfortable wooden chair that can be reused at home, '
-            'in a workspace or for creative projects.',
+            'Comfortable wooden chair that can be reused at home, in a workspace or for creative projects.',
         'image':
-            'https://images.unsplash.com/photo-1503602642458-232111445657'
-            '?auto=format&fit=crop&w=1000&q=85',
+            'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=1000&q=85',
         'images': [
-          'https://images.unsplash.com/photo-1503602642458-232111445657'
-              '?auto=format&fit=crop&w=1200&q=85',
+          'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=1200&q=85',
         ],
       },
       {
@@ -83,14 +74,11 @@ class _SellerProfileState extends State<SellerProfile> {
         'wishlistCount': 8,
         'availableQuantity': 5,
         'description':
-            'Collection of reclaimed wood pieces for DIY, '
-            'crafting and upcycling projects.',
+            'Collection of reclaimed wood pieces for DIY, crafting and upcycling projects.',
         'image':
-            'https://images.unsplash.com/photo-1519710164239-da123dc03ef4'
-            '?auto=format&fit=crop&w=1000&q=85',
+            'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=1000&q=85',
         'images': [
-          'https://images.unsplash.com/photo-1519710164239-da123dc03ef4'
-              '?auto=format&fit=crop&w=1200&q=85',
+          'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=1200&q=85',
         ],
       },
       {
@@ -105,67 +93,45 @@ class _SellerProfileState extends State<SellerProfile> {
         'wishlistCount': 16,
         'availableQuantity': 1,
         'description':
-            'Vintage storage cabinet with plenty of room for '
-            'books, decor and household items.',
+            'Vintage storage cabinet with plenty of room for books, decor and household items.',
         'image':
-            'https://images.unsplash.com/photo-1558997519-83ea9252edf8'
-            '?auto=format&fit=crop&w=1000&q=85',
+            'https://images.unsplash.com/photo-1558997519-83ea9252edf8?auto=format&fit=crop&w=1000&q=85',
         'images': [
-          'https://images.unsplash.com/photo-1558997519-83ea9252edf8'
-              '?auto=format&fit=crop&w=1200&q=85',
+          'https://images.unsplash.com/photo-1558997519-83ea9252edf8?auto=format&fit=crop&w=1200&q=85',
         ],
       },
     ];
   }
 
-  // ============================================================
-  // BUILD
-  // ============================================================
-
   @override
   Widget build(BuildContext context) {
     final sellerName = widget.seller['name']?.toString() ?? 'Rahul';
-
     final location =
         widget.seller['location']?.toString() ?? 'Ahmedabad, Gujarat';
-
     final rating = widget.seller['rating']?.toString() ?? '4.8';
-
     final reviews = widget.seller['reviews']?.toString() ?? '42';
-
     final listings = widget.seller['listings']?.toString() ?? '127';
-
     final sold = widget.seller['sold']?.toString() ?? '42';
-
     final positive = widget.seller['positive']?.toString() ?? '98%';
 
     return Scaffold(
       backgroundColor: AppColors.background,
-
-      // ==========================================================
-      // APP BAR
-      // ==========================================================
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
-
         leading: IconButton(
           tooltip: 'Back',
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
           icon: const Icon(
             Icons.arrow_back_rounded,
             color: AppColors.textPrimary,
           ),
         ),
-
         title: Text(
           'Seller Profile',
           style: AppTextStyles.title.copyWith(fontSize: 20),
         ),
-
         actions: [
           IconButton(
             tooltip: 'More',
@@ -177,10 +143,6 @@ class _SellerProfileState extends State<SellerProfile> {
           ),
         ],
       ),
-
-      // ==========================================================
-      // BODY
-      // ==========================================================
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -188,49 +150,28 @@ class _SellerProfileState extends State<SellerProfile> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --------------------------------------------------
-              // SELLER HEADER
-              // --------------------------------------------------
               _buildSellerHeader(
                 sellerName: sellerName,
                 location: location,
                 rating: rating,
                 reviews: reviews,
               ),
-
               const SizedBox(height: 18),
-
-              // --------------------------------------------------
-              // FOLLOW / CONTACT
-              // --------------------------------------------------
               _buildActionButtons(),
-
               const SizedBox(height: 22),
-
-              // --------------------------------------------------
-              // STATS
-              // --------------------------------------------------
               _buildStats(listings: listings, sold: sold, positive: positive),
-
               const SizedBox(height: 24),
-
-              // --------------------------------------------------
-              // ABOUT SELLER
-              // --------------------------------------------------
               _buildAboutSeller(),
-
+              const SizedBox(height: 18),
+              _buildReviewsSection(
+                sellerName: sellerName,
+                location: location,
+                rating: rating,
+                reviews: reviews,
+              ),
               const SizedBox(height: 25),
-
-              // --------------------------------------------------
-              // LISTINGS HEADER
-              // --------------------------------------------------
               _buildListingsHeader(),
-
               const SizedBox(height: 12),
-
-              // --------------------------------------------------
-              // PRODUCT GRID
-              // --------------------------------------------------
               _buildListings(),
             ],
           ),
@@ -239,10 +180,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ============================================================
-  // SELLER HEADER
-  // ============================================================
-
+  /// Builds the top section with avatar, verification status, rating, and location.
   Widget _buildSellerHeader({
     required String sellerName,
     required String location,
@@ -252,9 +190,6 @@ class _SellerProfileState extends State<SellerProfile> {
     return Center(
       child: Column(
         children: [
-          // ------------------------------------------------------
-          // AVATAR
-          // ------------------------------------------------------
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -277,10 +212,6 @@ class _SellerProfileState extends State<SellerProfile> {
                   ),
                 ),
               ),
-
-              // --------------------------------------------------
-              // VERIFIED BADGE
-              // --------------------------------------------------
               Positioned(
                 right: 1,
                 bottom: 3,
@@ -301,12 +232,7 @@ class _SellerProfileState extends State<SellerProfile> {
               ),
             ],
           ),
-
           const SizedBox(height: 12),
-
-          // ------------------------------------------------------
-          // NAME
-          // ------------------------------------------------------
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -314,9 +240,7 @@ class _SellerProfileState extends State<SellerProfile> {
                 sellerName,
                 style: AppTextStyles.title.copyWith(fontSize: 20),
               ),
-
               const SizedBox(width: 5),
-
               const Icon(
                 Icons.verified_rounded,
                 size: 18,
@@ -324,39 +248,43 @@ class _SellerProfileState extends State<SellerProfile> {
               ),
             ],
           ),
-
           const SizedBox(height: 5),
-
-          // ------------------------------------------------------
-          // RATING
-          // ------------------------------------------------------
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.star_rounded, color: Colors.amber, size: 17),
-
-              const SizedBox(width: 4),
-
-              Text(
-                rating,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+          GestureDetector(
+            onTap: () => _openSellerReviews(
+              sellerName: sellerName,
+              location: location,
+              rating: rating,
+              reviews: reviews,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.star_rounded,
+                  color: AppColors.primary,
+                  size: 17,
                 ),
-              ),
-
-              const SizedBox(width: 3),
-
-              Text('($reviews reviews)', style: AppTextStyles.caption),
-            ],
+                const SizedBox(width: 4),
+                Text(
+                  rating,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 3),
+                Text('($reviews reviews)', style: AppTextStyles.caption),
+                const SizedBox(width: 2),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 17,
+                  color: AppColors.textSecondary,
+                ),
+              ],
+            ),
           ),
-
           const SizedBox(height: 5),
-
-          // ------------------------------------------------------
-          // LOCATION
-          // ------------------------------------------------------
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -365,15 +293,11 @@ class _SellerProfileState extends State<SellerProfile> {
                 color: AppColors.textSecondary,
                 size: 14,
               ),
-
               const SizedBox(width: 3),
-
               Text(location, style: AppTextStyles.caption),
             ],
           ),
-
           const SizedBox(height: 6),
-
           Text(
             'Member since January 2025',
             style: AppTextStyles.caption.copyWith(fontSize: 9),
@@ -383,23 +307,16 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ============================================================
-  // ACTION BUTTONS
-  // ============================================================
-
+  /// Builds the follow toggle and contact buttons.
   Widget _buildActionButtons() {
     return Row(
       children: [
-        // --------------------------------------------------------
-        // FOLLOW
-        // --------------------------------------------------------
         Expanded(
           child: OutlinedButton.icon(
             onPressed: () {
               setState(() {
                 _isFollowing = !_isFollowing;
               });
-
               _showMessage(
                 _isFollowing
                     ? 'You are now following this seller.'
@@ -423,12 +340,7 @@ class _SellerProfileState extends State<SellerProfile> {
             ),
           ),
         ),
-
         const SizedBox(width: 10),
-
-        // --------------------------------------------------------
-        // CONTACT
-        // --------------------------------------------------------
         Expanded(
           child: ElevatedButton.icon(
             onPressed: _contactSeller,
@@ -449,10 +361,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ============================================================
-  // STATS
-  // ============================================================
-
+  /// Builds the summary stats row displaying total listings, items sold, and positive feedback percentage.
   Widget _buildStats({
     required String listings,
     required String sold,
@@ -474,9 +383,7 @@ class _SellerProfileState extends State<SellerProfile> {
               icon: Icons.inventory_2_outlined,
             ),
           ),
-
           _statDivider(),
-
           Expanded(
             child: _statItem(
               value: sold,
@@ -484,9 +391,7 @@ class _SellerProfileState extends State<SellerProfile> {
               icon: Icons.shopping_bag_outlined,
             ),
           ),
-
           _statDivider(),
-
           Expanded(
             child: _statItem(
               value: positive,
@@ -499,6 +404,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
+  /// Helper widget for rendering a single statistic card inside the stats row.
   Widget _statItem({
     required String value,
     required String label,
@@ -507,18 +413,15 @@ class _SellerProfileState extends State<SellerProfile> {
     return Column(
       children: [
         Icon(icon, size: 18, color: AppColors.primary),
-
         const SizedBox(height: 5),
-
         Text(value, style: AppTextStyles.title.copyWith(fontSize: 17)),
-
         const SizedBox(height: 2),
-
         Text(label, style: AppTextStyles.caption.copyWith(fontSize: 9)),
       ],
     );
   }
 
+  /// Vertical line separator used between individual statistic items.
   Widget _statDivider() {
     return Container(
       width: 1,
@@ -527,18 +430,13 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ============================================================
-  // ABOUT SELLER
-  // ============================================================
-
+  /// Renders the seller's biography and interest tags section.
   Widget _buildAboutSeller() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('About Seller', style: AppTextStyles.title.copyWith(fontSize: 16)),
-
         const SizedBox(height: 10),
-
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(15),
@@ -551,14 +449,10 @@ class _SellerProfileState extends State<SellerProfile> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'I believe useful things should not be '
-                'thrown away. I enjoy giving furniture, '
-                'materials and household items a second life.',
+                'I believe useful things should not be thrown away. I enjoy giving furniture, materials and household items a second life.',
                 style: AppTextStyles.body.copyWith(fontSize: 12, height: 1.55),
               ),
-
               const SizedBox(height: 13),
-
               Wrap(
                 spacing: 7,
                 runSpacing: 7,
@@ -575,6 +469,120 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
+  /// Renders a clickable summary card leading to the seller reviews screen.
+  Widget _buildReviewsSection({
+    required String sellerName,
+    required String location,
+    required String rating,
+    required String reviews,
+  }) {
+    final ratingValue = double.tryParse(rating) ?? 4.8;
+    final reviewCount = int.tryParse(reviews) ?? 42;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Reviews', style: AppTextStyles.title.copyWith(fontSize: 16)),
+        const SizedBox(height: 10),
+        GestureDetector(
+          onTap: () => _openSellerReviews(
+            sellerName: sellerName,
+            location: location,
+            rating: rating,
+            reviews: reviews,
+          ),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.accent.withOpacity(0.45)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                    color: AppColors.light,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.star_rounded,
+                    color: AppColors.primary,
+                    size: 25,
+                  ),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Seller Reviews',
+                        style: AppTextStyles.title.copyWith(fontSize: 15),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.star_rounded,
+                            color: AppColors.primary,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            ratingValue.toStringAsFixed(1),
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '$reviewCount reviews',
+                            style: AppTextStyles.caption,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textSecondary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Navigates to the full seller reviews screen.
+  void _openSellerReviews({
+    required String sellerName,
+    required String location,
+    required String rating,
+    required String reviews,
+  }) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SellerReviews(
+          sellerName: sellerName,
+          sellerLocation: location,
+          rating: double.tryParse(rating) ?? 4.8,
+          reviewCount: int.tryParse(reviews) ?? 42,
+          isVerified: true,
+        ),
+      ),
+    );
+  }
+
+  /// Chip tag indicating specific seller interests or specialties.
   Widget _interestTag(String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
@@ -593,10 +601,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ============================================================
-  // LISTINGS HEADER
-  // ============================================================
-
+  /// Header row above the product grid containing count and sort options.
   Widget _buildListingsHeader() {
     return Row(
       children: [
@@ -604,9 +609,7 @@ class _SellerProfileState extends State<SellerProfile> {
           'Active Listings',
           style: AppTextStyles.title.copyWith(fontSize: 16),
         ),
-
         const SizedBox(width: 7),
-
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
           decoration: BoxDecoration(
@@ -622,9 +625,7 @@ class _SellerProfileState extends State<SellerProfile> {
             ),
           ),
         ),
-
         const Spacer(),
-
         Text(
           'Newest',
           style: AppTextStyles.caption.copyWith(
@@ -632,9 +633,7 @@ class _SellerProfileState extends State<SellerProfile> {
             fontWeight: FontWeight.w600,
           ),
         ),
-
         const SizedBox(width: 3),
-
         const Icon(
           Icons.keyboard_arrow_down_rounded,
           size: 16,
@@ -644,10 +643,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ============================================================
-  // LISTINGS
-  // ============================================================
-
+  /// Grid view rendering active product listings for this seller.
   Widget _buildListings() {
     return GridView.builder(
       shrinkWrap: true,
@@ -661,7 +657,6 @@ class _SellerProfileState extends State<SellerProfile> {
       ),
       itemBuilder: (context, index) {
         final product = _listings[index];
-
         return _SellerProductCard(
           product: product,
           onTap: () {
@@ -677,18 +672,12 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ============================================================
-  // CONTACT SELLER
-  // ============================================================
-
+  /// Action placeholder for starting a direct chat with the seller.
   void _contactSeller() {
     _showMessage('Chat with seller will be connected later.');
   }
 
-  // ============================================================
-  // MORE OPTIONS
-  // ============================================================
-
+  /// Displays a modal sheet containing options to report or block the seller.
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
@@ -711,29 +700,23 @@ class _SellerProfileState extends State<SellerProfile> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-
                 const SizedBox(height: 18),
-
                 _sellerOption(
                   icon: Icons.flag_outlined,
                   title: 'Report Seller',
                   destructive: true,
                   onTap: () {
                     Navigator.pop(sheetContext);
-
                     _showMessage('Report seller option selected.');
                   },
                 ),
-
                 const SizedBox(height: 9),
-
                 _sellerOption(
                   icon: Icons.block_outlined,
                   title: 'Block Seller',
                   destructive: true,
                   onTap: () {
                     Navigator.pop(sheetContext);
-
                     _showMessage('Block seller option selected.');
                   },
                 ),
@@ -745,6 +728,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
+  /// Tile item for options listed in the seller actions bottom sheet.
   Widget _sellerOption({
     required IconData icon,
     required String title,
@@ -775,9 +759,7 @@ class _SellerProfileState extends State<SellerProfile> {
               size: 20,
               color: destructive ? AppColors.error : AppColors.primary,
             ),
-
             const SizedBox(width: 10),
-
             Text(
               title,
               style: TextStyle(
@@ -786,9 +768,7 @@ class _SellerProfileState extends State<SellerProfile> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-
             const Spacer(),
-
             Icon(
               Icons.chevron_right_rounded,
               size: 19,
@@ -800,23 +780,16 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ============================================================
-  // MESSAGE
-  // ============================================================
-
+  /// Displays a floating snackbar feedback message.
   void _showMessage(String message) {
     if (!mounted) return;
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 }
 
-// =================================================================
-// SELLER PRODUCT CARD
-// =================================================================
-
+/// Product card widget displayed in the active listings grid of the seller profile.
 class _SellerProductCard extends StatelessWidget {
   const _SellerProductCard({required this.product, required this.onTap});
 
@@ -847,9 +820,6 @@ class _SellerProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ======================================================
-            // IMAGE
-            // ======================================================
             Expanded(
               child: Stack(
                 children: [
@@ -871,10 +841,6 @@ class _SellerProductCard extends StatelessWidget {
                       },
                     ),
                   ),
-
-                  // ------------------------------------------------
-                  // CONDITION
-                  // ------------------------------------------------
                   Positioned(
                     top: 8,
                     left: 8,
@@ -897,10 +863,6 @@ class _SellerProductCard extends StatelessWidget {
                       ),
                     ),
                   ),
-
-                  // ------------------------------------------------
-                  // CATEGORY
-                  // ------------------------------------------------
                   Positioned(
                     bottom: 8,
                     left: 8,
@@ -926,10 +888,6 @@ class _SellerProductCard extends StatelessWidget {
                 ],
               ),
             ),
-
-            // ======================================================
-            // DETAILS
-            // ======================================================
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
               child: Column(
@@ -945,16 +903,12 @@ class _SellerProductCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-
                   const SizedBox(height: 3),
-
                   Text(
                     '₹$price',
                     style: AppTextStyles.title.copyWith(fontSize: 16),
                   ),
-
                   const SizedBox(height: 4),
-
                   Row(
                     children: [
                       const Icon(
@@ -962,16 +916,12 @@ class _SellerProductCard extends StatelessWidget {
                         size: 11,
                         color: AppColors.textSecondary,
                       ),
-
                       const SizedBox(width: 3),
-
                       Text(
                         '${product['views']} views',
                         style: AppTextStyles.caption.copyWith(fontSize: 9),
                       ),
-
                       const Spacer(),
-
                       const Icon(
                         Icons.arrow_forward_rounded,
                         size: 12,
