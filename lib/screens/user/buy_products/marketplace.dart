@@ -17,9 +17,7 @@ class Marketplace extends StatefulWidget {
 }
 
 class _MarketplaceState extends State<Marketplace> {
-  // ============================================================
   // STATE
-  // ============================================================
 
   String selectedCategory = 'All';
 
@@ -31,9 +29,7 @@ class _MarketplaceState extends State<Marketplace> {
 
   final TextEditingController _searchController = TextEditingController();
 
-  // ============================================================
   // CATEGORIES
-  // ============================================================
 
   final List<String> categories = [
     'All',
@@ -45,9 +41,7 @@ class _MarketplaceState extends State<Marketplace> {
     'Books',
   ];
 
-  // ============================================================
   // CONDITIONS
-  // ============================================================
 
   final List<String> conditions = [
     'All',
@@ -59,9 +53,7 @@ class _MarketplaceState extends State<Marketplace> {
     'Recycled',
   ];
 
-  // ============================================================
   // DUMMY PRODUCTS
-  // ============================================================
 
   final List<Map<String, dynamic>> products = [
     {
@@ -238,9 +230,7 @@ class _MarketplaceState extends State<Marketplace> {
     },
   ];
 
-  // ============================================================
   // INIT
-  // ============================================================
 
   @override
   void initState() {
@@ -256,9 +246,7 @@ class _MarketplaceState extends State<Marketplace> {
     }
   }
 
-  // ============================================================
   // DISPOSE
-  // ============================================================
 
   @override
   void dispose() {
@@ -266,18 +254,14 @@ class _MarketplaceState extends State<Marketplace> {
     super.dispose();
   }
 
-  // ============================================================
   // FILTERED PRODUCTS
-  // ============================================================
 
   List<Map<String, dynamic>> get filteredProducts {
     List<Map<String, dynamic>> result = List<Map<String, dynamic>>.from(
       products,
     );
 
-    // ------------------------------------------------------------
     // CATEGORY
-    // ------------------------------------------------------------
 
     if (selectedCategory != 'All') {
       result = result
@@ -285,9 +269,7 @@ class _MarketplaceState extends State<Marketplace> {
           .toList();
     }
 
-    // ------------------------------------------------------------
     // SEARCH
-    // ------------------------------------------------------------
 
     if (searchQuery.trim().isNotEmpty) {
       final query = searchQuery.toLowerCase().trim();
@@ -307,9 +289,7 @@ class _MarketplaceState extends State<Marketplace> {
       }).toList();
     }
 
-    // ------------------------------------------------------------
     // CONDITION
-    // ------------------------------------------------------------
 
     if (selectedCondition != 'All') {
       result = result
@@ -317,9 +297,7 @@ class _MarketplaceState extends State<Marketplace> {
           .toList();
     }
 
-    // ------------------------------------------------------------
     // PRICE
-    // ------------------------------------------------------------
 
     result = result.where((product) {
       final price = (product['price'] as num).toDouble();
@@ -327,9 +305,7 @@ class _MarketplaceState extends State<Marketplace> {
       return price >= priceRange.start && price <= priceRange.end;
     }).toList();
 
-    // ------------------------------------------------------------
     // SORT
-    // ------------------------------------------------------------
 
     if (selectedSort == 'Price: Low to High') {
       result.sort((a, b) => (a['price'] as num).compareTo(b['price'] as num));
@@ -342,9 +318,7 @@ class _MarketplaceState extends State<Marketplace> {
     return result;
   }
 
-  // ============================================================
   // BUILD
-  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -388,9 +362,7 @@ class _MarketplaceState extends State<Marketplace> {
 
           const Spacer(),
 
-          // ------------------------------------------------------
           // WISHLIST SHORTCUT
-          // ------------------------------------------------------
           IconButton(
             tooltip: 'Wishlist',
             onPressed: () {
@@ -405,18 +377,14 @@ class _MarketplaceState extends State<Marketplace> {
             ),
           ),
 
-          // ------------------------------------------------------
           // MORE MENU
-          // ------------------------------------------------------
           const UserMoreMenu(),
         ],
       ),
     );
   }
 
-  // ============================================================
   // SEARCH BAR
-  // ============================================================
 
   Widget _buildSearchBar() {
     return Padding(
@@ -484,9 +452,7 @@ class _MarketplaceState extends State<Marketplace> {
     );
   }
 
-  // ============================================================
   // CATEGORIES
-  // ============================================================
 
   Widget _buildCategories() {
     return SizedBox(
@@ -535,9 +501,7 @@ class _MarketplaceState extends State<Marketplace> {
     );
   }
 
-  // ============================================================
   // FILTER ROW
-  // ============================================================
 
   Widget _buildFilterRow() {
     final count = filteredProducts.length;
@@ -553,9 +517,7 @@ class _MarketplaceState extends State<Marketplace> {
 
           const Spacer(),
 
-          // ------------------------------------------------------
           // ACTIVE CATEGORY
-          // ------------------------------------------------------
           if (selectedCategory != 'All')
             _activeFilterChip(selectedCategory, () {
               setState(() {
@@ -565,9 +527,7 @@ class _MarketplaceState extends State<Marketplace> {
 
           if (selectedCategory != 'All') const SizedBox(width: 6),
 
-          // ------------------------------------------------------
           // ACTIVE CONDITION
-          // ------------------------------------------------------
           if (selectedCondition != 'All')
             _activeFilterChip(selectedCondition, () {
               setState(() {
@@ -577,9 +537,7 @@ class _MarketplaceState extends State<Marketplace> {
 
           if (selectedCondition != 'All') const SizedBox(width: 6),
 
-          // ------------------------------------------------------
           // FILTER
-          // ------------------------------------------------------
           _smallActionButton(
             icon: Icons.tune_rounded,
             text: 'Filter',
@@ -588,9 +546,7 @@ class _MarketplaceState extends State<Marketplace> {
 
           const SizedBox(width: 7),
 
-          // ------------------------------------------------------
           // SORT
-          // ------------------------------------------------------
           _smallActionButton(
             icon: Icons.swap_vert_rounded,
             text: 'Sort',
@@ -601,9 +557,7 @@ class _MarketplaceState extends State<Marketplace> {
     );
   }
 
-  // ============================================================
   // ACTIVE FILTER CHIP
-  // ============================================================
 
   Widget _activeFilterChip(String text, VoidCallback onRemove) {
     return GestureDetector(
@@ -634,9 +588,7 @@ class _MarketplaceState extends State<Marketplace> {
     );
   }
 
-  // ============================================================
   // SMALL ACTION BUTTON
-  // ============================================================
 
   Widget _smallActionButton({
     required IconData icon,
@@ -671,9 +623,7 @@ class _MarketplaceState extends State<Marketplace> {
     );
   }
 
-  // ============================================================
   // PRODUCT GRID
-  // ============================================================
 
   Widget _buildProductGrid() {
     final items = filteredProducts;
@@ -703,9 +653,7 @@ class _MarketplaceState extends State<Marketplace> {
     );
   }
 
-  // ============================================================
   // PRODUCT DETAILS
-  // ============================================================
 
   void _openProductDetails(Map<String, dynamic> product) {
     Navigator.push(
@@ -714,9 +662,7 @@ class _MarketplaceState extends State<Marketplace> {
     );
   }
 
-  // ============================================================
   // EMPTY STATE
-  // ============================================================
 
   Widget _buildEmptyState() {
     return Center(
@@ -763,9 +709,7 @@ class _MarketplaceState extends State<Marketplace> {
     );
   }
 
-  // ============================================================
   // FILTER SHEET
-  // ============================================================
 
   void _showFilterSheet() {
     RangeValues temporaryPrice = priceRange;
@@ -791,9 +735,7 @@ class _MarketplaceState extends State<Marketplace> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ------------------------------------------------
                       // HANDLE
-                      // ------------------------------------------------
                       Center(
                         child: Container(
                           height: 4,
@@ -807,9 +749,7 @@ class _MarketplaceState extends State<Marketplace> {
 
                       const SizedBox(height: 20),
 
-                      // ------------------------------------------------
                       // TITLE
-                      // ------------------------------------------------
                       Row(
                         children: [
                           Text('Filter Products', style: AppTextStyles.title),
@@ -831,9 +771,7 @@ class _MarketplaceState extends State<Marketplace> {
 
                       const SizedBox(height: 18),
 
-                      // ------------------------------------------------
                       // CATEGORY
-                      // ------------------------------------------------
                       const Text(
                         'Category',
                         style: TextStyle(
@@ -873,9 +811,7 @@ class _MarketplaceState extends State<Marketplace> {
 
                       const SizedBox(height: 22),
 
-                      // ------------------------------------------------
                       // CONDITION
-                      // ------------------------------------------------
                       const Text(
                         'Condition',
                         style: TextStyle(
@@ -915,9 +851,7 @@ class _MarketplaceState extends State<Marketplace> {
 
                       const SizedBox(height: 22),
 
-                      // ------------------------------------------------
                       // PRICE
-                      // ------------------------------------------------
                       const Text(
                         'Price Range',
                         style: TextStyle(
@@ -960,9 +894,7 @@ class _MarketplaceState extends State<Marketplace> {
 
                       const SizedBox(height: 15),
 
-                      // ------------------------------------------------
                       // APPLY
-                      // ------------------------------------------------
                       SizedBox(
                         width: double.infinity,
                         height: 48,
@@ -992,9 +924,7 @@ class _MarketplaceState extends State<Marketplace> {
     );
   }
 
-  // ============================================================
   // SORT SHEET
-  // ============================================================
 
   void _showSortSheet() {
     final options = [
@@ -1018,9 +948,7 @@ class _MarketplaceState extends State<Marketplace> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ------------------------------------------------
                 // HANDLE
-                // ------------------------------------------------
                 Center(
                   child: Container(
                     height: 4,
@@ -1095,9 +1023,7 @@ class _MarketplaceState extends State<Marketplace> {
     );
   }
 
-  // ============================================================
   // SORT ICON
-  // ============================================================
 
   IconData _sortIcon(String option) {
     switch (option) {
@@ -1115,9 +1041,7 @@ class _MarketplaceState extends State<Marketplace> {
     }
   }
 
-  // ============================================================
   // RESET FILTERS
-  // ============================================================
 
   void _resetFilters() {
     _searchController.clear();
@@ -1131,9 +1055,7 @@ class _MarketplaceState extends State<Marketplace> {
     });
   }
 
-  // ============================================================
   // MESSAGE
-  // ============================================================
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1142,9 +1064,7 @@ class _MarketplaceState extends State<Marketplace> {
   }
 }
 
-// =================================================================
 // PRODUCT CARD
-// =================================================================
 
 class _ProductCard extends StatefulWidget {
   const _ProductCard({required this.product, required this.onTap});
@@ -1184,9 +1104,7 @@ class _ProductCardState extends State<_ProductCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ======================================================
             // IMAGE
-            // ======================================================
             Expanded(
               child: Stack(
                 children: [
@@ -1224,9 +1142,7 @@ class _ProductCardState extends State<_ProductCard> {
                     ),
                   ),
 
-                  // ==================================================
                   // CONDITION
-                  // ==================================================
                   Positioned(
                     left: 9,
                     top: 9,
@@ -1250,9 +1166,7 @@ class _ProductCardState extends State<_ProductCard> {
                     ),
                   ),
 
-                  // ==================================================
                   // WISHLIST
-                  // ==================================================
                   Positioned(
                     right: 9,
                     top: 9,
@@ -1294,9 +1208,7 @@ class _ProductCardState extends State<_ProductCard> {
                     ),
                   ),
 
-                  // ==================================================
                   // CATEGORY
-                  // ==================================================
                   Positioned(
                     left: 9,
                     bottom: 9,
@@ -1323,17 +1235,13 @@ class _ProductCardState extends State<_ProductCard> {
               ),
             ),
 
-            // ======================================================
             // PRODUCT INFO
-            // ======================================================
             Padding(
               padding: const EdgeInsets.fromLTRB(11, 10, 11, 11),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ------------------------------------------------
                   // TITLE
-                  // ------------------------------------------------
                   Text(
                     product['title'],
                     maxLines: 1,
@@ -1347,9 +1255,7 @@ class _ProductCardState extends State<_ProductCard> {
 
                   const SizedBox(height: 4),
 
-                  // ------------------------------------------------
                   // PRICE
-                  // ------------------------------------------------
                   Text(
                     '₹${price.toStringAsFixed(0)}',
                     style: AppTextStyles.title.copyWith(fontSize: 17),
@@ -1357,9 +1263,7 @@ class _ProductCardState extends State<_ProductCard> {
 
                   const SizedBox(height: 5),
 
-                  // ------------------------------------------------
                   // SELLER
-                  // ------------------------------------------------
                   Row(
                     children: [
                       const Icon(
@@ -1383,9 +1287,7 @@ class _ProductCardState extends State<_ProductCard> {
 
                   const SizedBox(height: 4),
 
-                  // ------------------------------------------------
                   // LOCATION
-                  // ------------------------------------------------
                   Row(
                     children: [
                       const Icon(
@@ -1409,9 +1311,7 @@ class _ProductCardState extends State<_ProductCard> {
 
                   const SizedBox(height: 8),
 
-                  // ------------------------------------------------
                   // VIEW PRODUCT
-                  // ------------------------------------------------
                   SizedBox(
                     width: double.infinity,
                     height: 32,

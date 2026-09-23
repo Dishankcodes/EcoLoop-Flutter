@@ -12,9 +12,7 @@ class AddressList extends StatefulWidget {
 }
 
 class _AddressListState extends State<AddressList> {
-  // ===========================================================================
   // TEMPORARY UI DATA
-  // ===========================================================================
   //
   // This is only for the UI phase.
   // Backend/API integration will replace this later.
@@ -51,9 +49,7 @@ class _AddressListState extends State<AddressList> {
     ),
   ];
 
-  // ===========================================================================
   // ADD ADDRESS
-  // ===========================================================================
 
   Future<void> _addAddress() async {
     final result = await Navigator.push(
@@ -71,9 +67,7 @@ class _AddressListState extends State<AddressList> {
     }
   }
 
-  // ===========================================================================
   // EDIT ADDRESS
-  // ===========================================================================
 
   Future<void> _editAddress(AddressItem address) async {
     final result = await Navigator.push(
@@ -91,9 +85,7 @@ class _AddressListState extends State<AddressList> {
     }
   }
 
-  // ===========================================================================
   // DELETE ADDRESS
-  // ===========================================================================
 
   Future<void> _deleteAddress(AddressItem address) async {
     final shouldDelete = await showDialog<bool>(
@@ -158,9 +150,7 @@ class _AddressListState extends State<AddressList> {
     );
   }
 
-  // ===========================================================================
   // SET DEFAULT
-  // ===========================================================================
 
   void _setDefaultAddress(AddressItem address) {
     setState(() {
@@ -178,18 +168,14 @@ class _AddressListState extends State<AddressList> {
     );
   }
 
-  // ===========================================================================
   // BUILD
-  // ===========================================================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
 
-      // -----------------------------------------------------------------------
       // APP BAR
-      // -----------------------------------------------------------------------
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
@@ -212,9 +198,7 @@ class _AddressListState extends State<AddressList> {
         ),
       ),
 
-      // -----------------------------------------------------------------------
       // BODY
-      // -----------------------------------------------------------------------
       body: SafeArea(
         child: _addresses.isEmpty
             ? _EmptyAddressState(onAddAddress: _addAddress)
@@ -225,7 +209,6 @@ class _AddressListState extends State<AddressList> {
                   children: [
                     // =========================================================
                     // HEADER
-                    // =========================================================
                     Text(
                       'Saved addresses',
                       style: AppTextStyles.title.copyWith(
@@ -244,9 +227,7 @@ class _AddressListState extends State<AddressList> {
 
                     const SizedBox(height: 22),
 
-                    // =========================================================
                     // ADDRESS CARDS
-                    // =========================================================
                     ..._addresses.map(
                       (address) => Padding(
                         padding: const EdgeInsets.only(bottom: 14),
@@ -269,9 +250,7 @@ class _AddressListState extends State<AddressList> {
               ),
       ),
 
-      // -----------------------------------------------------------------------
       // ADD ADDRESS BUTTON
-      // -----------------------------------------------------------------------
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
@@ -311,9 +290,7 @@ class _AddressListState extends State<AddressList> {
   }
 }
 
-// =============================================================================
 // ADDRESS ITEM MODEL
-// =============================================================================
 
 class AddressItem {
   final String id;
@@ -349,9 +326,7 @@ class AddressItem {
     required this.isDefault,
   });
 
-  // ---------------------------------------------------------------------------
   // CONVERT TO MAP
-  // ---------------------------------------------------------------------------
 
   Map<String, dynamic> toMap() {
     return {
@@ -371,9 +346,7 @@ class AddressItem {
   }
 }
 
-// =============================================================================
 // ADDRESS CARD
-// =============================================================================
 
 class _AddressCard extends StatelessWidget {
   final AddressItem address;
@@ -673,9 +646,7 @@ class _AddressCard extends StatelessWidget {
   }
 }
 
-// =============================================================================
 // ADDRESS TYPE BADGE
-// =============================================================================
 
 class _AddressTypeBadge extends StatelessWidget {
   final String type;
@@ -705,9 +676,7 @@ class _AddressTypeBadge extends StatelessWidget {
   }
 }
 
-// =============================================================================
 // EMPTY STATE
-// =============================================================================
 
 class _EmptyAddressState extends StatelessWidget {
   final VoidCallback onAddAddress;
@@ -773,9 +742,7 @@ class _EmptyAddressState extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            // -----------------------------------------------------------------
             // ADD BUTTON
-            // -----------------------------------------------------------------
             SizedBox(
               height: 50,
 

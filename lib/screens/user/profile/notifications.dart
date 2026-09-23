@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/app_colors.dart';
 
+/// Screen for displaying user activity notifications, unread updates, and status alerts.
 class Notifications extends StatefulWidget {
   const Notifications({super.key});
 
@@ -10,10 +11,6 @@ class Notifications extends StatefulWidget {
 }
 
 class _NotificationsState extends State<Notifications> {
-  // ============================================================
-  // DUMMY NOTIFICATIONS
-  // ============================================================
-
   final List<Map<String, dynamic>> _notifications = [
     {
       'id': 1,
@@ -81,10 +78,6 @@ class _NotificationsState extends State<Notifications> {
     },
   ];
 
-  // ============================================================
-  // BUILD
-  // ============================================================
-
   @override
   Widget build(BuildContext context) {
     final unreadCount = _notifications
@@ -130,11 +123,8 @@ class _NotificationsState extends State<Notifications> {
                   _buildSectionTitle('New', '$unreadCount unread'),
                   const SizedBox(height: 8),
                 ],
-
                 ..._buildUnreadNotifications(),
-
                 const SizedBox(height: 20),
-
                 if (_hasReadNotifications()) ...[
                   _buildSectionTitle('Earlier'),
                   const SizedBox(height: 8),
@@ -145,10 +135,7 @@ class _NotificationsState extends State<Notifications> {
     );
   }
 
-  // ============================================================
-  // UNREAD
-  // ============================================================
-
+  /// Filters and builds the list of unread notification cards.
   List<Widget> _buildUnreadNotifications() {
     final unread = _notifications
         .where((notification) => !notification['isRead'])
@@ -159,10 +146,7 @@ class _NotificationsState extends State<Notifications> {
         .toList();
   }
 
-  // ============================================================
-  // READ
-  // ============================================================
-
+  /// Filters and builds the list of read notification cards.
   List<Widget> _buildReadNotifications() {
     final read = _notifications
         .where((notification) => notification['isRead'])
@@ -173,14 +157,12 @@ class _NotificationsState extends State<Notifications> {
         .toList();
   }
 
+  /// Returns true if there are any read notifications in the list.
   bool _hasReadNotifications() {
     return _notifications.any((notification) => notification['isRead']);
   }
 
-  // ============================================================
-  // SECTION TITLE
-  // ============================================================
-
+  /// Renders category section headers with optional unread count badges.
   Widget _buildSectionTitle(String title, [String? subtitle]) {
     return Row(
       children: [
@@ -214,10 +196,7 @@ class _NotificationsState extends State<Notifications> {
     );
   }
 
-  // ============================================================
-  // NOTIFICATION CARD
-  // ============================================================
-
+  /// Renders a swipeable dismissible card for a notification item.
   Widget _buildNotificationCard(Map<String, dynamic> notification) {
     final isRead = notification['isRead'] == true;
 
@@ -262,9 +241,7 @@ class _NotificationsState extends State<Notifications> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildNotificationIcon(notification['type'].toString()),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,7 +261,6 @@ class _NotificationsState extends State<Notifications> {
                             ),
                           ),
                         ),
-
                         if (!isRead)
                           Container(
                             margin: const EdgeInsets.only(left: 8, top: 4),
@@ -297,9 +273,7 @@ class _NotificationsState extends State<Notifications> {
                           ),
                       ],
                     ),
-
                     const SizedBox(height: 5),
-
                     Text(
                       notification['message'].toString(),
                       style: const TextStyle(
@@ -308,9 +282,7 @@ class _NotificationsState extends State<Notifications> {
                         color: AppColors.textSecondary,
                       ),
                     ),
-
                     const SizedBox(height: 7),
-
                     Text(
                       notification['time'].toString(),
                       style: const TextStyle(
@@ -321,9 +293,7 @@ class _NotificationsState extends State<Notifications> {
                   ],
                 ),
               ),
-
               const SizedBox(width: 5),
-
               const Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 12,
@@ -336,92 +306,66 @@ class _NotificationsState extends State<Notifications> {
     );
   }
 
-  // ============================================================
-  // NOTIFICATION ICON
-  // ============================================================
-
+  /// Returns the matching icon box based on notification type.
   Widget _buildNotificationIcon(String type) {
     IconData icon;
-    Color backgroundColor;
 
     switch (type) {
       case 'wishlist':
         icon = Icons.favorite_rounded;
-        backgroundColor = AppColors.light;
         break;
-
       case 'order':
         icon = Icons.shopping_bag_outlined;
-        backgroundColor = AppColors.light;
         break;
-
       case 'delivery':
         icon = Icons.local_shipping_outlined;
-        backgroundColor = AppColors.light;
         break;
-
       case 'donation':
         icon = Icons.volunteer_activism_outlined;
-        backgroundColor = AppColors.light;
         break;
-
       case 'reward':
         icon = Icons.card_giftcard_outlined;
-        backgroundColor = AppColors.light;
         break;
-
       case 'message':
         icon = Icons.chat_bubble_outline_rounded;
-        backgroundColor = AppColors.light;
         break;
-
       case 'eco':
         icon = Icons.eco_outlined;
-        backgroundColor = AppColors.light;
         break;
-
       default:
         icon = Icons.notifications_none_rounded;
-        backgroundColor = AppColors.light;
     }
 
     return Container(
       height: 44,
       width: 44,
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: AppColors.light,
         borderRadius: BorderRadius.circular(13),
       ),
       child: Icon(icon, size: 21, color: AppColors.primary),
     );
   }
 
-  // ============================================================
-  // ACTIONS
-  // ============================================================
-
+  /// Marks all current notifications as read.
   void _markAllAsRead() {
     setState(() {
       for (final notification in _notifications) {
         notification['isRead'] = true;
       }
     });
-
     _showMessage('All notifications marked as read.');
   }
 
+  /// Marks an individual notification as read and handles navigation/action.
   void _openNotification(Map<String, dynamic> notification) {
     setState(() {
       notification['isRead'] = true;
     });
-
     _showMessage('Notification details will be connected later.');
   }
 
-  // ============================================================
-  // EMPTY STATE
-  // ============================================================
-
+  /// Renders an empty placeholder view when there are no notifications.
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
@@ -432,7 +376,7 @@ class _NotificationsState extends State<Notifications> {
             Container(
               height: 90,
               width: 90,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.light,
                 shape: BoxShape.circle,
               ),
@@ -442,9 +386,7 @@ class _NotificationsState extends State<Notifications> {
                 color: AppColors.primary,
               ),
             ),
-
             const SizedBox(height: 20),
-
             const Text(
               'No notifications yet',
               style: TextStyle(
@@ -453,9 +395,7 @@ class _NotificationsState extends State<Notifications> {
                 color: AppColors.textPrimary,
               ),
             ),
-
             const SizedBox(height: 8),
-
             const Text(
               'When you receive updates about orders,\n'
               'listings or donations, they will appear here.',
@@ -472,11 +412,9 @@ class _NotificationsState extends State<Notifications> {
     );
   }
 
-  // ============================================================
-  // MESSAGE
-  // ============================================================
-
+  /// Displays a floating snackbar feedback message.
   void _showMessage(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );

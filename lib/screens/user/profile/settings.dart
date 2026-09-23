@@ -7,6 +7,7 @@ import '../../common/help_support.dart';
 import '../../common/terms_conditions.dart';
 import 'edit_profile.dart';
 
+/// Screen managing user preferences, account actions, privacy options, and support links.
 class Settings extends StatefulWidget {
   const Settings({super.key});
 
@@ -31,9 +32,7 @@ class _SettingsState extends State<Settings> {
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.textPrimary,
         leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_rounded),
         ),
         title: Text('Settings', style: AppTextStyles.title),
@@ -42,11 +41,7 @@ class _SettingsState extends State<Settings> {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
         children: [
-          // ======================================================
-          // PREFERENCES
-          // ======================================================
           _buildSectionTitle('Preferences'),
-
           _buildSettingsCard(
             children: [
               _buildSwitchTile(
@@ -60,15 +55,12 @@ class _SettingsState extends State<Settings> {
                   setState(() {
                     darkModeEnabled = value;
                   });
-
                   _showMessage(
                     value ? 'Dark Mode enabled' : 'Dark Mode disabled',
                   );
                 },
               ),
-
               _buildDivider(),
-
               _buildSwitchTile(
                 icon: Icons.notifications_none_rounded,
                 title: 'Notifications',
@@ -82,9 +74,7 @@ class _SettingsState extends State<Settings> {
                   });
                 },
               ),
-
               _buildDivider(),
-
               _buildSwitchTile(
                 icon: Icons.email_outlined,
                 title: 'Email Updates',
@@ -98,18 +88,14 @@ class _SettingsState extends State<Settings> {
                   });
                 },
               ),
-
               _buildDivider(),
-
               _buildSettingsTile(
                 icon: Icons.language_rounded,
                 title: 'Language',
                 subtitle: selectedLanguage,
                 onTap: _showLanguageSheet,
               ),
-
               _buildDivider(),
-
               _buildSettingsTile(
                 icon: Icons.location_on_outlined,
                 title: 'Location',
@@ -133,14 +119,8 @@ class _SettingsState extends State<Settings> {
               ),
             ],
           ),
-
           const SizedBox(height: 25),
-
-          // ======================================================
-          // ACCOUNT
-          // ======================================================
           _buildSectionTitle('Account'),
-
           _buildSettingsCard(
             children: [
               _buildSettingsTile(
@@ -154,9 +134,7 @@ class _SettingsState extends State<Settings> {
                   );
                 },
               ),
-
               _buildDivider(),
-
               _buildSettingsTile(
                 icon: Icons.lock_outline_rounded,
                 title: 'Change Password',
@@ -165,14 +143,8 @@ class _SettingsState extends State<Settings> {
               ),
             ],
           ),
-
           const SizedBox(height: 25),
-
-          // ======================================================
-          // PRIVACY & SECURITY
-          // ======================================================
           _buildSectionTitle('Privacy & Security'),
-
           _buildSettingsCard(
             children: [
               _buildSettingsTile(
@@ -181,9 +153,7 @@ class _SettingsState extends State<Settings> {
                 subtitle: 'Manage your privacy preferences',
                 onTap: _showPrivacySheet,
               ),
-
               _buildDivider(),
-
               _buildSettingsTile(
                 icon: Icons.security_outlined,
                 title: 'Security',
@@ -192,14 +162,8 @@ class _SettingsState extends State<Settings> {
               ),
             ],
           ),
-
           const SizedBox(height: 25),
-
-          // ======================================================
-          // SUPPORT
-          // ======================================================
           _buildSectionTitle('Support'),
-
           _buildSettingsCard(
             children: [
               _buildSettingsTile(
@@ -213,9 +177,7 @@ class _SettingsState extends State<Settings> {
                   );
                 },
               ),
-
               _buildDivider(),
-
               _buildSettingsTile(
                 icon: Icons.description_outlined,
                 title: 'Terms & Conditions',
@@ -227,9 +189,7 @@ class _SettingsState extends State<Settings> {
                   );
                 },
               ),
-
               _buildDivider(),
-
               _buildSettingsTile(
                 icon: Icons.info_outline_rounded,
                 title: 'About EcoLoop',
@@ -243,30 +203,21 @@ class _SettingsState extends State<Settings> {
               ),
             ],
           ),
-
           const SizedBox(height: 25),
-
-          // ======================================================
-          // FOOTER
-          // ======================================================
           Center(
             child: Text(
               'EcoLoop',
               style: AppTextStyles.title.copyWith(fontSize: 16),
             ),
           ),
-
           const SizedBox(height: 3),
-
           Center(
             child: Text(
               'Small Actions. Big Impact.',
               style: AppTextStyles.caption,
             ),
           ),
-
           const SizedBox(height: 5),
-
           Center(
             child: Text(
               'Version 1.0.0',
@@ -278,10 +229,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  // ============================================================
-  // SECTION TITLE
-  // ============================================================
-
+  /// Title header label for setting categories.
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 3, bottom: 9),
@@ -289,10 +237,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  // ============================================================
-  // SETTINGS CARD
-  // ============================================================
-
+  /// Container card wrapping settings tile options in a styled block.
   Widget _buildSettingsCard({required List<Widget> children}) {
     return Container(
       decoration: BoxDecoration(
@@ -311,10 +256,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  // ============================================================
-  // NORMAL CLICKABLE TILE
-  // ============================================================
-
+  /// Clickable navigation tile item.
   Widget _buildSettingsTile({
     required IconData icon,
     required String title,
@@ -332,9 +274,7 @@ class _SettingsState extends State<Settings> {
           child: Row(
             children: [
               _buildIconBox(icon),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -346,9 +286,7 @@ class _SettingsState extends State<Settings> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-
                     const SizedBox(height: 3),
-
                     Text(
                       subtitle,
                       maxLines: 1,
@@ -358,9 +296,7 @@ class _SettingsState extends State<Settings> {
                   ],
                 ),
               ),
-
               const SizedBox(width: 8),
-
               trailing ??
                   const Icon(
                     Icons.chevron_right_rounded,
@@ -374,10 +310,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  // ============================================================
-  // SWITCH TILE
-  // ============================================================
-
+  /// Toggle switch tile item.
   Widget _buildSwitchTile({
     required IconData icon,
     required String title,
@@ -388,17 +321,13 @@ class _SettingsState extends State<Settings> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          onChanged(!value);
-        },
+        onTap: () => onChanged(!value),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
           child: Row(
             children: [
               _buildIconBox(icon),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -410,9 +339,7 @@ class _SettingsState extends State<Settings> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-
                     const SizedBox(height: 3),
-
                     Text(
                       subtitle,
                       maxLines: 1,
@@ -422,7 +349,6 @@ class _SettingsState extends State<Settings> {
                   ],
                 ),
               ),
-
               Switch(
                 value: value,
                 activeColor: AppColors.primary,
@@ -435,10 +361,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  // ============================================================
-  // ICON BOX
-  // ============================================================
-
+  /// Styled background box wrapping leading category icons.
   Widget _buildIconBox(IconData icon) {
     return Container(
       width: 42,
@@ -451,10 +374,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  // ============================================================
-  // DIVIDER
-  // ============================================================
-
+  /// Inset horizontal line separator for card lists.
   Widget _buildDivider() {
     return Padding(
       padding: const EdgeInsets.only(left: 69),
@@ -462,10 +382,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  // ============================================================
-  // LANGUAGE
-  // ============================================================
-
+  /// Displays the modal sheet for language selection.
   void _showLanguageSheet() {
     showModalBottomSheet(
       context: context,
@@ -491,13 +408,9 @@ class _SettingsState extends State<Settings> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 Text('Choose Language', style: AppTextStyles.title),
-
                 const SizedBox(height: 5),
-
                 const Text(
                   'Select your preferred language.',
                   style: TextStyle(
@@ -505,9 +418,7 @@ class _SettingsState extends State<Settings> {
                     color: AppColors.textSecondary,
                   ),
                 ),
-
                 const SizedBox(height: 15),
-
                 _languageOption('English'),
                 _languageOption('Hindi'),
                 _languageOption('Gujarati'),
@@ -519,6 +430,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  /// Option tile rendered inside the language selection sheet.
   Widget _languageOption(String language) {
     final selected = selectedLanguage == language;
 
@@ -550,19 +462,14 @@ class _SettingsState extends State<Settings> {
           setState(() {
             selectedLanguage = language;
           });
-
           Navigator.pop(context);
-
           _showMessage('Language changed to $language');
         },
       ),
     );
   }
 
-  // ============================================================
-  // CHANGE PASSWORD
-  // ============================================================
-
+  /// Displays the modal sheet for changing the account password.
   void _showChangePasswordSheet() {
     final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
@@ -605,13 +512,9 @@ class _SettingsState extends State<Settings> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 20),
-
                       Text('Change Password', style: AppTextStyles.title),
-
                       const SizedBox(height: 5),
-
                       const Text(
                         'Create a new password for your EcoLoop account.',
                         style: TextStyle(
@@ -619,9 +522,7 @@ class _SettingsState extends State<Settings> {
                           color: AppColors.textSecondary,
                         ),
                       ),
-
                       const SizedBox(height: 20),
-
                       _passwordField(
                         controller: currentPasswordController,
                         label: 'Current Password',
@@ -632,9 +533,7 @@ class _SettingsState extends State<Settings> {
                           });
                         },
                       ),
-
                       const SizedBox(height: 12),
-
                       _passwordField(
                         controller: newPasswordController,
                         label: 'New Password',
@@ -645,9 +544,7 @@ class _SettingsState extends State<Settings> {
                           });
                         },
                       ),
-
                       const SizedBox(height: 12),
-
                       _passwordField(
                         controller: confirmPasswordController,
                         label: 'Confirm New Password',
@@ -658,9 +555,7 @@ class _SettingsState extends State<Settings> {
                           });
                         },
                       ),
-
                       const SizedBox(height: 20),
-
                       SizedBox(
                         width: double.infinity,
                         height: 48,
@@ -671,15 +566,12 @@ class _SettingsState extends State<Settings> {
                               _showMessage('Please enter your new password.');
                               return;
                             }
-
                             if (newPasswordController.text !=
                                 confirmPasswordController.text) {
                               _showMessage('Passwords do not match.');
                               return;
                             }
-
                             Navigator.pop(sheetContext);
-
                             _showMessage(
                               'Password update will be connected later.',
                             );
@@ -698,6 +590,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  /// Custom text input field wrapper for secure password entries.
   Widget _passwordField({
     required TextEditingController controller,
     required String label,
@@ -720,10 +613,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  // ============================================================
-  // PRIVACY
-  // ============================================================
-
+  /// Displays the modal sheet for managing user privacy controls.
   void _showPrivacySheet() {
     bool profileVisible = true;
     bool activityVisible = false;
@@ -757,13 +647,9 @@ class _SettingsState extends State<Settings> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 20),
-
                       Text('Privacy Preferences', style: AppTextStyles.title),
-
                       const SizedBox(height: 15),
-
                       _privacySwitch(
                         title: 'Public Profile',
                         subtitle: 'Allow other users to view your profile',
@@ -774,7 +660,6 @@ class _SettingsState extends State<Settings> {
                           });
                         },
                       ),
-
                       _privacySwitch(
                         title: 'Activity Visibility',
                         subtitle:
@@ -786,7 +671,6 @@ class _SettingsState extends State<Settings> {
                           });
                         },
                       ),
-
                       _privacySwitch(
                         title: 'Location Sharing',
                         subtitle:
@@ -798,9 +682,7 @@ class _SettingsState extends State<Settings> {
                           });
                         },
                       ),
-
                       const SizedBox(height: 8),
-
                       Container(
                         padding: const EdgeInsets.all(13),
                         decoration: BoxDecoration(
@@ -840,6 +722,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  /// Switch item rendered within the privacy bottom sheet.
   Widget _privacySwitch({
     required String title,
     required String subtitle,
@@ -883,10 +766,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  // ============================================================
-  // SECURITY
-  // ============================================================
-
+  /// Displays the modal sheet detailing security features and active sessions.
   void _showSecuritySheet() {
     showModalBottomSheet(
       context: context,
@@ -914,39 +794,30 @@ class _SettingsState extends State<Settings> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 20),
-
                   Text('Account Security', style: AppTextStyles.title),
-
                   const SizedBox(height: 15),
-
                   _securityItem(
                     Icons.lock_outline_rounded,
                     'Password',
                     'Your account password is protected.',
                   ),
-
                   _securityItem(
                     Icons.verified_user_outlined,
                     'Account Verification',
                     'Your EcoLoop account verification status.',
                   ),
-
                   _securityItem(
                     Icons.devices_outlined,
                     'Active Sessions',
                     'Manage devices where your account is signed in.',
                   ),
-
                   _securityItem(
                     Icons.warning_amber_rounded,
                     'Security Alerts',
                     'Important security notifications will appear here.',
                   ),
-
                   const SizedBox(height: 10),
-
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(13),
@@ -972,6 +843,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  /// Item tile rendered inside the account security bottom sheet.
   Widget _securityItem(IconData icon, String title, String subtitle) {
     return Material(
       color: Colors.transparent,
@@ -1002,11 +874,9 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  // ============================================================
-  // MESSAGE
-  // ============================================================
-
+  /// Displays a floating snackbar feedback message.
   void _showMessage(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );

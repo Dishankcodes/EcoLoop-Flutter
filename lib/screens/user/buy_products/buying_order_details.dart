@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/app_colors.dart';
 import 'order_tracking.dart';
 
+/// Screen displaying comprehensive details and status tracking for a purchased order.
 class BuyingOrderDetails extends StatefulWidget {
   final Map<String, dynamic> order;
 
@@ -18,13 +19,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   @override
   void initState() {
     super.initState();
-
     _status = widget.order['status']?.toString() ?? 'Confirmed';
   }
-
-  // ============================================================
-  // DATA
-  // ============================================================
 
   String get productName =>
       widget.order['product']?.toString() ?? 'Wooden Study Table';
@@ -57,10 +53,6 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   bool get isDelivered => _status == 'Delivered';
 
-  // ============================================================
-  // BUILD
-  // ============================================================
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,25 +63,15 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         child: Column(
           children: [
             _buildOrderHeader(),
-
             if (isCancelled) _buildCancelledBanner(),
-
             if (!isCancelled) _buildStatusSection(),
-
             _buildProductSection(),
-
             _buildSellerSection(),
-
             _buildDeliverySection(),
-
             _buildPaymentSection(),
-
             _buildOrderInformation(),
-
             _buildEcoLoopProtection(),
-
             if (isDelivered) _buildDeliveredMessage(),
-
             _buildHelpSection(),
           ],
         ),
@@ -98,10 +80,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // APP BAR
-  // ============================================================
-
+  /// AppBar with title and overflow options menu.
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: AppColors.surface,
@@ -126,10 +105,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // ORDER HEADER
-  // ============================================================
-
+  /// Top summary card displaying order placement date and order ID.
   Widget _buildOrderHeader() {
     return Container(
       width: double.infinity,
@@ -150,9 +126,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
               size: 26,
             ),
           ),
-
           const SizedBox(width: 13),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -176,9 +150,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
               ],
             ),
           ),
-
           const SizedBox(width: 10),
-
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -202,10 +174,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // CANCELLED BANNER
-  // ============================================================
-
+  /// Banner displayed when an order has been cancelled.
   Widget _buildCancelledBanner() {
     return Container(
       width: double.infinity,
@@ -250,10 +219,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // STATUS
-  // ============================================================
-
+  /// Step-by-step order progress timeline.
   Widget _buildStatusSection() {
     return _section(
       child: Column(
@@ -274,9 +240,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
               _statusChip(),
             ],
           ),
-
           const SizedBox(height: 23),
-
           _timelineItem(
             icon: Icons.check_circle_rounded,
             title: 'Order Confirmed',
@@ -284,7 +248,6 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             completed: _isStepCompleted(1),
             active: _status == 'Confirmed',
           ),
-
           _timelineItem(
             icon: Icons.inventory_2_rounded,
             title: 'Item Packed',
@@ -292,7 +255,6 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             completed: _isStepCompleted(2),
             active: _status == 'Packed',
           ),
-
           _timelineItem(
             icon: Icons.local_shipping_rounded,
             title: 'Shipped',
@@ -300,7 +262,6 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             completed: _isStepCompleted(3),
             active: _status == 'Shipped',
           ),
-
           _timelineItem(
             icon: Icons.home_rounded,
             title: 'Delivered',
@@ -309,9 +270,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             active: _status == 'Delivered',
             isLast: true,
           ),
-
           const SizedBox(height: 5),
-
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
@@ -346,25 +305,23 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
+  /// Helper to determine whether a given timeline step index is completed.
   bool _isStepCompleted(int step) {
     switch (_status) {
       case 'Confirmed':
         return step <= 1;
-
       case 'Packed':
         return step <= 2;
-
       case 'Shipped':
         return step <= 3;
-
       case 'Delivered':
         return true;
-
       default:
         return false;
     }
   }
 
+  /// Individual item rendered in the order status timeline.
   Widget _timelineItem({
     required IconData icon,
     required String title,
@@ -395,7 +352,6 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                 ),
                 child: Icon(icon, size: 17, color: color),
               ),
-
               if (!isLast)
                 Container(
                   height: 37,
@@ -407,9 +363,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             ],
           ),
         ),
-
         const SizedBox(width: 12),
-
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(bottom: 17),
@@ -444,6 +398,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
+  /// Status pill badge indicating current order state.
   Widget _statusChip() {
     Color color;
 
@@ -451,15 +406,12 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       case 'Delivered':
         color = AppColors.success;
         break;
-
       case 'Shipped':
         color = AppColors.primary;
         break;
-
       case 'Packed':
         color = Colors.orange;
         break;
-
       default:
         color = AppColors.primary;
     }
@@ -481,19 +433,14 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // PRODUCT
-  // ============================================================
-
+  /// Product summary card containing image/icon, name, quantity, and price.
   Widget _buildProductSection() {
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle('Item Details', Icons.shopping_bag_outlined),
-
           const SizedBox(height: 15),
-
           Container(
             padding: const EdgeInsets.all(13),
             decoration: BoxDecoration(
@@ -512,9 +459,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   ),
                   child: Icon(productIcon, size: 38, color: AppColors.primary),
                 ),
-
                 const SizedBox(width: 13),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -529,9 +474,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                           color: AppColors.textPrimary,
                         ),
                       ),
-
                       const SizedBox(height: 7),
-
                       Text(
                         'Quantity: $quantity',
                         style: const TextStyle(
@@ -539,9 +482,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                           color: AppColors.textSecondary,
                         ),
                       ),
-
                       const SizedBox(height: 5),
-
                       Text(
                         price,
                         style: const TextStyle(
@@ -561,19 +502,14 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // SELLER
-  // ============================================================
-
+  /// Seller profile information and contact trigger.
   Widget _buildSellerSection() {
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle('Seller', Icons.person_outline_rounded),
-
           const SizedBox(height: 16),
-
           Row(
             children: [
               Container(
@@ -589,9 +525,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   size: 27,
                 ),
               ),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -604,9 +538,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-
                     const SizedBox(height: 4),
-
                     const Row(
                       children: [
                         Icon(
@@ -627,7 +559,6 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   ],
                 ),
               ),
-
               OutlinedButton(
                 onPressed: () {
                   _showMessage('Seller contact will be connected later.');
@@ -653,19 +584,14 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // DELIVERY
-  // ============================================================
-
+  /// Shipping address and delivery timeline information.
   Widget _buildDeliverySection() {
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle('Delivery Details', Icons.local_shipping_outlined),
-
           const SizedBox(height: 16),
-
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -703,8 +629,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        '28/4 Jagdish Apartment, '
-                        'Viratnagar Canal Road',
+                        '28/4 Jagdish Apartment, Viratnagar Canal Road',
                         style: TextStyle(
                           fontSize: 11,
                           height: 1.4,
@@ -717,13 +642,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
               ],
             ),
           ),
-
           const SizedBox(height: 15),
-
           _detailRow(Icons.local_shipping_outlined, 'Delivery', deliveryMethod),
-
           const SizedBox(height: 12),
-
           _detailRow(
             Icons.event_outlined,
             'Expected',
@@ -734,34 +655,23 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // PAYMENT / BILL
-  // ============================================================
-
+  /// Payment breakdown including item cost, charges, and payment mode.
   Widget _buildPaymentSection() {
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle('Payment Summary', Icons.receipt_long_outlined),
-
           const SizedBox(height: 18),
-
           _billRow('Item total', price),
-
           _billRow('EcoLoop handling charge', '₹20'),
-
           _billRow('Delivery charges', 'FREE'),
-
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 5),
             child: Divider(),
           ),
-
           _billRow('Total Paid', price, bold: true),
-
           const SizedBox(height: 5),
-
           Row(
             children: [
               const Icon(
@@ -785,6 +695,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
+  /// Helper widget for displaying individual line items in payment summary.
   Widget _billRow(String title, String value, {bool bold = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -813,31 +724,24 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // ORDER INFORMATION
-  // ============================================================
-
+  /// Key metadata table covering IDs, dates, and current order state.
   Widget _buildOrderInformation() {
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle('Order Information', Icons.info_outline_rounded),
-
           const SizedBox(height: 18),
-
           _informationRow('Order ID', orderId),
-
           _informationRow('Order placed', orderDate),
-
           _informationRow('Payment', payment),
-
           _informationRow('Status', _status, isLast: true),
         ],
       ),
     );
   }
 
+  /// Helper widget for rendering a metadata field in order information.
   Widget _informationRow(String title, String value, {bool isLast = false}) {
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
@@ -870,10 +774,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // ECOLOOP PROTECTION
-  // ============================================================
-
+  /// Card highlighting EcoLoop purchase protection policy.
   Widget _buildEcoLoopProtection() {
     return _section(
       child: Container(
@@ -902,8 +803,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   ),
                   SizedBox(height: 5),
                   Text(
-                    'Your purchase is protected through '
-                    'the EcoLoop order process.',
+                    'Your purchase is protected through the EcoLoop order process.',
                     style: TextStyle(
                       fontSize: 11,
                       height: 1.45,
@@ -919,10 +819,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // DELIVERED MESSAGE
-  // ============================================================
-
+  /// Confirmation banner shown when the item status is Delivered.
   Widget _buildDeliveredMessage() {
     return _section(
       child: Container(
@@ -942,8 +839,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Your order was delivered successfully. '
-                'We hope you enjoy your item! 🌱',
+                'Your order was delivered successfully. We hope you enjoy your item! 🌱',
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.5,
@@ -957,19 +853,14 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // HELP
-  // ============================================================
-
+  /// Customer support tile for order-related queries.
   Widget _buildHelpSection() {
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle('Need Help?', Icons.support_agent_outlined),
-
           const SizedBox(height: 13),
-
           InkWell(
             onTap: () {
               _showMessage('Order support will be connected later.');
@@ -1022,10 +913,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // BOTTOM BAR
-  // ============================================================
-
+  /// Persistent bottom action bar providing order cancellation or live tracking.
   Widget _buildBottomBar() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
@@ -1065,9 +953,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                 ),
               ),
             ),
-
             const SizedBox(width: 10),
-
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: _trackOrder,
@@ -1090,10 +976,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // ACTIONS
-  // ============================================================
-
+  /// Navigates to the live order tracking view.
   void _trackOrder() {
     Navigator.push(
       context,
@@ -1101,6 +984,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
+  /// Prompts a confirmation dialog to cancel the active order.
   void _cancelOrder() {
     showDialog(
       context: context,
@@ -1120,19 +1004,15 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Keep Order'),
             ),
             TextButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
-
                 setState(() {
                   _status = 'Cancelled';
                 });
-
                 _showMessage('Order cancelled.');
               },
               child: const Text(
@@ -1149,14 +1029,12 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
+  /// Action placeholder for repeating a purchase on a delivered item.
   void _buyAgain() {
     _showMessage('Buy Again will be connected to the product flow later.');
   }
 
-  // ============================================================
-  // MORE OPTIONS
-  // ============================================================
-
+  /// Opens the bottom sheet menu with additional order options.
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
@@ -1201,6 +1079,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
+  /// Option tile rendered within the options bottom sheet.
   Widget _bottomSheetOption({
     required IconData icon,
     required String title,
@@ -1229,10 +1108,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  // ============================================================
-  // COMMON
-  // ============================================================
-
+  /// Title row widget used across section cards.
   Widget _sectionTitle(String title, IconData icon) {
     return Row(
       children: [
@@ -1250,6 +1126,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
+  /// Detail line item with title and right-aligned value.
   Widget _detailRow(IconData icon, String title, String value) {
     return Row(
       children: [
@@ -1275,6 +1152,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
+  /// Card container wrapping individual order detail sections.
   Widget _section({required Widget child}) {
     return Container(
       width: double.infinity,
@@ -1285,7 +1163,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
+  /// Displays a floating snackbar feedback message.
   void _showMessage(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );

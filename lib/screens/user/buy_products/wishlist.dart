@@ -131,9 +131,7 @@ class _WishlistState extends State<Wishlist> {
     }).toList();
   }
 
-  // ============================================================
   // BUILD
-  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -198,9 +196,7 @@ class _WishlistState extends State<Wishlist> {
     );
   }
 
-  // ============================================================
   // HEADER
-  // ============================================================
 
   Widget _buildHeader() {
     return Padding(
@@ -242,9 +238,7 @@ class _WishlistState extends State<Wishlist> {
     );
   }
 
-  // ============================================================
   // SEARCH
-  // ============================================================
 
   Widget _buildSearch() {
     return Padding(
@@ -294,9 +288,7 @@ class _WishlistState extends State<Wishlist> {
     );
   }
 
-  // ============================================================
   // RESULT INFO
-  // ============================================================
 
   Widget _buildResultInfo() {
     final count = _filteredItems.length;
@@ -325,9 +317,7 @@ class _WishlistState extends State<Wishlist> {
     );
   }
 
-  // ============================================================
   // GRID
-  // ============================================================
 
   Widget _buildGrid() {
     final items = _filteredItems;
@@ -364,9 +354,7 @@ class _WishlistState extends State<Wishlist> {
     );
   }
 
-  // ============================================================
   // OPEN PRODUCT
-  // ============================================================
 
   void _openProductDetails(Map<String, dynamic> product) {
     Navigator.push(
@@ -375,9 +363,7 @@ class _WishlistState extends State<Wishlist> {
     );
   }
 
-  // ============================================================
   // REMOVE PRODUCT
-  // ============================================================
 
   void _removeProduct(Map<String, dynamic> product) {
     final originalIndex = _wishlistItems.indexOf(product);
@@ -411,9 +397,7 @@ class _WishlistState extends State<Wishlist> {
     );
   }
 
-  // ============================================================
   // CLEAR WISHLIST
-  // ============================================================
 
   void _confirmClearWishlist() {
     showDialog(
@@ -474,9 +458,7 @@ class _WishlistState extends State<Wishlist> {
     );
   }
 
-  // ============================================================
   // NO SEARCH RESULT
-  // ============================================================
 
   Widget _buildNoSearchResult() {
     return Center(
@@ -530,9 +512,7 @@ class _WishlistState extends State<Wishlist> {
     );
   }
 
-  // ============================================================
   // EMPTY WISHLIST
-  // ============================================================
 
   Widget _buildEmptyState() {
     return Center(
@@ -593,9 +573,7 @@ class _WishlistState extends State<Wishlist> {
     );
   }
 
-  // ============================================================
   // MESSAGE
-  // ============================================================
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -604,9 +582,7 @@ class _WishlistState extends State<Wishlist> {
   }
 }
 
-// =================================================================
 // WISHLIST PRODUCT CARD
-// =================================================================
 
 class _WishlistProductCard extends StatelessWidget {
   const _WishlistProductCard({
@@ -649,9 +625,7 @@ class _WishlistProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // =================================================
             // IMAGE
-            // =================================================
             Expanded(
               child: Stack(
                 children: [
@@ -691,9 +665,7 @@ class _WishlistProductCard extends StatelessWidget {
                     ),
                   ),
 
-                  // ------------------------------------------------
                   // CONDITION
-                  // ------------------------------------------------
                   Positioned(
                     left: 9,
                     top: 9,
@@ -720,9 +692,7 @@ class _WishlistProductCard extends StatelessWidget {
                     ),
                   ),
 
-                  // ------------------------------------------------
                   // REMOVE WISHLIST
-                  // ------------------------------------------------
                   Positioned(
                     right: 9,
                     top: 9,
@@ -748,9 +718,7 @@ class _WishlistProductCard extends StatelessWidget {
                     ),
                   ),
 
-                  // ------------------------------------------------
                   // CATEGORY
-                  // ------------------------------------------------
                   Positioned(
                     left: 9,
                     bottom: 9,
@@ -780,9 +748,7 @@ class _WishlistProductCard extends StatelessWidget {
               ),
             ),
 
-            // =================================================
             // DETAILS
-            // =================================================
             Padding(
               padding: const EdgeInsets.fromLTRB(11, 10, 11, 11),
 

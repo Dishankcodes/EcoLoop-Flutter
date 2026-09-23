@@ -11,6 +11,7 @@ import '../buy_products/orders.dart';
 import '../buy_products/wishlist.dart';
 import '../donations/donate_item.dart';
 import '../donations/donation_history.dart';
+import '../reviews/review_history.dart';
 import '../sell_products/my_listings.dart';
 import '../sell_products/selling_orders.dart';
 import 'address_list.dart';
@@ -266,6 +267,23 @@ class Profile extends StatelessWidget {
         ),
 
         _ProfileDivider(),
+
+        // REVIEW HISTORY
+        _ProfileTile(
+          icon: Icons.rate_review_outlined,
+          title: 'Review History',
+          subtitle: 'View and manage your product and seller reviews',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ReviewHistory()),
+            );
+          },
+        ),
+
+        _ProfileDivider(),
+
+        // WISHLIST
 
         // WISHLIST
         _ProfileTile(

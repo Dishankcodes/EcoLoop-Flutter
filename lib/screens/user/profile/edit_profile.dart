@@ -17,9 +17,7 @@ class EditProfile extends StatefulWidget {
 }
 
 class _EditProfileState extends State<EditProfile> {
-  // ============================================================
   // CONTROLLERS
-  // ============================================================
 
   final TextEditingController _nameController = TextEditingController(
     text: 'Dishank Prajapati',
@@ -37,9 +35,7 @@ class _EditProfileState extends State<EditProfile> {
     text: 'EcoLoop user who believes unused things deserve a new life.',
   );
 
-  // ============================================================
   // LOCATION & PREFERENCES
-  // ============================================================
 
   String? _initialStateName = 'Gujarat';
   String? _initialCityName = 'Ahmedabad';
@@ -89,9 +85,7 @@ class _EditProfileState extends State<EditProfile> {
     super.dispose();
   }
 
-  // ============================================================
   // MESSAGE HELPERS
-  // ============================================================
 
   void _showMessage({
     required String title,
@@ -148,9 +142,7 @@ class _EditProfileState extends State<EditProfile> {
     return 'Something went wrong. Please try again.';
   }
 
-  // ============================================================
   // LOCATION API & CACHING
-  // ============================================================
 
   Future<void> _loadStates() async {
     if (!mounted) return;
@@ -314,9 +306,7 @@ class _EditProfileState extends State<EditProfile> {
     }
   }
 
-  // ============================================================
   // BUILD
-  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -422,35 +412,20 @@ class _EditProfileState extends State<EditProfile> {
                 maxLength: 150,
                 textCapitalization: TextCapitalization.sentences,
               ),
-
               const SizedBox(height: 28),
-
               _buildSectionTitle('Location', Icons.location_on_outlined),
-
               const SizedBox(height: 12),
-
               _buildStateDropdown(),
-
               const SizedBox(height: 14),
-
               _buildCityDropdown(),
-
               const SizedBox(height: 28),
-
               _buildSectionTitle('Marketplace Preferences', Icons.tune_rounded),
-
               const SizedBox(height: 12),
-
               _buildPreferredCategory(),
-
               const SizedBox(height: 14),
-
               _buildPrivacyOption(),
-
               const SizedBox(height: 28),
-
               _buildAccountInformation(),
-
               const SizedBox(height: 30),
 
               _buildSaveButton(),
@@ -461,9 +436,7 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-  // ============================================================
   // LOCATION DROPDOWNS
-  // ============================================================
 
   Widget _buildStateDropdown() {
     return Column(
@@ -716,9 +689,7 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-  // ============================================================
   // PROFILE PHOTO
-  // ============================================================
 
   Widget _buildProfilePhoto() {
     return Center(
@@ -789,9 +760,7 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-  // ============================================================
   // SECTION TITLE
-  // ============================================================
 
   Widget _buildSectionTitle(String title, IconData icon) {
     return Row(
@@ -813,9 +782,7 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-  // ============================================================
   // TEXT FIELD
-  // ============================================================
 
   Widget _buildTextField({
     required TextEditingController controller,
@@ -896,9 +863,7 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-  // ============================================================
   // PREFERRED CATEGORY
-  // ============================================================
 
   Widget _buildPreferredCategory() {
     return Container(
@@ -992,9 +957,7 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-  // ============================================================
   // PRIVACY OPTION
-  // ============================================================
 
   Widget _buildPrivacyOption() {
     return Container(
@@ -1059,9 +1022,7 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-  // ============================================================
   // ACCOUNT INFORMATION
-  // ============================================================
 
   Widget _buildAccountInformation() {
     return Container(
@@ -1093,9 +1054,7 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-  // ============================================================
   // SAVE BUTTON
-  // ============================================================
 
   Widget _buildSaveButton() {
     return SizedBox(
