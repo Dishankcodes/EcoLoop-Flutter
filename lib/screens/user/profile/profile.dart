@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../shared_preferences_util.dart';
+import '../../../widgets/cart_popup.dart';
 import '../../../widgets/user_more_menu.dart';
 import '../../common/help_support.dart';
 import '../../welcome_screen.dart';
@@ -241,16 +242,19 @@ class Profile extends StatelessWidget {
         _ProfileTile(
           icon: Icons.shopping_cart_outlined,
           title: 'My Cart',
-          subtitle: 'Items saved for checkout',
-          trailing: _buildBadge('0'),
+          subtitle: CartPopup.isEmpty
+              ? 'Your cart is empty'
+              : '${CartPopup.totalItems} ${CartPopup.totalItems == 1 ? 'item' : 'items'} saved for checkout',
+          trailing: _buildBadge(CartPopup.totalItems.toString()),
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const Cart()),
+              MaterialPageRoute(
+                builder: (_) => Cart(initialItems: CartPopup.items),
+              ),
             );
           },
         ),
-
         _ProfileDivider(),
 
         // ORDERS

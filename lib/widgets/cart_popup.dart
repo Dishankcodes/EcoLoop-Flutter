@@ -5,11 +5,81 @@ import 'package:flutter/material.dart';
 import '../app_theme/user/app_colors.dart';
 import '../app_theme/user/app_text_styles.dart';
 import '../screens/user/buy_products/cart.dart';
+import '../screens/user/buy_products/checkout.dart';
 
 class CartPopup {
   CartPopup._();
 
   static OverlayEntry? _currentEntry;
+
+  static NavigatorState? _navigatorState;
+
+  static bool _navigationInProgress = false;
+
+  static final List<Map<String, dynamic>> _cartItems = [];
+
+  static List<Map<String, dynamic>> get items {
+    return _cartItems.map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  static bool get isEmpty => _cartItems.isEmpty;
+
+  static int get totalItems {
+    var total = 0;
+
+    for (final item in _cartItems) {
+      total += _toInt(item['quantity'], fallback: 1);
+    }
+
+    return total;
+  }
+
+  static double get totalAmount {
+    var total = 0.0;
+
+    for (final item in _cartItems) {
+      final price = _toDouble(item['price']);
+      final quantity = _toInt(item['quantity'], fallback: 1);
+
+      total += price * quantity;
+    }
+
+    return total;
+  }
+
+  static void addItem(
+    BuildContext context, {
+    required Map<String, dynamic> item,
+  }) {
+    final normalized = _normalizeItem(item);
+    final productId = normalized['productId'].toString();
+
+    final existingIndex = _cartItems.indexWhere(
+      (cartItem) => cartItem['productId'].toString() == productId,
+    );
+
+    if (existingIndex == -1) {
+      _cartItems.add(normalized);
+    } else {
+      final existing = _cartItems[existingIndex];
+
+      final currentQuantity = _toInt(existing['quantity'], fallback: 1);
+
+      final incomingQuantity = _toInt(normalized['quantity'], fallback: 1);
+
+      final availableQuantity = _toInt(
+        existing['availableQuantity'],
+        fallback: 10,
+      );
+
+      existing['quantity'] = _safeQuantity(
+        currentQuantity + incomingQuantity,
+        availableQuantity,
+      );
+    }
+
+    _showOrUpdate(context);
+  }
 
   static void show(
     BuildContext context, {
@@ -19,35 +89,89 @@ class CartPopup {
       return;
     }
 
-    _removeCurrent();
+    for (final item in items) {
+      _addWithoutShowing(item);
+    }
 
-    final overlay = Overlay.maybeOf(context);
+    _showOrUpdate(context);
+  }
+
+  static void _addWithoutShowing(Map<String, dynamic> item) {
+    final normalized = _normalizeItem(item);
+    final productId = normalized['productId'].toString();
+
+    final existingIndex = _cartItems.indexWhere(
+      (cartItem) => cartItem['productId'].toString() == productId,
+    );
+
+    if (existingIndex == -1) {
+      _cartItems.add(normalized);
+      return;
+    }
+
+    final existing = _cartItems[existingIndex];
+
+    final currentQuantity = _toInt(existing['quantity'], fallback: 1);
+
+    final incomingQuantity = _toInt(normalized['quantity'], fallback: 1);
+
+    final availableQuantity = _toInt(
+      existing['availableQuantity'],
+      fallback: 10,
+    );
+
+    existing['quantity'] = _safeQuantity(
+      currentQuantity + incomingQuantity,
+      availableQuantity,
+    );
+  }
+
+  static void _showOrUpdate(BuildContext context) {
+    if (_cartItems.isEmpty) {
+      return;
+    }
+
+    final navigator = Navigator.maybeOf(context, rootNavigator: true);
+
+    if (navigator == null || !navigator.mounted) {
+      return;
+    }
+
+    _showOrUpdateWithNavigator(navigator);
+  }
+
+  static void _showOrUpdateWithNavigator(NavigatorState navigator) {
+    if (_cartItems.isEmpty) {
+      return;
+    }
+
+    if (!navigator.mounted) {
+      return;
+    }
+
+    final overlay = navigator.overlay;
 
     if (overlay == null) {
       return;
     }
 
+    _navigatorState = navigator;
+
+    if (_currentEntry != null) {
+      _currentEntry!.markNeedsBuild();
+      return;
+    }
+
+    _navigationInProgress = false;
+
     final entry = OverlayEntry(
       builder: (_) {
         return _CartPopupOverlay(
+          key: _popupKey,
           items: items,
-          onClose: _removeCurrent,
-          onViewCart: () {
-            _removeCurrent();
-
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => Cart(initialItems: items)),
-            );
-          },
-          onCheckout: () {
-            _removeCurrent();
-
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => Cart(initialItems: items)),
-            );
-          },
+          onClose: dismiss,
+          onViewCart: _openCart,
+          onCheckout: _openCheckout,
         );
       },
     );
@@ -57,13 +181,207 @@ class CartPopup {
     overlay.insert(entry);
   }
 
-  static void _removeCurrent() {
-    _currentEntry?.remove();
-    _currentEntry = null;
+  static final GlobalKey<_CartPopupOverlayState> _popupKey =
+      GlobalKey<_CartPopupOverlayState>();
+
+  static void _openCart() {
+    if (_navigationInProgress) {
+      return;
+    }
+
+    final navigator = _navigatorState;
+
+    if (navigator == null || !navigator.mounted) {
+      return;
+    }
+
+    final cartItems = items;
+
+    if (cartItems.isEmpty) {
+      return;
+    }
+
+    _navigationInProgress = true;
+
+    dismiss();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!navigator.mounted) {
+        _navigationInProgress = false;
+        return;
+      }
+
+      navigator
+          .push(
+            MaterialPageRoute(builder: (_) => Cart(initialItems: cartItems)),
+          )
+          .whenComplete(() {
+            _navigationInProgress = false;
+          });
+    });
+  }
+
+  static void _openCheckout() {
+    if (_navigationInProgress) {
+      return;
+    }
+
+    final navigator = _navigatorState;
+
+    if (navigator == null || !navigator.mounted) {
+      return;
+    }
+
+    final cartItems = items;
+
+    if (cartItems.isEmpty) {
+      return;
+    }
+
+    _navigationInProgress = true;
+
+    dismiss();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!navigator.mounted) {
+        _navigationInProgress = false;
+        return;
+      }
+
+      navigator
+          .push(MaterialPageRoute(builder: (_) => Checkout(items: cartItems)))
+          .whenComplete(() {
+            _navigationInProgress = false;
+          });
+    });
   }
 
   static void dismiss() {
-    _removeCurrent();
+    final entry = _currentEntry;
+
+    _currentEntry = null;
+
+    if (entry != null) {
+      entry.remove();
+    }
+  }
+
+  static void clear() {
+    _cartItems.clear();
+    dismiss();
+
+    _navigatorState = null;
+    _navigationInProgress = false;
+  }
+
+  static void removeItem(String productId) {
+    _cartItems.removeWhere(
+      (item) => item['productId'].toString() == productId.toString(),
+    );
+
+    if (_cartItems.isEmpty) {
+      dismiss();
+    } else {
+      _currentEntry?.markNeedsBuild();
+    }
+  }
+
+  static void updateQuantity(String productId, int quantity) {
+    final index = _cartItems.indexWhere(
+      (item) => item['productId'].toString() == productId.toString(),
+    );
+
+    if (index == -1) {
+      return;
+    }
+
+    final item = _cartItems[index];
+
+    final availableQuantity = _toInt(item['availableQuantity'], fallback: 10);
+
+    item['quantity'] = _safeQuantity(quantity, availableQuantity);
+
+    _currentEntry?.markNeedsBuild();
+  }
+
+  static Map<String, dynamic> _normalizeItem(Map<String, dynamic> item) {
+    final copy = Map<String, dynamic>.from(item);
+
+    final productId =
+        copy['productId'] ??
+        copy['id'] ??
+        'product_${DateTime.now().microsecondsSinceEpoch}';
+
+    final title = copy['title'] ?? copy['name'] ?? 'EcoLoop Product';
+
+    final price = _toDouble(copy['price']);
+
+    final availableQuantity = _toInt(
+      copy['availableQuantity'] ?? copy['stock'] ?? 10,
+      fallback: 10,
+    );
+
+    final quantity = _safeQuantity(
+      _toInt(copy['quantity'], fallback: 1),
+      availableQuantity <= 0 ? 1 : availableQuantity,
+    );
+
+    copy['productId'] = productId;
+    copy['id'] = productId;
+    copy['title'] = title;
+    copy['price'] = price;
+    copy['quantity'] = quantity;
+    copy['availableQuantity'] = availableQuantity <= 0 ? 1 : availableQuantity;
+
+    return copy;
+  }
+
+  static int _toInt(dynamic value, {int fallback = 0}) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    if (value is String) {
+      final cleaned = value.replaceAll('₹', '').replaceAll(',', '').trim();
+
+      return int.tryParse(cleaned) ?? fallback;
+    }
+
+    return fallback;
+  }
+
+  static double _toDouble(dynamic value) {
+    if (value is double) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    if (value is String) {
+      final cleaned = value.replaceAll('₹', '').replaceAll(',', '').trim();
+
+      return double.tryParse(cleaned) ?? 0;
+    }
+
+    return 0;
+  }
+
+  static int _safeQuantity(int quantity, int maximum) {
+    if (quantity < 1) {
+      return 1;
+    }
+
+    if (maximum > 0 && quantity > maximum) {
+      return maximum;
+    }
+
+    return quantity;
   }
 }
 
@@ -74,6 +392,7 @@ class _CartPopupOverlay extends StatefulWidget {
   final VoidCallback onCheckout;
 
   const _CartPopupOverlay({
+    super.key,
     required this.items,
     required this.onClose,
     required this.onViewCart,
@@ -87,12 +406,16 @@ class _CartPopupOverlay extends StatefulWidget {
 class _CartPopupOverlayState extends State<_CartPopupOverlay>
     with SingleTickerProviderStateMixin {
   late final AnimationController _entranceController;
+
   late final Animation<double> _fadeAnimation;
+
   late final Animation<Offset> _entranceSlideAnimation;
 
   Timer? _moveTimer;
 
   bool _isAtBottom = false;
+
+  String _lastProductKey = '';
 
   @override
   void initState() {
@@ -116,16 +439,46 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
           ),
         );
 
+    _lastProductKey = _productKey(widget.items);
+
     _entranceController.forward();
 
-    _moveTimer = Timer(const Duration(seconds: 5), _moveToBottom);
+    _startMoveTimer();
   }
 
   @override
-  void dispose() {
+  void didUpdateWidget(covariant _CartPopupOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final newProductKey = _productKey(widget.items);
+
+    if (newProductKey != _lastProductKey) {
+      _lastProductKey = newProductKey;
+
+      _resetPopupPosition();
+    }
+  }
+
+  void _startMoveTimer() {
     _moveTimer?.cancel();
-    _entranceController.dispose();
-    super.dispose();
+
+    _moveTimer = Timer(const Duration(seconds: 3), _moveToBottom);
+  }
+
+  void _resetPopupPosition() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isAtBottom = false;
+    });
+
+    _entranceController
+      ..reset()
+      ..forward();
+
+    _startMoveTimer();
   }
 
   void _moveToBottom() {
@@ -138,8 +491,33 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
     });
   }
 
+  String _productKey(List<Map<String, dynamic>> items) {
+    if (items.isEmpty) {
+      return '';
+    }
+
+    final last = items.last;
+
+    return [
+      last['productId']?.toString() ?? '',
+      last['quantity']?.toString() ?? '',
+      items.length.toString(),
+    ].join('|');
+  }
+
+  @override
+  void dispose() {
+    _moveTimer?.cancel();
+    _entranceController.dispose();
+    super.dispose();
+  }
+
   Map<String, dynamic> get product {
-    return widget.items.first;
+    if (widget.items.isEmpty) {
+      return {};
+    }
+
+    return widget.items.last;
   }
 
   String get title {
@@ -147,23 +525,11 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
   }
 
   int get quantity {
-    final value = product['quantity'];
-
-    if (value is num) {
-      return value.toInt();
-    }
-
-    return int.tryParse(value?.toString() ?? '1') ?? 1;
+    return _toInt(product['quantity'], fallback: 1);
   }
 
   int get price {
-    final value = product['price'];
-
-    if (value is num) {
-      return value.toInt();
-    }
-
-    return _extractPrice(value?.toString() ?? '0');
+    return _toInt(product['price'], fallback: 0);
   }
 
   int get total {
@@ -177,6 +543,12 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
       return singleImage;
     }
 
+    final imageUrl = product['imageUrl']?.toString();
+
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return imageUrl;
+    }
+
     final images = product['images'];
 
     if (images is List && images.isNotEmpty) {
@@ -186,17 +558,11 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
     return '';
   }
 
-  int get totalItems {
-    int total = 0;
+  int get itemCount {
+    var total = 0;
 
     for (final item in widget.items) {
-      final value = item['quantity'];
-
-      if (value is num) {
-        total += value.toInt();
-      } else {
-        total += int.tryParse(value?.toString() ?? '1') ?? 1;
-      }
+      total += _toInt(item['quantity'], fallback: 1);
     }
 
     return total;
@@ -219,7 +585,7 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
               12,
               8,
               12,
-              _isAtBottom ? bottomInset + 78 : 12,
+              _isAtBottom ? bottomInset + 82 : 12,
             ),
             child: FadeTransition(
               opacity: _fadeAnimation,
@@ -405,7 +771,7 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
       children: [
         Expanded(
           child: Text(
-            totalItems == 1 ? '1 item in cart' : '$totalItems items in cart',
+            itemCount == 1 ? '1 item in cart' : '$itemCount items in cart',
             style: AppTextStyles.caption.copyWith(
               fontSize: 10.5,
               fontWeight: FontWeight.w500,
@@ -453,10 +819,22 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
     );
   }
 
-  int _extractPrice(String value) {
-    final cleaned = value.replaceAll('₹', '').replaceAll(',', '').trim();
+  int _toInt(dynamic value, {int fallback = 0}) {
+    if (value is int) {
+      return value;
+    }
 
-    return int.tryParse(cleaned) ?? 0;
+    if (value is num) {
+      return value.toInt();
+    }
+
+    if (value is String) {
+      final cleaned = value.replaceAll('₹', '').replaceAll(',', '').trim();
+
+      return int.tryParse(cleaned) ?? fallback;
+    }
+
+    return fallback;
   }
 
   String _formatPrice(int value) {

@@ -900,15 +900,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 4),
-                            Text(
-                              'Your artist account is already registered. You can login directly.',
-                              style: ArtistTextStyles.caption.copyWith(
-                                fontSize: 13,
-                                color: ArtistColors.textMuted,
-                                height: 1.5,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
+
                             const SizedBox(height: 8),
                             TextButton(
                               onPressed: _isSendingOtp

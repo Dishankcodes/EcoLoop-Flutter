@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../widgets/bottom_navigation.dart';
-import 'sell_products/add_product.dart';
 import 'buy_products/marketplace.dart';
 import 'buy_products/orders.dart';
 import 'profile/profile.dart';
+import 'sell_products/add_product.dart';
 import 'user_home.dart';
 
 class UserMain extends StatefulWidget {

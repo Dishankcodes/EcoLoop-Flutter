@@ -37,9 +37,7 @@ class _CartState extends State<Cart> {
     _loadInitialItems();
   }
 
-  // ---------------------------------------------------------------------------
   // INITIAL DATA
-  // ---------------------------------------------------------------------------
 
   void _loadInitialItems() {
     final incoming = widget.initialItems ?? [];
@@ -102,9 +100,7 @@ class _CartState extends State<Cart> {
     return copy;
   }
 
-  // ---------------------------------------------------------------------------
   // HELPERS
-  // ---------------------------------------------------------------------------
 
   int _toInt(dynamic value, {int fallback = 0}) {
     if (value is int) return value;
@@ -231,9 +227,7 @@ class _CartState extends State<Cart> {
     return (item['category'] ?? 'Recycled').toString();
   }
 
-  // ---------------------------------------------------------------------------
   // CALCULATIONS
-  // ---------------------------------------------------------------------------
 
   int get _totalItems {
     int total = 0;
@@ -291,9 +285,7 @@ class _CartState extends State<Cart> {
     return value < 0 ? 0 : value;
   }
 
-  // ---------------------------------------------------------------------------
   // QUANTITY
-  // ---------------------------------------------------------------------------
 
   void _increaseQuantity(int index) {
     if (index < 0 || index >= _cartItems.length) {
@@ -335,9 +327,7 @@ class _CartState extends State<Cart> {
     });
   }
 
-  // ---------------------------------------------------------------------------
   // REMOVE
-  // ---------------------------------------------------------------------------
 
   void _confirmRemove(int index) {
     if (index < 0 || index >= _cartItems.length) {
@@ -433,9 +423,7 @@ class _CartState extends State<Cart> {
     _showMessage('${item['title']} removed from cart.');
   }
 
-  // ---------------------------------------------------------------------------
   // SAVE FOR LATER
-  // ---------------------------------------------------------------------------
 
   void _saveForLater(int index) {
     if (index < 0 || index >= _cartItems.length) {
@@ -469,9 +457,7 @@ class _CartState extends State<Cart> {
     _showMessage('Item moved back to cart.');
   }
 
-  // ---------------------------------------------------------------------------
   // CLEAR CART
-  // ---------------------------------------------------------------------------
 
   void _clearCart() {
     if (_cartItems.isEmpty) {
@@ -553,9 +539,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // COUPONS
-  // ---------------------------------------------------------------------------
 
   void _openCoupons() {
     showModalBottomSheet(
@@ -803,9 +787,7 @@ class _CartState extends State<Cart> {
     }
   }
 
-  // ---------------------------------------------------------------------------
   // ECO POINTS
-  // ---------------------------------------------------------------------------
 
   void _toggleEcoPoints() {
     if (_ecoPoints <= 0) {
@@ -818,9 +800,7 @@ class _CartState extends State<Cart> {
     });
   }
 
-  // ---------------------------------------------------------------------------
   // CHECKOUT
-  // ---------------------------------------------------------------------------
 
   void _proceedToCheckout() {
     if (_cartItems.isEmpty) {
@@ -841,9 +821,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // MESSAGE
-  // ---------------------------------------------------------------------------
 
   void _showMessage(String message) {
     if (!mounted) {
@@ -864,9 +842,7 @@ class _CartState extends State<Cart> {
       );
   }
 
-  // ---------------------------------------------------------------------------
   // BUILD
-  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -911,9 +887,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // EMPTY CART
-  // ---------------------------------------------------------------------------
 
   Widget _buildEmptyCart() {
     return SafeArea(
@@ -970,9 +944,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // CART CONTENT
-  // ---------------------------------------------------------------------------
 
   Widget _buildCartContent() {
     return SafeArea(
@@ -1007,9 +979,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // FREE DELIVERY BANNER
-  // ---------------------------------------------------------------------------
 
   Widget _buildFreeDeliveryBanner() {
     final remaining = 999 - _subtotal;
@@ -1068,9 +1038,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // CART ITEMS
-  // ---------------------------------------------------------------------------
 
   Widget _buildCartItemsSection() {
     return Column(
@@ -1275,9 +1243,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // QUANTITY SELECTOR
-  // ---------------------------------------------------------------------------
 
   Widget _buildQuantitySelector({
     required int quantity,
@@ -1336,9 +1302,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // COUPON CARD
-  // ---------------------------------------------------------------------------
 
   Widget _buildCouponCard() {
     final hasCoupon = _appliedCoupon != null;
@@ -1455,9 +1419,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // ECO POINTS
-  // ---------------------------------------------------------------------------
 
   Widget _buildEcoPointsCard() {
     final discount = _ecoPointDiscount;
@@ -1514,9 +1476,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // PRICE DETAILS
-  // ---------------------------------------------------------------------------
 
   Widget _buildPriceDetails() {
     return Container(
@@ -1621,9 +1581,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // ECO MESSAGE
-  // ---------------------------------------------------------------------------
 
   Widget _buildEcoMessage() {
     return Container(
@@ -1662,9 +1620,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // SAVED FOR LATER
-  // ---------------------------------------------------------------------------
 
   Widget _buildSavedForLaterSection() {
     if (_savedForLater.isEmpty) {
@@ -1766,9 +1722,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // SIMILAR PRODUCTS
-  // ---------------------------------------------------------------------------
 
   Widget _buildSimilarProducts() {
     final products = [
@@ -1875,9 +1829,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // PRODUCT IMAGE
-  // ---------------------------------------------------------------------------
 
   Widget _buildProductImage(
     String image, {
@@ -1942,9 +1894,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // BOTTOM CHECKOUT BAR
-  // ---------------------------------------------------------------------------
 
   Widget _buildBottomCheckoutBar() {
     return Positioned(

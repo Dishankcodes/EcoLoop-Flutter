@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../app_theme/user/app_colors.dart';
 import '../../app_theme/user/app_text_styles.dart';
-import '../../widgets/floating_cart_bar.dart';
 import '../../widgets/user_more_menu.dart';
-import 'sell_products/add_product.dart';
-import 'donations/donate_item.dart';
 import 'buy_products/marketplace.dart';
 import 'buy_products/product_details.dart';
+import 'donations/donate_item.dart';
+import 'sell_products/add_product.dart';
 
 class UserHome extends StatefulWidget {
   const UserHome({super.key});
@@ -17,17 +16,13 @@ class UserHome extends StatefulWidget {
 }
 
 class _UserHomeState extends State<UserHome> {
-  // ============================================================
   // SEARCH
-  // ============================================================
 
   final TextEditingController _searchController = TextEditingController();
 
   String _searchQuery = '';
 
-  // ============================================================
   // CATEGORIES
-  // ============================================================
 
   final List<Map<String, dynamic>> _categories = [
     {'title': 'Furniture', 'icon': Icons.chair_outlined},
@@ -38,9 +33,7 @@ class _UserHomeState extends State<UserHome> {
     {'title': 'Books', 'icon': Icons.menu_book_outlined},
   ];
 
-  // ============================================================
   // RECOMMENDED PRODUCTS
-  // ============================================================
 
   final List<Map<String, dynamic>> _products = [
     {
@@ -133,9 +126,7 @@ class _UserHomeState extends State<UserHome> {
     },
   ];
 
-  // ============================================================
   // DISPOSE
-  // ============================================================
 
   @override
   void dispose() {
@@ -143,9 +134,7 @@ class _UserHomeState extends State<UserHome> {
     super.dispose();
   }
 
-  // ============================================================
   // BUILD
-  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -157,41 +146,31 @@ class _UserHomeState extends State<UserHome> {
             CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                // ======================================================
                 // HEADER
-                // ======================================================
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                   sliver: SliverToBoxAdapter(child: _buildHeader()),
                 ),
 
-                // ======================================================
                 // GREETING
-                // ======================================================
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
                   sliver: SliverToBoxAdapter(child: _buildGreeting()),
                 ),
 
-                // ======================================================
                 // SEARCH
-                // ======================================================
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                   sliver: SliverToBoxAdapter(child: _buildSearchBar()),
                 ),
 
-                // ======================================================
                 // QUICK ACTIONS
-                // ======================================================
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                   sliver: SliverToBoxAdapter(child: _buildQuickActions()),
                 ),
 
-                // ======================================================
                 // EXPLORE CATEGORIES HEADER
-                // ======================================================
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
                   sliver: SliverToBoxAdapter(
@@ -204,33 +183,25 @@ class _UserHomeState extends State<UserHome> {
                   ),
                 ),
 
-                // ======================================================
                 // CATEGORIES
-                // ======================================================
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                   sliver: SliverToBoxAdapter(child: _buildCategories()),
                 ),
 
-                // ======================================================
                 // SELL BANNER
-                // ======================================================
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
                   sliver: SliverToBoxAdapter(child: _buildSellBanner()),
                 ),
 
-                // ======================================================
                 // DONATE BANNER
-                // ======================================================
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                   sliver: SliverToBoxAdapter(child: _buildDonateBanner()),
                 ),
 
-                // ======================================================
                 // RECOMMENDED HEADER
-                // ======================================================
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 27, 20, 0),
                   sliver: SliverToBoxAdapter(
@@ -243,9 +214,7 @@ class _UserHomeState extends State<UserHome> {
                   ),
                 ),
 
-                // ======================================================
                 // RECOMMENDED PRODUCTS
-                // ======================================================
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 95),
                   sliver: SliverToBoxAdapter(child: _buildProducts()),
@@ -253,26 +222,19 @@ class _UserHomeState extends State<UserHome> {
               ],
             ),
 
-            // ======================================================
             // FLOATING CART BAR
-            // ======================================================
-            const FloatingCartBar(),
           ],
         ),
       ),
     );
   }
 
-  // ============================================================
   // HEADER
-  // ============================================================
 
   Widget _buildHeader() {
     return Row(
       children: [
-        // --------------------------------------------------------
         // ECOLOOP LOGO
-        // --------------------------------------------------------
         Container(
           width: 43,
           height: 43,
@@ -294,24 +256,18 @@ class _UserHomeState extends State<UserHome> {
 
         const SizedBox(width: 10),
 
-        // --------------------------------------------------------
         // ECOLOOP NAME
-        // --------------------------------------------------------
         Text('EcoLoop', style: AppTextStyles.title.copyWith(fontSize: 19)),
 
         const Spacer(),
 
-        // --------------------------------------------------------
         // MORE MENU
-        // --------------------------------------------------------
         const UserMoreMenu(),
       ],
     );
   }
 
-  // ============================================================
   // GREETING
-  // ============================================================
 
   Widget _buildGreeting() {
     return Column(
@@ -329,9 +285,7 @@ class _UserHomeState extends State<UserHome> {
     );
   }
 
-  // ============================================================
   // SEARCH BAR
-  // ============================================================
 
   Widget _buildSearchBar() {
     return Container(
@@ -352,18 +306,14 @@ class _UserHomeState extends State<UserHome> {
         controller: _searchController,
         textInputAction: TextInputAction.search,
 
-        // --------------------------------------------------------
         // SEARCH SUBMIT
-        // --------------------------------------------------------
         onSubmitted: (value) {
           final query = value.trim();
 
           _openMarketplace(search: query.isEmpty ? null : query);
         },
 
-        // --------------------------------------------------------
         // LIVE TEXT
-        // --------------------------------------------------------
         onChanged: (value) {
           setState(() {
             _searchQuery = value;
@@ -374,17 +324,13 @@ class _UserHomeState extends State<UserHome> {
           hintText: 'Search products, materials...',
           hintStyle: AppTextStyles.hint,
 
-          // ------------------------------------------------------
           // SEARCH ICON
-          // ------------------------------------------------------
           prefixIcon: const Icon(
             Icons.search_rounded,
             color: AppColors.primary,
           ),
 
-          // ------------------------------------------------------
           // CLEAR / OPEN MARKETPLACE
-          // ------------------------------------------------------
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
                   tooltip: 'Clear search',
@@ -422,16 +368,12 @@ class _UserHomeState extends State<UserHome> {
     );
   }
 
-  // ============================================================
   // QUICK ACTIONS
-  // ============================================================
 
   Widget _buildQuickActions() {
     return Row(
       children: [
-        // --------------------------------------------------------
         // SELL
-        // --------------------------------------------------------
         Expanded(
           child: _QuickAction(
             icon: Icons.add_box_outlined,
@@ -443,9 +385,7 @@ class _UserHomeState extends State<UserHome> {
 
         const SizedBox(width: 12),
 
-        // --------------------------------------------------------
         // DONATE
-        // --------------------------------------------------------
         Expanded(
           child: _QuickAction(
             icon: Icons.volunteer_activism_outlined,
@@ -458,9 +398,7 @@ class _UserHomeState extends State<UserHome> {
     );
   }
 
-  // ============================================================
   // SECTION HEADER
-  // ============================================================
 
   Widget _buildSectionHeader(String title, {VoidCallback? onTap}) {
     return Row(
@@ -500,9 +438,7 @@ class _UserHomeState extends State<UserHome> {
     );
   }
 
-  // ============================================================
   // CATEGORIES
-  // ============================================================
 
   Widget _buildCategories() {
     return SizedBox(
@@ -546,9 +482,7 @@ class _UserHomeState extends State<UserHome> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // ------------------------------------------------
                   // CATEGORY ICON
-                  // ------------------------------------------------
                   Container(
                     width: 43,
                     height: 43,
@@ -561,9 +495,7 @@ class _UserHomeState extends State<UserHome> {
 
                   const SizedBox(height: 7),
 
-                  // ------------------------------------------------
                   // CATEGORY NAME
-                  // ------------------------------------------------
                   Text(
                     title,
                     maxLines: 1,
@@ -582,9 +514,7 @@ class _UserHomeState extends State<UserHome> {
     );
   }
 
-  // ============================================================
   // SELL BANNER
-  // ============================================================
 
   Widget _buildSellBanner() {
     return GestureDetector(
@@ -599,9 +529,7 @@ class _UserHomeState extends State<UserHome> {
         ),
         child: Row(
           children: [
-            // ------------------------------------------------------
             // ICON
-            // ------------------------------------------------------
             Container(
               width: 49,
               height: 49,
@@ -618,9 +546,7 @@ class _UserHomeState extends State<UserHome> {
 
             const SizedBox(width: 12),
 
-            // ------------------------------------------------------
             // TEXT
-            // ------------------------------------------------------
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -645,9 +571,7 @@ class _UserHomeState extends State<UserHome> {
 
             const SizedBox(width: 8),
 
-            // ------------------------------------------------------
             // SELL BUTTON
-            // ------------------------------------------------------
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
               decoration: BoxDecoration(
@@ -682,9 +606,7 @@ class _UserHomeState extends State<UserHome> {
     );
   }
 
-  // ============================================================
   // DONATE BANNER
-  // ============================================================
 
   Widget _buildDonateBanner() {
     return GestureDetector(
@@ -699,9 +621,7 @@ class _UserHomeState extends State<UserHome> {
         ),
         child: Row(
           children: [
-            // ------------------------------------------------------
             // ICON
-            // ------------------------------------------------------
             Container(
               width: 47,
               height: 47,
@@ -718,9 +638,7 @@ class _UserHomeState extends State<UserHome> {
 
             const SizedBox(width: 11),
 
-            // ------------------------------------------------------
             // TEXT
-            // ------------------------------------------------------
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -743,9 +661,7 @@ class _UserHomeState extends State<UserHome> {
               ),
             ),
 
-            // ------------------------------------------------------
             // ARROW
-            // ------------------------------------------------------
             const Icon(
               Icons.arrow_forward_ios_rounded,
               size: 14,
@@ -757,9 +673,7 @@ class _UserHomeState extends State<UserHome> {
     );
   }
 
-  // ============================================================
   // RECOMMENDED PRODUCTS
-  // ============================================================
 
   Widget _buildProducts() {
     return GridView.builder(
@@ -785,9 +699,7 @@ class _UserHomeState extends State<UserHome> {
     );
   }
 
-  // ============================================================
   // OPEN MARKETPLACE
-  // ============================================================
 
   void _openMarketplace({String? search, String? category}) {
     final cleanSearch = search?.trim().isEmpty == true ? null : search?.trim();
@@ -806,9 +718,7 @@ class _UserHomeState extends State<UserHome> {
     );
   }
 
-  // ============================================================
   // OPEN ADD PRODUCT
-  // ============================================================
 
   void _openAddProduct() {
     Navigator.of(
@@ -816,9 +726,7 @@ class _UserHomeState extends State<UserHome> {
     ).push(MaterialPageRoute(builder: (_) => const AddProduct()));
   }
 
-  // ============================================================
   // OPEN DONATE
-  // ============================================================
 
   void _openDonate() {
     Navigator.of(
@@ -826,9 +734,7 @@ class _UserHomeState extends State<UserHome> {
     ).push(MaterialPageRoute(builder: (_) => const DonateItem()));
   }
 
-  // ============================================================
   // OPEN PRODUCT DETAILS
-  // ============================================================
 
   void _openProduct(Map<String, dynamic> product) {
     Navigator.of(
@@ -837,9 +743,7 @@ class _UserHomeState extends State<UserHome> {
   }
 }
 
-// =================================================================
 // QUICK ACTION
-// =================================================================
 
 class _QuickAction extends StatelessWidget {
   const _QuickAction({
@@ -875,9 +779,7 @@ class _QuickAction extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // ------------------------------------------------------
             // ICON
-            // ------------------------------------------------------
             Container(
               width: 40,
               height: 40,
@@ -890,9 +792,7 @@ class _QuickAction extends StatelessWidget {
 
             const SizedBox(width: 9),
 
-            // ------------------------------------------------------
             // TEXT
-            // ------------------------------------------------------
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -926,9 +826,7 @@ class _QuickAction extends StatelessWidget {
   }
 }
 
-// =================================================================
 // HOME PRODUCT CARD
-// =================================================================
 
 class _HomeProductCard extends StatelessWidget {
   const _HomeProductCard({required this.product, required this.onTap});
@@ -960,15 +858,11 @@ class _HomeProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ======================================================
             // IMAGE
-            // ======================================================
             Expanded(
               child: Stack(
                 children: [
-                  // ------------------------------------------------
                   // PRODUCT IMAGE
-                  // ------------------------------------------------
                   Positioned.fill(
                     child: Image.network(
                       product['image'].toString(),
@@ -1005,9 +899,7 @@ class _HomeProductCard extends StatelessWidget {
                     ),
                   ),
 
-                  // ------------------------------------------------
                   // CONDITION
-                  // ------------------------------------------------
                   Positioned(
                     top: 8,
                     left: 8,
@@ -1031,9 +923,7 @@ class _HomeProductCard extends StatelessWidget {
                     ),
                   ),
 
-                  // ------------------------------------------------
                   // CATEGORY
-                  // ------------------------------------------------
                   Positioned(
                     bottom: 8,
                     left: 8,
@@ -1060,17 +950,13 @@ class _HomeProductCard extends StatelessWidget {
               ),
             ),
 
-            // ======================================================
             // PRODUCT DETAILS
-            // ======================================================
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ------------------------------------------------
                   // TITLE
-                  // ------------------------------------------------
                   Text(
                     product['title'].toString(),
                     maxLines: 1,
@@ -1084,9 +970,7 @@ class _HomeProductCard extends StatelessWidget {
 
                   const SizedBox(height: 3),
 
-                  // ------------------------------------------------
                   // PRICE
-                  // ------------------------------------------------
                   Text(
                     '₹$price',
                     style: AppTextStyles.title.copyWith(fontSize: 16),
@@ -1094,9 +978,7 @@ class _HomeProductCard extends StatelessWidget {
 
                   const SizedBox(height: 4),
 
-                  // ------------------------------------------------
                   // SELLER
-                  // ------------------------------------------------
                   Row(
                     children: [
                       const Icon(

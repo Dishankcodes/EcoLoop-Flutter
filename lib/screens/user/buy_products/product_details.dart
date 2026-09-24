@@ -1497,8 +1497,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     if (!cartProduct.containsKey('images')) {
       cartProduct['images'] = images;
     }
-
-    CartPopup.show(context, items: [cartProduct]);
+    CartPopup.addItem(context, item: cartProduct);
   }
 
   /// Directs user immediately to the checkout flow with selected quantity.
