@@ -2,8 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../api/api_manager.dart';
-import '../../../app_theme/app_colors.dart';
-import '../../../app_theme/app_text_styles.dart';
+import '../../../app_theme/user/app_colors.dart';
+import '../../../app_theme/user/app_text_styles.dart';
 import '../../../models/auth/user/user_login_model.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/app_message.dart';

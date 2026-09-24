@@ -1,8 +1,8 @@
 import 'package:ecoloop/screens/user/buy_products/marketplace.dart';
 import 'package:flutter/material.dart';
 
-import '../../../app_theme/app_colors.dart';
-import '../../../app_theme/app_text_styles.dart';
+import '../../../app_theme/user/app_colors.dart';
+import '../../../app_theme/user/app_text_styles.dart';
 
 class OrderSuccess extends StatefulWidget {
   final String? orderId;

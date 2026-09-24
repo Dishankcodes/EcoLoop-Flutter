@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../api/api_manager.dart';
-import '../../../app_theme/app_colors.dart';
-import '../../../app_theme/app_text_styles.dart';
+import '../../../app_theme/user/app_colors.dart';
+import '../../../app_theme/user/app_text_styles.dart';
 import '../../../models/auth/user/user_register_model.dart';
 import '../../../models/location/city_model.dart';
 import '../../../models/location/state_model.dart';

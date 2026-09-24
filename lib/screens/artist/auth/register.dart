@@ -3,8 +3,9 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 
 import '../../../api/api_manager.dart';
-import '../../../app_theme/app_colors.dart';
-import '../../../app_theme/app_text_styles.dart';
+import '../../../app_theme/artist/artist_colors.dart';
+import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../app_theme/artist/artist_theme.dart';
 import '../../../models/auth/artist/artist_send_otp_request.dart';
 import '../../../models/location/city_model.dart';
 import '../../../models/location/state_model.dart';
@@ -23,60 +24,43 @@ class ArtistRegister extends StatefulWidget {
 }
 
 class _ArtistRegisterState extends State<ArtistRegister> {
-  // FORM
-
+  // Form
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-
   final TextEditingController _nameController = TextEditingController();
-
   final TextEditingController _emailController = TextEditingController();
-
   final TextEditingController _phoneController = TextEditingController();
-
   final TextEditingController _bioController = TextEditingController();
-
   final TextEditingController _skillsController = TextEditingController();
-
   final TextEditingController _experienceController = TextEditingController();
 
-  // MESSAGE
-
+  // Message
   String? _message;
   String? _messageTitle;
   AppMessageType? _messageType;
 
-  // LOCATION
-
+  // Location
   StateModel? _selectedState;
   CityModel? _selectedCity;
-
   List<StateModel> _states = [];
   List<CityModel> _cities = [];
-
   bool _isLoadingStates = false;
   bool _isLoadingCities = false;
 
-  // CITY CACHE
-
+  // City Cache
   final Map<String, List<CityModel>> _citiesCache = {};
-
   final Map<String, Future<List<CityModel>>> _cityLoadingFutures = {};
 
-  // FORM STATE
-
+  // Form State
   bool _isSendingOtp = false;
 
-  // INIT
-
+  // Init
   @override
   void initState() {
     super.initState();
-
     _loadStates();
   }
 
-  // DISPOSE
-
+  // Dispose
   @override
   void dispose() {
     _nameController.dispose();
@@ -85,19 +69,16 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     _bioController.dispose();
     _skillsController.dispose();
     _experienceController.dispose();
-
     super.dispose();
   }
 
-  // MESSAGE
-
+  // Message
   void _showMessage({
     required String title,
     required String message,
     required AppMessageType type,
   }) {
     if (!mounted) return;
-
     setState(() {
       _messageTitle = title;
       _message = message;
@@ -107,7 +88,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
   void _clearMessage() {
     if (!mounted) return;
-
     setState(() {
       _messageTitle = null;
       _message = null;
@@ -115,31 +95,25 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     });
   }
 
-  // ERROR HANDLING
-
+  // Error Handling
   String _getReadableError(Object error) {
     if (error is DioException) {
-      // Connection timeout
       if (error.type == DioExceptionType.connectionTimeout) {
         return 'Connection timed out. Please check your internet connection.';
       }
 
-      // Send timeout
       if (error.type == DioExceptionType.sendTimeout) {
         return 'The request took too long to send. Please try again.';
       }
 
-      // Receive timeout
       if (error.type == DioExceptionType.receiveTimeout) {
         return 'The server took too long to respond. Please try again.';
       }
 
-      // Connection error
       if (error.type == DioExceptionType.connectionError) {
         return 'Unable to connect to the server. Please check your internet connection.';
       }
 
-      // Server response
       final responseData = error.response?.data;
 
       if (responseData is Map<String, dynamic>) {
@@ -174,8 +148,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     return 'Something went wrong. Please try again.';
   }
 
-  // LOAD STATES
-
+  // Load States
   Future<void> _loadStates() async {
     if (!mounted) return;
 
@@ -193,9 +166,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
           _states = response.data!;
           _isLoadingStates = false;
         });
-
-        // We don't download every city's data here.
-        // Cities are loaded only when the user selects a state.
       } else {
         setState(() {
           _isLoadingStates = false;
@@ -222,32 +192,23 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     }
   }
 
-  // FETCH CITIES FOR STATE
-
+  // Fetch Cities For State
   Future<List<CityModel>> _fetchCitiesForState(String stateCode) {
-    // CACHE
-
     if (_citiesCache.containsKey(stateCode)) {
       return Future.value(_citiesCache[stateCode]!);
     }
-
-    // PREVENT DUPLICATE REQUESTS
 
     if (_cityLoadingFutures.containsKey(stateCode)) {
       return _cityLoadingFutures[stateCode]!;
     }
 
-    // REQUEST
-
     final future = _requestCities(stateCode);
-
     _cityLoadingFutures[stateCode] = future;
 
     return future;
   }
 
-  // REQUEST CITIES
-
+  // Request Cities
   Future<List<CityModel>> _requestCities(String stateCode) async {
     try {
       final response = await ApiManager().client.getCities(
@@ -257,9 +218,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
       if (response.success == true && response.data != null) {
         final cities = response.data!;
-
         _citiesCache[stateCode] = cities;
-
         return cities;
       }
 
@@ -271,12 +230,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     }
   }
 
-  // LOAD CITIES AFTER STATE SELECTION
-
+  // Load Cities After State Selection
   Future<void> _loadCities(String stateCode) async {
     if (!mounted) return;
-
-    // CHECK CACHE FIRST
 
     final cachedCities = _citiesCache[stateCode];
 
@@ -286,11 +242,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
         _selectedCity = null;
         _isLoadingCities = false;
       });
-
       return;
     }
-
-    // SHOW LOADING
 
     setState(() {
       _cities = [];
@@ -303,7 +256,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
       if (!mounted) return;
 
-      // State may have changed while request was running.
       if (_selectedState?.stateCode != stateCode) {
         return;
       }
@@ -340,25 +292,21 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     }
   }
 
-  // VALIDATION
-
+  // Validation
   String? _validateRequired(String? value, String fieldName) {
     if (value == null || value.trim().isEmpty) {
       return 'Please enter your $fieldName';
     }
-
     return null;
   }
 
-  // EMAIL VALIDATION
-
+  // Email Validation
   String? _validateEmail(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Please enter your email';
     }
 
     final email = value.trim();
-
     final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
     if (!emailRegex.hasMatch(email)) {
@@ -368,8 +316,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     return null;
   }
 
-  // PHONE VALIDATION
-
+  // Phone Validation
   String? _validatePhone(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Please enter your phone number';
@@ -384,8 +331,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     return null;
   }
 
-  // EXPERIENCE VALIDATION
-
+  // Experience Validation
   String? _validateExperience(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Please enter your experience';
@@ -404,21 +350,14 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     return null;
   }
 
-  // SEND REGISTRATION OTP
-
+  // Send Registration OTP
   Future<void> _createArtistAccount() async {
     FocusScope.of(context).unfocus();
-
-    // Clear previous server message
     _clearMessage();
-
-    // FORM VALIDATION
 
     if (!_formKey.currentState!.validate()) {
       return;
     }
-
-    // STATE VALIDATION
 
     if (_selectedState == null) {
       _showMessage(
@@ -426,11 +365,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
         message: 'Please select your state.',
         type: AppMessageType.warning,
       );
-
       return;
     }
-
-    // CITY VALIDATION
 
     if (_selectedCity == null) {
       _showMessage(
@@ -438,11 +374,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
         message: 'Please select your city.',
         type: AppMessageType.warning,
       );
-
       return;
     }
-
-    // PREVENT DOUBLE CLICK
 
     if (_isSendingOtp) {
       return;
@@ -456,18 +389,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     });
 
     try {
-      // SEND OTP
-      //
-      // IMPORTANT:
-      // We send BOTH email and phone here.
-      //
-      // Backend checks:
-      // 1. Email already exists
-      // 2. Phone already exists
-      //
-      // If either exists, response.success will be false
-      // and we DO NOT navigate to OTP.
-
       final request = ArtistSendOtpRequest(email: email, phone: phone);
 
       final response = await ApiManager().client.artistRegisterSendOtp(
@@ -477,11 +398,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
       if (!mounted) return;
 
-      // SERVER REJECTED REGISTRATION
-      //
-      // IMPORTANT:
-      // return prevents opening OTP screen.
-
       if (response.success != true || response.data?.sent != true) {
         _showMessage(
           title: 'Unable to continue',
@@ -490,11 +406,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
               'We could not send the verification code. Please try again.',
           type: AppMessageType.error,
         );
-
         return;
       }
-
-      // KEEP REGISTRATION DATA IN MEMORY
 
       final registrationData = <String, dynamic>{
         'userName': _nameController.text.trim(),
@@ -507,8 +420,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
         'skills': _skillsController.text.trim(),
         'experience': _experienceController.text.trim(),
       };
-
-      // ONLY NOW OPEN OTP SCREEN
 
       Navigator.push(
         context,
@@ -537,641 +448,521 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     }
   }
 
-  // BUILD
-
+  // Build
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-
-              children: [
-                // BACK BUTTON
-                const AppBackButton(),
-
-                const SizedBox(height: 20),
-
-                // TITLE
-                Center(
-                  child: Text(
-                    'Artist Registration',
-                    style: AppTextStyles.heading,
-                    textAlign: TextAlign.center,
+    return Theme(
+      data: ArtistTheme.lightTheme,
+      child: Builder(
+        builder: (context) {
+          return Scaffold(
+            backgroundColor: ArtistColors.background,
+            body: SafeArea(
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
                   ),
-                ),
-
-                const SizedBox(height: 8),
-
-                Center(
-                  child: Text(
-                    'Tell us about your creativity',
-                    style: AppTextStyles.body,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-
-                // PROFILE ICON
-                Center(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircleAvatar(
-                        radius: 48,
+                      // Back Button
+                      const AppBackButton(),
+                      const SizedBox(height: 20),
 
-                        backgroundColor: AppColors.primary.withValues(
-                          alpha: 0.10,
-                        ),
-
-                        child: const Icon(
-                          Icons.person_outline,
-                          size: 48,
-                          color: AppColors.primary,
-                        ),
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          // Profile photo upload
-                          // will be connected later.
-                        },
-
-                        icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-
-                        label: const Text('Add Photo'),
-
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-
-                          side: const BorderSide(color: AppColors.primary),
-
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                      // Title
+                      Center(
+                        child: Text(
+                          'Artist Registration',
+                          style: ArtistTextStyles.heading,
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-
-                // NAME
-                _buildLabel('Your Name'),
-
-                const SizedBox(height: 8),
-
-                TextFormField(
-                  controller: _nameController,
-
-                  textCapitalization: TextCapitalization.words,
-
-                  validator: (value) => _validateRequired(value, 'name'),
-
-                  decoration: const InputDecoration(
-                    hintText: 'Enter your name',
-
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // EMAIL
-                _buildLabel('Email'),
-
-                const SizedBox(height: 8),
-
-                TextFormField(
-                  controller: _emailController,
-
-                  keyboardType: TextInputType.emailAddress,
-
-                  validator: _validateEmail,
-
-                  decoration: const InputDecoration(
-                    hintText: 'Enter your email',
-
-                    prefixIcon: Icon(Icons.email_outlined),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // PHONE
-                _buildLabel('Phone Number'),
-
-                const SizedBox(height: 8),
-
-                TextFormField(
-                  controller: _phoneController,
-
-                  keyboardType: TextInputType.phone,
-
-                  maxLength: 10,
-
-                  validator: _validatePhone,
-
-                  decoration: const InputDecoration(
-                    hintText: 'Enter your 10-digit phone number',
-
-                    prefixIcon: Icon(Icons.phone_outlined),
-
-                    counterText: '',
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // STATE
-                _buildLabel('State'),
-
-                const SizedBox(height: 8),
-
-                DropdownSearch<StateModel>(
-                  selectedItem: _selectedState,
-
-                  enabled: !_isLoadingStates && _states.isNotEmpty,
-
-                  items: (filter, loadProps) => _states,
-
-                  itemAsString: (StateModel state) => state.stateName,
-
-                  compareFn: (StateModel a, StateModel b) =>
-                      a.stateCode == b.stateCode,
-
-                  onSelected: (StateModel? value) {
-                    if (value == null) {
-                      return;
-                    }
-
-                    setState(() {
-                      _selectedState = value;
-
-                      _selectedCity = null;
-
-                      final cached = _citiesCache[value.stateCode];
-
-                      if (cached != null) {
-                        _cities = cached;
-
-                        _isLoadingCities = false;
-                      } else {
-                        _cities = [];
-
-                        _isLoadingCities = true;
-                      }
-                    });
-
-                    _loadCities(value.stateCode);
-                  },
-
-                  validator: (value) {
-                    if (value == null) {
-                      return 'Please select your state';
-                    }
-
-                    return null;
-                  },
-
-                  decoratorProps: DropDownDecoratorProps(
-                    decoration: InputDecoration(
-                      hintText: _isLoadingStates
-                          ? 'Loading states...'
-                          : 'Select your state',
-
-                      prefixIcon: const Icon(Icons.map_outlined),
-
-                      suffixIcon: _isLoadingStates
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
-
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            )
-                          : null,
-                    ),
-                  ),
-
-                  popupProps: PopupProps.modalBottomSheet(
-                    showSearchBox: true,
-
-                    searchDelay: Duration.zero,
-
-                    title: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-
-                      child: Text(
-                        'Select State',
-
-                        style: AppTextStyles.body.copyWith(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-
-                    searchFieldProps: TextFieldProps(
-                      decoration: InputDecoration(
-                        hintText: 'Search state...',
-
-                        prefixIcon: const Icon(Icons.search_rounded),
-
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-
-                    itemBuilder: (context, state, isDisabled, isSelected) {
-                      return ListTile(
-                        leading: Icon(
-                          Icons.map_outlined,
-
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                        ),
-
-                        title: Text(
-                          state.stateName,
-
-                          style: AppTextStyles.body.copyWith(
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                          ),
-                        ),
-
-                        trailing: isSelected
-                            ? const Icon(
-                                Icons.check_rounded,
-                                color: AppColors.primary,
-                              )
-                            : null,
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // CITY
-                _buildLabel('City'),
-
-                const SizedBox(height: 8),
-
-                DropdownSearch<CityModel>(
-                  selectedItem: _selectedCity,
-
-                  enabled:
-                      _selectedState != null &&
-                      !_isLoadingCities &&
-                      _cities.isNotEmpty,
-
-                  items: (filter, loadProps) => _cities,
-
-                  itemAsString: (CityModel city) => city.cityName,
-
-                  compareFn: (CityModel a, CityModel b) => a.cityId == b.cityId,
-
-                  onSelected: (CityModel? value) {
-                    setState(() {
-                      _selectedCity = value;
-                    });
-                  },
-
-                  validator: (value) {
-                    if (value == null) {
-                      return 'Please select your city';
-                    }
-
-                    return null;
-                  },
-
-                  decoratorProps: DropDownDecoratorProps(
-                    decoration: InputDecoration(
-                      hintText: _selectedState == null
-                          ? 'Select state first'
-                          : _isLoadingCities
-                          ? 'Loading cities...'
-                          : _cities.isEmpty
-                          ? 'No cities available'
-                          : 'Select your city',
-
-                      prefixIcon: const Icon(Icons.location_city_outlined),
-
-                      suffixIcon: _isLoadingCities
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
-
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            )
-                          : null,
-                    ),
-                  ),
-
-                  popupProps: PopupProps.modalBottomSheet(
-                    showSearchBox: true,
-                    searchDelay: Duration.zero,
-                    title: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-                      child: Text(
-                        _selectedState == null
-                            ? 'Select City'
-                            : 'Select City in ${_selectedState!.stateName}',
-                        style: AppTextStyles.body.copyWith(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-
-                    searchFieldProps: TextFieldProps(
-                      decoration: InputDecoration(
-                        hintText: 'Search city...',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-
-                    itemBuilder: (context, city, isDisabled, isSelected) {
-                      return ListTile(
-                        leading: Icon(
-                          Icons.location_city_outlined,
-
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                        ),
-
-                        title: Text(
-                          city.cityName,
-
-                          style: AppTextStyles.body.copyWith(
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                          ),
-                        ),
-                        trailing: isSelected
-                            ? const Icon(
-                                Icons.check_rounded,
-                                color: AppColors.primary,
-                              )
-                            : null,
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // BIO
-                _buildLabel('Bio'),
-                const SizedBox(height: 8),
-
-                TextFormField(
-                  controller: _bioController,
-                  maxLines: 4,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    hintText: 'Tell us about yourself and your creativity',
-                    prefixIcon: Padding(
-                      padding: EdgeInsets.only(bottom: 55),
-                      child: Icon(Icons.description_outlined),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // SKILLS
-                _buildLabel('Skills'),
-
-                const SizedBox(height: 8),
-
-                TextFormField(
-                  controller: _skillsController,
-
-                  maxLines: 2,
-
-                  textCapitalization: TextCapitalization.sentences,
-
-                  decoration: const InputDecoration(
-                    hintText: 'Example: Painting, Pottery, Woodwork',
-
-                    prefixIcon: Icon(Icons.palette_outlined),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // EXPERIENCE
-                _buildLabel('Experience'),
-
-                const SizedBox(height: 8),
-
-                TextFormField(
-                  controller: _experienceController,
-
-                  keyboardType: TextInputType.number,
-
-                  validator: _validateExperience,
-
-                  decoration: const InputDecoration(
-                    hintText: 'Experience in years',
-
-                    prefixIcon: Icon(Icons.work_outline),
-
-                    suffixText: 'Years',
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-
-                // SEND OTP BUTTON
-                SizedBox(
-                  width: double.infinity,
-
-                  height: 56,
-
-                  child: ElevatedButton(
-                    onPressed: _isSendingOtp ? null : _createArtistAccount,
-
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-
-                      foregroundColor: Colors.white,
-
-                      disabledBackgroundColor: AppColors.primary.withValues(
-                        alpha: 0.5,
-                      ),
-
-                      minimumSize: Size.zero,
-
-                      padding: EdgeInsets.zero,
-
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-
-                    child: _isSendingOtp
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(
-                            'Continue & Send OTP',
-                            style: AppTextStyles.button,
-                          ),
-                  ),
-                ),
-
-                // MESSAGE
-                //
-                // IMPORTANT:
-                // This is BELOW the button.
-                //
-                // Existing email / phone errors will appear HERE.
-                if (_message != null &&
-                    _messageTitle != null &&
-                    _messageType != null) ...[
-                  const SizedBox(height: 16),
-
-                  AppMessage(
-                    title: _messageTitle!,
-
-                    message: _message!,
-
-                    type: _messageType!,
-
-                    onClose: _clearMessage,
-                  ),
-                ],
-
-                const SizedBox(height: 22),
-
-                // LOGIN
-                Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        'Already registered?',
-
-                        style: AppTextStyles.caption.copyWith(fontSize: 14),
-
-                        textAlign: TextAlign.center,
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      Text(
-                        'Your artist account is already registered. '
-                        'You can login directly.',
-
-                        style: AppTextStyles.caption.copyWith(fontSize: 13),
-
-                        textAlign: TextAlign.center,
-                      ),
-
                       const SizedBox(height: 8),
+                      Center(
+                        child: Text(
+                          'Tell us about your creativity',
+                          style: ArtistTextStyles.body,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 28),
 
-                      TextButton(
-                        onPressed: _isSendingOtp
-                            ? null
-                            : () {
-                                Navigator.pushReplacement(
-                                  context,
+                      // Profile Icon
+                      Center(
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 96,
+                              height: 96,
+                              decoration: BoxDecoration(
+                                color: ArtistColors.primary.withOpacity(0.10),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: ArtistColors.primary.withOpacity(0.12),
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.person_outline,
+                                size: 48,
+                                color: ArtistColors.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            OutlinedButton.icon(
+                              onPressed: () {},
+                              icon: const Icon(
+                                Icons.add_a_photo_outlined,
+                                size: 18,
+                              ),
+                              label: Text(
+                                'Add Photo',
+                                style: ArtistTextStyles.body.copyWith(
+                                  color: ArtistColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: ArtistColors.primary,
+                                backgroundColor: ArtistColors.surface,
+                                side: const BorderSide(
+                                  color: ArtistColors.primary,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 28),
 
-                                  MaterialPageRoute(
-                                    builder: (_) => const ArtistLogin(
-                                      title: 'Artist Login',
+                      // Name
+                      _buildLabel('Your Name'),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _nameController,
+                        textCapitalization: TextCapitalization.words,
+                        validator: (value) => _validateRequired(value, 'name'),
+                        onChanged: (_) => _clearMessage(),
+                        decoration: const InputDecoration(
+                          hintText: 'Enter your name',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Email
+                      _buildLabel('Email'),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: _validateEmail,
+                        autocorrect: false,
+                        onChanged: (_) => _clearMessage(),
+                        decoration: const InputDecoration(
+                          hintText: 'Enter your email',
+                          prefixIcon: Icon(Icons.email_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Phone
+                      _buildLabel('Phone Number'),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        maxLength: 10,
+                        validator: _validatePhone,
+                        onChanged: (_) => _clearMessage(),
+                        decoration: const InputDecoration(
+                          hintText: 'Enter your 10-digit phone number',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                          counterText: '',
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // State
+                      _buildLabel('State'),
+                      const SizedBox(height: 8),
+                      DropdownSearch<StateModel>(
+                        selectedItem: _selectedState,
+                        enabled: !_isLoadingStates && _states.isNotEmpty,
+                        items: (filter, loadProps) => _states,
+                        itemAsString: (StateModel state) => state.stateName,
+                        compareFn: (StateModel a, StateModel b) =>
+                            a.stateCode == b.stateCode,
+                        onSelected: (StateModel? value) {
+                          if (value == null) return;
+                          setState(() {
+                            _selectedState = value;
+                            _selectedCity = null;
+
+                            final cached = _citiesCache[value.stateCode];
+                            if (cached != null) {
+                              _cities = cached;
+                              _isLoadingCities = false;
+                            } else {
+                              _cities = [];
+                              _isLoadingCities = true;
+                            }
+                          });
+                          _loadCities(value.stateCode);
+                        },
+                        validator: (value) {
+                          if (value == null) return 'Please select your state';
+                          return null;
+                        },
+                        decoratorProps: DropDownDecoratorProps(
+                          decoration: InputDecoration(
+                            hintText: _isLoadingStates
+                                ? 'Loading states...'
+                                : 'Select your state',
+                            prefixIcon: const Icon(Icons.map_outlined),
+                            suffixIcon: _isLoadingStates
+                                ? const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: ArtistColors.primary,
+                                      ),
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        ),
+                        popupProps: PopupProps.modalBottomSheet(
+                          showSearchBox: true,
+                          searchDelay: Duration.zero,
+                          title: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                            child: Text(
+                              'Select State',
+                              style: ArtistTextStyles.title,
+                            ),
+                          ),
+                          searchFieldProps: TextFieldProps(
+                            decoration: InputDecoration(
+                              hintText: 'Search state...',
+                              hintStyle: ArtistTextStyles.hint,
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                          itemBuilder:
+                              (context, state, isDisabled, isSelected) {
+                                return ListTile(
+                                  leading: Icon(
+                                    Icons.map_outlined,
+                                    color: isSelected
+                                        ? ArtistColors.primary
+                                        : ArtistColors.textSecondary,
+                                  ),
+                                  title: Text(
+                                    state.stateName,
+                                    style: ArtistTextStyles.body.copyWith(
+                                      color: ArtistColors.textPrimary,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
                                     ),
                                   ),
+                                  trailing: isSelected
+                                      ? const Icon(
+                                          Icons.check_rounded,
+                                          color: ArtistColors.primary,
+                                        )
+                                      : null,
                                 );
                               },
-
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-
-                          minimumSize: Size.zero,
-
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
+                      ),
+                      const SizedBox(height: 20),
 
-                        child: Text(
-                          'Login Here',
+                      // City
+                      _buildLabel('City'),
+                      const SizedBox(height: 8),
+                      DropdownSearch<CityModel>(
+                        selectedItem: _selectedCity,
+                        enabled:
+                            _selectedState != null &&
+                            !_isLoadingCities &&
+                            _cities.isNotEmpty,
+                        items: (filter, loadProps) => _cities,
+                        itemAsString: (CityModel city) => city.cityName,
+                        compareFn: (CityModel a, CityModel b) =>
+                            a.cityId == b.cityId,
+                        onSelected: (CityModel? value) {
+                          setState(() {
+                            _selectedCity = value;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null) return 'Please select your city';
+                          return null;
+                        },
+                        decoratorProps: DropDownDecoratorProps(
+                          decoration: InputDecoration(
+                            hintText: _selectedState == null
+                                ? 'Select state first'
+                                : _isLoadingCities
+                                ? 'Loading cities...'
+                                : _cities.isEmpty
+                                ? 'No cities available'
+                                : 'Select your city',
+                            prefixIcon: const Icon(
+                              Icons.location_city_outlined,
+                            ),
+                            suffixIcon: _isLoadingCities
+                                ? const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: ArtistColors.primary,
+                                      ),
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        ),
+                        popupProps: PopupProps.modalBottomSheet(
+                          showSearchBox: true,
+                          searchDelay: Duration.zero,
+                          title: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                            child: Text(
+                              _selectedState == null
+                                  ? 'Select City'
+                                  : 'Select City in ${_selectedState!.stateName}',
+                              style: ArtistTextStyles.title,
+                            ),
+                          ),
+                          searchFieldProps: TextFieldProps(
+                            decoration: InputDecoration(
+                              hintText: 'Search city...',
+                              hintStyle: ArtistTextStyles.hint,
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                          itemBuilder: (context, city, isDisabled, isSelected) {
+                            return ListTile(
+                              leading: Icon(
+                                Icons.location_city_outlined,
+                                color: isSelected
+                                    ? ArtistColors.primary
+                                    : ArtistColors.textSecondary,
+                              ),
+                              title: Text(
+                                city.cityName,
+                                style: ArtistTextStyles.body.copyWith(
+                                  color: ArtistColors.textPrimary,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                              trailing: isSelected
+                                  ? const Icon(
+                                      Icons.check_rounded,
+                                      color: ArtistColors.primary,
+                                    )
+                                  : null,
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 20),
 
-                          style: AppTextStyles.body.copyWith(
-                            color: AppColors.primary,
-
-                            fontWeight: FontWeight.w600,
+                      // Bio
+                      _buildLabel('Bio'),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _bioController,
+                        maxLines: 4,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          hintText:
+                              'Tell us about yourself and your creativity',
+                          prefixIcon: Padding(
+                            padding: EdgeInsets.only(bottom: 55),
+                            child: Icon(Icons.description_outlined),
                           ),
                         ),
                       ),
+                      const SizedBox(height: 20),
+
+                      // Skills
+                      _buildLabel('Skills'),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _skillsController,
+                        maxLines: 2,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          hintText: 'Example: Painting, Pottery, Woodwork',
+                          prefixIcon: Icon(Icons.palette_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Experience
+                      _buildLabel('Experience'),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _experienceController,
+                        keyboardType: TextInputType.number,
+                        validator: _validateExperience,
+                        decoration: const InputDecoration(
+                          hintText: 'Experience in years',
+                          prefixIcon: Icon(Icons.work_outline),
+                          suffixText: 'Years',
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+
+                      // Send OTP Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _isSendingOtp
+                              ? null
+                              : _createArtistAccount,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ArtistColors.primary,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: ArtistColors.primary
+                                .withOpacity(0.5),
+                            minimumSize: Size.zero,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: _isSendingOtp
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  'Continue & Send OTP',
+                                  style: ArtistTextStyles.button,
+                                ),
+                        ),
+                      ),
+
+                      // Message
+                      if (_message != null &&
+                          _messageTitle != null &&
+                          _messageType != null) ...[
+                        const SizedBox(height: 16),
+                        AppMessage(
+                          title: _messageTitle!,
+                          message: _message!,
+                          type: _messageType!,
+                          onClose: _clearMessage,
+                        ),
+                      ],
+                      const SizedBox(height: 22),
+
+                      // Login
+                      Center(
+                        child: Column(
+                          children: [
+                            Text(
+                              'Already registered?',
+                              style: ArtistTextStyles.caption.copyWith(
+                                fontSize: 14,
+                                color: ArtistColors.textSecondary,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Your artist account is already registered. You can login directly.',
+                              style: ArtistTextStyles.caption.copyWith(
+                                fontSize: 13,
+                                color: ArtistColors.textMuted,
+                                height: 1.5,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: _isSendingOtp
+                                  ? null
+                                  : () {
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const ArtistLogin(
+                                            title: 'Artist Login',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                              style: TextButton.styleFrom(
+                                foregroundColor: ArtistColors.primary,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                'Login Here',
+                                style: ArtistTextStyles.body.copyWith(
+                                  color: ArtistColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 12),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
-  // LABEL
-
+  // Label
   Widget _buildLabel(String text) {
     return Text(
       text,
-
-      style: AppTextStyles.body.copyWith(
+      style: ArtistTextStyles.body.copyWith(
         fontSize: 14,
-
         fontWeight: FontWeight.w600,
-
-        color: AppColors.textPrimary,
+        color: ArtistColors.textPrimary,
       ),
     );
   }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../app_theme/app_colors.dart';
-import '../../../app_theme/app_text_styles.dart';
+import '../../../app_theme/user/app_colors.dart';
+import '../../../app_theme/user/app_text_styles.dart';
 import '../../../widgets/cart_popup.dart';
 import '../reviews/product_reviews.dart';
 import '../reviews/write_review.dart';

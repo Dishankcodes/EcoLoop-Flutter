@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../app_theme/app_colors.dart';
+import '../../../app_theme/user/app_colors.dart';
 
 /// Screen providing real-time tracking updates, timeline progress, and delivery details for an order.
 class OrderTracking extends StatefulWidget {

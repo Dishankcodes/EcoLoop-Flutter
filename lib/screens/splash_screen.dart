@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../app_theme/app_text_styles.dart';
+import '../app_theme/user/app_text_styles.dart';
 import '../shared_preferences_util.dart';
 import 'artist/artist_dashboard.dart';
 import 'onboarding_screens/onboarding1.dart';

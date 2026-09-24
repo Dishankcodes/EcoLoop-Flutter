@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../app_theme/app_colors.dart';
+import '../../../app_theme/user/app_colors.dart';
 
 /// Screen for displaying user activity notifications, unread updates, and status alerts.
 class Notifications extends StatefulWidget {

@@ -2,8 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../api/api_manager.dart';
-import '../../../app_theme/app_colors.dart';
-import '../../../app_theme/app_text_styles.dart';
+import '../../../app_theme/artist/artist_colors.dart';
+import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../app_theme/artist/artist_theme.dart';
 import '../../../models/auth/artist/artist_send_otp_request.dart';
 import '../../../widgets/back_button.dart';
 import '../../../widgets/more_menu.dart';
@@ -33,10 +34,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
     super.dispose();
   }
 
-  // ============================================================
-  // SEND LOGIN OTP
-  // ============================================================
-
+  // Send Login OTP
   Future<void> _sendLoginOtp() async {
     FocusScope.of(context).unfocus();
 
@@ -47,10 +45,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
 
     final email = _emailController.text.trim();
 
-    // ------------------------------------------------------------
-    // VALIDATE EMAIL
-    // ------------------------------------------------------------
-
+    // Validate Email
     if (email.isEmpty) {
       setState(() {
         _errorMessage = 'Please enter your email address.';
@@ -77,10 +72,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
 
       if (!mounted) return;
 
-      // ==========================================================
-      // SUCCESS → OPEN OTP
-      // ==========================================================
-
+      // Success -> Open OTP
       if (response.success == true && response.data?.sent == true) {
         setState(() {
           _successMessage = 'OTP sent successfully to $email.';
@@ -101,62 +93,38 @@ class _ArtistLoginState extends State<ArtistLogin> {
         return;
       }
 
-      // ==========================================================
-      // NORMAL API ERROR
-      //
-      // Example:
-      // success = false
-      // error = "You don't have an artist account..."
-      //
-      // IMPORTANT:
-      // DO NOT OPEN OTP
-      // ==========================================================
-
+      // Normal API Error (Do Not Open OTP)
       final error = response.error?.trim();
 
       setState(() {
         _errorMessage = error != null && error.isNotEmpty
             ? error
-            : "You don't have an artist account. "
-                  "Please create an account first.";
+            : "You don't have an artist account. Please create an account first.";
       });
     } on DioException catch (e) {
       if (!mounted) return;
 
       final statusCode = e.response?.statusCode;
 
-      // ==========================================================
-      // ACCOUNT DOES NOT EXIST
-      // ==========================================================
-
+      // Account Does Not Exist
       if (statusCode == 404) {
         setState(() {
           _errorMessage =
-              "You don't have an artist account. "
-              "Please create an account first.";
+              "You don't have an artist account. Please create an account first.";
         });
-
         return;
       }
 
-      // ==========================================================
-      // ACCOUNT EXISTS BUT NOT ACTIVE
-      // ==========================================================
-
+      // Account Exists But Not Active
       if (statusCode == 403) {
         setState(() {
           _errorMessage =
-              'Your artist account is not active. '
-              'Please contact support.';
+              'Your artist account is not active. Please contact support.';
         });
-
         return;
       }
 
-      // ==========================================================
-      // OTHER DIO ERROR
-      // ==========================================================
-
+      // Other Dio Error
       setState(() {
         _errorMessage = _getDioErrorMessage(e);
       });
@@ -175,18 +143,12 @@ class _ArtistLoginState extends State<ArtistLogin> {
     }
   }
 
-  // ============================================================
-  // EMAIL VALIDATION
-  // ============================================================
-
+  // Email Validation
   bool _isValidEmail(String email) {
     return RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(email);
   }
 
-  // ============================================================
-  // DIO ERROR MESSAGE
-  // ============================================================
-
+  // Dio Error Message
   String _getDioErrorMessage(DioException error) {
     final responseData = error.response?.data;
 
@@ -215,78 +177,54 @@ class _ArtistLoginState extends State<ArtistLogin> {
       }
     }
 
-    // ------------------------------------------------------------
-    // CONNECTION ERROR
-    // ------------------------------------------------------------
-
+    // Connection Error
     if (error.type == DioExceptionType.connectionError) {
-      return 'No internet connection. '
-          'Please check your network.';
+      return 'No internet connection. Please check your network.';
     }
 
-    // ------------------------------------------------------------
-    // TIMEOUT
-    // ------------------------------------------------------------
-
+    // Timeout
     if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.sendTimeout ||
         error.type == DioExceptionType.receiveTimeout) {
-      return 'The request timed out. '
-          'Please try again.';
+      return 'The request timed out. Please try again.';
     }
 
-    // ------------------------------------------------------------
-    // SERVER ERROR
-    // ------------------------------------------------------------
-
+    // Server Error
     final statusCode = error.response?.statusCode;
 
     if (statusCode != null) {
       if (statusCode == 404) {
-        return "You don't have an artist account. "
-            "Please create an account first.";
+        return "You don't have an artist account. Please create an account first.";
       }
 
       if (statusCode == 403) {
-        return 'Your artist account is not active. '
-            'Please contact support.';
+        return 'Your artist account is not active. Please contact support.';
       }
 
       if (statusCode >= 500) {
-        return 'Server error. '
-            'Please try again later.';
+        return 'Server error. Please try again later.';
       }
     }
 
-    return 'Unable to connect to the server. '
-        'Please try again.';
+    return 'Unable to connect to the server. Please try again.';
   }
 
-  // ============================================================
-  // GENERAL ERROR
-  // ============================================================
-
+  // General Error
   String _getGeneralErrorMessage(dynamic error) {
     final message = error.toString();
 
     if (message.contains('SocketException')) {
-      return 'No internet connection. '
-          'Please check your network.';
+      return 'No internet connection. Please check your network.';
     }
 
     if (message.contains('TimeoutException')) {
-      return 'The request timed out. '
-          'Please try again.';
+      return 'The request timed out. Please try again.';
     }
 
-    return 'Something went wrong. '
-        'Please try again.';
+    return 'Something went wrong. Please try again.';
   }
 
-  // ============================================================
-  // OPEN REGISTRATION
-  // ============================================================
-
+  // Open Registration
   void _openRegistration() {
     if (_isLoading) return;
 
@@ -298,10 +236,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
     );
   }
 
-  // ============================================================
-  // GOOGLE BUTTON
-  // ============================================================
-
+  // Google Button
   void _continueWithGoogle() {
     if (_isLoading) return;
 
@@ -311,421 +246,315 @@ class _ArtistLoginState extends State<ArtistLogin> {
     });
   }
 
-  // ============================================================
-  // BUILD
-  // ============================================================
-
+  // Build
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-
-            children: [
-              // ==================================================
-              // TOP BAR
-              // ==================================================
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: const [AppBackButton(), MoreMenu()],
-              ),
-
-              const SizedBox(height: 30),
-
-              // ==================================================
-              // ARTIST ICON
-              // ==================================================
-              Center(
-                child: Container(
-                  width: 86,
-                  height: 86,
-
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.10),
-                    shape: BoxShape.circle,
-                  ),
-
-                  child: Icon(
-                    Icons.palette_outlined,
-                    size: 42,
-                    color: AppColors.primary,
-                  ),
+    return Theme(
+      data: ArtistTheme.lightTheme,
+      child: Builder(
+        builder: (context) {
+          return Scaffold(
+            backgroundColor: ArtistColors.background,
+            body: SafeArea(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
                 ),
-              ),
-
-              const SizedBox(height: 25),
-
-              // ==================================================
-              // TITLE
-              // ==================================================
-              Center(
-                child: Text(
-                  'Welcome Back, Artist!',
-                  style: AppTextStyles.heading,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              Center(
-                child: Text(
-                  'Login to manage your artwork and products.',
-                  style: AppTextStyles.body,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-              const SizedBox(height: 35),
-
-              // ==================================================
-              // ERROR MESSAGE
-              // ==================================================
-              if (_errorMessage != null) ...[
-                _messageBox(message: _errorMessage!, isError: true),
-
-                const SizedBox(height: 16),
-
-                // ------------------------------------------------
-                // CREATE ACCOUNT WHEN ACCOUNT DOES NOT EXIST
-                // ------------------------------------------------
-                if (_isAccountNotFoundMessage(_errorMessage!)) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton(
-                      onPressed: _isLoading ? null : _openRegistration,
-
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-
-                        side: BorderSide(color: AppColors.primary),
-
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-
-                      child: Text(
-                        'Create Account',
-                        style: AppTextStyles.body.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 18),
-                ],
-              ],
-
-              // ==================================================
-              // SUCCESS MESSAGE
-              // ==================================================
-              if (_successMessage != null) ...[
-                _messageBox(message: _successMessage!, isError: false),
-
-                const SizedBox(height: 16),
-              ],
-
-              // ==================================================
-              // EMAIL LABEL
-              // ==================================================
-              Text(
-                'Email Address',
-                style: AppTextStyles.body.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              // ==================================================
-              // EMAIL FIELD
-              // ==================================================
-              TextField(
-                controller: _emailController,
-
-                keyboardType: TextInputType.emailAddress,
-
-                textInputAction: TextInputAction.done,
-
-                enabled: !_isLoading,
-
-                autocorrect: false,
-
-                onChanged: (_) {
-                  if (_errorMessage != null || _successMessage != null) {
-                    setState(() {
-                      _errorMessage = null;
-                      _successMessage = null;
-                    });
-                  }
-                },
-
-                onSubmitted: (_) {
-                  if (!_isLoading) {
-                    _sendLoginOtp();
-                  }
-                },
-
-                decoration: InputDecoration(
-                  hintText: 'Enter your email address',
-
-                  hintStyle: AppTextStyles.hint,
-
-                  prefixIcon: const Icon(Icons.email_outlined),
-
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-
-                    borderSide: BorderSide(
-                      color: AppColors.primary,
-                      width: 1.5,
-                    ),
-                  ),
-
-                  filled: true,
-
-                  fillColor: theme.colorScheme.surface,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // ==================================================
-              // SEND OTP BUTTON
-              // ==================================================
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _sendLoginOtp,
-
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-
-                    foregroundColor: Colors.white,
-
-                    disabledBackgroundColor: AppColors.primary.withValues(
-                      alpha: 0.5,
-                    ),
-
-                    elevation: 0,
-
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text('Send OTP', style: AppTextStyles.button),
-                ),
-              ),
-
-              const SizedBox(height: 22),
-
-              // ==================================================
-              // REGISTER
-              // ==================================================
-              Center(
-                child: Wrap(
-                  alignment: WrapAlignment.center,
-
-                  crossAxisAlignment: WrapCrossAlignment.center,
-
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "Don't have an artist account?",
-                      style: AppTextStyles.body,
+                    // Top Bar
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: const [AppBackButton(), MoreMenu()],
                     ),
+                    const SizedBox(height: 30),
 
-                    TextButton(
-                      onPressed: _isLoading ? null : _openRegistration,
-
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 5),
-                      ),
-
-                      child: Text(
-                        'Create Account',
-                        style: AppTextStyles.body.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
+                    // Artist Icon
+                    Center(
+                      child: Container(
+                        width: 86,
+                        height: 86,
+                        decoration: BoxDecoration(
+                          color: ArtistColors.primary.withOpacity(0.10),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.palette_outlined,
+                          size: 42,
+                          color: ArtistColors.primary,
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
+                    const SizedBox(height: 25),
 
-              const SizedBox(height: 12),
-
-              // ==================================================
-              // OR
-              // ==================================================
-              Row(
-                children: [
-                  Expanded(
-                    child: Divider(
-                      color: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.15,
+                    // Title
+                    Center(
+                      child: Text(
+                        'Welcome Back, Artist!',
+                        style: ArtistTextStyles.heading,
+                        textAlign: TextAlign.center,
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 10),
 
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    // Subtitle
+                    Center(
+                      child: Text(
+                        'Login to manage your artwork and products.',
+                        style: ArtistTextStyles.body,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 35),
 
-                    child: Text(
-                      'OR',
-                      style: AppTextStyles.caption.copyWith(
+                    // Error Message
+                    if (_errorMessage != null) ...[
+                      _messageBox(message: _errorMessage!, isError: true),
+                      const SizedBox(height: 16),
+
+                      // Create Account
+                      if (_isAccountNotFoundMessage(_errorMessage!)) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton(
+                            onPressed: _isLoading ? null : _openRegistration,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: ArtistColors.primary,
+                              side: const BorderSide(
+                                color: ArtistColors.primary,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              'Create Account',
+                              style: ArtistTextStyles.body.copyWith(
+                                color: ArtistColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                      ],
+                    ],
+
+                    // Success Message
+                    if (_successMessage != null) ...[
+                      _messageBox(message: _successMessage!, isError: false),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Email Label
+                    Text(
+                      'Email Address',
+                      style: ArtistTextStyles.body.copyWith(
+                        color: ArtistColors.textPrimary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
 
-                  Expanded(
-                    child: Divider(
-                      color: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.15,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 18),
-
-              // ==================================================
-              // GOOGLE BUTTON
-              // ==================================================
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-
-                child: OutlinedButton(
-                  onPressed: _isLoading ? null : _continueWithGoogle,
-
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.surface,
-
-                    side: BorderSide(
-                      color: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.15,
-                      ),
-                    ),
-
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-
-                    children: [
-                      Container(
-                        width: 22,
-                        height: 22,
-
-                        alignment: Alignment.center,
-
-                        child: const Text(
-                          'G',
-                          style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w700,
+                    // Email Field
+                    TextField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.done,
+                      enabled: !_isLoading,
+                      autocorrect: false,
+                      onChanged: (_) {
+                        if (_errorMessage != null || _successMessage != null) {
+                          setState(() {
+                            _errorMessage = null;
+                            _successMessage = null;
+                          });
+                        }
+                      },
+                      onSubmitted: (_) {
+                        if (!_isLoading) {
+                          _sendLoginOtp();
+                        }
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Enter your email address',
+                        hintStyle: ArtistTextStyles.hint,
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: ArtistColors.border,
                           ),
                         ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: ArtistColors.primary.withOpacity(0.4),
+                            width: 1.5,
+                          ),
+                        ),
+                        filled: true,
+                        fillColor: ArtistColors.surface,
                       ),
+                    ),
+                    const SizedBox(height: 20),
 
-                      const SizedBox(width: 10),
+                    // Send OTP Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _sendLoginOtp,
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Send OTP'),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
 
-                      Text(
-                        'Continue with Google',
-                        style: AppTextStyles.body.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
+                    // Register
+                    Center(
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            "Don't have an artist account?",
+                            style: ArtistTextStyles.body,
+                          ),
+                          TextButton(
+                            onPressed: _isLoading ? null : _openRegistration,
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                              ),
+                            ),
+                            child: Text(
+                              'Create Account',
+                              style: ArtistTextStyles.body.copyWith(
+                                color: ArtistColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // OR Divider
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Divider(color: ArtistColors.border),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          child: Text(
+                            'OR',
+                            style: ArtistTextStyles.caption.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const Expanded(
+                          child: Divider(color: ArtistColors.border),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Google Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: OutlinedButton(
+                        onPressed: _isLoading ? null : _continueWithGoogle,
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: ArtistColors.surface,
+                          foregroundColor: ArtistColors.textPrimary,
+                          minimumSize: const Size(double.infinity, 52),
+                          side: const BorderSide(color: ArtistColors.border),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 22,
+                              height: 22,
+                              alignment: Alignment.center,
+                              child: const Text(
+                                'G',
+                                style: TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w700,
+                                  color: ArtistColors.primary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Continue with Google',
+                              style: ArtistTextStyles.body.copyWith(
+                                color: ArtistColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
+                    const SizedBox(height: 22),
 
-              const SizedBox(height: 22),
-
-              // ==================================================
-              // SECURITY TEXT
-              // ==================================================
-              Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-
-                  children: [
-                    Icon(
-                      Icons.lock_outline,
-                      size: 15,
-
-                      color: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.55,
+                    // Security Text
+                    Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.lock_outline,
+                            size: 15,
+                            color: ArtistColors.textMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Secure OTP based login',
+                            style: ArtistTextStyles.caption,
+                          ),
+                        ],
                       ),
                     ),
-
-                    const SizedBox(width: 6),
-
-                    Text(
-                      'Secure OTP based login',
-                      style: AppTextStyles.caption,
-                    ),
+                    const SizedBox(height: 25),
                   ],
                 ),
               ),
-
-              const SizedBox(height: 25),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  // ============================================================
-  // ACCOUNT NOT FOUND CHECK
-  // ============================================================
-
+  // Account Not Found Check
   bool _isAccountNotFoundMessage(String message) {
     final text = message.toLowerCase();
 
@@ -734,46 +563,37 @@ class _ArtistLoginState extends State<ArtistLogin> {
         text.contains('account not found');
   }
 
-  // ============================================================
-  // MESSAGE BOX
-  // ============================================================
-
+  // Message Box
   Widget _messageBox({required String message, required bool isError}) {
-    final color = isError ? Colors.red.shade700 : Colors.green.shade700;
-
-    final background = isError ? Colors.red.shade50 : Colors.green.shade50;
-
-    final icon = isError ? Icons.error_outline : Icons.check_circle_outline;
+    final Color color = isError ? ArtistColors.error : ArtistColors.success;
+    final Color background = isError
+        ? const Color(0xFFFDECEC)
+        : const Color(0xFFEAF4EE);
+    final IconData icon = isError
+        ? Icons.error_outline
+        : Icons.check_circle_outline;
 
     return Container(
       width: double.infinity,
-
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-
       decoration: BoxDecoration(
         color: background,
-
         borderRadius: BorderRadius.circular(12),
-
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        border: Border.all(color: color.withOpacity(0.25)),
       ),
-
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-
         children: [
           Icon(icon, size: 20, color: color),
-
           const SizedBox(width: 10),
-
           Expanded(
             child: Text(
               message,
-
-              style: TextStyle(
+              style: ArtistTextStyles.caption.copyWith(
                 color: color,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
+                height: 1.5,
               ),
             ),
           ),
