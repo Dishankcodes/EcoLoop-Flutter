@@ -4,7 +4,7 @@ class ArtistColors {
   ArtistColors._();
 
   // Primary Palette
-  static const Color primary = Color(0xFF270809); // Deep Maroon
+  static const Color primary = Color(0xFF832035); // Maroon
   static const Color secondary = Color(0xFF08271F); // Deep Forest Green
   static const Color accent = Color(0xFFC1C8C4); // Soft Sage
   static const Color light = Color(0xFFF0F1EF); // Light accent background
