@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app_theme/user/app_text_styles.dart';
 import '../shared_preferences_util.dart';
-import 'artist/artist_dashboard.dart';
+import 'artist/artist_main.dart';
 import 'onboarding_screens/onboarding1.dart';
 import 'user/user_main.dart';
 import 'welcome_screen.dart';
@@ -62,7 +62,7 @@ class _SplashScreenState extends State<SplashScreen>
       if (userRole == 'artist') {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const ArtistDashboard()),
+          MaterialPageRoute(builder: (_) => const ArtistMain()),
         );
       } else {
         Navigator.pushReplacement(

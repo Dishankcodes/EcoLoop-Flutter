@@ -4,10 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'artist_colors.dart';
 
 class ArtistTextStyles {
-  static var navigation;
-
-  static TextStyle? price;
-
   ArtistTextStyles._();
 
   // ============================================================

@@ -26,42 +26,80 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  // Form Key & Text Controllers
+  // ─────────────────────────────────────────────
+  // FORM KEY & TEXT CONTROLLERS
+  // ─────────────────────────────────────────────
+
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
   final TextEditingController _firstNameController = TextEditingController();
+
   final TextEditingController _lastNameController = TextEditingController();
+
   final TextEditingController _emailController = TextEditingController();
+
   final TextEditingController _phoneController = TextEditingController();
+
   final TextEditingController _passwordController = TextEditingController();
 
-  // Application Message Notification State
+  // ─────────────────────────────────────────────
+  // APPLICATION MESSAGE
+  // ─────────────────────────────────────────────
+
   String? _message;
   String? _messageTitle;
   AppMessageType? _messageType;
 
-  // Selected Form Fields
+  // ─────────────────────────────────────────────
+  // SELECTED FORM FIELDS
+  // ─────────────────────────────────────────────
+
   String? _selectedGender;
+
   StateModel? _selectedState;
+
   CityModel? _selectedCity;
 
-  // Location Data State
+  // ─────────────────────────────────────────────
+  // LOCATION DATA
+  // ─────────────────────────────────────────────
+
   List<StateModel> _states = [];
+
   List<CityModel> _cities = [];
+
   bool _isLoadingStates = false;
+
   bool _isLoadingCities = false;
 
-  // City Caching & Concurrency Management
+  // ─────────────────────────────────────────────
+  // CITY CACHE & CONCURRENCY
+  // ─────────────────────────────────────────────
+
   final Map<String, List<CityModel>> _citiesCache = {};
+
   final Map<String, Future<List<CityModel>>> _cityLoadingFutures = {};
 
-  // Form Controls
+  // ─────────────────────────────────────────────
+  // FORM CONTROLS
+  // ─────────────────────────────────────────────
+
   bool _obscurePassword = true;
+
+  // ─────────────────────────────────────────────
+  // INIT
+  // ─────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
+
     _loadStates();
   }
+
+  // ─────────────────────────────────────────────
+  // DISPOSE
+  // ─────────────────────────────────────────────
 
   @override
   void dispose() {
@@ -70,8 +108,13 @@ class _RegisterPageState extends State<RegisterPage> {
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
+
     super.dispose();
   }
+
+  // ─────────────────────────────────────────────
+  // SHOW MESSAGE
+  // ─────────────────────────────────────────────
 
   void _showMessage({
     required String title,
@@ -79,6 +122,7 @@ class _RegisterPageState extends State<RegisterPage> {
     required AppMessageType type,
   }) {
     if (!mounted) return;
+
     setState(() {
       _messageTitle = title;
       _message = message;
@@ -86,8 +130,13 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
+  // ─────────────────────────────────────────────
+  // CLEAR MESSAGE
+  // ─────────────────────────────────────────────
+
   void _clearMessage() {
     if (!mounted) return;
+
     setState(() {
       _messageTitle = null;
       _message = null;
@@ -95,7 +144,10 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
-  /// Extracts user-friendly error messages from API or network failures.
+  // ─────────────────────────────────────────────
+  // READABLE ERROR
+  // ─────────────────────────────────────────────
+
   String _getReadableError(Object error) {
     if (error is DioException) {
       if (error.type == DioExceptionType.connectionTimeout) {
@@ -138,11 +190,16 @@ class _RegisterPageState extends State<RegisterPage> {
     return 'Something went wrong. Please try again.';
   }
 
-  /// Loads available states from the backend and initiates background prefetching for cities.
+  // ─────────────────────────────────────────────
+  // LOAD STATES
+  // ─────────────────────────────────────────────
+
   Future<void> _loadStates() async {
     if (!mounted) return;
 
-    setState(() => _isLoadingStates = true);
+    setState(() {
+      _isLoadingStates = true;
+    });
 
     try {
       final response = await ApiManager().client.getStates('/locations/states');
@@ -157,7 +214,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
         _prefetchCitiesInBackground();
       } else {
-        setState(() => _isLoadingStates = false);
+        setState(() {
+          _isLoadingStates = false;
+        });
 
         _showMessage(
           title: 'Unable to load states',
@@ -168,7 +227,9 @@ class _RegisterPageState extends State<RegisterPage> {
     } catch (e) {
       if (!mounted) return;
 
-      setState(() => _isLoadingStates = false);
+      setState(() {
+        _isLoadingStates = false;
+      });
 
       _showMessage(
         title: 'Unable to load states',
@@ -178,7 +239,10 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Retrieves cities for a given state code using cache or in-flight futures if available.
+  // ─────────────────────────────────────────────
+  // FETCH CITIES
+  // ─────────────────────────────────────────────
+
   Future<List<CityModel>> _fetchCitiesForState(String stateCode) {
     if (_citiesCache.containsKey(stateCode)) {
       return Future.value(_citiesCache[stateCode]!);
@@ -189,12 +253,16 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     final future = _requestCities(stateCode);
+
     _cityLoadingFutures[stateCode] = future;
 
     return future;
   }
 
-  /// Executes the network request to fetch cities for a specific state code.
+  // ─────────────────────────────────────────────
+  // REQUEST CITIES
+  // ─────────────────────────────────────────────
+
   Future<List<CityModel>> _requestCities(String stateCode) async {
     try {
       final response = await ApiManager().client.getCities(
@@ -204,7 +272,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (response.success == true && response.data != null) {
         final cities = response.data!;
+
         _citiesCache[stateCode] = cities;
+
         return cities;
       }
 
@@ -216,7 +286,10 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Prefetches city data in small batches to optimize performance without overloading network requests.
+  // ─────────────────────────────────────────────
+  // PREFETCH CITIES
+  // ─────────────────────────────────────────────
+
   Future<void> _prefetchCitiesInBackground() async {
     if (_states.isEmpty) return;
 
@@ -237,6 +310,7 @@ class _RegisterPageState extends State<RegisterPage> {
         if (_citiesCache.containsKey(selectedCode)) {
           setState(() {
             _cities = _citiesCache[selectedCode]!;
+
             _isLoadingCities = false;
           });
         }
@@ -244,7 +318,10 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Fetches and displays cities based on the user's selected state.
+  // ─────────────────────────────────────────────
+  // LOAD CITIES
+  // ─────────────────────────────────────────────
+
   Future<void> _loadCities(String stateCode) async {
     if (!mounted) return;
 
@@ -256,6 +333,7 @@ class _RegisterPageState extends State<RegisterPage> {
         _selectedCity = null;
         _isLoadingCities = false;
       });
+
       return;
     }
 
@@ -270,7 +348,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (!mounted) return;
 
-      if (_selectedState?.stateCode != stateCode) return;
+      if (_selectedState?.stateCode != stateCode) {
+        return;
+      }
 
       if (cities.isNotEmpty) {
         setState(() {
@@ -292,7 +372,9 @@ class _RegisterPageState extends State<RegisterPage> {
     } catch (e) {
       if (!mounted) return;
 
-      setState(() => _isLoadingCities = false);
+      setState(() {
+        _isLoadingCities = false;
+      });
 
       _showMessage(
         title: 'Unable to load cities',
@@ -302,30 +384,42 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  // Field Validation Helpers
+  // ─────────────────────────────────────────────
+  // VALIDATION
+  // ─────────────────────────────────────────────
+
   String? _validateRequired(String? value, String fieldName) {
     if (value == null || value.trim().isEmpty) {
-      return "Please enter your $fieldName";
+      return 'Please enter your $fieldName';
     }
 
     return null;
   }
 
-  String? _validateGender() =>
-      _selectedGender == null ? "Please select your gender" : null;
+  String? _validateGender() {
+    return _selectedGender == null ? 'Please select your gender' : null;
+  }
 
-  String? _validateState() =>
-      _selectedState == null ? "Please select your state" : null;
+  String? _validateState() {
+    return _selectedState == null ? 'Please select your state' : null;
+  }
 
-  String? _validateCity() =>
-      _selectedCity == null ? "Please select your city" : null;
+  String? _validateCity() {
+    return _selectedCity == null ? 'Please select your city' : null;
+  }
 
-  /// Validates input and triggers account registration API request.
+  // ─────────────────────────────────────────────
+  // CREATE ACCOUNT
+  // ─────────────────────────────────────────────
+
   Future<void> _createAccount() async {
     FocusScope.of(context).unfocus();
+
     _clearMessage();
 
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
     final genderError = _validateGender();
 
@@ -335,6 +429,7 @@ class _RegisterPageState extends State<RegisterPage> {
         message: genderError,
         type: AppMessageType.warning,
       );
+
       return;
     }
 
@@ -346,6 +441,7 @@ class _RegisterPageState extends State<RegisterPage> {
         message: stateError,
         type: AppMessageType.warning,
       );
+
       return;
     }
 
@@ -357,10 +453,13 @@ class _RegisterPageState extends State<RegisterPage> {
         message: cityError,
         type: AppMessageType.warning,
       );
+
       return;
     }
 
-    if (_selectedState == null || _selectedCity == null) return;
+    if (_selectedState == null || _selectedCity == null) {
+      return;
+    }
 
     showDialog(
       context: context,
@@ -392,14 +491,19 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (response.success == true && response.data != null) {
         final data = response.data!;
+
         final account = data.account;
 
         await Prefs.setBool('isLoggedIn', true);
+
         await Prefs.setString('userRole', data.role ?? 'user');
+
         await Prefs.setString('authToken', data.token ?? '');
+
         await Prefs.setString('userEmail', account?.email ?? '');
 
         final firstName = account?.firstName ?? '';
+
         final lastName = account?.lastName ?? '';
 
         await Prefs.setString('userName', '$firstName $lastName'.trim());
@@ -411,11 +515,10 @@ class _RegisterPageState extends State<RegisterPage> {
           MaterialPageRoute(builder: (_) => const UserMain()),
         );
       } else {
-        // Only message handling added here.
-        // No OTP or flow changes.
         final errorMessage = (response.error ?? '').trim().toLowerCase();
 
         String title = 'Registration failed';
+
         String message;
 
         // Both email and phone already exist.
@@ -425,6 +528,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 errorMessage.contains('exist') ||
                 errorMessage.contains('registered'))) {
           title = 'Account already exists';
+
           message =
               'This email or phone number is already registered. Please login instead.';
         }
@@ -434,6 +538,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 errorMessage.contains('exist') ||
                 errorMessage.contains('registered'))) {
           title = 'Email already registered';
+
           message =
               'This email is already registered. Please use another email or login.';
         }
@@ -443,10 +548,11 @@ class _RegisterPageState extends State<RegisterPage> {
                 errorMessage.contains('exist') ||
                 errorMessage.contains('registered'))) {
           title = 'Phone number already registered';
+
           message =
               'This phone number is already registered. Please use another number or login.';
         }
-        // Other backend errors remain unchanged.
+        // Other backend errors.
         else {
           message = response.error ?? 'Unable to create your account.';
         }
@@ -470,6 +576,10 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
+  // ─────────────────────────────────────────────
+  // BUILD
+  // ─────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -483,12 +593,19 @@ class _RegisterPageState extends State<RegisterPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ─────────────────────────────
+                // BACK BUTTON
+                // ─────────────────────────────
                 const AppBackButton(),
+
                 const SizedBox(height: 16),
 
+                // ─────────────────────────────
+                // TITLE
+                // ─────────────────────────────
                 Center(
                   child: Text(
-                    "Create Account",
+                    'Create Account',
                     style: AppTextStyles.heading,
                     textAlign: TextAlign.center,
                   ),
@@ -498,16 +615,20 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 Center(
                   child: Text(
-                    "Join the EcoLoop community",
+                    'Join the EcoLoop community',
                     style: AppTextStyles.body,
                     textAlign: TextAlign.center,
                   ),
                 ),
 
+                // ─────────────────────────────
+                // MESSAGE
+                // ─────────────────────────────
                 if (_message != null &&
                     _messageTitle != null &&
                     _messageType != null) ...[
                   const SizedBox(height: 24),
+
                   AppMessage(
                     title: _messageTitle!,
                     message: _message!,
@@ -518,87 +639,84 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 28),
 
+                // ─────────────────────────────
+                // ECOLOOP LOGO
+                // ─────────────────────────────
                 Center(
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 48,
-                        backgroundColor: AppColors.primary.withValues(
-                          alpha: 0.10,
-                        ),
-                        child: const Icon(
-                          Icons.person_outline,
-                          size: 48,
-                          color: AppColors.primary,
-                        ),
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      OutlinedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                        label: const Text("Add Photo"),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.primary),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: Image.asset(
+                    'assets/logo/ecoloop_logo.png',
+                    width: 115,
+                    height: 115,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    isAntiAlias: true,
                   ),
                 ),
 
                 const SizedBox(height: 28),
 
-                _buildLabel("First Name"),
+                // ─────────────────────────────
+                // FIRST NAME
+                // ─────────────────────────────
+                _buildLabel('First Name'),
+
                 const SizedBox(height: 8),
 
                 TextFormField(
                   controller: _firstNameController,
                   textCapitalization: TextCapitalization.words,
-                  validator: (value) => _validateRequired(value, "first name"),
+                  validator: (value) => _validateRequired(value, 'first name'),
                   decoration: const InputDecoration(
-                    hintText: "Enter your first name",
+                    hintText: 'Enter your first name',
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
-                _buildLabel("Last Name"),
+                // ─────────────────────────────
+                // LAST NAME
+                // ─────────────────────────────
+                _buildLabel('Last Name'),
+
                 const SizedBox(height: 8),
 
                 TextFormField(
                   controller: _lastNameController,
                   textCapitalization: TextCapitalization.words,
-                  validator: (value) => _validateRequired(value, "last name"),
+                  validator: (value) => _validateRequired(value, 'last name'),
                   decoration: const InputDecoration(
-                    hintText: "Enter your last name",
+                    hintText: 'Enter your last name',
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
-                _buildLabel("Email"),
+                // ─────────────────────────────
+                // EMAIL
+                // ─────────────────────────────
+                _buildLabel('Email'),
+
                 const SizedBox(height: 8),
 
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  validator: (value) => _validateRequired(value, "email"),
+                  validator: (value) => _validateRequired(value, 'email'),
                   decoration: const InputDecoration(
-                    hintText: "Enter your email",
+                    hintText: 'Enter your email',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
-                _buildLabel("Phone Number"),
+                // ─────────────────────────────
+                // PHONE
+                // ─────────────────────────────
+                _buildLabel('Phone Number'),
+
                 const SizedBox(height: 8),
 
                 TextFormField(
@@ -611,34 +729,44 @@ class _RegisterPageState extends State<RegisterPage> {
                   ],
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return "Please enter your phone number";
+                      return 'Please enter your phone number';
                     }
 
                     if (value.trim().length != 10) {
-                      return "Phone number must be exactly 10 digits";
+                      return 'Phone number must be exactly 10 digits';
                     }
 
                     return null;
                   },
                   decoration: const InputDecoration(
-                    hintText: "Enter your phone number",
+                    hintText: 'Enter your phone number',
                     prefixIcon: Icon(Icons.phone_outlined),
-                    counterText: "",
+                    counterText: '',
                   ),
                 ),
 
                 const SizedBox(height: 24),
 
-                _buildLabel("Gender"),
+                // ─────────────────────────────
+                // GENDER
+                // ─────────────────────────────
+                _buildLabel('Gender'),
+
                 const SizedBox(height: 6),
 
-                _buildGenderOption("Male"),
-                _buildGenderOption("Female"),
-                _buildGenderOption("Other"),
+                _buildGenderOption('Male'),
+
+                _buildGenderOption('Female'),
+
+                _buildGenderOption('Other'),
 
                 const SizedBox(height: 20),
 
-                _buildLabel("State"),
+                // ─────────────────────────────
+                // STATE
+                // ─────────────────────────────
+                _buildLabel('State'),
+
                 const SizedBox(height: 8),
 
                 DropdownSearch<StateModel>(
@@ -649,10 +777,13 @@ class _RegisterPageState extends State<RegisterPage> {
                   compareFn: (StateModel a, StateModel b) =>
                       a.stateCode == b.stateCode,
                   onSelected: (StateModel? value) {
-                    if (value == null) return;
+                    if (value == null) {
+                      return;
+                    }
 
                     setState(() {
                       _selectedState = value;
+
                       _selectedCity = null;
 
                       final cached = _citiesCache[value.stateCode];
@@ -669,12 +800,12 @@ class _RegisterPageState extends State<RegisterPage> {
                     _loadCities(value.stateCode);
                   },
                   validator: (value) =>
-                      value == null ? "Please select your state" : null,
+                      value == null ? 'Please select your state' : null,
                   decoratorProps: DropDownDecoratorProps(
                     decoration: InputDecoration(
                       hintText: _isLoadingStates
-                          ? "Loading states..."
-                          : "Select your state",
+                          ? 'Loading states...'
+                          : 'Select your state',
                       prefixIcon: const Icon(Icons.map_outlined),
                       suffixIcon: _isLoadingStates
                           ? const Padding(
@@ -696,7 +827,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     title: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
                       child: Text(
-                        "Select State",
+                        'Select State',
                         style: AppTextStyles.body.copyWith(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -705,7 +836,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     searchFieldProps: TextFieldProps(
                       decoration: InputDecoration(
-                        hintText: "Search state...",
+                        hintText: 'Search state...',
                         prefixIcon: const Icon(Icons.search_rounded),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -741,7 +872,11 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 20),
 
-                _buildLabel("City"),
+                // ─────────────────────────────
+                // CITY
+                // ─────────────────────────────
+                _buildLabel('City'),
+
                 const SizedBox(height: 8),
 
                 DropdownSearch<CityModel>(
@@ -757,16 +892,16 @@ class _RegisterPageState extends State<RegisterPage> {
                     setState(() => _selectedCity = value);
                   },
                   validator: (value) =>
-                      value == null ? "Please select your city" : null,
+                      value == null ? 'Please select your city' : null,
                   decoratorProps: DropDownDecoratorProps(
                     decoration: InputDecoration(
                       hintText: _selectedState == null
-                          ? "Select state first"
+                          ? 'Select state first'
                           : _isLoadingCities
-                          ? "Loading cities..."
+                          ? 'Loading cities...'
                           : _cities.isEmpty
-                          ? "No cities available"
-                          : "Select your city",
+                          ? 'No cities available'
+                          : 'Select your city',
                       prefixIcon: const Icon(Icons.location_city_outlined),
                       suffixIcon: _isLoadingCities
                           ? const Padding(
@@ -789,8 +924,8 @@ class _RegisterPageState extends State<RegisterPage> {
                       padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
                       child: Text(
                         _selectedState == null
-                            ? "Select City"
-                            : "Select City in ${_selectedState!.stateName}",
+                            ? 'Select City'
+                            : 'Select City in ${_selectedState!.stateName}',
                         style: AppTextStyles.body.copyWith(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -799,7 +934,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     searchFieldProps: TextFieldProps(
                       decoration: InputDecoration(
-                        hintText: "Search city...",
+                        hintText: 'Search city...',
                         prefixIcon: const Icon(Icons.search_rounded),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -835,15 +970,19 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 20),
 
-                _buildLabel("Password"),
+                // ─────────────────────────────
+                // PASSWORD
+                // ─────────────────────────────
+                _buildLabel('Password'),
+
                 const SizedBox(height: 8),
 
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  validator: (value) => _validateRequired(value, "password"),
+                  validator: (value) => _validateRequired(value, 'password'),
                   decoration: InputDecoration(
-                    hintText: "Create a password",
+                    hintText: 'Create a password',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       onPressed: () {
@@ -862,6 +1001,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 30),
 
+                // ─────────────────────────────
+                // CREATE ACCOUNT
+                // ─────────────────────────────
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -876,19 +1018,22 @@ class _RegisterPageState extends State<RegisterPage> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text("Create Account", style: AppTextStyles.button),
+                    child: Text('Create Account', style: AppTextStyles.button),
                   ),
                 ),
 
                 const SizedBox(height: 18),
 
+                // ─────────────────────────────
+                // LOGIN
+                // ─────────────────────────────
                 Center(
                   child: Wrap(
                     alignment: WrapAlignment.center,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
-                        "Already have an account?",
+                        'Already have an account?',
                         style: AppTextStyles.caption.copyWith(fontSize: 14),
                       ),
                       TextButton(
@@ -897,7 +1042,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             context,
                             MaterialPageRoute(
                               builder: (_) =>
-                                  const UserLogin(title: "User Login"),
+                                  const UserLogin(title: 'User Login'),
                             ),
                           );
                         },
@@ -910,7 +1055,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         child: Text(
-                          "Login",
+                          'Login',
                           style: AppTextStyles.body.copyWith(
                             color: AppColors.primary,
                             fontWeight: FontWeight.w600,
@@ -923,6 +1068,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 8),
 
+                // ─────────────────────────────
+                // BECOME AN ARTIST
+                // ─────────────────────────────
                 Center(
                   child: TextButton(
                     onPressed: () {
@@ -940,7 +1088,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                     child: Text(
-                      "Become an Artist →",
+                      'Become an Artist →',
                       style: AppTextStyles.body.copyWith(
                         color: AppColors.primary,
                         fontSize: 15,
@@ -959,6 +1107,10 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
+  // ─────────────────────────────────────────────
+  // LABEL
+  // ─────────────────────────────────────────────
+
   Widget _buildLabel(String text) {
     return Text(
       text,
@@ -969,6 +1121,10 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
     );
   }
+
+  // ─────────────────────────────────────────────
+  // GENDER OPTION
+  // ─────────────────────────────────────────────
 
   Widget _buildGenderOption(String value) {
     return SizedBox(
@@ -988,7 +1144,9 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         activeColor: AppColors.primary,
         onChanged: (selectedValue) {
-          setState(() => _selectedGender = selectedValue);
+          setState(() {
+            _selectedGender = selectedValue;
+          });
         },
       ),
     );

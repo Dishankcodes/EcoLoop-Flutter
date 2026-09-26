@@ -176,7 +176,7 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const ArtistDashboard()),
+      MaterialPageRoute(builder: (_) => const ArtistHome()),
       (route) => false,
     );
   }
@@ -208,7 +208,7 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const ArtistDashboard()),
+      MaterialPageRoute(builder: (_) => const ArtistHome()),
       (route) => false,
     );
   }
