@@ -7,6 +7,7 @@ import 'buy_products/marketplace.dart';
 import 'my_products/add_product.dart';
 import 'my_products/selling_orders.dart';
 
+/// Artist dashboard screen displaying store analytics, quick action shortcuts, recent orders, and top products.
 class ArtistHome extends StatefulWidget {
   const ArtistHome({super.key});
 
@@ -15,9 +16,6 @@ class ArtistHome extends StatefulWidget {
 }
 
 class _ArtistHomeState extends State<ArtistHome> {
-  // DASHBOARD DATA
-  // UI ONLY - WILL BE CONNECTED TO API LATER
-
   final List<Map<String, dynamic>> _stats = [
     {
       'title': 'Total Sales',
@@ -120,8 +118,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     },
   ];
 
-  // SNACKBAR
-
+  /// Displays a feedback floating snackbar message.
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -141,8 +138,7 @@ class _ArtistHomeState extends State<ArtistHome> {
       );
   }
 
-  // QUICK ACTION NAVIGATION
-
+  /// Handles routing for quick action shortcuts.
   void _handleQuickAction(String type) {
     switch (type) {
       case 'add':
@@ -151,36 +147,29 @@ class _ArtistHomeState extends State<ArtistHome> {
           MaterialPageRoute(builder: (_) => const AddProduct()),
         );
         break;
-
       case 'marketplace':
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const Marketplace()),
         );
         break;
-
       case 'orders':
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const SellingOrders()),
         );
         break;
-
       case 'earnings':
         _showMessage('Earnings section will be connected later.');
         break;
-
       case 'products':
         _showMessage('My Products will be connected later.');
         break;
-
       case 'reviews':
         _showMessage('Reviews will be connected later.');
         break;
     }
   }
-
-  // BUILD
 
   @override
   Widget build(BuildContext context) {
@@ -228,13 +217,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                           );
                         },
                       ),
-
                       const SizedBox(height: 12),
-
                       _buildRecentOrders(),
-
                       const SizedBox(height: 30),
-
                       _buildSectionHeader(
                         'Top Performing Products',
                         'View all',
@@ -242,19 +227,12 @@ class _ArtistHomeState extends State<ArtistHome> {
                           _showMessage('My Products will be connected later.');
                         },
                       ),
-
                       const SizedBox(height: 12),
-
                       _buildTopProducts(),
-
                       const SizedBox(height: 30),
-
                       _buildSectionHeader('Performance Overview', 'This Month'),
-
                       const SizedBox(height: 12),
-
                       _buildPerformanceCard(),
-
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -267,8 +245,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // HEADER
-
+  /// Dashboard greeting header with store title and overflow popup menu.
   Widget _buildHeader() {
     return Row(
       children: [
@@ -286,9 +263,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                   letterSpacing: -0.5,
                 ),
               ),
-
               const SizedBox(height: 5),
-
               Text(
                 'Here is what is happening with your store.',
                 style: ArtistTextStyles.caption.copyWith(fontSize: 12.5),
@@ -296,16 +271,13 @@ class _ArtistHomeState extends State<ArtistHome> {
             ],
           ),
         ),
-
         const SizedBox(width: 12),
-
         const ArtistMoreMenu(),
       ],
     );
   }
 
-  // EARNINGS CARD
-
+  /// Total earnings summary card gradient block.
   Widget _buildEarningsCard() {
     return InkWell(
       onTap: () {
@@ -344,9 +316,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                       fontSize: 13,
                     ),
                   ),
-
                   const SizedBox(height: 7),
-
                   Text(
                     '₹24,850',
                     style: ArtistTextStyles.heading.copyWith(
@@ -355,9 +325,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                       letterSpacing: -1,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   Row(
                     children: [
                       Container(
@@ -377,18 +345,14 @@ class _ArtistHomeState extends State<ArtistHome> {
                           ),
                         ),
                       ),
-
                       const SizedBox(width: 8),
-
                       Text('from last month', style: ArtistTextStyles.caption),
                     ],
                   ),
                 ],
               ),
             ),
-
             const SizedBox(width: 16),
-
             Container(
               width: 60,
               height: 60,
@@ -419,8 +383,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // STATS
-
+  /// Store metrics statistics cards grid/row.
   Widget _buildStats(bool isWide) {
     if (isWide) {
       return Row(
@@ -449,6 +412,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
+  /// Helper widget rendering individual stat metric cards.
   Widget _buildStatCard(Map<String, dynamic> stat) {
     return InkWell(
       onTap: () {
@@ -478,9 +442,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                 color: ArtistColors.primary,
               ),
             ),
-
             const Spacer(),
-
             Text(
               stat['value'] as String,
               style: ArtistTextStyles.title.copyWith(
@@ -489,9 +451,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                 color: ArtistColors.primary,
               ),
             ),
-
             const SizedBox(height: 2),
-
             Text(
               stat['title'] as String,
               maxLines: 1,
@@ -507,8 +467,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // SECTION HEADER
-
+  /// Reusable section title with action label button.
   Widget _buildSectionHeader(
     String title,
     String action, {
@@ -525,7 +484,6 @@ class _ArtistHomeState extends State<ArtistHome> {
             ),
           ),
         ),
-
         if (onTap != null)
           InkWell(
             onTap: onTap,
@@ -545,8 +503,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // QUICK ACTIONS
-
+  /// Quick action shortcuts layout builder.
   Widget _buildQuickActions(bool isWide) {
     if (isWide) {
       return Row(
@@ -579,6 +536,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
+  /// Shortcut tile item card.
   Widget _buildQuickActionCard(Map<String, dynamic> action) {
     return InkWell(
       onTap: () {
@@ -608,9 +566,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                 size: 21,
               ),
             ),
-
             const SizedBox(height: 8),
-
             Text(
               action['title'] as String,
               textAlign: TextAlign.center,
@@ -628,8 +584,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // RECENT ORDERS
-
+  /// List of recent incoming customer orders.
   Widget _buildRecentOrders() {
     return Container(
       decoration: BoxDecoration(
@@ -640,13 +595,13 @@ class _ArtistHomeState extends State<ArtistHome> {
       child: Column(
         children: List.generate(_recentOrders.length, (index) {
           final order = _recentOrders[index];
-
           return _buildOrderItem(order, index == _recentOrders.length - 1);
         }),
       ),
     );
   }
 
+  /// Helper row widget for individual order items inside recent orders list.
   Widget _buildOrderItem(Map<String, dynamic> order, bool isLast) {
     return InkWell(
       onTap: () {
@@ -671,9 +626,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                     size: 22,
                   ),
                 ),
-
                 const SizedBox(width: 12),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -686,9 +639,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-
                       const SizedBox(height: 3),
-
                       Text(
                         '${order['id']} • ${order['customer']}',
                         maxLines: 1,
@@ -698,9 +649,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                     ],
                   ),
                 ),
-
                 const SizedBox(width: 8),
-
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -711,15 +660,12 @@ class _ArtistHomeState extends State<ArtistHome> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-
                     const SizedBox(height: 5),
-
                     _buildStatusBadge(order['status'] as String),
                   ],
                 ),
               ],
             ),
-
             if (!isLast) ...[
               const SizedBox(height: 14),
               Divider(height: 1, color: ArtistColors.border),
@@ -730,8 +676,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // STATUS BADGE
-
+  /// Status badge label for order state.
   Widget _buildStatusBadge(String status) {
     final Color color = _statusColor(status);
 
@@ -756,29 +701,23 @@ class _ArtistHomeState extends State<ArtistHome> {
     switch (status) {
       case 'Pending':
         return ArtistColors.warning;
-
       case 'Confirmed':
         return ArtistColors.info;
-
       case 'Processing':
         return ArtistColors.primary;
-
       case 'Completed':
         return ArtistColors.success;
-
       case 'Cancelled':
         return ArtistColors.error;
-
       default:
         return ArtistColors.textSecondary;
     }
   }
 
-  // TOP PRODUCTS
-
+  /// Horizontal carousel of top-performing items.
   Widget _buildTopProducts() {
     return SizedBox(
-      height: 215,
+      height: 230,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -791,6 +730,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
+  /// Product item card inside top products horizontal list.
   Widget _buildProductCard(Map<String, dynamic> product) {
     return InkWell(
       onTap: () {
@@ -809,7 +749,7 @@ class _ArtistHomeState extends State<ArtistHome> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              height: 92,
+              height: 88,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: ArtistColors.surfaceSoft,
@@ -821,9 +761,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                 color: ArtistColors.primary,
               ),
             ),
-
-            const SizedBox(height: 10),
-
+            const SizedBox(height: 8),
             Text(
               product['name'] as String,
               maxLines: 1,
@@ -832,13 +770,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-
             const SizedBox(height: 2),
-
             Text(product['category'] as String, style: ArtistTextStyles.small),
-
             const Spacer(),
-
             Row(
               children: [
                 Text(
@@ -848,9 +782,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-
                 const Spacer(),
-
                 Text(
                   product['sold'] as String,
                   style: ArtistTextStyles.small.copyWith(
@@ -866,8 +798,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // PERFORMANCE CARD
-
+  /// Monthly performance chart section block.
   Widget _buildPerformanceCard() {
     return Container(
       width: double.infinity,
@@ -902,7 +833,6 @@ class _ArtistHomeState extends State<ArtistHome> {
                   ],
                 ),
               ),
-
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
                 decoration: BoxDecoration(
@@ -919,17 +849,13 @@ class _ArtistHomeState extends State<ArtistHome> {
               ),
             ],
           ),
-
           const SizedBox(height: 20),
-
           SizedBox(
             height: 115,
             width: double.infinity,
             child: CustomPaint(painter: _PerformanceChartPainter()),
           ),
-
           const SizedBox(height: 8),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']
@@ -942,8 +868,7 @@ class _ArtistHomeState extends State<ArtistHome> {
   }
 }
 
-// PERFORMANCE CHART
-
+/// Custom painter rendering smooth earnings overview line chart graph.
 class _PerformanceChartPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -962,10 +887,8 @@ class _PerformanceChartPainter extends CustomPainter {
       ..color = ArtistColors.light.withOpacity(0.22)
       ..style = PaintingStyle.fill;
 
-    // Horizontal grid lines
     for (int i = 1; i <= 3; i++) {
       final double y = size.height * i / 4;
-
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
 
@@ -991,7 +914,6 @@ class _PerformanceChartPainter extends CustomPainter {
       ..close();
 
     canvas.drawPath(fillPath, fillPaint);
-
     canvas.drawPath(linePath, linePaint);
 
     final Paint pointPaint = Paint()
