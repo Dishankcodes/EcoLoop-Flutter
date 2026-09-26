@@ -36,22 +36,26 @@ class ArtistBottomNavigation extends StatelessWidget {
           height: 68,
           child: Row(
             children: [
+              // HOME / DASHBOARD
               _navItem(
-                icon: Icons.dashboard_outlined,
-                activeIcon: Icons.dashboard_rounded,
-                label: 'Dashboard',
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home_rounded,
+                label: 'Home',
                 index: 0,
               ),
 
+              // MARKETPLACE
               _navItem(
-                icon: Icons.inventory_2_outlined,
-                activeIcon: Icons.inventory_2_rounded,
-                label: 'Materials',
+                icon: Icons.storefront_outlined,
+                activeIcon: Icons.storefront_rounded,
+                label: 'Marketplace',
                 index: 1,
               ),
 
+              // ADD PRODUCT
               _addButton(),
 
+              // SELLING ORDERS
               _navItem(
                 icon: Icons.receipt_long_outlined,
                 activeIcon: Icons.receipt_long_rounded,
@@ -59,6 +63,7 @@ class ArtistBottomNavigation extends StatelessWidget {
                 index: 2,
               ),
 
+              // PROFILE
               _navItem(
                 icon: Icons.person_outline_rounded,
                 activeIcon: Icons.person_rounded,
@@ -71,6 +76,8 @@ class ArtistBottomNavigation extends StatelessWidget {
       ),
     );
   }
+
+  // NAVIGATION ITEM
 
   Widget _navItem({
     required IconData icon,
@@ -101,7 +108,7 @@ class ArtistBottomNavigation extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 9.5,
+                fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 color: isSelected
                     ? ArtistColors.primary
@@ -113,6 +120,8 @@ class ArtistBottomNavigation extends StatelessWidget {
       ),
     );
   }
+
+  // ADD PRODUCT BUTTON
 
   Widget _addButton() {
     return Expanded(

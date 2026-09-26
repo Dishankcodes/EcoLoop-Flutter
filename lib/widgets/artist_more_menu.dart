@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../app_theme/artist/artist_colors.dart';
 import '../app_theme/artist/artist_text_styles.dart';
+import '../screens/artist/my_products/product_analytics.dart';
 import '../screens/artist/profile/contact_us.dart';
 import '../screens/artist/profile/settings.dart';
-import '../screens/artist/sell_products/product_analytics.dart';
 import '../screens/welcome_screen.dart';
 import '../shared_preferences_util.dart';
 
@@ -98,9 +98,7 @@ class ArtistMoreMenu extends StatelessWidget {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // LOGOUT DIALOG
-  // ---------------------------------------------------------------------------
 
   static void _showLogoutDialog(BuildContext context) {
     showDialog(

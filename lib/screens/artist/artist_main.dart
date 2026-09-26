@@ -4,8 +4,8 @@ import '../../widgets/artist_bottom_navigation.dart';
 import 'artist_dashboard.dart';
 import 'buy_products/marketplace.dart';
 import 'profile/profile.dart';
-import 'sell_products/add_product.dart';
-import 'sell_products/selling_orders.dart';
+import 'my_products/add_product.dart';
+import 'my_products/selling_orders.dart';
 
 class ArtistMain extends StatefulWidget {
   const ArtistMain({super.key});

@@ -9,10 +9,6 @@ class RegisterUserRequest {
   final String stateCode;
   final String password;
 
-  final String? profilePhotoBase64;
-  final String? profilePhotoFileName;
-  final String? profilePhotoMimeType;
-
   RegisterUserRequest({
     required this.firstName,
     required this.lastName,
@@ -23,9 +19,6 @@ class RegisterUserRequest {
     required this.state,
     required this.stateCode,
     required this.password,
-    this.profilePhotoBase64,
-    this.profilePhotoFileName,
-    this.profilePhotoMimeType,
   });
 
   Map<String, dynamic> toJson() {
@@ -39,14 +32,6 @@ class RegisterUserRequest {
       'state': state,
       'stateCode': stateCode,
       'password': password,
-
-      if (profilePhotoBase64 != null) 'profilePhotoBase64': profilePhotoBase64,
-
-      if (profilePhotoFileName != null)
-        'profilePhotoFileName': profilePhotoFileName,
-
-      if (profilePhotoMimeType != null)
-        'profilePhotoMimeType': profilePhotoMimeType,
     };
   }
 
@@ -61,9 +46,6 @@ class RegisterUserRequest {
       state: json['state']?.toString() ?? '',
       stateCode: json['stateCode']?.toString() ?? '',
       password: json['password']?.toString() ?? '',
-      profilePhotoBase64: json['profilePhotoBase64']?.toString(),
-      profilePhotoFileName: json['profilePhotoFileName']?.toString(),
-      profilePhotoMimeType: json['profilePhotoMimeType']?.toString(),
     );
   }
 }
