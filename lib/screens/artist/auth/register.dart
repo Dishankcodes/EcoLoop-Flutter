@@ -24,7 +24,8 @@ class ArtistRegister extends StatefulWidget {
 }
 
 class _ArtistRegisterState extends State<ArtistRegister> {
-  // Form
+  // FORM
+
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -33,12 +34,14 @@ class _ArtistRegisterState extends State<ArtistRegister> {
   final TextEditingController _skillsController = TextEditingController();
   final TextEditingController _experienceController = TextEditingController();
 
-  // Message
+  // MESSAGE
+
   String? _message;
   String? _messageTitle;
   AppMessageType? _messageType;
 
-  // Location
+  // LOCATION
+
   StateModel? _selectedState;
   CityModel? _selectedCity;
   List<StateModel> _states = [];
@@ -46,21 +49,23 @@ class _ArtistRegisterState extends State<ArtistRegister> {
   bool _isLoadingStates = false;
   bool _isLoadingCities = false;
 
-  // City Cache
+  // CITY CACHE
+
   final Map<String, List<CityModel>> _citiesCache = {};
   final Map<String, Future<List<CityModel>>> _cityLoadingFutures = {};
 
-  // Form State
+  // FORM STATE
   bool _isSendingOtp = false;
 
-  // Init
+  // INIT
   @override
   void initState() {
     super.initState();
     _loadStates();
   }
 
-  // Dispose
+  // DISPOSE
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -72,7 +77,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     super.dispose();
   }
 
-  // Message
+  // MESSAGE
+
   void _showMessage({
     required String title,
     required String message,
@@ -95,7 +101,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     });
   }
 
-  // Error Handling
+  // ERROR HANDLING
+
   String _getReadableError(Object error) {
     if (error is DioException) {
       if (error.type == DioExceptionType.connectionTimeout) {
@@ -148,7 +155,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     return 'Something went wrong. Please try again.';
   }
 
-  // Load States
+  // LOAD STATES
+
   Future<void> _loadStates() async {
     if (!mounted) return;
 
@@ -192,7 +200,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     }
   }
 
-  // Fetch Cities For State
+  // FETCH CITIES
+
   Future<List<CityModel>> _fetchCitiesForState(String stateCode) {
     if (_citiesCache.containsKey(stateCode)) {
       return Future.value(_citiesCache[stateCode]!);
@@ -203,12 +212,14 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     }
 
     final future = _requestCities(stateCode);
+
     _cityLoadingFutures[stateCode] = future;
 
     return future;
   }
 
-  // Request Cities
+  // REQUEST CITIES
+
   Future<List<CityModel>> _requestCities(String stateCode) async {
     try {
       final response = await ApiManager().client.getCities(
@@ -218,7 +229,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
       if (response.success == true && response.data != null) {
         final cities = response.data!;
+
         _citiesCache[stateCode] = cities;
+
         return cities;
       }
 
@@ -230,7 +243,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     }
   }
 
-  // Load Cities After State Selection
+  // LOAD CITIES
+
   Future<void> _loadCities(String stateCode) async {
     if (!mounted) return;
 
@@ -242,6 +256,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
         _selectedCity = null;
         _isLoadingCities = false;
       });
+
       return;
     }
 
@@ -292,21 +307,23 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     }
   }
 
-  // Validation
+  // VALIDATION
+
   String? _validateRequired(String? value, String fieldName) {
     if (value == null || value.trim().isEmpty) {
       return 'Please enter your $fieldName';
     }
+
     return null;
   }
 
-  // Email Validation
   String? _validateEmail(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Please enter your email';
     }
 
     final email = value.trim();
+
     final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
     if (!emailRegex.hasMatch(email)) {
@@ -316,7 +333,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     return null;
   }
 
-  // Phone Validation
   String? _validatePhone(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Please enter your phone number';
@@ -331,7 +347,6 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     return null;
   }
 
-  // Experience Validation
   String? _validateExperience(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Please enter your experience';
@@ -350,9 +365,11 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     return null;
   }
 
-  // Send Registration OTP
+  // SEND REGISTRATION OTP
+
   Future<void> _createArtistAccount() async {
     FocusScope.of(context).unfocus();
+
     _clearMessage();
 
     if (!_formKey.currentState!.validate()) {
@@ -365,6 +382,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
         message: 'Please select your state.',
         type: AppMessageType.warning,
       );
+
       return;
     }
 
@@ -374,6 +392,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
         message: 'Please select your city.',
         type: AppMessageType.warning,
       );
+
       return;
     }
 
@@ -382,6 +401,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     }
 
     final email = _emailController.text.trim();
+
     final phone = _phoneController.text.trim();
 
     setState(() {
@@ -406,6 +426,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
               'We could not send the verification code. Please try again.',
           type: AppMessageType.error,
         );
+
         return;
       }
 
@@ -448,7 +469,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     }
   }
 
-  // Build
+  // BUILD
+
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -469,11 +491,12 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Back Button
+                      // BACK BUTTON
                       const AppBackButton(),
+
                       const SizedBox(height: 20),
 
-                      // Title
+                      // TITLE
                       Center(
                         child: Text(
                           'Artist Registration',
@@ -481,7 +504,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+
                       const SizedBox(height: 8),
+
                       Center(
                         child: Text(
                           'Tell us about your creativity',
@@ -489,61 +514,28 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+
                       const SizedBox(height: 28),
 
-                      // Profile Icon
+                      // ECOLOOP LOGO
                       Center(
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 96,
-                              height: 96,
-                              decoration: BoxDecoration(
-                                color: ArtistColors.primary.withOpacity(0.10),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: ArtistColors.primary.withOpacity(0.12),
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.person_outline,
-                                size: 48,
-                                color: ArtistColors.primary,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            OutlinedButton.icon(
-                              onPressed: () {},
-                              icon: const Icon(
-                                Icons.add_a_photo_outlined,
-                                size: 18,
-                              ),
-                              label: Text(
-                                'Add Photo',
-                                style: ArtistTextStyles.body.copyWith(
-                                  color: ArtistColors.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: ArtistColors.primary,
-                                backgroundColor: ArtistColors.surface,
-                                side: const BorderSide(
-                                  color: ArtistColors.primary,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: Image.asset(
+                          'assets/logo/ecoloop_logo.png',
+                          width: 115,
+                          height: 115,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                          isAntiAlias: true,
                         ),
                       ),
+
                       const SizedBox(height: 28),
 
-                      // Name
+                      // NAME
                       _buildLabel('Your Name'),
+
                       const SizedBox(height: 8),
+
                       TextFormField(
                         controller: _nameController,
                         textCapitalization: TextCapitalization.words,
@@ -554,11 +546,14 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           prefixIcon: Icon(Icons.person_outline),
                         ),
                       ),
+
                       const SizedBox(height: 20),
 
-                      // Email
+                      // EMAIL
                       _buildLabel('Email'),
+
                       const SizedBox(height: 8),
+
                       TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
@@ -570,11 +565,14 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           prefixIcon: Icon(Icons.email_outlined),
                         ),
                       ),
+
                       const SizedBox(height: 20),
 
-                      // Phone
+                      // PHONE
                       _buildLabel('Phone Number'),
+
                       const SizedBox(height: 8),
+
                       TextFormField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
@@ -587,11 +585,14 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           counterText: '',
                         ),
                       ),
+
                       const SizedBox(height: 20),
 
-                      // State
+                      // STATE
                       _buildLabel('State'),
+
                       const SizedBox(height: 8),
+
                       DropdownSearch<StateModel>(
                         selectedItem: _selectedState,
                         enabled: !_isLoadingStates && _states.isNotEmpty,
@@ -600,12 +601,16 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                         compareFn: (StateModel a, StateModel b) =>
                             a.stateCode == b.stateCode,
                         onSelected: (StateModel? value) {
-                          if (value == null) return;
+                          if (value == null) {
+                            return;
+                          }
+
                           setState(() {
                             _selectedState = value;
                             _selectedCity = null;
 
                             final cached = _citiesCache[value.stateCode];
+
                             if (cached != null) {
                               _cities = cached;
                               _isLoadingCities = false;
@@ -614,10 +619,14 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                               _isLoadingCities = true;
                             }
                           });
+
                           _loadCities(value.stateCode);
                         },
                         validator: (value) {
-                          if (value == null) return 'Please select your state';
+                          if (value == null) {
+                            return 'Please select your state';
+                          }
+
                           return null;
                         },
                         decoratorProps: DropDownDecoratorProps(
@@ -689,11 +698,14 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                               },
                         ),
                       ),
+
                       const SizedBox(height: 20),
 
-                      // City
+                      // CITY
                       _buildLabel('City'),
+
                       const SizedBox(height: 8),
+
                       DropdownSearch<CityModel>(
                         selectedItem: _selectedCity,
                         enabled:
@@ -710,7 +722,10 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           });
                         },
                         validator: (value) {
-                          if (value == null) return 'Please select your city';
+                          if (value == null) {
+                            return 'Please select your city';
+                          }
+
                           return null;
                         },
                         decoratorProps: DropDownDecoratorProps(
@@ -789,11 +804,14 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           },
                         ),
                       ),
+
                       const SizedBox(height: 20),
 
-                      // Bio
+                      // BIO
                       _buildLabel('Bio'),
+
                       const SizedBox(height: 8),
+
                       TextFormField(
                         controller: _bioController,
                         maxLines: 4,
@@ -807,11 +825,14 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           ),
                         ),
                       ),
+
                       const SizedBox(height: 20),
 
-                      // Skills
+                      // SKILLS
                       _buildLabel('Skills'),
+
                       const SizedBox(height: 8),
+
                       TextFormField(
                         controller: _skillsController,
                         maxLines: 2,
@@ -821,11 +842,14 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           prefixIcon: Icon(Icons.palette_outlined),
                         ),
                       ),
+
                       const SizedBox(height: 20),
 
-                      // Experience
+                      // EXPERIENCE
                       _buildLabel('Experience'),
+
                       const SizedBox(height: 8),
+
                       TextFormField(
                         controller: _experienceController,
                         keyboardType: TextInputType.number,
@@ -836,9 +860,10 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           suffixText: 'Years',
                         ),
                       ),
+
                       const SizedBox(height: 30),
 
-                      // Send OTP Button
+                      // SEND OTP BUTTON
                       SizedBox(
                         width: double.infinity,
                         height: 56,
@@ -873,11 +898,12 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                         ),
                       ),
 
-                      // Message
+                      // MESSAGE
                       if (_message != null &&
                           _messageTitle != null &&
                           _messageType != null) ...[
                         const SizedBox(height: 16),
+
                         AppMessage(
                           title: _messageTitle!,
                           message: _message!,
@@ -885,9 +911,10 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           onClose: _clearMessage,
                         ),
                       ],
+
                       const SizedBox(height: 22),
 
-                      // Login
+                      // LOGIN
                       Center(
                         child: Column(
                           children: [
@@ -899,9 +926,11 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                               ),
                               textAlign: TextAlign.center,
                             ),
+
                             const SizedBox(height: 4),
 
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 4),
+
                             TextButton(
                               onPressed: _isSendingOtp
                                   ? null
@@ -935,6 +964,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           ],
                         ),
                       ),
+
                       const SizedBox(height: 12),
                     ],
                   ),
@@ -947,7 +977,8 @@ class _ArtistRegisterState extends State<ArtistRegister> {
     );
   }
 
-  // Label
+  // LABEL
+
   Widget _buildLabel(String text) {
     return Text(
       text,
