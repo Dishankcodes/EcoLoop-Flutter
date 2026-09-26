@@ -15,10 +15,8 @@ class ArtistHome extends StatefulWidget {
 }
 
 class _ArtistHomeState extends State<ArtistHome> {
-  // ============================================================
   // DASHBOARD DATA
   // UI ONLY - WILL BE CONNECTED TO API LATER
-  // ============================================================
 
   final List<Map<String, dynamic>> _stats = [
     {
@@ -122,9 +120,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     },
   ];
 
-  // ============================================================
   // SNACKBAR
-  // ============================================================
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
@@ -145,9 +141,7 @@ class _ArtistHomeState extends State<ArtistHome> {
       );
   }
 
-  // ============================================================
   // QUICK ACTION NAVIGATION
-  // ============================================================
 
   void _handleQuickAction(String type) {
     switch (type) {
@@ -186,9 +180,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     }
   }
 
-  // ============================================================
   // BUILD
-  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -215,25 +207,15 @@ class _ArtistHomeState extends State<ArtistHome> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildHeader(),
-
                       const SizedBox(height: 22),
-
                       _buildEarningsCard(),
-
                       const SizedBox(height: 18),
-
                       _buildStats(isWide),
-
                       const SizedBox(height: 30),
-
                       _buildSectionHeader('Quick Actions', 'Manage your store'),
-
                       const SizedBox(height: 12),
-
                       _buildQuickActions(isWide),
-
                       const SizedBox(height: 30),
-
                       _buildSectionHeader(
                         'Recent Orders',
                         'View all',
@@ -285,9 +267,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // ============================================================
   // HEADER
-  // ============================================================
 
   Widget _buildHeader() {
     return Row(
@@ -324,9 +304,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // ============================================================
   // EARNINGS CARD
-  // ============================================================
 
   Widget _buildEarningsCard() {
     return InkWell(
@@ -441,9 +419,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // ============================================================
   // STATS
-  // ============================================================
 
   Widget _buildStats(bool isWide) {
     if (isWide) {
@@ -531,9 +507,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // ============================================================
   // SECTION HEADER
-  // ============================================================
 
   Widget _buildSectionHeader(
     String title,
@@ -571,9 +545,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // ============================================================
   // QUICK ACTIONS
-  // ============================================================
 
   Widget _buildQuickActions(bool isWide) {
     if (isWide) {
@@ -656,9 +628,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // ============================================================
   // RECENT ORDERS
-  // ============================================================
 
   Widget _buildRecentOrders() {
     return Container(
@@ -760,9 +730,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // ============================================================
   // STATUS BADGE
-  // ============================================================
 
   Widget _buildStatusBadge(String status) {
     final Color color = _statusColor(status);
@@ -806,9 +774,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     }
   }
 
-  // ============================================================
   // TOP PRODUCTS
-  // ============================================================
 
   Widget _buildTopProducts() {
     return SizedBox(
@@ -900,9 +866,7 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  // ============================================================
   // PERFORMANCE CARD
-  // ============================================================
 
   Widget _buildPerformanceCard() {
     return Container(
@@ -978,9 +942,7 @@ class _ArtistHomeState extends State<ArtistHome> {
   }
 }
 
-// ============================================================
 // PERFORMANCE CHART
-// ============================================================
 
 class _PerformanceChartPainter extends CustomPainter {
   @override
