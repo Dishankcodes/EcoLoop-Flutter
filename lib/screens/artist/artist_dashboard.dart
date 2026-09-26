@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 
 void main() => runApp(const MaterialApp(
   debugShowCheckedModeBanner: false,
-  home: ArtistDashboardScreen(),
+  home: ArtistDashboard(),
 ));
 
-class ArtistDashboardScreen extends StatefulWidget {
-  const ArtistDashboardScreen({super.key});
+class ArtistDashboard extends StatefulWidget {
+  const ArtistDashboard({super.key});
 
   @override
-  State<ArtistDashboardScreen> createState() => _ArtistDashboardScreenState();
+  State<ArtistDashboard> createState() => _ArtistDashboardState();
 }
 
-class _ArtistDashboardScreenState extends State<ArtistDashboardScreen> {
+class _ArtistDashboardState extends State<ArtistDashboard> {
   int _selectedIndex = 0;
 
   final _stats = [
