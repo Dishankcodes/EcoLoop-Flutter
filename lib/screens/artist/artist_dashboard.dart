@@ -528,7 +528,7 @@ class _ArtistHomeState extends State<ArtistHome> {
         crossAxisCount: 3,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
-        childAspectRatio: 1.12,
+        childAspectRatio: 1.02,
       ),
       itemBuilder: (context, index) {
         return _buildQuickActionCard(_quickActions[index]);
@@ -544,7 +544,7 @@ class _ArtistHomeState extends State<ArtistHome> {
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
           color: ArtistColors.surface,
           borderRadius: BorderRadius.circular(16),
@@ -552,30 +552,34 @@ class _ArtistHomeState extends State<ArtistHome> {
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 42,
-              height: 42,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 color: ArtistColors.surfaceSoft,
-                borderRadius: BorderRadius.circular(13),
+                borderRadius: BorderRadius.circular(11),
               ),
               child: Icon(
                 action['icon'] as IconData,
                 color: ArtistColors.primary,
-                size: 21,
+                size: 20,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              action['title'] as String,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: ArtistTextStyles.small.copyWith(
-                fontSize: 10.5,
-                color: ArtistColors.textPrimary,
-                fontWeight: FontWeight.w600,
+            const SizedBox(height: 6),
+            Flexible(
+              child: Text(
+                action['title'] as String,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: ArtistTextStyles.small.copyWith(
+                  fontSize: 10,
+                  color: ArtistColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  height: 1.1,
+                ),
               ),
             ),
           ],
@@ -717,7 +721,7 @@ class _ArtistHomeState extends State<ArtistHome> {
   /// Horizontal carousel of top-performing items.
   Widget _buildTopProducts() {
     return SizedBox(
-      height: 230,
+      height: 235,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -749,7 +753,7 @@ class _ArtistHomeState extends State<ArtistHome> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              height: 88,
+              height: 85,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: ArtistColors.surfaceSoft,
@@ -757,7 +761,7 @@ class _ArtistHomeState extends State<ArtistHome> {
               ),
               child: Icon(
                 product['icon'] as IconData,
-                size: 38,
+                size: 36,
                 color: ArtistColors.primary,
               ),
             ),

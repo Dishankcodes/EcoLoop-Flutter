@@ -13,14 +13,18 @@ class AddProduct extends StatefulWidget {
 class _AddProductState extends State<AddProduct> {
   final _formKey = GlobalKey<FormState>();
 
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _priceController = TextEditingController();
+  final TextEditingController titleController = TextEditingController();
+  final TextEditingController descriptionController = TextEditingController();
+  final TextEditingController priceController = TextEditingController();
+  final TextEditingController quantityController = TextEditingController(
+    text: '1',
+  );
 
-  String? _selectedCategory;
-  String? _selectedCondition;
+  String? selectedCategory;
+  String? selectedCondition;
+  String? selectedListingType;
 
-  final List<String> _categories = [
+  final List<String> categories = [
     'Furniture',
     'Electronics',
     'Home & Decor',
@@ -31,7 +35,7 @@ class _AddProductState extends State<AddProduct> {
     'Other',
   ];
 
-  final List<String> _conditions = [
+  final List<String> conditions = [
     'New',
     'Like New',
     'Good',
@@ -39,11 +43,14 @@ class _AddProductState extends State<AddProduct> {
     'Needs Repair',
   ];
 
+  final List<String> listingTypes = ['Sell', 'Donate'];
+
   @override
   void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _priceController.dispose();
+    titleController.dispose();
+    descriptionController.dispose();
+    priceController.dispose();
+    quantityController.dispose();
     super.dispose();
   }
 
@@ -51,178 +58,236 @@ class _AddProductState extends State<AddProduct> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ArtistColors.background,
+
+      // APP BAR
       appBar: AppBar(
-        title: Text(
-          'Sell an Item',
-          style: ArtistTextStyles.title.copyWith(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+        backgroundColor: ArtistColors.background,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: ArtistColors.textPrimary,
           ),
         ),
-        backgroundColor: ArtistColors.background,
-        foregroundColor: ArtistColors.textPrimary,
-        elevation: 0,
+        title: Text('Add Product', style: ArtistTextStyles.title),
       ),
+
+      // BODY
       body: Form(
         key: _formKey,
-        child: SingleChildScrollView(
+        child: ListView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildIntro(),
-              const SizedBox(height: 28),
-              _buildSectionTitle(
-                'Product Photos',
-                'Add clear photos of your product',
-              ),
-              const SizedBox(height: 12),
-              _buildImagePicker(),
-              const SizedBox(height: 28),
-              _buildSectionTitle(
-                'Product Details',
-                'Tell buyers about your item',
-              ),
-              const SizedBox(height: 18),
-              _buildTextField(
-                controller: _titleController,
-                label: 'Product Title',
-                hint: 'e.g. Upcycled Wooden Table',
-                icon: Icons.title_rounded,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a product title';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _descriptionController,
-                label: 'Description',
-                hint: 'Describe your product...',
-                icon: Icons.description_outlined,
-                maxLines: 5,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a description';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _priceController,
-                label: 'Price',
-                hint: 'Enter price',
-                icon: Icons.currency_rupee_rounded,
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a price';
-                  }
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
+          children: [
+            _buildIntro(),
 
-                  final price = double.tryParse(value);
+            const SizedBox(height: 24),
 
-                  if (price == null || price <= 0) {
-                    return 'Please enter a valid price';
-                  }
+            // PRODUCT PHOTOS
+            _buildSectionTitle('Product Photos'),
 
-                  return null;
-                },
+            const SizedBox(height: 10),
+
+            _buildImagePicker(),
+
+            const SizedBox(height: 25),
+
+            // PRODUCT DETAILS
+            _buildSectionTitle('Product Details'),
+
+            const SizedBox(height: 10),
+
+            // Product Name
+            _buildTextField(
+              controller: titleController,
+              label: 'Product Name',
+              hint: 'e.g. Handcrafted Wooden Table',
+              icon: Icons.inventory_2_outlined,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter product name';
+                }
+
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 14),
+
+            // Category
+            _buildDropdown(
+              value: selectedCategory,
+              label: 'Category',
+              hint: 'Select category',
+              icon: Icons.category_outlined,
+              items: categories,
+              onChanged: (value) {
+                setState(() {
+                  selectedCategory = value;
+                });
+              },
+            ),
+
+            const SizedBox(height: 14),
+
+            // Condition
+            _buildDropdown(
+              value: selectedCondition,
+              label: 'Condition',
+              hint: 'Select condition',
+              icon: Icons.recycling_outlined,
+              items: conditions,
+              onChanged: (value) {
+                setState(() {
+                  selectedCondition = value;
+                });
+              },
+            ),
+
+            const SizedBox(height: 14),
+
+            // Listing Type
+            _buildDropdown(
+              value: selectedListingType,
+              label: 'Listing Type',
+              hint: 'Select listing type',
+              icon: Icons.sell_outlined,
+              items: listingTypes,
+              onChanged: (value) {
+                setState(() {
+                  selectedListingType = value;
+                });
+              },
+            ),
+
+            const SizedBox(height: 14),
+
+            // Price
+            _buildTextField(
+              controller: priceController,
+              label: 'Price',
+              hint: 'Enter product price',
+              icon: Icons.currency_rupee_rounded,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
               ),
-              const SizedBox(height: 16),
-              _buildDropdown(
-                label: 'Category',
-                hint: 'Select category',
-                value: _selectedCategory,
-                items: _categories,
-                icon: Icons.category_outlined,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCategory = value;
-                  });
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please select a category';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              _buildDropdown(
-                label: 'Condition',
-                hint: 'Select condition',
-                value: _selectedCondition,
-                items: _conditions,
-                icon: Icons.auto_awesome_outlined,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCondition = value;
-                  });
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please select a condition';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 28),
-              _buildSellButton(),
-              const SizedBox(height: 16),
-              _buildDonationOption(),
-            ],
-          ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter price';
+                }
+
+                final price = double.tryParse(value.trim());
+
+                if (price == null || price < 0) {
+                  return 'Please enter a valid price';
+                }
+
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 14),
+
+            // Quantity
+            _buildTextField(
+              controller: quantityController,
+              label: 'Quantity',
+              hint: 'Enter available quantity',
+              icon: Icons.inventory_outlined,
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter quantity';
+                }
+
+                final quantity = int.tryParse(value.trim());
+
+                if (quantity == null || quantity <= 0) {
+                  return 'Quantity must be greater than 0';
+                }
+
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 14),
+
+            // Description
+            _buildTextField(
+              controller: descriptionController,
+              label: 'Description',
+              hint: 'Tell buyers about your product...',
+              icon: Icons.description_outlined,
+              maxLines: 5,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please add a description';
+                }
+
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 28),
+
+            // LIST PRODUCT BUTTON
+            _buildListProductButton(),
+
+            const SizedBox(height: 18),
+
+            // PRODUCT TIPS
+            _buildProductTips(),
+          ],
         ),
       ),
     );
   }
+
+  // INTRO
 
   Widget _buildIntro() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: ArtistColors.surfaceSoft,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: ArtistColors.border,
-        ),
+        color: ArtistColors.light,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: ArtistColors.primary,
-              borderRadius: BorderRadius.circular(14),
+              color: ArtistColors.surface,
+              borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
               Icons.storefront_outlined,
-              color: Colors.white,
-              size: 24,
+              color: ArtistColors.primary,
             ),
           ),
-          const SizedBox(width: 14),
+
+          const SizedBox(width: 12),
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'List your creation',
-                  style: ArtistTextStyles.title.copyWith(
-                    fontSize: 17,
-                  ),
+                  'Bring your creation to the marketplace',
+                  style: ArtistTextStyles.bodyMedium,
                 ),
-                const SizedBox(height: 5),
+
+                const SizedBox(height: 4),
+
                 Text(
-                  'Share your handmade or upcycled products with the EcoLoop community.',
-                  style: ArtistTextStyles.body,
+                  'Add your product details and make it available to EcoLoop buyers.',
+                  style: ArtistTextStyles.caption,
                 ),
               ],
             ),
@@ -232,84 +297,104 @@ class _AddProductState extends State<AddProduct> {
     );
   }
 
-  Widget _buildSectionTitle(
-      String title,
-      String subtitle,
-      ) {
+  // SECTION TITLE
+
+  Widget _buildSectionTitle(String title) {
+    return Text(title, style: ArtistTextStyles.title.copyWith(fontSize: 16));
+  }
+
+  // IMAGE PICKER
+
+  Widget _buildImagePicker() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: ArtistTextStyles.title.copyWith(
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-          ),
+        Text('Add up to 4 photos', style: ArtistTextStyles.caption),
+
+        const SizedBox(height: 10),
+
+        // ------------------------------------------------------
+        // ROW 1
+        // ------------------------------------------------------
+        Row(
+          children: [
+            Expanded(child: _buildPhotoSlot(index: 0, label: 'Main Photo')),
+
+            const SizedBox(width: 10),
+
+            Expanded(child: _buildPhotoSlot(index: 1, label: 'Photo 2')),
+          ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: ArtistTextStyles.caption,
+
+        const SizedBox(height: 10),
+
+        // ------------------------------------------------------
+        // ROW 2
+        // ------------------------------------------------------
+        Row(
+          children: [
+            Expanded(child: _buildPhotoSlot(index: 2, label: 'Photo 3')),
+
+            const SizedBox(width: 10),
+
+            Expanded(child: _buildPhotoSlot(index: 3, label: 'Photo 4')),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildImagePicker() {
-    return Container(
-      height: 150,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: ArtistColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: ArtistColors.border,
-          width: 1.2,
-        ),
-      ),
-      child: InkWell(
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Image picker will be connected in the next phase.',
-                style: ArtistTextStyles.bodyMedium.copyWith(
-                  color: Colors.white,
-                ),
-              ),
-              backgroundColor: ArtistColors.primary,
-              behavior: SnackBarBehavior.floating,
+  // INDIVIDUAL PHOTO SLOT
+
+  Widget _buildPhotoSlot({required int index, required String label}) {
+    return GestureDetector(
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$label image picker will be connected in the next phase.',
             ),
-          );
-        },
-        borderRadius: BorderRadius.circular(18),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
+      child: Container(
+        height: 125,
+        decoration: BoxDecoration(
+          color: ArtistColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: ArtistColors.border),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                color: ArtistColors.light.withOpacity(0.5),
-                shape: BoxShape.circle,
+                color: ArtistColors.light,
+                borderRadius: BorderRadius.circular(11),
               ),
-              child: const Icon(
-                Icons.add_a_photo_outlined,
+              child: Icon(
+                index == 0
+                    ? Icons.add_a_photo_outlined
+                    : Icons.add_photo_alternate_outlined,
                 color: ArtistColors.primary,
-                size: 24,
+                size: 22,
               ),
             ),
-            const SizedBox(height: 10),
+
+            const SizedBox(height: 9),
+
             Text(
-              'Add Product Photos',
-              style: ArtistTextStyles.bodyMedium.copyWith(
-                color: ArtistColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
+              label,
+              style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 12),
             ),
-            const SizedBox(height: 3),
+
+            const SizedBox(height: 2),
+
             Text(
-              'Add clear images of your product',
+              index == 0 ? 'Required' : 'Optional',
               style: ArtistTextStyles.small,
             ),
           ],
@@ -318,262 +403,170 @@ class _AddProductState extends State<AddProduct> {
     );
   }
 
+  // TEXT FIELD
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
     required String hint,
     required IconData icon,
-    String? Function(String?)? validator,
-    int maxLines = 1,
     TextInputType? keyboardType,
+    int maxLines = 1,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: ArtistTextStyles.label,
-        ),
-        const SizedBox(height: 8),
+        Text(label, style: ArtistTextStyles.label),
+
+        const SizedBox(height: 7),
+
         TextFormField(
           controller: controller,
-          validator: validator,
-          maxLines: maxLines,
           keyboardType: keyboardType,
-          style: ArtistTextStyles.bodyMedium,
+          maxLines: maxLines,
+          validator: validator,
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: ArtistTextStyles.hint,
-            prefixIcon: Icon(
-              icon,
-              color: ArtistColors.primary,
-              size: 21,
-            ),
-            filled: true,
-            fillColor: ArtistColors.surface,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: ArtistColors.border,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: ArtistColors.border,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: ArtistColors.primary,
-                width: 1.3,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: ArtistColors.error,
-              ),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: ArtistColors.error,
-                width: 1.3,
-              ),
-            ),
+            prefixIcon: Icon(icon, color: ArtistColors.primary, size: 21),
           ),
         ),
       ],
     );
   }
 
+  // DROPDOWN
+
   Widget _buildDropdown({
+    required String? value,
     required String label,
     required String hint,
-    required String? value,
-    required List<String> items,
     required IconData icon,
+    required List<String> items,
     required ValueChanged<String?> onChanged,
-    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: ArtistTextStyles.label,
-        ),
-        const SizedBox(height: 8),
+        Text(label, style: ArtistTextStyles.label),
+
+        const SizedBox(height: 7),
+
         DropdownButtonFormField<String>(
           value: value,
-          validator: validator,
-          onChanged: onChanged,
-          style: ArtistTextStyles.bodyMedium,
+          hint: Text(hint, style: ArtistTextStyles.hint),
           icon: const Icon(
             Icons.keyboard_arrow_down_rounded,
-            color: ArtistColors.primary,
+            color: ArtistColors.textSecondary,
           ),
           decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: ArtistTextStyles.hint,
-            prefixIcon: Icon(
-              icon,
-              color: ArtistColors.primary,
-              size: 21,
-            ),
-            filled: true,
-            fillColor: ArtistColors.surface,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: ArtistColors.border,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: ArtistColors.border,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: ArtistColors.primary,
-                width: 1.3,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: ArtistColors.error,
-              ),
-            ),
+            prefixIcon: Icon(icon, color: ArtistColors.primary, size: 21),
           ),
-          dropdownColor: ArtistColors.surface,
           items: items.map((item) {
             return DropdownMenuItem<String>(
               value: item,
-              child: Text(
-                item,
-                style: ArtistTextStyles.bodyMedium,
-              ),
+              child: Text(item, style: ArtistTextStyles.bodyMedium),
             );
           }).toList(),
+          onChanged: onChanged,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please select $label';
+            }
+
+            return null;
+          },
         ),
       ],
     );
   }
 
-  Widget _buildSellButton() {
+  // LIST PRODUCT BUTTON
+
+  Widget _buildListProductButton() {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () {
-          if (_formKey.currentState!.validate()) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Product listing will be connected in the next phase.',
-                  style: ArtistTextStyles.bodyMedium.copyWith(
-                    color: Colors.white,
-                  ),
-                ),
-                backgroundColor: ArtistColors.primary,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            );
+          if (!_formKey.currentState!.validate()) {
+            return;
           }
-        },
-        icon: const Icon(
-          Icons.sell_outlined,
-          size: 20,
-        ),
-        label: Text(
-          'List Product',
-          style: ArtistTextStyles.button,
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: ArtistColors.primary,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 15),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildDonationOption() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: ArtistColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: ArtistColors.border,
-        ),
-      ),
-      child: ListTile(
-        onTap: () {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text(
-                'Donation flow will be connected in the next phase.',
-                style: ArtistTextStyles.bodyMedium.copyWith(
-                  color: Colors.white,
-                ),
+                'Product listing will be connected in the next phase.',
               ),
-              backgroundColor: ArtistColors.primary,
               behavior: SnackBarBehavior.floating,
             ),
           );
         },
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 4,
-        ),
-        leading: Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: ArtistColors.surfaceSoft,
-            borderRadius: BorderRadius.circular(12),
+        icon: const Icon(Icons.add_business_outlined),
+        label: const Text('List Product'),
+      ),
+    );
+  }
+
+  // PRODUCT TIPS
+
+  Widget _buildProductTips() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: ArtistColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ArtistColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.lightbulb_outline_rounded,
+                color: ArtistColors.warning,
+                size: 21,
+              ),
+
+              const SizedBox(width: 9),
+
+              Text('Product Listing Tips', style: ArtistTextStyles.bodyMedium),
+            ],
           ),
-          child: const Icon(
-            Icons.volunteer_activism_outlined,
-            color: ArtistColors.primary,
+
+          const SizedBox(height: 12),
+
+          _buildTip('Use clear, well-lit product photos.'),
+
+          _buildTip('Write an accurate and detailed description.'),
+
+          _buildTip('Choose the correct category and condition.'),
+
+          _buildTip('Keep your price and available quantity updated.'),
+        ],
+      ),
+    );
+  }
+
+  // SINGLE TIP
+
+  Widget _buildTip(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Icon(Icons.circle, size: 5, color: ArtistColors.primary),
           ),
-        ),
-        title: Text(
-          'Want to donate instead?',
-          style: ArtistTextStyles.bodyMedium.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        subtitle: Text(
-          'Give your item a second life by donating it.',
-          style: ArtistTextStyles.small,
-        ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios_rounded,
-          size: 15,
-          color: ArtistColors.textMuted,
-        ),
+
+          const SizedBox(width: 9),
+
+          Expanded(child: Text(text, style: ArtistTextStyles.caption)),
+        ],
       ),
     );
   }
