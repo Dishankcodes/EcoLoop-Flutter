@@ -143,16 +143,28 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   // SELLER ROLE
 
-  String get sellerRole {
-    final rawRole =
+  /// Canonical seller account type.
+  ///
+  /// Backend will provide `sellerType` as either:
+  /// - `user`
+  /// - `artist`
+  ///
+  /// Temporary fallbacks are kept so the current UI continues to work
+  /// before the backend is connected.
+  String get sellerType {
+    final rawType =
+        widget.product['sellerType'] ??
+        widget.product['seller_type'] ??
         widget.product['sellerRole'] ??
         widget.product['seller_role'] ??
         widget.product['role'] ??
-        widget.product['sellerType'] ??
-        widget.product['seller_type'];
+        'user';
 
-    return rawRole?.toString().trim().toLowerCase() ?? 'user';
+    return rawType.toString().trim().toLowerCase();
   }
+
+  /// Backward-compatible alias for existing local UI/cart data.
+  String get sellerRole => sellerType;
 
   bool get isArtistSeller {
     return sellerRole == 'artist' ||
@@ -178,8 +190,13 @@ class _ProductDetailsState extends State<ProductDetails> {
       'name': seller,
       'location': location,
 
-      // Role
+      // Seller identity
+      'sellerType': sellerType,
       'role': isArtistSeller ? 'artist' : 'user',
+      'sellerId':
+          widget.product['sellerId'] ??
+          widget.product['artistId'] ??
+          widget.product['userId'],
 
       // Common profile data
       'image':
@@ -1485,7 +1502,7 @@ class _ProductDetailsState extends State<ProductDetails> {
         'condition': 'Good',
         'category': category,
         'seller': 'Amit K.',
-        'sellerRole': 'user',
+        'sellerType': 'user',
         'location': 'Ahmedabad, Gujarat',
         'availableQuantity': 3,
         'image':
@@ -1498,7 +1515,7 @@ class _ProductDetailsState extends State<ProductDetails> {
         'condition': 'Used',
         'category': category,
         'seller': 'Neha P.',
-        'sellerRole': 'user',
+        'sellerType': 'user',
         'location': 'Ahmedabad, Gujarat',
         'availableQuantity': 2,
         'image':
@@ -1511,7 +1528,7 @@ class _ProductDetailsState extends State<ProductDetails> {
         'condition': 'Good',
         'category': category,
         'seller': 'Vivek ReMaker',
-        'sellerRole': 'artist',
+        'sellerType': 'artist',
         'location': 'Gandhinagar, Gujarat',
         'availableQuantity': 4,
         'image':
@@ -1524,7 +1541,7 @@ class _ProductDetailsState extends State<ProductDetails> {
         'condition': 'Good',
         'category': category,
         'seller': 'Rahul ReMaker',
-        'sellerRole': 'artist',
+        'sellerType': 'artist',
         'location': 'Ahmedabad, Gujarat',
         'availableQuantity': 2,
         'image':
@@ -1702,7 +1719,12 @@ class _ProductDetailsState extends State<ProductDetails> {
     cartProduct['condition'] = condition;
     cartProduct['category'] = category;
     cartProduct['seller'] = seller;
-    cartProduct['sellerRole'] = sellerRole;
+    cartProduct['sellerType'] = sellerType;
+    cartProduct['sellerRole'] = sellerType; // backward compatibility
+    cartProduct['sellerId'] =
+        widget.product['sellerId'] ??
+        widget.product['artistId'] ??
+        widget.product['userId'];
     cartProduct['location'] = location;
     cartProduct['availableQuantity'] = availableQuantity;
 

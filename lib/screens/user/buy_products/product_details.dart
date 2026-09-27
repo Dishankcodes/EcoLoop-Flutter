@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../widgets/cart_popup.dart';
+import '../../artist/profile/artist_profile.dart';
 import '../reviews/product_reviews.dart';
 import '../reviews/write_review.dart';
 import 'checkout.dart';
@@ -59,6 +60,31 @@ class _ProductDetailsState extends State<ProductDetails> {
   String get category => widget.product['category']?.toString() ?? 'Furniture';
 
   String get seller => widget.product['seller']?.toString() ?? 'Rahul Mehta';
+
+  /// Seller account type used for profile navigation.
+  ///
+  /// Backend will provide this as `sellerType`:
+  /// - `user`    -> SellerProfile
+  /// - `artist`  -> ArtistProfile
+  ///
+  /// The legacy fallbacks are kept only so older/local product maps do not
+  /// break while the backend integration is still being implemented.
+  String get sellerType {
+    final type =
+        widget.product['sellerType'] ??
+        widget.product['sellerRole'] ??
+        widget.product['seller_role'] ??
+        widget.product['role'] ??
+        'user';
+
+    return type.toString().trim().toLowerCase();
+  }
+
+  bool get isArtistSeller =>
+      sellerType == 'artist' ||
+      sellerType == 'remaker' ||
+      sellerType == 're_maker' ||
+      sellerType == 're-maker';
 
   String get location =>
       widget.product['location']?.toString() ?? 'Ahmedabad, Gujarat';
@@ -1271,6 +1297,7 @@ class _ProductDetailsState extends State<ProductDetails> {
         'condition': 'Good',
         'category': category,
         'seller': 'Amit K.',
+        'sellerType': 'user',
         'location': 'Ahmedabad, Gujarat',
         'availableQuantity': 3,
         'image':
@@ -1283,6 +1310,7 @@ class _ProductDetailsState extends State<ProductDetails> {
         'condition': 'Used',
         'category': category,
         'seller': 'Neha P.',
+        'sellerType': 'artist',
         'location': 'Ahmedabad, Gujarat',
         'availableQuantity': 2,
         'image':
@@ -1295,6 +1323,7 @@ class _ProductDetailsState extends State<ProductDetails> {
         'condition': 'Good',
         'category': category,
         'seller': 'Vivek R.',
+        'sellerType': 'user',
         'location': 'Gandhinagar, Gujarat',
         'availableQuantity': 4,
         'image':
@@ -1306,7 +1335,8 @@ class _ProductDetailsState extends State<ProductDetails> {
         'price': 2900,
         'condition': 'Good',
         'category': category,
-        'seller': 'Rahul M.',
+        'seller': 'Kavya R.',
+        'sellerType': 'artist',
         'location': 'Ahmedabad, Gujarat',
         'availableQuantity': 2,
         'image':
@@ -1528,11 +1558,33 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   /// Opens full profile page for the seller.
   void _openSellerProfile() {
+    if (isArtistSeller) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ArtistProfile(
+            artist: {
+              'artistId':
+                  widget.product['sellerId'] ?? widget.product['artistId'],
+              'name': seller,
+              'location': location,
+              'rating': '4.8',
+              'reviews': '42',
+              'followers': '127',
+              'products': '127',
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => SellerProfile(
           seller: {
+            'userId': widget.product['sellerId'] ?? widget.product['userId'],
             'name': seller,
             'location': location,
             'rating': '4.8',
