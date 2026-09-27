@@ -1,380 +1,90 @@
 import 'package:flutter/material.dart';
 
-void main() => runApp(const MaterialApp(
-  debugShowCheckedModeBanner: false,
-  home: ArtistWriteReviewPage(),
-));
+import '../../../app_theme/artist/artist_colors.dart';
+import '../../../app_theme/artist/artist_text_styles.dart';
 
-class ArtistWriteReviewPage extends StatefulWidget {
-  const ArtistWriteReviewPage({super.key});
+class WriteReview extends StatefulWidget {
+  final Map<String, dynamic> product;
+
+  const WriteReview({super.key, required this.product});
 
   @override
-  State<ArtistWriteReviewPage> createState() => _ArtistWriteReviewPageState();
+  State<WriteReview> createState() => _WriteReviewState();
 }
 
-class _ArtistWriteReviewPageState extends State<ArtistWriteReviewPage> {
-  // Artist theme
-  static const Color primary = Color(0xFFA6533C);
-  static const Color primaryDark = Color(0xFF7D3F2F);
-  static const Color background = Color(0xFFF9F5F2);
-  static const Color cardColor = Colors.white;
-  static const Color textColor = Color(0xFF2D2522);
-  static const Color secondaryText = Color(0xFF8A7D77);
-  static const Color borderColor = Color(0xFFE8DDD8);
+class _WriteReviewState extends State<WriteReview> {
+  final TextEditingController _reviewController = TextEditingController();
 
-  int selectedRating = 0;
+  int _rating = 0;
+  bool _wouldRecommend = true;
+  bool _isSubmitting = false;
 
-  final TextEditingController reviewController = TextEditingController();
+  String get _title =>
+      widget.product['title']?.toString() ?? 'Wooden Study Table';
+
+  String get _image {
+    final images = widget.product['images'];
+
+    if (images is List && images.isNotEmpty) {
+      return images.first.toString();
+    }
+
+    final image = widget.product['image']?.toString();
+
+    if (image != null && image.isNotEmpty) {
+      return image;
+    }
+
+    return 'https://images.unsplash.com/photo-1518455027359-f3f8164ba6b0?auto=format&fit=crop&w=700&q=80';
+  }
 
   @override
   void dispose() {
-    reviewController.dispose();
+    _reviewController.dispose();
     super.dispose();
-  }
-
-  void submitReview() {
-    if (selectedRating == 0) {
-      showMessage('Please select a rating');
-      return;
-    }
-
-    if (reviewController.text.trim().isEmpty) {
-      showMessage('Please write your review');
-      return;
-    }
-
-    showMessage('Review submitted successfully!');
-
-    reviewController.clear();
-
-    setState(() {
-      selectedRating = 0;
-    });
-  }
-
-  void showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-          backgroundColor: primaryDark,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: background,
-
-      // ---------------- APP BAR ----------------
+      backgroundColor: ArtistColors.background,
       appBar: AppBar(
-        backgroundColor: background,
+        backgroundColor: ArtistColors.background,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: ArtistColors.textPrimary,
         leading: IconButton(
+          onPressed: () => Navigator.pop(context),
           icon: const Icon(
             Icons.arrow_back_rounded,
-            color: textColor,
+            color: ArtistColors.textPrimary,
           ),
-          onPressed: () => showMessage('Back clicked'),
+          tooltip: 'Back',
         ),
-        title: const Text(
-          'Write a Review',
-          style: TextStyle(
-            color: textColor,
+        title: Text(
+          'Write Review',
+          style: ArtistTextStyles.title.copyWith(
             fontSize: 18,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        centerTitle: true,
       ),
-
-      // ---------------- BODY ----------------
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
-              // Product section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: borderColor,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primary.withValues(alpha: 0.06),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: Image.network(
-                        'https://images.unsplash.com/photo-1538688525198-9b88f6f53126?w=300&q=80',
-                        width: 78,
-                        height: 78,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-
-                    const SizedBox(width: 14),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'Wooden Coffee Table',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: textColor,
-                            ),
-                          ),
-                          SizedBox(height: 7),
-                          Text(
-                            '₹2,499',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: primary,
-                            ),
-                          ),
-                          SizedBox(height: 5),
-                          Text(
-                            'Purchased product',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: secondaryText,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // Rating title
-              const Text(
-                'How was your experience?',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: textColor,
-                ),
-              ),
-
-              const SizedBox(height: 7),
-
-              const Text(
-                'Your review helps other users discover quality products and artists.',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: secondaryText,
-                  height: 1.4,
-                ),
-              ),
-
+              _buildProductCard(),
+              const SizedBox(height: 18),
+              _buildRatingSection(),
+              const SizedBox(height: 18),
+              _buildReviewSection(),
+              const SizedBox(height: 18),
+              _buildRecommendationSection(),
               const SizedBox(height: 20),
-
-              // ---------------- STAR RATING ----------------
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 22,
-                  horizontal: 16,
-                ),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: borderColor,
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Rate this product',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: secondaryText,
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        5,
-                            (index) {
-                          final starNumber = index + 1;
-
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                selectedRating = starNumber;
-                              });
-                            },
-                            child: Padding(
-                              padding:
-                              const EdgeInsets.symmetric(horizontal: 5),
-                              child: Icon(
-                                starNumber <= selectedRating
-                                    ? Icons.star_rounded
-                                    : Icons.star_border_rounded,
-                                size: 42,
-                                color: primary,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    Text(
-                      selectedRating == 0
-                          ? 'Tap a star to rate'
-                          : ratingText(selectedRating),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // ---------------- REVIEW ----------------
-              const Text(
-                'Write your review',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: textColor,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              Container(
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: borderColor,
-                  ),
-                ),
-                child: TextField(
-                  controller: reviewController,
-                  maxLines: 6,
-                  maxLength: 500,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: textColor,
-                  ),
-                  decoration: const InputDecoration(
-                    hintText:
-                    'Share your experience with this product...',
-                    hintStyle: TextStyle(
-                      color: Color(0xFFAAA09B),
-                      fontSize: 13,
-                    ),
-                    contentPadding: EdgeInsets.all(16),
-                    border: InputBorder.none,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              const Row(
-                children: [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    size: 15,
-                    color: secondaryText,
-                  ),
-                  SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Keep your review honest, respectful and helpful.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: secondaryText,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 28),
-
-              // ---------------- SUBMIT BUTTON ----------------
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: submitReview,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text(
-                    'Submit Review',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              // Cancel
-              Center(
-                child: TextButton(
-                  onPressed: () => showMessage('Review cancelled'),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: primary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
+              _buildSubmitButton(),
             ],
           ),
         ),
@@ -382,12 +92,120 @@ class _ArtistWriteReviewPageState extends State<ArtistWriteReviewPage> {
     );
   }
 
-  String ratingText(int rating) {
-    switch (rating) {
+  // Product card.
+  Widget _buildProductCard() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ArtistColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ArtistColors.border),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(
+              _image,
+              width: 68,
+              height: 68,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 68,
+                height: 68,
+                color: ArtistColors.surfaceSoft,
+                child: const Icon(
+                  Icons.image_outlined,
+                  color: ArtistColors.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Text(
+              _title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: ArtistTextStyles.bodyMedium.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Rating section.
+  Widget _buildRatingSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'How was your experience?',
+          style: ArtistTextStyles.title.copyWith(fontSize: 18),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Tap a star to rate this product.',
+          style: ArtistTextStyles.caption,
+        ),
+        const SizedBox(height: 14),
+        Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(5, (index) {
+              final value = index + 1;
+              final selected = value <= _rating;
+
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _rating = value;
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: AnimatedScale(
+                    scale: selected ? 1.08 : 1,
+                    duration: const Duration(milliseconds: 160),
+                    child: Icon(
+                      selected
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      size: 42,
+                      color: selected
+                          ? ArtistColors.warning
+                          : ArtistColors.textMuted,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: 7),
+        Center(
+          child: Text(
+            _rating == 0 ? 'Select your rating' : _ratingLabel,
+            style: ArtistTextStyles.bodyMedium.copyWith(
+              color: ArtistColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Rating label.
+  String get _ratingLabel {
+    switch (_rating) {
       case 1:
         return 'Poor';
       case 2:
-        return 'Needs Improvement';
+        return 'Fair';
       case 3:
         return 'Good';
       case 4:
@@ -395,7 +213,206 @@ class _ArtistWriteReviewPageState extends State<ArtistWriteReviewPage> {
       case 5:
         return 'Excellent';
       default:
-        return '';
+        return 'Select your rating';
     }
+  }
+
+  // Review section.
+  Widget _buildReviewSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Tell us more',
+          style: ArtistTextStyles.title.copyWith(fontSize: 18),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Your review can help another person make a better choice.',
+          style: ArtistTextStyles.caption,
+        ),
+        const SizedBox(height: 11),
+        TextField(
+          controller: _reviewController,
+          maxLines: 6,
+          maxLength: 500,
+          textCapitalization: TextCapitalization.sentences,
+          style: ArtistTextStyles.body.copyWith(
+            color: ArtistColors.textPrimary,
+          ),
+          cursorColor: ArtistColors.primary,
+          decoration: InputDecoration(
+            hintText: 'What did you like? How was the condition?',
+            hintStyle: ArtistTextStyles.hint.copyWith(
+              color: ArtistColors.textMuted,
+            ),
+            filled: true,
+            fillColor: ArtistColors.surface,
+            alignLabelWithHint: true,
+            contentPadding: const EdgeInsets.all(15),
+            counterStyle: ArtistTextStyles.small,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: ArtistColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: ArtistColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(
+                color: ArtistColors.primary,
+                width: 1.3,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Recommendation section.
+  Widget _buildRecommendationSection() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: ArtistColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ArtistColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: ArtistColors.surfaceSoft,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: const Icon(
+              Icons.thumb_up_alt_outlined,
+              color: ArtistColors.primary,
+              size: 21,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Would you recommend it?',
+                  style: ArtistTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Help us understand your experience.',
+                  style: ArtistTextStyles.small,
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: _wouldRecommend,
+            activeColor: ArtistColors.primary,
+            activeTrackColor: ArtistColors.primary.withValues(alpha: 0.35),
+            onChanged: (value) {
+              setState(() {
+                _wouldRecommend = value;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Submit button.
+  Widget _buildSubmitButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: _isSubmitting ? null : _submit,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: ArtistColors.primary,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: ArtistColors.primary.withValues(alpha: 0.55),
+          disabledForegroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: _isSubmitting
+            ? const SizedBox(
+                width: 21,
+                height: 21,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: Colors.white,
+                ),
+              )
+            : Text('Submit Review', style: ArtistTextStyles.button),
+      ),
+    );
+  }
+
+  // Submit review.
+  Future<void> _submit() async {
+    if (_rating == 0) {
+      _showMessage('Please select a rating first.');
+      return;
+    }
+
+    if (_reviewController.text.trim().isEmpty) {
+      _showMessage('Please write a short review.');
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    await Future.delayed(const Duration(milliseconds: 700));
+
+    if (!mounted) return;
+
+    final review = {
+      'rating': _rating,
+      'comment': _reviewController.text.trim(),
+      'wouldRecommend': _wouldRecommend,
+      'date': 'Just now',
+    };
+
+    Navigator.pop(context, review);
+  }
+
+  // Show message.
+  void _showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: ArtistTextStyles.body.copyWith(
+              color: Colors.white,
+              fontSize: 12.5,
+            ),
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ArtistColors.accent,
+          margin: const EdgeInsets.all(14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(11),
+          ),
+        ),
+      );
   }
 }

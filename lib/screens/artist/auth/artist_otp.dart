@@ -12,7 +12,7 @@ import '../../../models/auth/artist/artist_register_verify_otp_request.dart';
 import '../../../models/auth/artist/artist_send_otp_request.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/back_button.dart';
-import '../artist_dashboard.dart';
+import '../artist_main.dart';
 
 class ArtistOtpScreen extends StatefulWidget {
   const ArtistOtpScreen({
@@ -26,7 +26,9 @@ class ArtistOtpScreen extends StatefulWidget {
   final bool isRegistration;
 
   /// Used only during registration.
-  /// Contains: userName, email, phone, city, state, stateCode, bio, skills, experience
+  /// Contains:
+  /// userName, email, phone, city, state, stateCode,
+  /// bio, skills, experience
   final Map<String, dynamic>? registrationData;
 
   @override
@@ -34,26 +36,33 @@ class ArtistOtpScreen extends StatefulWidget {
 }
 
 class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
-  // Form
+  // FORM
+
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _otpController = TextEditingController();
 
-  // State
+  // STATE
+
   bool _isVerifying = false;
   bool _isResending = false;
+
   int _secondsRemaining = 60;
+
   Timer? _timer;
+
   String? _errorMessage;
   String? _successMessage;
 
-  // Init
+  // INIT
+
   @override
   void initState() {
     super.initState();
     _startTimer();
   }
 
-  // Dispose
+  // DISPOSE
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -61,9 +70,12 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
     super.dispose();
   }
 
-  // Timer
+  // TIMER
+
   void _startTimer() {
     _timer?.cancel();
+
+    if (!mounted) return;
 
     setState(() {
       _secondsRemaining = 60;
@@ -77,6 +89,7 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
 
       if (_secondsRemaining <= 1) {
         timer.cancel();
+
         setState(() {
           _secondsRemaining = 0;
         });
@@ -88,9 +101,12 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
     });
   }
 
-  // Verify OTP
+  // VERIFY OTP
+
   Future<void> _verifyOtp() async {
     FocusScope.of(context).unfocus();
+
+    if (!mounted) return;
 
     setState(() {
       _errorMessage = null;
@@ -128,7 +144,8 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
     }
   }
 
-  // Registration OTP
+  // REGISTRATION OTP
+
   Future<void> _verifyRegistrationOtp(String otp) async {
     final data = widget.registrationData;
 
@@ -174,14 +191,25 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
 
     if (!mounted) return;
 
+    // IMPORTANT:
+    // Open ArtistMain instead of ArtistHome.
+    //
+    // ArtistMain contains:
+    //   - ArtistHome
+    //   - Marketplace
+    //   - Selling Orders
+    //   - Profile
+    //   - Bottom Navigation Bar
+
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const ArtistHome()),
+      MaterialPageRoute(builder: (_) => const ArtistMain()),
       (route) => false,
     );
   }
 
-  // Login OTP
+  // LOGIN OTP
+
   Future<void> _verifyLoginOtp(String otp) async {
     final request = ArtistLoginVerifyOtpRequest(email: widget.email, otp: otp);
 
@@ -206,16 +234,21 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
 
     if (!mounted) return;
 
+    // IMPORTANT:
+    // Open ArtistMain instead of ArtistHome.
+
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const ArtistHome()),
+      MaterialPageRoute(builder: (_) => const ArtistMain()),
       (route) => false,
     );
   }
 
-  // Save Session
+  // SAVE ARTIST SESSION
+
   Future<void> _saveArtistSession(ArtistAuthResponse auth) async {
     await Prefs.setBool('isLoggedIn', true);
+
     await Prefs.setString('userRole', 'artist');
 
     if (auth.token != null) {
@@ -257,11 +290,14 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
     }
   }
 
-  // Resend OTP
+  // RESEND OTP
+
   Future<void> _resendOtp() async {
     if (_secondsRemaining > 0 || _isResending || _isVerifying) {
       return;
     }
+
+    if (!mounted) return;
 
     setState(() {
       _errorMessage = null;
@@ -308,7 +344,8 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
     }
   }
 
-  // Error Message
+  // ERROR MESSAGE
+
   String _cleanErrorMessage(Object error) {
     final message = error.toString();
 
@@ -320,6 +357,7 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
   }
 
   // UI
+
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -340,11 +378,12 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Back Button
+                      // BACK BUTTON
                       const AppBackButton(),
+
                       const SizedBox(height: 30),
 
-                      // OTP Icon
+                      // OTP ICON
                       Center(
                         child: Container(
                           width: 86,
@@ -360,9 +399,10 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
                           ),
                         ),
                       ),
+
                       const SizedBox(height: 25),
 
-                      // Title
+                      // TITLE
                       Center(
                         child: Text(
                           widget.isRegistration
@@ -372,9 +412,10 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+
                       const SizedBox(height: 10),
 
-                      // Subtitle
+                      // SUBTITLE
                       Center(
                         child: Text(
                           widget.isRegistration
@@ -384,9 +425,10 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+
                       const SizedBox(height: 5),
 
-                      // Email
+                      // EMAIL
                       Center(
                         child: Text(
                           widget.email,
@@ -397,9 +439,10 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+
                       const SizedBox(height: 35),
 
-                      // Enter OTP Label
+                      // ENTER OTP LABEL
                       Text(
                         'Enter OTP',
                         style: ArtistTextStyles.body.copyWith(
@@ -407,9 +450,10 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
                           color: ArtistColors.textPrimary,
                         ),
                       ),
+
                       const SizedBox(height: 8),
 
-                      // OTP Field
+                      // OTP FIELD
                       TextFormField(
                         controller: _otpController,
                         keyboardType: TextInputType.number,
@@ -447,21 +491,23 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
                           prefixIcon: Icon(Icons.lock_outline),
                         ),
                       ),
+
                       const SizedBox(height: 15),
 
-                      // Error Message
+                      // ERROR MESSAGE
                       if (_errorMessage != null)
                         _buildMessage(message: _errorMessage!, isError: true),
 
-                      // Success Message
+                      // SUCCESS MESSAGE
                       if (_successMessage != null)
                         _buildMessage(
                           message: _successMessage!,
                           isError: false,
                         ),
+
                       const SizedBox(height: 10),
 
-                      // Timer
+                      // TIMER
                       Center(
                         child: Text(
                           _secondsRemaining > 0
@@ -471,9 +517,10 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+
                       const SizedBox(height: 8),
 
-                      // Resend OTP Button
+                      // RESEND OTP BUTTON
                       Center(
                         child: TextButton(
                           onPressed:
@@ -507,9 +554,10 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
                                 ),
                         ),
                       ),
+
                       const SizedBox(height: 25),
 
-                      // Verify Button
+                      // VERIFY BUTTON
                       SizedBox(
                         width: double.infinity,
                         height: 56,
@@ -543,9 +591,10 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
                                 ),
                         ),
                       ),
+
                       const SizedBox(height: 20),
 
-                      // Change Email Button
+                      // CHANGE EMAIL
                       Center(
                         child: TextButton(
                           onPressed: _isVerifying || _isResending
@@ -563,6 +612,7 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
                           ),
                         ),
                       ),
+
                       const SizedBox(height: 15),
                     ],
                   ),
@@ -575,12 +625,15 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
     );
   }
 
-  // Message Box
+  // MESSAGE BOX
+
   Widget _buildMessage({required String message, required bool isError}) {
     final Color color = isError ? ArtistColors.error : ArtistColors.success;
+
     final Color background = isError
         ? const Color(0xFFFDECEC)
         : const Color(0xFFEAF4EE);
+
     final IconData icon = isError
         ? Icons.error_outline
         : Icons.check_circle_outline;
@@ -598,7 +651,9 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 20, color: color),
+
           const SizedBox(width: 10),
+
           Expanded(
             child: Text(
               message,
@@ -615,6 +670,8 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
     );
   }
 }
+
+// GOOGLE FONTS / OTP STYLE
 
 class GoogleFontsHelper {
   GoogleFontsHelper._();

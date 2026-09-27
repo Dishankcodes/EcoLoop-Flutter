@@ -11,6 +11,7 @@ import '../my_products/add_product.dart';
 import '../my_products/my_product.dart';
 import '../my_products/product_analytics.dart';
 import '../my_products/selling_orders.dart';
+import '../reviews/review_history.dart';
 import 'aboutyou.dart';
 import 'address_list.dart';
 import 'certification.dart';
@@ -349,6 +350,20 @@ class Profile extends StatelessWidget {
           subtitle: 'View products added to your shopping cart',
           onTap: () {
             _showComingSoon(context, 'My Cart');
+          },
+        ),
+
+        const _ProfileDivider(),
+
+        _ProfileTile(
+          icon: Icons.rate_review_outlined,
+          title: 'Review History',
+          subtitle: 'View and manage your product and seller reviews',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ReviewHistory()),
+            );
           },
         ),
 

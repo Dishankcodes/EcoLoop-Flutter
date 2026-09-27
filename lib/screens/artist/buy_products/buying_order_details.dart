@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import 'buying_order_track.dart';
 
 class BuyingOrderDetails extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -1125,6 +1126,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   title: 'Order Receipt',
                   onTap: () {
                     Navigator.pop(context);
+
                     _showMessage('Order receipt will be available here.');
                   },
                 ),
@@ -1134,6 +1136,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   title: 'Share Order',
                   onTap: () {
                     Navigator.pop(context);
+
                     _showMessage('Order sharing will be connected later.');
                   },
                 ),
@@ -1143,6 +1146,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   title: 'Get Help',
                   onTap: () {
                     Navigator.pop(context);
+
                     _showMessage('Order support will be connected later.');
                   },
                 ),
@@ -1186,7 +1190,10 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   // TRACK ORDER
 
   void _trackOrder() {
-    _showMessage('Order tracking page will be connected next.');
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => OrderTracking(order: widget.order)),
+    );
   }
 
   // CANCEL ORDER

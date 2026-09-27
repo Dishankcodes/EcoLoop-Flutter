@@ -32,7 +32,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
       'date': '2 weeks ago',
       'verified': true,
       'comment':
-      'Really happy with the product. The quality was excellent and everything was packed carefully.',
+          'Really happy with the product. The quality was excellent and everything was packed carefully.',
       'helpful': 18,
       'photos': [
         'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=500&q=80',
@@ -46,7 +46,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
       'date': '1 month ago',
       'verified': true,
       'comment':
-      'Good quality and a smooth buying experience. The product looks exactly like the pictures.',
+          'Good quality and a smooth buying experience. The product looks exactly like the pictures.',
       'helpful': 11,
       'photos': <String>[],
       'product': 'Recycled Wood Table',
@@ -58,7 +58,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
       'date': '1 month ago',
       'verified': true,
       'comment':
-      'Loved giving this item a second life. Beautiful work and very good finishing.',
+          'Loved giving this item a second life. Beautiful work and very good finishing.',
       'helpful': 9,
       'photos': <String>[],
       'product': 'Upcycled Wall Decor',
@@ -70,7 +70,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
       'date': '2 months ago',
       'verified': false,
       'comment':
-      'Nice product overall. A few small marks were visible, but the used condition was mentioned.',
+          'Nice product overall. A few small marks were visible, but the used condition was mentioned.',
       'helpful': 6,
       'photos': <String>[],
       'product': 'Vintage Wooden Chair',
@@ -82,7 +82,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
       'date': '2 months ago',
       'verified': true,
       'comment':
-      'Excellent experience from start to finish. Would definitely purchase from this artist again.',
+          'Excellent experience from start to finish. Would definitely purchase from this artist again.',
       'helpful': 14,
       'photos': [
         'https://images.unsplash.com/photo-1541558869434-2840d308329a?auto=format&fit=crop&w=500&q=80',
@@ -96,7 +96,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
       'date': '3 months ago',
       'verified': true,
       'comment':
-      'The product was okay for the price. Communication with the artist was good.',
+          'The product was okay for the price. Communication with the artist was good.',
       'helpful': 4,
       'photos': <String>[],
       'product': 'Recycled Home Decor',
@@ -104,8 +104,9 @@ class _ArtistReviewsState extends State<ArtistReviews> {
   ];
 
   List<Map<String, dynamic>> get _filteredReviews {
-    List<Map<String, dynamic>> result =
-    List<Map<String, dynamic>>.from(_reviews);
+    List<Map<String, dynamic>> result = List<Map<String, dynamic>>.from(
+      _reviews,
+    );
 
     switch (_selectedFilter) {
       case '5 Star':
@@ -125,9 +126,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
         break;
       case 'With Photos':
         result = result
-            .where(
-              (r) => (r['photos'] as List<dynamic>).isNotEmpty,
-        )
+            .where((r) => (r['photos'] as List<dynamic>).isNotEmpty)
             .toList();
         break;
     }
@@ -135,16 +134,12 @@ class _ArtistReviewsState extends State<ArtistReviews> {
     if (_selectedSort == 'Newest') {
       result = List<Map<String, dynamic>>.from(result.reversed);
     } else if (_selectedSort == 'Highest Rating') {
-      result.sort(
-            (a, b) => (b['rating'] as int).compareTo(a['rating'] as int),
-      );
+      result.sort((a, b) => (b['rating'] as int).compareTo(a['rating'] as int));
     } else if (_selectedSort == 'Lowest Rating') {
-      result.sort(
-            (a, b) => (a['rating'] as int).compareTo(b['rating'] as int),
-      );
+      result.sort((a, b) => (a['rating'] as int).compareTo(b['rating'] as int));
     } else if (_selectedSort == 'Most Helpful') {
       result.sort(
-            (a, b) => (b['helpful'] as int).compareTo(a['helpful'] as int),
+        (a, b) => (b['helpful'] as int).compareTo(a['helpful'] as int),
       );
     }
 
@@ -195,9 +190,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
       decoration: BoxDecoration(
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: ArtistColors.primary.withValues(alpha: 0.20),
-        ),
+        border: Border.all(color: ArtistColors.primary.withValues(alpha: 0.20)),
       ),
       child: Row(
         children: [
@@ -243,13 +236,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
   }
 
   Widget _buildRatingSummary() {
-    const counts = {
-      5: 3,
-      4: 2,
-      3: 1,
-      2: 0,
-      1: 0,
-    };
+    const counts = {5: 3, 4: 2, 3: 1, 2: 0, 1: 0};
 
     return Container(
       width: double.infinity,
@@ -257,9 +244,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
       decoration: BoxDecoration(
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: ArtistColors.primary.withValues(alpha: 0.20),
-        ),
+        border: Border.all(color: ArtistColors.primary.withValues(alpha: 0.20)),
       ),
       child: Row(
         children: [
@@ -318,10 +303,10 @@ class _ArtistReviewsState extends State<ArtistReviews> {
                           child: LinearProgressIndicator(
                             value: count / 3,
                             minHeight: 6,
-                            backgroundColor:
-                            ArtistColors.primary.withValues(alpha: 0.10),
-                            valueColor:
-                            const AlwaysStoppedAnimation<Color>(
+                            backgroundColor: ArtistColors.primary.withValues(
+                              alpha: 0.10,
+                            ),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
                               ArtistColors.primary,
                             ),
                           ),
@@ -367,32 +352,17 @@ class _ArtistReviewsState extends State<ArtistReviews> {
           },
           color: ArtistColors.surface,
           itemBuilder: (_) => const [
-            PopupMenuItem(
-              value: 'Most Relevant',
-              child: Text('Most Relevant'),
-            ),
-            PopupMenuItem(
-              value: 'Newest',
-              child: Text('Newest'),
-            ),
+            PopupMenuItem(value: 'Most Relevant', child: Text('Most Relevant')),
+            PopupMenuItem(value: 'Newest', child: Text('Newest')),
             PopupMenuItem(
               value: 'Highest Rating',
               child: Text('Highest Rating'),
             ),
-            PopupMenuItem(
-              value: 'Lowest Rating',
-              child: Text('Lowest Rating'),
-            ),
-            PopupMenuItem(
-              value: 'Most Helpful',
-              child: Text('Most Helpful'),
-            ),
+            PopupMenuItem(value: 'Lowest Rating', child: Text('Lowest Rating')),
+            PopupMenuItem(value: 'Most Helpful', child: Text('Most Helpful')),
           ],
           child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 11,
-              vertical: 8,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
             decoration: BoxDecoration(
               color: ArtistColors.surface,
               borderRadius: BorderRadius.circular(10),
@@ -442,9 +412,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
               padding: const EdgeInsets.symmetric(horizontal: 13),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: selected
-                    ? ArtistColors.primary
-                    : ArtistColors.surface,
+                color: selected ? ArtistColors.primary : ArtistColors.surface,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: selected
@@ -457,9 +425,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
                 style: ArtistTextStyles.body.copyWith(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: selected
-                      ? Colors.white
-                      : ArtistColors.textPrimary,
+                  color: selected ? Colors.white : ArtistColors.textPrimary,
                 ),
               ),
             ),
@@ -490,9 +456,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
             const SizedBox(height: 12),
             Text(
               'No reviews found',
-              style: ArtistTextStyles.heading.copyWith(
-                fontSize: 15,
-              ),
+              style: ArtistTextStyles.heading.copyWith(fontSize: 15),
             ),
             const SizedBox(height: 5),
             Text(
@@ -507,9 +471,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
       );
     }
 
-    return Column(
-      children: reviews.map(_reviewCard).toList(),
-    );
+    return Column(children: reviews.map(_reviewCard).toList());
   }
 
   Widget _reviewCard(Map<String, dynamic> review) {
@@ -522,9 +484,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
       decoration: BoxDecoration(
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: ArtistColors.primary.withValues(alpha: 0.16),
-        ),
+        border: Border.all(color: ArtistColors.primary.withValues(alpha: 0.16)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -569,10 +529,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
                     const SizedBox(height: 3),
                     Row(
                       children: [
-                        _stars(
-                          (review['rating'] as int).toDouble(),
-                          size: 14,
-                        ),
+                        _stars((review['rating'] as int).toDouble(), size: 14),
                         const SizedBox(width: 7),
                         Text(
                           review['date'],
@@ -590,10 +547,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
           ),
           const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 9,
-              vertical: 5,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
             decoration: BoxDecoration(
               color: ArtistColors.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
@@ -610,10 +564,7 @@ class _ArtistReviewsState extends State<ArtistReviews> {
           const SizedBox(height: 9),
           Text(
             review['comment'],
-            style: ArtistTextStyles.body.copyWith(
-              fontSize: 12,
-              height: 1.45,
-            ),
+            style: ArtistTextStyles.body.copyWith(fontSize: 12, height: 1.45),
           ),
           if (photos.isNotEmpty) ...[
             const SizedBox(height: 12),
