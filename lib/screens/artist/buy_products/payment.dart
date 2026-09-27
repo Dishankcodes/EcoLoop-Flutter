@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
-import '../../user/buy_products/order_success.dart';
+import 'order_success.dart';
 
 /// Screen managing checkout payment method selection, card/UPI input fields, and payment confirmation.
 class Payment extends StatefulWidget {
