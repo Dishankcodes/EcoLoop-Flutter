@@ -5,7 +5,12 @@ import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/artist_more_menu.dart';
 import '../../welcome_screen.dart';
+import 'aboutyou.dart';
+import 'address_list.dart';
+import 'certification.dart';
 import 'edit_profile.dart';
+import 'followers.dart';
+import 'notification.dart';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});
@@ -14,7 +19,6 @@ class Profile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ArtistColors.background,
-
       // APP BAR
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -24,7 +28,6 @@ class Profile extends StatelessWidget {
         title: Text('Profile', style: ArtistTextStyles.title),
         actions: const [ArtistMoreMenu(), SizedBox(width: 8)],
       ),
-
       // BODY
       body: SafeArea(
         child: SingleChildScrollView(
@@ -34,37 +37,21 @@ class Profile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildProfileHeader(context),
-
               const SizedBox(height: 18),
-
               _buildQuickStats(context),
-
               const SizedBox(height: 24),
-
               _buildArtistInformation(context),
-
               const SizedBox(height: 22),
-
               _buildProductsSection(context),
-
               const SizedBox(height: 22),
-
               _buildOrdersSection(context),
-
               const SizedBox(height: 22),
-
               _buildBusinessSection(context),
-
               const SizedBox(height: 22),
-
               _buildPreferencesSection(context),
-
               const SizedBox(height: 22),
-
               _buildLogoutButton(context),
-
               const SizedBox(height: 14),
-
               Center(
                 child: Text(
                   'EcoLoop • Give Things a New Life',
@@ -81,7 +68,6 @@ class Profile extends StatelessWidget {
   }
 
   // PROFILE HEADER
-
   Widget _buildProfileHeader(BuildContext context) {
     return Container(
       width: double.infinity,
@@ -100,7 +86,6 @@ class Profile extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // PROFILE IMAGE
           Container(
             width: 92,
             height: 92,
@@ -118,10 +103,7 @@ class Profile extends StatelessWidget {
               color: ArtistColors.primary,
             ),
           ),
-
           const SizedBox(height: 13),
-
-          // NAME
           Text(
             'Creative Studio',
             textAlign: TextAlign.center,
@@ -130,14 +112,9 @@ class Profile extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-
           const SizedBox(height: 4),
-
           Text('artist@ecoloop.com', style: ArtistTextStyles.caption),
-
           const SizedBox(height: 6),
-
-          // ARTIST BADGE
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -146,9 +123,7 @@ class Profile extends StatelessWidget {
                 size: 16,
                 color: ArtistColors.primary,
               ),
-
               const SizedBox(width: 5),
-
               Text(
                 'EcoLoop ReMaker',
                 style: ArtistTextStyles.caption.copyWith(
@@ -158,10 +133,7 @@ class Profile extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 8),
-
-          // LOCATION
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -170,16 +142,11 @@ class Profile extends StatelessWidget {
                 size: 15,
                 color: ArtistColors.textSecondary,
               ),
-
               const SizedBox(width: 4),
-
               Text('Ahmedabad, Gujarat', style: ArtistTextStyles.caption),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          // ACTION BUTTONS
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -210,9 +177,7 @@ class Profile extends StatelessWidget {
                   ),
                 ),
               ),
-
               const SizedBox(width: 10),
-
               OutlinedButton.icon(
                 onPressed: () {
                   _showComingSoon(context, 'View Portfolio');
@@ -245,7 +210,6 @@ class Profile extends StatelessWidget {
   }
 
   // QUICK STATS
-
   Widget _buildQuickStats(BuildContext context) {
     return Row(
       children: [
@@ -259,9 +223,7 @@ class Profile extends StatelessWidget {
             },
           ),
         ),
-
         const SizedBox(width: 10),
-
         Expanded(
           child: _QuickStatCard(
             icon: Icons.shopping_bag_outlined,
@@ -272,9 +234,7 @@ class Profile extends StatelessWidget {
             },
           ),
         ),
-
         const SizedBox(width: 10),
-
         Expanded(
           child: _QuickStatCard(
             icon: Icons.star_outline_rounded,
@@ -285,16 +245,17 @@ class Profile extends StatelessWidget {
             },
           ),
         ),
-
         const SizedBox(width: 10),
-
         Expanded(
           child: _QuickStatCard(
             icon: Icons.people_outline_rounded,
             value: '2.4K',
             label: 'Followers',
             onTap: () {
-              _showComingSoon(context, 'Followers');
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const Followers()),
+              );
             },
           ),
         ),
@@ -303,55 +264,31 @@ class Profile extends StatelessWidget {
   }
 
   // ARTIST INFORMATION
-
   Widget _buildArtistInformation(BuildContext context) {
     return _ProfileSection(
       title: 'Artist Information',
       children: [
-        // BIO
         _ProfileTile(
           icon: Icons.person_outline_rounded,
-          title: 'About',
-          subtitle:
-              'Creating sustainable products through creative reuse and upcycling.',
+          title: 'About You',
+          subtitle: 'Tell buyers about yourself and your creative journey',
           onTap: () {
-            _showComingSoon(context, 'Artist Bio');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AboutYou()),
+            );
           },
         ),
-
         _ProfileDivider(),
-
-        // SKILLS
-        _ProfileTile(
-          icon: Icons.handyman_outlined,
-          title: 'Skills',
-          subtitle: 'Woodwork • Upcycling • Home Decor',
-          onTap: () {
-            _showComingSoon(context, 'Artist Skills');
-          },
-        ),
-
-        _ProfileDivider(),
-
-        // EXPERIENCE
-        _ProfileTile(
-          icon: Icons.workspace_premium_outlined,
-          title: 'Experience',
-          subtitle: '3+ years of creative making',
-          onTap: () {
-            _showComingSoon(context, 'Artist Experience');
-          },
-        ),
-
-        _ProfileDivider(),
-
-        // LOCATION
         _ProfileTile(
           icon: Icons.location_on_outlined,
-          title: 'Location',
-          subtitle: 'Ahmedabad, Gujarat',
+          title: 'My Addresses',
+          subtitle: 'Manage your saved addresses',
           onTap: () {
-            _showComingSoon(context, 'Location');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AddressList()),
+            );
           },
         ),
       ],
@@ -359,12 +296,10 @@ class Profile extends StatelessWidget {
   }
 
   // PRODUCTS SECTION
-
   Widget _buildProductsSection(BuildContext context) {
     return _ProfileSection(
       title: 'Products',
       children: [
-        // MY PRODUCTS
         _ProfileTile(
           icon: Icons.inventory_2_outlined,
           title: 'My Products',
@@ -373,10 +308,7 @@ class Profile extends StatelessWidget {
             _showComingSoon(context, 'My Products');
           },
         ),
-
         _ProfileDivider(),
-
-        // ADD PRODUCT
         _ProfileTile(
           icon: Icons.add_business_outlined,
           title: 'Add Product',
@@ -385,10 +317,7 @@ class Profile extends StatelessWidget {
             _showComingSoon(context, 'Add Product');
           },
         ),
-
         _ProfileDivider(),
-
-        // PRODUCT ANALYTICS
         _ProfileTile(
           icon: Icons.analytics_outlined,
           title: 'Product Analytics',
@@ -402,12 +331,10 @@ class Profile extends StatelessWidget {
   }
 
   // ORDERS SECTION
-
   Widget _buildOrdersSection(BuildContext context) {
     return _ProfileSection(
       title: 'Orders',
       children: [
-        // SELLING ORDERS
         _ProfileTile(
           icon: Icons.receipt_long_outlined,
           title: 'Selling Orders',
@@ -416,10 +343,7 @@ class Profile extends StatelessWidget {
             _showComingSoon(context, 'Selling Orders');
           },
         ),
-
         _ProfileDivider(),
-
-        // PENDING ORDERS
         _ProfileTile(
           icon: Icons.pending_actions_outlined,
           title: 'Pending Orders',
@@ -429,10 +353,7 @@ class Profile extends StatelessWidget {
             _showComingSoon(context, 'Pending Orders');
           },
         ),
-
         _ProfileDivider(),
-
-        // REVIEWS
         _ProfileTile(
           icon: Icons.rate_review_outlined,
           title: 'Reviews',
@@ -446,12 +367,10 @@ class Profile extends StatelessWidget {
   }
 
   // BUSINESS SECTION
-
   Widget _buildBusinessSection(BuildContext context) {
     return _ProfileSection(
       title: 'Business',
       children: [
-        // EARNINGS
         _ProfileTile(
           icon: Icons.account_balance_wallet_outlined,
           title: 'Earnings',
@@ -460,23 +379,20 @@ class Profile extends StatelessWidget {
             _showComingSoon(context, 'Earnings');
           },
         ),
-
         _ProfileDivider(),
-
-        // FOLLOWERS
         _ProfileTile(
           icon: Icons.people_outline_rounded,
           title: 'Followers',
           subtitle: 'People following your artist profile',
           trailing: _buildBadge('2.4K'),
           onTap: () {
-            _showComingSoon(context, 'Followers');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Followers()),
+            );
           },
         ),
-
         _ProfileDivider(),
-
-        // PORTFOLIO
         _ProfileTile(
           icon: Icons.collections_outlined,
           title: 'Portfolio',
@@ -485,16 +401,16 @@ class Profile extends StatelessWidget {
             _showComingSoon(context, 'Portfolio');
           },
         ),
-
         _ProfileDivider(),
-
-        // CERTIFICATION
         _ProfileTile(
           icon: Icons.verified_outlined,
           title: 'Certification',
           subtitle: 'View your artist certification',
           onTap: () {
-            _showComingSoon(context, 'Certification');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Certification()),
+            );
           },
         ),
       ],
@@ -502,12 +418,10 @@ class Profile extends StatelessWidget {
   }
 
   // PREFERENCES & SUPPORT
-
   Widget _buildPreferencesSection(BuildContext context) {
     return _ProfileSection(
       title: 'Preferences & Support',
       children: [
-        // SETTINGS
         _ProfileTile(
           icon: Icons.settings_outlined,
           title: 'Settings',
@@ -516,22 +430,19 @@ class Profile extends StatelessWidget {
             _showComingSoon(context, 'Settings');
           },
         ),
-
         _ProfileDivider(),
-
-        // NOTIFICATIONS
         _ProfileTile(
           icon: Icons.notifications_none_rounded,
           title: 'Notifications',
           subtitle: 'View your latest notifications',
           onTap: () {
-            _showComingSoon(context, 'Notifications');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Notifications()),
+            );
           },
         ),
-
         _ProfileDivider(),
-
-        // CONTACT US
         _ProfileTile(
           icon: Icons.contact_support_outlined,
           title: 'Contact Us',
@@ -545,7 +456,6 @@ class Profile extends StatelessWidget {
   }
 
   // LOGOUT BUTTON
-
   Widget _buildLogoutButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
@@ -579,7 +489,6 @@ class Profile extends StatelessWidget {
   }
 
   // BADGE
-
   Widget _buildBadge(String value) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -599,7 +508,6 @@ class Profile extends StatelessWidget {
   }
 
   // COMING SOON
-
   void _showComingSoon(BuildContext context, String page) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -614,7 +522,6 @@ class Profile extends StatelessWidget {
   }
 
   // LOGOUT DIALOG
-
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -645,25 +552,15 @@ class Profile extends StatelessWidget {
                 ),
               ),
             ),
-
             ElevatedButton(
               onPressed: () async {
                 Navigator.pop(dialogContext);
-
                 await Prefs.setBool('isLoggedIn', false);
-
                 await Prefs.setString('authToken', '');
-
                 await Prefs.setString('userRole', '');
-
                 await Prefs.setString('userEmail', '');
-
                 await Prefs.setString('userName', '');
-
-                if (!context.mounted) {
-                  return;
-                }
-
+                if (!context.mounted) return;
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const WelcomeScreen()),
@@ -688,7 +585,6 @@ class Profile extends StatelessWidget {
 }
 
 // PROFILE SECTION
-
 class _ProfileSection extends StatelessWidget {
   const _ProfileSection({required this.title, required this.children});
 
@@ -707,7 +603,6 @@ class _ProfileSection extends StatelessWidget {
             style: ArtistTextStyles.title.copyWith(fontSize: 16),
           ),
         ),
-
         Container(
           decoration: BoxDecoration(
             color: ArtistColors.surface,
@@ -722,7 +617,6 @@ class _ProfileSection extends StatelessWidget {
 }
 
 // PROFILE TILE
-
 class _ProfileTile extends StatelessWidget {
   const _ProfileTile({
     required this.icon,
@@ -756,9 +650,7 @@ class _ProfileTile extends StatelessWidget {
               ),
               child: Icon(icon, size: 21, color: ArtistColors.primary),
             ),
-
             const SizedBox(width: 12),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -769,9 +661,7 @@ class _ProfileTile extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-
                   const SizedBox(height: 2),
-
                   Text(
                     subtitle,
                     maxLines: 2,
@@ -781,9 +671,7 @@ class _ProfileTile extends StatelessWidget {
                 ],
               ),
             ),
-
             const SizedBox(width: 8),
-
             trailing ??
                 const Icon(
                   Icons.chevron_right_rounded,
@@ -798,7 +686,6 @@ class _ProfileTile extends StatelessWidget {
 }
 
 // PROFILE DIVIDER
-
 class _ProfileDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -814,7 +701,6 @@ class _ProfileDivider extends StatelessWidget {
 }
 
 // QUICK STAT CARD
-
 class _QuickStatCard extends StatelessWidget {
   const _QuickStatCard({
     required this.icon,
@@ -845,13 +731,9 @@ class _QuickStatCard extends StatelessWidget {
           child: Column(
             children: [
               Icon(icon, size: 20, color: ArtistColors.primary),
-
               const SizedBox(height: 5),
-
               Text(value, style: ArtistTextStyles.title.copyWith(fontSize: 17)),
-
               const SizedBox(height: 1),
-
               Text(
                 label,
                 style: ArtistTextStyles.small.copyWith(fontSize: 9.5),

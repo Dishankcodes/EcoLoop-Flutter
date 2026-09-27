@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 
 void main() => runApp(const MaterialApp(
   debugShowCheckedModeBanner: false,
-  home: CertificateUploadScreen(),
+  home: Certification(),
 ));
 
-class CertificateUploadScreen extends StatefulWidget {
-  const CertificateUploadScreen({super.key});
+class Certification extends StatefulWidget {
+  const Certification({super.key});
 
   @override
-  State<CertificateUploadScreen> createState() =>
-      _CertificateUploadScreenState();
+  State<Certification> createState() =>
+      _CertificationState();
 }
 
-class _CertificateUploadScreenState
-    extends State<CertificateUploadScreen> {
+class _CertificationState
+    extends State<Certification> {
   final Color primary = const Color(0xFFAD563E);
   final Color background = const Color(0xFFF7F0E7);
   final Color cardColor = const Color(0xFFFFFCF8);

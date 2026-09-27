@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 
 void main() => runApp(const MaterialApp(
   debugShowCheckedModeBanner: false,
-  home: FollowersScreen(),
+  home: Followers(),
 ));
 
-class FollowersScreen extends StatefulWidget {
-  const FollowersScreen({super.key});
+class Followers extends StatefulWidget {
+  const Followers({super.key});
 
   @override
-  State<FollowersScreen> createState() => _FollowersScreenState();
+  State<Followers> createState() => _FollowersState();
 }
 
-class _FollowersScreenState extends State<FollowersScreen> {
+class _FollowersState extends State<Followers> {
   final Color primary = const Color(0xFFAD563E);
   final Color background = const Color(0xFFF7F0E7);
   final Color cardColor = const Color(0xFFFFFCF8);

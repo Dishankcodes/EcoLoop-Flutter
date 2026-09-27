@@ -1,21 +1,18 @@
 import 'package:flutter/material.dart';
 
-void main() => runApp(const MaterialApp(
-  debugShowCheckedModeBanner: false,
-  home: AboutYouScreen(),
-));
+void main() => runApp(
+  const MaterialApp(debugShowCheckedModeBanner: false, home: AboutYou()),
+);
 
-class AboutYouScreen extends StatefulWidget {
-  const AboutYouScreen({super.key});
+class AboutYou extends StatefulWidget {
+  const AboutYou({super.key});
 
   @override
-  State<AboutYouScreen> createState() => _AboutYouScreenState();
+  State<AboutYou> createState() => _AboutYouState();
 }
 
-class _AboutYouScreenState extends State<AboutYouScreen> {
-  // ================================================================
+class _AboutYouState extends State<AboutYou> {
   // ARTIST THEME
-  // ================================================================
 
   final Color primary = const Color(0xFFAD563E);
   final Color background = const Color(0xFFF7F0E7);
@@ -24,9 +21,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
   final Color textColor = const Color(0xFF292522);
   final Color mutedColor = const Color(0xFF8B817A);
 
-  // ================================================================
   // SAMPLE REVIEWS
-  // ================================================================
 
   final List<Map<String, dynamic>> reviews = [
     {
@@ -34,41 +29,39 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
       'date': '12 Sep 2026',
       'rating': 5,
       'review':
-      'Beautiful handmade work. The finishing and attention to detail were excellent.',
+          'Beautiful handmade work. The finishing and attention to detail were excellent.',
     },
     {
       'name': 'Rahul Patel',
       'date': '05 Sep 2026',
       'rating': 5,
       'review':
-      'Really happy with my purchase. The product looks exactly like the pictures.',
+          'Really happy with my purchase. The product looks exactly like the pictures.',
     },
     {
       'name': 'Meera Joshi',
       'date': '28 Aug 2026',
       'rating': 4,
       'review':
-      'Very creative and unique work. Delivery was smooth and the quality was good.',
+          'Very creative and unique work. Delivery was smooth and the quality was good.',
     },
     {
       'name': 'Aarav Mehta',
       'date': '19 Aug 2026',
       'rating': 4,
       'review':
-      'Good craftsmanship and a beautiful design. Would definitely explore more products.',
+          'Good craftsmanship and a beautiful design. Would definitely explore more products.',
     },
     {
       'name': 'Kavya Patel',
       'date': '11 Aug 2026',
       'rating': 5,
       'review':
-      'One of the most beautiful handmade products I have purchased. Highly recommended.',
+          'One of the most beautiful handmade products I have purchased. Highly recommended.',
     },
   ];
 
-  // ================================================================
   // TOAST
-  // ================================================================
 
   void _toast(String message) {
     ScaffoldMessenger.of(context)
@@ -86,30 +79,21 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
       );
   }
 
-  // ================================================================
   // BUILD
-  // ================================================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: background,
 
-      // ============================================================
       // APP BAR
-      // ============================================================
-
       appBar: AppBar(
         backgroundColor: background,
         elevation: 0,
         centerTitle: true,
 
         leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_rounded,
-            color: textColor,
-            size: 25,
-          ),
+          icon: Icon(Icons.arrow_back_rounded, color: textColor, size: 25),
           onPressed: () => _toast('Back clicked'),
         ),
 
@@ -125,40 +109,24 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
         actions: [
           IconButton(
             tooltip: 'About You Help',
-            icon: Icon(
-              Icons.info_outline_rounded,
-              color: textColor,
-              size: 23,
-            ),
+            icon: Icon(Icons.info_outline_rounded, color: textColor, size: 23),
             onPressed: _showAboutHelp,
           ),
         ],
       ),
 
-      // ============================================================
       // BODY
-      // ============================================================
-
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  8,
-                  20,
-                  25,
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 25),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-
-                    // ==================================================
                     // INTRO
-                    // ==================================================
-
                     Text(
                       'What People Say About You',
                       style: TextStyle(
@@ -182,29 +150,19 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
 
                     const SizedBox(height: 20),
 
-                    // ==================================================
                     // ARTIST PROFILE CARD
-                    // ==================================================
-
                     _artistProfileCard(),
 
                     const SizedBox(height: 20),
 
-                    // ==================================================
                     // RATING SUMMARY
-                    // ==================================================
-
                     _ratingSummary(),
 
                     const SizedBox(height: 22),
 
-                    // ==================================================
                     // REVIEWS TITLE
-                    // ==================================================
-
                     Row(
-                      mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           'Customer Reviews',
@@ -222,8 +180,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF0DED4),
-                            borderRadius:
-                            BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
                             '${reviews.length} Reviews',
@@ -239,31 +196,21 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
 
                     const SizedBox(height: 13),
 
-                    // ==================================================
                     // REVIEW LIST
-                    // ==================================================
-
-                    ...reviews.map(
-                          (review) => _reviewCard(review),
-                    ),
+                    ...reviews.map((review) => _reviewCard(review)),
 
                     const SizedBox(height: 10),
 
-                    // ==================================================
                     // BOTTOM INFORMATION
-                    // ==================================================
-
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(15),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF0DED4),
-                        borderRadius:
-                        BorderRadius.circular(15),
+                        borderRadius: BorderRadius.circular(15),
                       ),
                       child: Row(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(
                             Icons.auto_awesome_outlined,
@@ -292,10 +239,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
               ),
             ),
 
-            // ========================================================
             // BOTTOM NAVIGATION
-            // ========================================================
-
             _bottomNavigation(),
           ],
         ),
@@ -303,9 +247,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
     );
   }
 
-  // ================================================================
   // ARTIST PROFILE CARD
-  // ================================================================
 
   Widget _artistProfileCard() {
     return Container(
@@ -314,10 +256,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: borderColor,
-          width: 1.2,
-        ),
+        border: Border.all(color: borderColor, width: 1.2),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -328,7 +267,6 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
       ),
       child: Row(
         children: [
-
           // Profile image
           Container(
             width: 70,
@@ -341,19 +279,14 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
                 width: 2,
               ),
             ),
-            child: Icon(
-              Icons.person_rounded,
-              color: primary,
-              size: 38,
-            ),
+            child: Icon(Icons.person_rounded, color: primary, size: 38),
           ),
 
           const SizedBox(width: 15),
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Artist Profile',
@@ -379,11 +312,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
 
                 Row(
                   children: [
-                    Icon(
-                      Icons.star_rounded,
-                      color: primary,
-                      size: 17,
-                    ),
+                    Icon(Icons.star_rounded, color: primary, size: 17),
 
                     const SizedBox(width: 4),
 
@@ -400,10 +329,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
 
                     Text(
                       'from 5 reviews',
-                      style: TextStyle(
-                        color: mutedColor,
-                        fontSize: 10,
-                      ),
+                      style: TextStyle(color: mutedColor, fontSize: 10),
                     ),
                   ],
                 ),
@@ -413,20 +339,14 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
 
           IconButton(
             onPressed: () => _toast('Edit About You'),
-            icon: Icon(
-              Icons.edit_outlined,
-              color: mutedColor,
-              size: 20,
-            ),
+            icon: Icon(Icons.edit_outlined, color: mutedColor, size: 20),
           ),
         ],
       ),
     );
   }
 
-  // ================================================================
   // RATING SUMMARY
-  // ================================================================
 
   Widget _ratingSummary() {
     return Container(
@@ -435,13 +355,10 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: borderColor,
-        ),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
-
           // Overall rating
           SizedBox(
             width: 92,
@@ -457,15 +374,11 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
                 ),
 
                 Row(
-                  mainAxisAlignment:
-                  MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(
                     5,
-                        (index) => Icon(
-                      Icons.star_rounded,
-                      color: primary,
-                      size: 16,
-                    ),
+                    (index) =>
+                        Icon(Icons.star_rounded, color: primary, size: 16),
                   ),
                 ),
 
@@ -501,13 +414,10 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
     );
   }
 
-  // ================================================================
   // RATING BAR
-  // ================================================================
 
   Widget _ratingBar(int rating, int count) {
-    final double progress =
-    reviews.isEmpty ? 0 : count / reviews.length;
+    final double progress = reviews.isEmpty ? 0 : count / reviews.length;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
@@ -525,27 +435,18 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
             ),
           ),
 
-          Icon(
-            Icons.star_rounded,
-            color: primary,
-            size: 12,
-          ),
+          Icon(Icons.star_rounded, color: primary, size: 12),
 
           const SizedBox(width: 6),
 
           Expanded(
             child: ClipRRect(
-              borderRadius:
-              BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(20),
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 6,
-                backgroundColor:
-                const Color(0xFFEDE5DC),
-                valueColor:
-                AlwaysStoppedAnimation<Color>(
-                  primary,
-                ),
+                backgroundColor: const Color(0xFFEDE5DC),
+                valueColor: AlwaysStoppedAnimation<Color>(primary),
               ),
             ),
           ),
@@ -557,10 +458,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
             child: Text(
               '$count',
               textAlign: TextAlign.right,
-              style: TextStyle(
-                color: mutedColor,
-                fontSize: 9,
-              ),
+              style: TextStyle(color: mutedColor, fontSize: 9),
             ),
           ),
         ],
@@ -568,13 +466,9 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
     );
   }
 
-  // ================================================================
   // REVIEW CARD
-  // ================================================================
 
-  Widget _reviewCard(
-      Map<String, dynamic> review,
-      ) {
+  Widget _reviewCard(Map<String, dynamic> review) {
     final int rating = review['rating'];
 
     return Container(
@@ -584,19 +478,14 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(
-          color: borderColor,
-        ),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           // Reviewer header
           Row(
             children: [
-
               // Avatar
               Container(
                 width: 42,
@@ -607,9 +496,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    review['name']
-                        .toString()
-                        .substring(0, 1),
+                    review['name'].toString().substring(0, 1),
                     style: TextStyle(
                       color: primary,
                       fontSize: 16,
@@ -623,8 +510,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       review['name'],
@@ -639,10 +525,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
 
                     Text(
                       review['date'],
-                      style: TextStyle(
-                        color: mutedColor,
-                        fontSize: 9.5,
-                      ),
+                      style: TextStyle(color: mutedColor, fontSize: 9.5),
                     ),
                   ],
                 ),
@@ -650,22 +533,14 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
 
               // Rating
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 5,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF0DED4),
-                  borderRadius:
-                  BorderRadius.circular(9),
+                  borderRadius: BorderRadius.circular(9),
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.star_rounded,
-                      color: primary,
-                      size: 14,
-                    ),
+                    Icon(Icons.star_rounded, color: primary, size: 14),
                     const SizedBox(width: 3),
                     Text(
                       '$rating.0',
@@ -687,10 +562,8 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
           Row(
             children: List.generate(
               5,
-                  (index) => Icon(
-                index < rating
-                    ? Icons.star_rounded
-                    : Icons.star_border_rounded,
+              (index) => Icon(
+                index < rating ? Icons.star_rounded : Icons.star_border_rounded,
                 color: primary,
                 size: 17,
               ),
@@ -715,11 +588,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
           // Helpful
           Row(
             children: [
-              Icon(
-                Icons.thumb_up_alt_outlined,
-                color: mutedColor,
-                size: 15,
-              ),
+              Icon(Icons.thumb_up_alt_outlined, color: mutedColor, size: 15),
 
               const SizedBox(width: 5),
 
@@ -735,9 +604,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
               const Spacer(),
 
               InkWell(
-                onTap: () => _toast(
-                  'Review options',
-                ),
+                onTap: () => _toast('Review options'),
                 child: Icon(
                   Icons.more_horiz_rounded,
                   color: mutedColor,
@@ -751,9 +618,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
     );
   }
 
-  // ================================================================
   // ABOUT HELP
-  // ================================================================
 
   void _showAboutHelp() {
     showDialog(
@@ -766,16 +631,12 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
             decoration: BoxDecoration(
               color: cardColor,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: borderColor,
-              ),
+              border: Border.all(color: borderColor),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 Row(
                   children: [
                     Container(
@@ -783,8 +644,7 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
                       height: 45,
                       decoration: BoxDecoration(
                         color: const Color(0xFFF0DED4),
-                        borderRadius:
-                        BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: Icon(
                         Icons.info_outline_rounded,
@@ -807,12 +667,8 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
                     ),
 
                     IconButton(
-                      onPressed: () =>
-                          Navigator.pop(context),
-                      icon: Icon(
-                        Icons.close_rounded,
-                        color: mutedColor,
-                      ),
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close_rounded, color: mutedColor),
                     ),
                   ],
                 ),
@@ -856,16 +712,12 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
                   width: double.infinity,
                   height: 45,
                   child: ElevatedButton(
-                    onPressed: () =>
-                        Navigator.pop(context),
-                    style:
-                    ElevatedButton.styleFrom(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
                       backgroundColor: primary,
                       elevation: 0,
-                      shape:
-                      RoundedRectangleBorder(
-                        borderRadius:
-                        BorderRadius.circular(13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13),
                       ),
                     ),
                     child: const Text(
@@ -886,45 +738,28 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
     );
   }
 
-  // ================================================================
   // BOTTOM NAVIGATION
-  // ================================================================
 
   Widget _bottomNavigation() {
     return Container(
       height: 76,
       decoration: BoxDecoration(
         color: cardColor,
-        border: Border(
-          top: BorderSide(
-            color: borderColor,
-            width: 1,
-          ),
-        ),
+        border: Border(top: BorderSide(color: borderColor, width: 1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(
-              alpha: 0.04,
-            ),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, -3),
           ),
         ],
       ),
       child: Row(
-        mainAxisAlignment:
-        MainAxisAlignment.spaceAround,
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
+          _navItem(Icons.home_outlined, 'Dashboard'),
 
-          _navItem(
-            Icons.home_outlined,
-            'Dashboard',
-          ),
-
-          _navItem(
-            Icons.search_outlined,
-            'Materials',
-          ),
+          _navItem(Icons.search_outlined, 'Materials'),
 
           Container(
             width: 50,
@@ -934,16 +769,14 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color:
-                  primary.withValues(alpha: 0.28),
+                  color: primary.withValues(alpha: 0.28),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
               ],
             ),
             child: IconButton(
-              onPressed: () =>
-                  _toast('Add New Item'),
+              onPressed: () => _toast('Add New Item'),
               icon: const Icon(
                 Icons.add_rounded,
                 color: Colors.white,
@@ -952,45 +785,26 @@ class _AboutYouScreenState extends State<AboutYouScreen> {
             ),
           ),
 
-          _navItem(
-            Icons.receipt_long_outlined,
-            'Orders',
-          ),
+          _navItem(Icons.receipt_long_outlined, 'Orders'),
 
-          _navItem(
-            Icons.person_outline_rounded,
-            'Profile',
-          ),
+          _navItem(Icons.person_outline_rounded, 'Profile'),
         ],
       ),
     );
   }
 
-  // ================================================================
   // NAV ITEM
-  // ================================================================
 
-  Widget _navItem(
-      IconData icon,
-      String label,
-      ) {
+  Widget _navItem(IconData icon, String label) {
     return InkWell(
       onTap: () => _toast('$label clicked'),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: 5,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         child: Column(
-          mainAxisAlignment:
-          MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              color: mutedColor,
-              size: 22,
-            ),
+            Icon(icon, color: mutedColor, size: 22),
 
             const SizedBox(height: 4),
 
