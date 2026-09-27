@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_theme/artist/artist_colors.dart';
 import '../app_theme/artist/artist_text_styles.dart';
 import '../screens/artist/buy_products/wishlist.dart';
-import '../screens/artist/profile/contact_us.dart';
+import '../screens/common/artist/contact_us.dart';
 import '../screens/artist/profile/notification.dart';
 import '../screens/artist/profile/settings.dart';
 import '../screens/welcome_screen.dart';

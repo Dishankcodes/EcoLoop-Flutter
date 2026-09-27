@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../widgets/cart_popup.dart';
-import '../../user/buy_products/checkout.dart';
-import '../../user/buy_products/seller_profile.dart';
-import '../../user/reviews/product_reviews.dart';
-import '../../user/reviews/write_review.dart';
+import 'checkout.dart';
+import '../../artist/reviews/product_reviews.dart';
+import '../../artist/reviews/write_review.dart';
+import 'seller_profile.dart';
 
 class ProductDetails extends StatefulWidget {
   final Map<String, dynamic> product;
