@@ -63,24 +63,13 @@ class ArtistMoreMenu extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
-        // Wishlist option
         PopupMenuItem<String>(
           value: 'wishlist',
-          height: 48,
           child: Row(
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: ArtistColors.light,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: const Icon(
-                  Icons.favorite_border_rounded,
-                  color: ArtistColors.primary,
-                  size: 18,
-                ),
+              const Icon(
+                Icons.favorite_border_rounded,
+                color: ArtistColors.primary,
               ),
               const SizedBox(width: 12),
               Text(
@@ -92,25 +81,13 @@ class ArtistMoreMenu extends StatelessWidget {
             ],
           ),
         ),
-
-        // Notifications option
         PopupMenuItem<String>(
           value: 'notifications',
-          height: 48,
           child: Row(
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: ArtistColors.light,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: ArtistColors.primary,
-                  size: 18,
-                ),
+              const Icon(
+                Icons.notifications_none_rounded,
+                color: ArtistColors.primary,
               ),
               const SizedBox(width: 12),
               Text(
@@ -122,27 +99,13 @@ class ArtistMoreMenu extends StatelessWidget {
             ],
           ),
         ),
-
-        const PopupMenuDivider(height: 8),
-
-        // Contact us option
         PopupMenuItem<String>(
           value: 'contact',
-          height: 48,
           child: Row(
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: ArtistColors.surfaceSoft,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: const Icon(
-                  Icons.contact_support_outlined,
-                  color: ArtistColors.primary,
-                  size: 18,
-                ),
+              const Icon(
+                Icons.contact_support_outlined,
+                color: ArtistColors.primary,
               ),
               const SizedBox(width: 12),
               Text(
@@ -154,26 +117,11 @@ class ArtistMoreMenu extends StatelessWidget {
             ],
           ),
         ),
-
-        // Settings option
         PopupMenuItem<String>(
           value: 'settings',
-          height: 48,
           child: Row(
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: ArtistColors.surfaceSoft,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: const Icon(
-                  Icons.settings_outlined,
-                  color: ArtistColors.primary,
-                  size: 18,
-                ),
-              ),
+              const Icon(Icons.settings_outlined, color: ArtistColors.primary),
               const SizedBox(width: 12),
               Text(
                 'Settings',
@@ -184,28 +132,11 @@ class ArtistMoreMenu extends StatelessWidget {
             ],
           ),
         ),
-
-        const PopupMenuDivider(height: 8),
-
-        // Logout option
         PopupMenuItem<String>(
           value: 'logout',
-          height: 48,
           child: Row(
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: ArtistColors.error.withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: const Icon(
-                  Icons.logout_rounded,
-                  color: ArtistColors.error,
-                  size: 18,
-                ),
-              ),
+              const Icon(Icons.logout_rounded, color: ArtistColors.error),
               const SizedBox(width: 12),
               Text(
                 'Logout',

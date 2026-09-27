@@ -1,35 +1,21 @@
 import 'package:flutter/material.dart';
 
-void main() => runApp(const MaterialApp(
-  debugShowCheckedModeBanner: false,
-  home: Certification(),
-));
+import '../../../app_theme/artist/artist_colors.dart';
+import '../../../app_theme/artist/artist_text_styles.dart';
 
 class Certification extends StatefulWidget {
   const Certification({super.key});
 
   @override
-  State<Certification> createState() =>
-      _CertificationState();
+  State<Certification> createState() => _CertificationState();
 }
 
-class _CertificationState
-    extends State<Certification> {
-  final Color primary = const Color(0xFFAD563E);
-  final Color background = const Color(0xFFF7F0E7);
-  final Color cardColor = const Color(0xFFFFFCF8);
-  final Color borderColor = const Color(0xFFE2D5C8);
-  final Color textColor = const Color(0xFF292522);
-  final Color mutedColor = const Color(0xFF8B817A);
+class _CertificationState extends State<Certification> {
+  final TextEditingController _titleController = TextEditingController();
 
-  final TextEditingController _titleController =
-  TextEditingController();
+  final TextEditingController _organizationController = TextEditingController();
 
-  final TextEditingController _organizationController =
-  TextEditingController();
-
-  final TextEditingController _yearController =
-  TextEditingController();
+  final TextEditingController _yearController = TextEditingController();
 
   String? _selectedType;
 
@@ -43,225 +29,212 @@ class _CertificationState
     'Other',
   ];
 
-  void _toast(String message) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+  @override
+  void initState() {
+    super.initState();
+
+    _titleController.addListener(_refreshPreview);
+    _organizationController.addListener(_refreshPreview);
+    _yearController.addListener(_refreshPreview);
   }
 
+  @override
+  void dispose() {
+    _titleController.removeListener(_refreshPreview);
+    _organizationController.removeListener(_refreshPreview);
+    _yearController.removeListener(_refreshPreview);
+
+    _titleController.dispose();
+    _organizationController.dispose();
+    _yearController.dispose();
+
+    super.dispose();
+  }
+
+  void _refreshPreview() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  // Submit certificate.
   void _submitCertificate() {
     FocusScope.of(context).unfocus();
-    _toast('Certificate submitted successfully');
+
+    if (_titleController.text.trim().isEmpty) {
+      _showMessage('Please enter the certificate name.');
+      return;
+    }
+
+    if (_organizationController.text.trim().isEmpty) {
+      _showMessage('Please enter the issuing organization.');
+      return;
+    }
+
+    if (_selectedType == null) {
+      _showMessage('Please select a certificate type.');
+      return;
+    }
+
+    if (_yearController.text.trim().isEmpty) {
+      _showMessage('Please enter the certification year.');
+      return;
+    }
+
+    _showMessage('Certificate submitted successfully.');
   }
 
-  // ================================================================
-  // CERTIFICATE HELP
-  // ================================================================
-
+  // Certificate help.
   void _showCertificateHelp() {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (dialogContext) {
         return Dialog(
           backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 24,
+          ),
           child: Container(
-            padding: const EdgeInsets.all(22),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: borderColor,
-                width: 1,
-              ),
+              color: ArtistColors.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: ArtistColors.border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
+                  color: Colors.black.withOpacity(0.08),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-
-                // ==================================================
-                // HELP HEADER
-                // ==================================================
-
-                Row(
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0DED4),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(
-                        Icons.help_outline_rounded,
-                        color: primary,
-                        size: 26,
-                      ),
-                    ),
-
-                    const SizedBox(width: 12),
-
-                    Expanded(
-                      child: Text(
-                        'Certificate Help',
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 19,
-                          fontWeight: FontWeight.w800,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: ArtistColors.light,
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                        child: const Icon(
+                          Icons.help_outline_rounded,
+                          color: ArtistColors.primary,
+                          size: 24,
                         ),
                       ),
-                    ),
-
-                    IconButton(
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      icon: Icon(
-                        Icons.close_rounded,
-                        color: mutedColor,
-                        size: 22,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                Text(
-                  'How to add a certificate?',
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // ==================================================
-                // HELP ITEMS
-                // ==================================================
-
-                _helpItem(
-                  Icons.badge_outlined,
-                  'Certificate Name',
-                  'Enter the official name written on your certificate.',
-                ),
-
-                _helpItem(
-                  Icons.business_outlined,
-                  'Issued By',
-                  'Enter the organization, institute, or authority that issued the certificate.',
-                ),
-
-                _helpItem(
-                  Icons.category_outlined,
-                  'Certificate Type',
-                  'Select the category that best matches your certificate.',
-                ),
-
-                _helpItem(
-                  Icons.calendar_today_outlined,
-                  'Certification Year',
-                  'Enter the year in which you received the certificate.',
-                ),
-
-                _helpItem(
-                  Icons.upload_file_outlined,
-                  'Certificate File',
-                  'Upload a clear PDF, JPG, or PNG certificate. Maximum file size is 5 MB.',
-                ),
-
-                const SizedBox(height: 5),
-
-                // ==================================================
-                // IMPORTANT NOTE
-                // ==================================================
-
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(13),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0DED4),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Row(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        color: primary,
-                        size: 20,
-                      ),
-
-                      const SizedBox(width: 9),
-
+                      const SizedBox(width: 11),
                       Expanded(
                         child: Text(
-                          'Make sure the certificate is clear and the information is readable. Your certificate may be reviewed before appearing on your artist profile.',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 11,
-                            height: 1.45,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          'Certificate Help',
+                          style: ArtistTextStyles.title.copyWith(fontSize: 18),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: ArtistColors.textSecondary,
+                          size: 21,
                         ),
                       ),
                     ],
                   ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // ==================================================
-                // GOT IT BUTTON
-                // ==================================================
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primary,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13),
-                      ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'How to add a certificate?',
+                    style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 14),
+                  ),
+                  const SizedBox(height: 14),
+                  _helpItem(
+                    Icons.badge_outlined,
+                    'Certificate Name',
+                    'Enter the official name written on your certificate.',
+                  ),
+                  _helpItem(
+                    Icons.business_outlined,
+                    'Issued By',
+                    'Enter the organization, institute, or authority that issued the certificate.',
+                  ),
+                  _helpItem(
+                    Icons.category_outlined,
+                    'Certificate Type',
+                    'Select the category that best matches your certificate.',
+                  ),
+                  _helpItem(
+                    Icons.calendar_today_outlined,
+                    'Certification Year',
+                    'Enter the year in which you received the certificate.',
+                  ),
+                  _helpItem(
+                    Icons.upload_file_outlined,
+                    'Certificate File',
+                    'Upload a clear PDF, JPG, or PNG certificate. Maximum file size is 5 MB.',
+                  ),
+                  const SizedBox(height: 3),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: ArtistColors.light,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
-                      'Got It',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          color: ArtistColors.primary,
+                          size: 19,
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            'Make sure the certificate is clear and the information is readable. Your certificate may be reviewed before appearing on your artist profile.',
+                            style: ArtistTextStyles.body.copyWith(
+                              color: ArtistColors.textPrimary,
+                              fontSize: 10.5,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(dialogContext);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ArtistColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                      ),
+                      child: Text(
+                        'Got It',
+                        style: ArtistTextStyles.button.copyWith(fontSize: 13),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -269,58 +242,37 @@ class _CertificationState
     );
   }
 
-  // ================================================================
-  // HELP ITEM
-  // ================================================================
-
-  Widget _helpItem(
-      IconData icon,
-      String title,
-      String description,
-      ) {
+  // Help item.
+  Widget _helpItem(IconData icon, String title, String description) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.only(bottom: 13),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 35,
+            height: 35,
             decoration: BoxDecoration(
-              color: const Color(0xFFF0DED4),
+              color: ArtistColors.light,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              icon,
-              color: primary,
-              size: 19,
-            ),
+            child: Icon(icon, color: ArtistColors.primary, size: 18),
           ),
-
           const SizedBox(width: 10),
-
           Expanded(
             child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 11.5),
                 ),
-
-                const SizedBox(height: 3),
-
+                const SizedBox(height: 2),
                 Text(
                   description,
-                  style: TextStyle(
-                    color: mutedColor,
-                    fontSize: 10.5,
-                    height: 1.4,
+                  style: ArtistTextStyles.caption.copyWith(
+                    fontSize: 10,
+                    height: 1.35,
                   ),
                 ),
               ],
@@ -332,586 +284,445 @@ class _CertificationState
   }
 
   @override
-  void dispose() {
-    _titleController.dispose();
-    _organizationController.dispose();
-    _yearController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: background,
-
-      // ============================================================
-      // APP BAR
-      // ============================================================
-
+      backgroundColor: ArtistColors.background,
       appBar: AppBar(
-        backgroundColor: background,
+        backgroundColor: ArtistColors.background,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         centerTitle: true,
-
         leading: IconButton(
-          icon: Icon(
+          tooltip: 'Back',
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          icon: const Icon(
             Icons.arrow_back_rounded,
-            color: textColor,
-            size: 25,
+            color: ArtistColors.textPrimary,
+            size: 23,
           ),
-          onPressed: () => _toast('Back clicked'),
         ),
-
         title: Text(
           'Certificates',
-          style: TextStyle(
-            color: textColor,
-            fontSize: 21,
-            fontWeight: FontWeight.w800,
+          style: ArtistTextStyles.title.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
           ),
         ),
-
         actions: [
           IconButton(
-            icon: Icon(
-              Icons.help_outline_rounded,
-              color: textColor,
-              size: 23,
-            ),
             tooltip: 'Certificate Help',
             onPressed: _showCertificateHelp,
+            icon: const Icon(
+              Icons.help_outline_rounded,
+              color: ArtistColors.textPrimary,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 5),
+        ],
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 5, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 16),
+              _buildUploadCard(),
+              const SizedBox(height: 20),
+              _buildInformationSection(),
+              const SizedBox(height: 20),
+              _buildPreviewSection(),
+              const SizedBox(height: 18),
+              _buildVerificationNote(),
+              const SizedBox(height: 20),
+              _buildSubmitButton(),
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  'You can add more certificates later.',
+                  style: ArtistTextStyles.caption.copyWith(fontSize: 10),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Header.
+  Widget _buildHeader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Verify Your Skills',
+          style: ArtistTextStyles.heading.copyWith(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          'Add your certificates to build trust and showcase your artistic expertise.',
+          style: ArtistTextStyles.body.copyWith(fontSize: 12, height: 1.4),
+        ),
+      ],
+    );
+  }
+
+  // Upload card.
+  Widget _buildUploadCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: ArtistColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: ArtistColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: ArtistColors.primary.withOpacity(0.035),
+            blurRadius: 9,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-
-      // ============================================================
-      // BODY
-      // ============================================================
-
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  8,
-                  20,
-                  25,
+      child: Column(
+        children: [
+          Container(
+            width: 66,
+            height: 66,
+            decoration: BoxDecoration(
+              color: ArtistColors.light,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(
+              Icons.workspace_premium_outlined,
+              color: ArtistColors.primary,
+              size: 34,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Upload Certificate',
+            style: ArtistTextStyles.title.copyWith(fontSize: 16),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Add a certificate to your artist profile',
+            textAlign: TextAlign.center,
+            style: ArtistTextStyles.caption.copyWith(fontSize: 10.5),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                _showMessage(
+                  'Certificate upload will be connected in the next phase.',
+                );
+              },
+              icon: const Icon(Icons.upload_rounded, size: 19),
+              label: Text(
+                'Choose Certificate',
+                style: ArtistTextStyles.button.copyWith(fontSize: 12.5),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ArtistColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
                 ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'PDF, JPG or PNG • Maximum 5 MB',
+            style: ArtistTextStyles.caption.copyWith(fontSize: 9.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Certificate information.
+  Widget _buildInformationSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Certificate Information',
+          style: ArtistTextStyles.title.copyWith(fontSize: 16),
+        ),
+        const SizedBox(height: 11),
+        _label('Certificate Name'),
+        const SizedBox(height: 5),
+        _textField(
+          controller: _titleController,
+          hint: 'Enter certificate name',
+          icon: Icons.badge_outlined,
+        ),
+        const SizedBox(height: 12),
+        _label('Issued By'),
+        const SizedBox(height: 5),
+        _textField(
+          controller: _organizationController,
+          hint: 'Enter organization / institute',
+          icon: Icons.business_outlined,
+        ),
+        const SizedBox(height: 12),
+        _label('Certificate Type'),
+        const SizedBox(height: 5),
+        _dropdownField(),
+        const SizedBox(height: 12),
+        _label('Year of Certification'),
+        const SizedBox(height: 5),
+        _textField(
+          controller: _yearController,
+          hint: 'e.g. 2025',
+          icon: Icons.calendar_today_outlined,
+          keyboardType: TextInputType.number,
+        ),
+      ],
+    );
+  }
+
+  // Preview.
+  Widget _buildPreviewSection() {
+    final title = _titleController.text.trim();
+    final organization = _organizationController.text.trim();
+    final year = _yearController.text.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Certificate Preview',
+          style: ArtistTextStyles.title.copyWith(fontSize: 16),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: ArtistColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: ArtistColors.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: ArtistColors.light,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(
+                  Icons.description_outlined,
+                  color: ArtistColors.primary,
+                  size: 27,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-
-                    // ==================================================
-                    // HEADER
-                    // ==================================================
-
                     Text(
-                      'Verify Your Skills',
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 23,
-                        fontWeight: FontWeight.w800,
+                      title.isEmpty ? 'Certificate Name' : title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ArtistTextStyles.bodyMedium.copyWith(
+                        fontSize: 12.5,
                       ),
                     ),
-
-                    const SizedBox(height: 6),
-
+                    const SizedBox(height: 3),
                     Text(
-                      'Add your certificates to build trust and showcase your artistic expertise.',
-                      style: TextStyle(
-                        color: mutedColor,
-                        fontSize: 13,
-                        height: 1.45,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      organization.isEmpty
+                          ? 'Issuing organization'
+                          : organization,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ArtistTextStyles.caption.copyWith(fontSize: 10),
                     ),
-
-                    const SizedBox(height: 22),
-
-                    // ==================================================
-                    // UPLOAD UI
-                    // ==================================================
-
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius:
-                        BorderRadius.circular(20),
-                        border: Border.all(
-                          color: borderColor,
-                          width: 1.2,
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.verified_outlined,
+                          color: ArtistColors.primary,
+                          size: 13,
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black
-                                .withValues(alpha: 0.03),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
+                        const SizedBox(width: 4),
+                        Text(
+                          year.isEmpty ? 'Year' : year,
+                          style: ArtistTextStyles.caption.copyWith(
+                            color: ArtistColors.primary,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w600,
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color:
-                              const Color(0xFFF0DED4),
-                              borderRadius:
-                              BorderRadius.circular(20),
-                            ),
-                            child: Icon(
-                              Icons.workspace_premium_outlined,
-                              color: primary,
-                              size: 37,
-                            ),
-                          ),
-
-                          const SizedBox(height: 15),
-
-                          Text(
-                            'Upload Certificate',
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-
-                          const SizedBox(height: 6),
-
-                          Text(
-                            'Add a certificate to your artist profile',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: mutedColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-
-                          const SizedBox(height: 17),
-
-                          InkWell(
-                            onTap: () =>
-                                _toast('Certificate upload'),
-                            borderRadius:
-                            BorderRadius.circular(13),
-                            child: Container(
-                              width: double.infinity,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: primary,
-                                borderRadius:
-                                BorderRadius.circular(13),
-                              ),
-                              child: const Row(
-                                mainAxisAlignment:
-                                MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.upload_rounded,
-                                    color: Colors.white,
-                                    size: 21,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Choose Certificate',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                      fontWeight:
-                                      FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          Text(
-                            'PDF, JPG or PNG • Maximum 5 MB',
-                            style: TextStyle(
-                              color: mutedColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // ==================================================
-                    // CERTIFICATE INFORMATION
-                    // ==================================================
-
-                    Text(
-                      'Certificate Information',
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-
-                    const SizedBox(height: 13),
-
-                    _label('Certificate Name'),
-
-                    const SizedBox(height: 6),
-
-                    _textField(
-                      controller: _titleController,
-                      hint: 'Enter certificate name',
-                      icon: Icons.badge_outlined,
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    _label('Issued By'),
-
-                    const SizedBox(height: 6),
-
-                    _textField(
-                      controller: _organizationController,
-                      hint: 'Enter organization / institute',
-                      icon: Icons.business_outlined,
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    _label('Certificate Type'),
-
-                    const SizedBox(height: 6),
-
-                    _dropdownField(),
-
-                    const SizedBox(height: 15),
-
-                    _label('Year of Certification'),
-
-                    const SizedBox(height: 6),
-
-                    _textField(
-                      controller: _yearController,
-                      hint: 'e.g. 2025',
-                      icon: Icons.calendar_today_outlined,
-                      keyboardType:
-                      TextInputType.number,
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // ==================================================
-                    // PREVIEW CARD
-                    // ==================================================
-
-                    Text(
-                      'Certificate Preview',
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius:
-                        BorderRadius.circular(17),
-                        border: Border.all(
-                          color: borderColor,
                         ),
-                      ),
-                      child: Row(
-                        children: [
+                        if (_selectedType != null) ...[
+                          const SizedBox(width: 8),
                           Container(
-                            width: 54,
-                            height: 54,
-                            decoration: BoxDecoration(
-                              color:
-                              const Color(0xFFF0DED4),
-                              borderRadius:
-                              BorderRadius.circular(14),
-                            ),
-                            child: Icon(
-                              Icons.description_outlined,
-                              color: primary,
-                              size: 28,
+                            width: 3,
+                            height: 3,
+                            decoration: const BoxDecoration(
+                              color: ArtistColors.textMuted,
+                              shape: BoxShape.circle,
                             ),
                           ),
-
-                          const SizedBox(width: 13),
-
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _titleController
-                                      .text.isEmpty
-                                      ? 'Certificate Name'
-                                      : _titleController.text,
-                                  maxLines: 1,
-                                  overflow:
-                                  TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: textColor,
-                                    fontSize: 13,
-                                    fontWeight:
-                                    FontWeight.w800,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 4),
-
-                                Text(
-                                  _organizationController
-                                      .text.isEmpty
-                                      ? 'Issuing organization'
-                                      : _organizationController.text,
-                                  maxLines: 1,
-                                  overflow:
-                                  TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: mutedColor,
-                                    fontSize: 11,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 4),
-
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.verified_outlined,
-                                      color: primary,
-                                      size: 13,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      _yearController
-                                          .text.isEmpty
-                                          ? 'Year'
-                                          : _yearController.text,
-                                      style: TextStyle(
-                                        color: primary,
-                                        fontSize: 10,
-                                        fontWeight:
-                                        FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          Icon(
-                            Icons.edit_outlined,
-                            color: mutedColor,
-                            size: 19,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 25),
-
-                    // ==================================================
-                    // VERIFICATION NOTE
-                    // ==================================================
-
-                    Container(
-                      padding: const EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0DED4),
-                        borderRadius:
-                        BorderRadius.circular(15),
-                      ),
-                      child: Row(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.info_outline_rounded,
-                            color: primary,
-                            size: 21,
-                          ),
-
-                          const SizedBox(width: 10),
-
-                          Expanded(
+                          const SizedBox(width: 7),
+                          Flexible(
                             child: Text(
-                              'Your certificate may be reviewed before it appears on your artist profile.',
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 11,
-                                height: 1.4,
-                                fontWeight:
-                                FontWeight.w500,
+                              _selectedType!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: ArtistTextStyles.caption.copyWith(
+                                fontSize: 9.5,
                               ),
                             ),
                           ),
                         ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 25),
-
-                    // ==================================================
-                    // SUBMIT BUTTON
-                    // ==================================================
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: _submitCertificate,
-                        style:
-                        ElevatedButton.styleFrom(
-                          backgroundColor: primary,
-                          elevation: 0,
-                          shape:
-                          RoundedRectangleBorder(
-                            borderRadius:
-                            BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: const Text(
-                          'Submit Certificate',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    Center(
-                      child: Text(
-                        'You can add more certificates later.',
-                        style: TextStyle(
-                          color: mutedColor,
-                          fontSize: 10,
-                        ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.edit_outlined,
+                color: ArtistColors.textMuted,
+                size: 18,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Verification note.
+  Widget _buildVerificationNote() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: ArtistColors.light,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            color: ArtistColors.primary,
+            size: 20,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              'Your certificate may be reviewed before it appears on your artist profile.',
+              style: ArtistTextStyles.body.copyWith(
+                color: ArtistColors.textPrimary,
+                fontSize: 10.5,
+                height: 1.4,
+              ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            // ========================================================
-            // BOTTOM NAVIGATION
-            // ========================================================
-
-            _bottomNavigation(),
-          ],
+  // Submit button.
+  Widget _buildSubmitButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton(
+        onPressed: _submitCertificate,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: ArtistColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Text(
+          'Submit Certificate',
+          style: ArtistTextStyles.button.copyWith(fontSize: 13),
         ),
       ),
     );
   }
 
-  // ================================================================
-  // LABEL
-  // ================================================================
-
+  // Field label.
   Widget _label(String text) {
-    return Text(
-      text,
-      style: TextStyle(
-        color: textColor,
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-      ),
-    );
+    return Text(text, style: ArtistTextStyles.label.copyWith(fontSize: 11.5));
   }
 
-  // ================================================================
-  // TEXT FIELD
-  // ================================================================
-
+  // Text field.
   Widget _textField({
     required TextEditingController controller,
     required String hint,
     required IconData icon,
-    TextInputType keyboardType =
-        TextInputType.text,
+    TextInputType keyboardType = TextInputType.text,
   }) {
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: borderColor,
-        ),
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: ArtistTextStyles.body.copyWith(
+        color: ArtistColors.textPrimary,
+        fontSize: 12.5,
       ),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        onChanged: (_) => setState(() {}),
-        style: TextStyle(
-          color: textColor,
-          fontSize: 13,
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: ArtistTextStyles.hint.copyWith(fontSize: 12),
+        prefixIcon: Icon(icon, color: ArtistColors.primary, size: 20),
+        filled: true,
+        fillColor: ArtistColors.surface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 13,
         ),
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          prefixIcon: Icon(
-            icon,
-            color: primary,
-            size: 21,
-          ),
-          hintText: hint,
-          hintStyle: TextStyle(
-            color: mutedColor.withValues(alpha: 0.75),
-            fontSize: 13,
-          ),
-          contentPadding:
-          const EdgeInsets.symmetric(
-            vertical: 16,
-          ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: ArtistColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: ArtistColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: ArtistColors.primary, width: 1.2),
         ),
       ),
     );
   }
 
-  // ================================================================
-  // DROPDOWN
-  // ================================================================
-
+  // Certificate dropdown.
   Widget _dropdownField() {
     return Container(
-      height: 52,
-      padding:
-      const EdgeInsets.symmetric(horizontal: 14),
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: borderColor,
-        ),
+        color: ArtistColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ArtistColors.border),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -919,39 +730,31 @@ class _CertificationState
           isExpanded: true,
           hint: Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.category_outlined,
-                color: primary,
-                size: 21,
+                color: ArtistColors.primary,
+                size: 20,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 11),
               Text(
                 'Select certificate type',
-                style: TextStyle(
-                  color:
-                  mutedColor.withValues(alpha: 0.75),
-                  fontSize: 13,
-                ),
+                style: ArtistTextStyles.hint.copyWith(fontSize: 12),
               ),
             ],
           ),
-          icon: Icon(
+          icon: const Icon(
             Icons.keyboard_arrow_down_rounded,
-            color: mutedColor,
+            color: ArtistColors.textSecondary,
           ),
-          dropdownColor: cardColor,
-          style: TextStyle(
-            color: textColor,
-            fontSize: 13,
+          dropdownColor: ArtistColors.surface,
+          style: ArtistTextStyles.body.copyWith(
+            color: ArtistColors.textPrimary,
+            fontSize: 12.5,
           ),
-          items: _certificateTypes
-              .map(
-                (type) => DropdownMenuItem<String>(
-              value: type,
-              child: Text(type),
-            ),
-          )
-              .toList(),
+          borderRadius: BorderRadius.circular(12),
+          items: _certificateTypes.map((type) {
+            return DropdownMenuItem<String>(value: type, child: Text(type));
+          }).toList(),
           onChanged: (value) {
             setState(() {
               _selectedType = value;
@@ -962,116 +765,27 @@ class _CertificationState
     );
   }
 
-  // ================================================================
-  // BOTTOM NAVIGATION
-  // ================================================================
-
-  Widget _bottomNavigation() {
-    return Container(
-      height: 76,
-      decoration: BoxDecoration(
-        color: cardColor,
-        border: Border(
-          top: BorderSide(
-            color: borderColor,
-            width: 1,
+  // Snackbar.
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: ArtistTextStyles.body.copyWith(
+              color: Colors.white,
+              fontSize: 11.5,
+            ),
+          ),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ArtistColors.accent,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(11),
           ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment:
-        MainAxisAlignment.spaceAround,
-        children: [
-          _navItem(
-            Icons.home_outlined,
-            'Dashboard',
-          ),
-
-          _navItem(
-            Icons.search_outlined,
-            'Materials',
-          ),
-
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: primary,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color:
-                  primary.withValues(alpha: 0.28),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: IconButton(
-              onPressed: () =>
-                  _toast('Add New Item'),
-              icon: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 28,
-              ),
-            ),
-          ),
-
-          _navItem(
-            Icons.receipt_long_outlined,
-            'Orders',
-          ),
-
-          _navItem(
-            Icons.person_outline_rounded,
-            'Profile',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItem(
-      IconData icon,
-      String label,
-      ) {
-    return InkWell(
-      onTap: () => _toast('$label clicked'),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: 5,
-        ),
-        child: Column(
-          mainAxisAlignment:
-          MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: mutedColor,
-              size: 22,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: mutedColor,
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+      );
   }
 }
