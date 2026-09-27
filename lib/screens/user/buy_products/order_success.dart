@@ -1,8 +1,13 @@
-import 'package:ecoloop/screens/user/buy_products/marketplace.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
+import '../../../widgets/bottom_navigation.dart';
+import '../profile/profile.dart';
+import '../sell_products/add_product.dart';
+import '../user_home.dart';
+import 'marketplace.dart';
+import 'orders.dart';
 
 class OrderSuccess extends StatefulWidget {
   final String? orderId;
@@ -34,6 +39,8 @@ class _OrderSuccessState extends State<OrderSuccess>
   late final Animation<double> _scaleAnimation;
   late final Animation<double> _fadeAnimation;
 
+  int _currentIndex = 0;
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +68,10 @@ class _OrderSuccessState extends State<OrderSuccess>
     _animationController.dispose();
     super.dispose();
   }
+
+  // ---------------------------------------------------------------------------
+  // HELPERS
+  // ---------------------------------------------------------------------------
 
   String get _displayOrderId {
     if (widget.orderId != null && widget.orderId!.trim().isNotEmpty) {
@@ -109,27 +120,84 @@ class _OrderSuccessState extends State<OrderSuccess>
     return parts.join(', ');
   }
 
-  void _continueShopping() {
-    Navigator.push(
+  // ---------------------------------------------------------------------------
+  // NAVIGATION
+  // ---------------------------------------------------------------------------
+
+  void _goToHome() {
+    Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => const Marketplace()),
+      MaterialPageRoute(builder: (_) => const UserHome()),
+      (route) => false,
     );
   }
 
   void _viewOrder() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Order details page will be connected next.'),
-        behavior: SnackBarBehavior.floating,
-      ),
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const Orders()),
     );
   }
+
+  void _continueShopping() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const Marketplace()),
+    );
+  }
+
+  void _onNavigationSelected(int index) {
+    if (index == 0) {
+      _goToHome();
+      return;
+    }
+
+    if (index == 1) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const Marketplace()),
+      );
+      return;
+    }
+
+    if (index == 2) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const Orders()),
+      );
+      return;
+    }
+
+    if (index == 3) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const Profile()),
+      );
+      return;
+    }
+
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
+  void _onAddProduct() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddProduct()),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // BUILD
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
+        bottom: false,
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: Column(
@@ -161,8 +229,17 @@ class _OrderSuccessState extends State<OrderSuccess>
           ),
         ),
       ),
+      bottomNavigationBar: UserBottomNavigation(
+        currentIndex: _currentIndex,
+        onItemSelected: _onNavigationSelected,
+        onAddProduct: _onAddProduct,
+      ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // TOP BAR
+  // ---------------------------------------------------------------------------
 
   Widget _buildTopBar() {
     return Padding(
@@ -170,11 +247,10 @@ class _OrderSuccessState extends State<OrderSuccess>
       child: Row(
         children: [
           IconButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            onPressed: _goToHome,
             icon: const Icon(Icons.close_rounded),
             color: AppColors.textPrimary,
+            tooltip: 'Go to Home',
           ),
           const SizedBox(width: 2),
           Expanded(
@@ -209,6 +285,10 @@ class _OrderSuccessState extends State<OrderSuccess>
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // SUCCESS ANIMATION
+  // ---------------------------------------------------------------------------
 
   Widget _buildSuccessAnimation() {
     return ScaleTransition(
@@ -266,6 +346,10 @@ class _OrderSuccessState extends State<OrderSuccess>
     return Icon(icon, color: AppColors.secondary, size: size);
   }
 
+  // ---------------------------------------------------------------------------
+  // SUCCESS MESSAGE
+  // ---------------------------------------------------------------------------
+
   Widget _buildSuccessMessage() {
     return Column(
       children: [
@@ -311,6 +395,10 @@ class _OrderSuccessState extends State<OrderSuccess>
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // ORDER CARD
+  // ---------------------------------------------------------------------------
+
   Widget _buildOrderCard() {
     return _sectionCard(
       child: Column(
@@ -349,6 +437,10 @@ class _OrderSuccessState extends State<OrderSuccess>
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // DELIVERY CARD
+  // ---------------------------------------------------------------------------
 
   Widget _buildDeliveryCard() {
     return _sectionCard(
@@ -419,6 +511,10 @@ class _OrderSuccessState extends State<OrderSuccess>
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // ECO MESSAGE
+  // ---------------------------------------------------------------------------
+
   Widget _buildEcoMessage() {
     return Container(
       width: double.infinity,
@@ -470,6 +566,10 @@ class _OrderSuccessState extends State<OrderSuccess>
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // ACTION BUTTONS
+  // ---------------------------------------------------------------------------
+
   Widget _buildActionButtons() {
     return Column(
       children: [
@@ -482,18 +582,23 @@ class _OrderSuccessState extends State<OrderSuccess>
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.receipt_long_outlined, size: 19),
-                SizedBox(width: 8),
+                const Icon(
+                  Icons.receipt_long_outlined,
+                  size: 19,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
                 Text(
                   'View Order',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  style: AppTextStyles.button.copyWith(fontSize: 15),
                 ),
               ],
             ),
@@ -512,14 +617,21 @@ class _OrderSuccessState extends State<OrderSuccess>
                 borderRadius: BorderRadius.circular(15),
               ),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.shopping_bag_outlined, size: 19),
-                SizedBox(width: 8),
+                const Icon(
+                  Icons.shopping_bag_outlined,
+                  size: 19,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
                 Text(
                   'Continue Shopping',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.primary,
+                    fontSize: 15,
+                  ),
                 ),
               ],
             ),
@@ -528,6 +640,10 @@ class _OrderSuccessState extends State<OrderSuccess>
       ],
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // COMMON SECTION CARD
+  // ---------------------------------------------------------------------------
 
   Widget _sectionCard({required Widget child}) {
     return Container(
@@ -542,6 +658,10 @@ class _OrderSuccessState extends State<OrderSuccess>
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // ICON BOX
+  // ---------------------------------------------------------------------------
+
   Widget _iconBox(IconData icon) {
     return Container(
       width: 42,
@@ -553,6 +673,10 @@ class _OrderSuccessState extends State<OrderSuccess>
       child: Icon(icon, color: AppColors.primary, size: 21),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // INFO ROW
+  // ---------------------------------------------------------------------------
 
   Widget _infoRow(
     String title,

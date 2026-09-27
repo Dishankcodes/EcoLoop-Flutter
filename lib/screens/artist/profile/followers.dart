@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import 'artist_profile.dart';
 
 class Followers extends StatefulWidget {
   const Followers({super.key});
@@ -21,6 +22,16 @@ class _FollowersState extends State<Followers> {
       'image':
           'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80',
       'following': true,
+
+      // Public Artist Profile data
+      'location': 'Ahmedabad, Gujarat',
+      'specialty': 'Upcycling & Home Decor',
+      'bio':
+          'Creative ReMaker passionate about turning unused materials into beautiful and meaningful products.',
+      'rating': 4.8,
+      'reviews': 24,
+      'sold': 36,
+      'verified': true,
     },
     {
       'name': 'Dishank Prajapati',
@@ -29,6 +40,15 @@ class _FollowersState extends State<Followers> {
       'image':
           'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&q=80',
       'following': true,
+
+      'location': 'Ahmedabad, Gujarat',
+      'specialty': 'Wood & Recycled Crafts',
+      'bio':
+          'ReMaker creating practical and sustainable products from reusable materials.',
+      'rating': 4.7,
+      'reviews': 18,
+      'sold': 28,
+      'verified': true,
     },
     {
       'name': 'Nivya Maniyar',
@@ -37,6 +57,15 @@ class _FollowersState extends State<Followers> {
       'image':
           'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80',
       'following': false,
+
+      'location': 'Ahmedabad, Gujarat',
+      'specialty': 'Art & Handmade Crafts',
+      'bio':
+          'Passionate creator transforming everyday materials into unique handmade artwork.',
+      'rating': 4.9,
+      'reviews': 31,
+      'sold': 42,
+      'verified': true,
     },
     {
       'name': 'Isha Mehta',
@@ -45,6 +74,15 @@ class _FollowersState extends State<Followers> {
       'image':
           'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80',
       'following': true,
+
+      'location': 'Ahmedabad, Gujarat',
+      'specialty': 'Fashion Upcycling',
+      'bio':
+          'Sustainable fashion creator focused on giving old fabrics a fresh new life.',
+      'rating': 4.6,
+      'reviews': 15,
+      'sold': 22,
+      'verified': true,
     },
     {
       'name': 'Kunal Joshi',
@@ -53,6 +91,15 @@ class _FollowersState extends State<Followers> {
       'image':
           'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80',
       'following': false,
+
+      'location': 'Ahmedabad, Gujarat',
+      'specialty': 'Woodwork & Furniture',
+      'bio':
+          'Maker creating functional furniture and decor using reclaimed wood.',
+      'rating': 4.5,
+      'reviews': 12,
+      'sold': 19,
+      'verified': true,
     },
     {
       'name': 'Nisha Patel',
@@ -61,6 +108,15 @@ class _FollowersState extends State<Followers> {
       'image':
           'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&q=80',
       'following': true,
+
+      'location': 'Ahmedabad, Gujarat',
+      'specialty': 'Paper & Decorative Crafts',
+      'bio':
+          'Creative ReMaker specialising in sustainable paper crafts and decorative pieces.',
+      'rating': 4.8,
+      'reviews': 20,
+      'sold': 27,
+      'verified': true,
     },
   ];
 
@@ -73,7 +129,6 @@ class _FollowersState extends State<Followers> {
 
     return _followers.where((follower) {
       final name = follower['name']?.toString().toLowerCase() ?? '';
-
       final username = follower['username']?.toString().toLowerCase() ?? '';
 
       return name.contains(query) || username.contains(query);
@@ -97,6 +152,17 @@ class _FollowersState extends State<Followers> {
     if (mounted) {
       setState(() {});
     }
+  }
+
+  // ============================================================
+  // OPEN PUBLIC ARTIST PROFILE
+  // ============================================================
+
+  void _openArtistProfile(Map<String, dynamic> follower) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ArtistProfile(artist: follower)),
+    );
   }
 
   @override
@@ -167,7 +233,10 @@ class _FollowersState extends State<Followers> {
     );
   }
 
-  // Page header.
+  // ============================================================
+  // HEADER
+  // ============================================================
+
   Widget _buildHeader() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -211,7 +280,10 @@ class _FollowersState extends State<Followers> {
     );
   }
 
-  // Follower summary.
+  // ============================================================
+  // FOLLOWER SUMMARY
+  // ============================================================
+
   Widget _buildFollowerSummary() {
     return Container(
       width: double.infinity,
@@ -292,7 +364,10 @@ class _FollowersState extends State<Followers> {
     );
   }
 
-  // Search field.
+  // ============================================================
+  // SEARCH
+  // ============================================================
+
   Widget _buildSearch() {
     return TextField(
       controller: _searchController,
@@ -342,7 +417,10 @@ class _FollowersState extends State<Followers> {
     );
   }
 
-  // Follower count.
+  // ============================================================
+  // FOLLOWER TITLE
+  // ============================================================
+
   Widget _buildFollowerTitle(int count) {
     return Row(
       children: [
@@ -366,7 +444,10 @@ class _FollowersState extends State<Followers> {
     );
   }
 
-  // Followers list.
+  // ============================================================
+  // FOLLOWER LIST
+  // ============================================================
+
   Widget _buildFollowerList(List<Map<String, dynamic>> followers) {
     return ListView.separated(
       shrinkWrap: true,
@@ -379,7 +460,10 @@ class _FollowersState extends State<Followers> {
     );
   }
 
-  // Follower card.
+  // ============================================================
+  // FOLLOWER CARD
+  // ============================================================
+
   Widget _buildFollowerCard(Map<String, dynamic> follower) {
     final bool isFollowing = follower['following'] == true;
 
@@ -391,70 +475,123 @@ class _FollowersState extends State<Followers> {
 
     final String image = follower['image']?.toString() ?? '';
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: ArtistColors.surface,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ArtistColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.025),
-            blurRadius: 7,
-            offset: const Offset(0, 2),
+
+        // ======================================================
+        // THIS OPENS THE PUBLIC ARTIST PROFILE
+        // ======================================================
+        onTap: () {
+          _openArtistProfile(follower);
+        },
+
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: ArtistColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: ArtistColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.025),
+                blurRadius: 7,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          _buildProfileImage(image, name),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: ArtistTextStyles.bodyMedium.copyWith(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  username,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: ArtistTextStyles.caption.copyWith(fontSize: 10),
-                ),
-                const SizedBox(height: 4),
-                Row(
+          child: Row(
+            children: [
+              _buildProfileImage(image, name),
+
+              const SizedBox(width: 11),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
-                      Icons.people_outline_rounded,
-                      color: ArtistColors.textMuted,
-                      size: 13,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: ArtistTextStyles.bodyMedium.copyWith(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 4),
+
+                        if (follower['verified'] == true)
+                          const Icon(
+                            Icons.verified_rounded,
+                            color: ArtistColors.primary,
+                            size: 14,
+                          ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
+
+                    const SizedBox(height: 2),
+
                     Text(
-                      followerCount,
-                      style: ArtistTextStyles.caption.copyWith(fontSize: 9.5),
+                      username,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ArtistTextStyles.caption.copyWith(fontSize: 10),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.people_outline_rounded,
+                          color: ArtistColors.textMuted,
+                          size: 13,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          followerCount,
+                          style: ArtistTextStyles.caption.copyWith(
+                            fontSize: 9.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // Keep button separate so tapping it does NOT
+              // open the artist profile.
+              _buildFollowButton(follower, isFollowing),
+
+              const SizedBox(width: 3),
+
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: ArtistColors.textMuted,
+                size: 20,
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          _buildFollowButton(follower, isFollowing),
-        ],
+        ),
       ),
     );
   }
 
-  // Profile image.
+  // ============================================================
+  // PROFILE IMAGE
+  // ============================================================
+
   Widget _buildProfileImage(String image, String name) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
@@ -472,7 +609,10 @@ class _FollowersState extends State<Followers> {
     );
   }
 
-  // Profile fallback.
+  // ============================================================
+  // PROFILE FALLBACK
+  // ============================================================
+
   Widget _profileFallback(String name) {
     final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'U';
 
@@ -493,13 +633,18 @@ class _FollowersState extends State<Followers> {
     );
   }
 
-  // Follow button.
+  // ============================================================
+  // FOLLOW BUTTON
+  // ============================================================
+
   Widget _buildFollowButton(Map<String, dynamic> follower, bool isFollowing) {
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
+
+        // Prevent the card's navigation from triggering.
         onTap: () {
           setState(() {
             follower['following'] = !isFollowing;
@@ -509,6 +654,7 @@ class _FollowersState extends State<Followers> {
 
           _showMessage(isFollowing ? 'Unfollowed $name' : 'Following $name');
         },
+
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
           decoration: BoxDecoration(
@@ -529,7 +675,10 @@ class _FollowersState extends State<Followers> {
     );
   }
 
-  // Empty state.
+  // ============================================================
+  // EMPTY STATE
+  // ============================================================
+
   Widget _buildEmptyState() {
     return Container(
       width: double.infinity,
@@ -554,19 +703,25 @@ class _FollowersState extends State<Followers> {
               size: 33,
             ),
           ),
+
           const SizedBox(height: 14),
+
           Text(
             'No followers found',
             style: ArtistTextStyles.title.copyWith(fontSize: 17),
           ),
+
           const SizedBox(height: 5),
+
           Text(
             'Try searching with a different name or username.',
             textAlign: TextAlign.center,
             style: ArtistTextStyles.body.copyWith(fontSize: 11.5),
           ),
+
           if (_searchController.text.isNotEmpty) ...[
             const SizedBox(height: 14),
+
             OutlinedButton(
               onPressed: () {
                 _searchController.clear();
@@ -596,7 +751,10 @@ class _FollowersState extends State<Followers> {
     );
   }
 
-  // More options.
+  // ============================================================
+  // MORE OPTIONS
+  // ============================================================
+
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
@@ -619,7 +777,9 @@ class _FollowersState extends State<Followers> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
+
                 const SizedBox(height: 17),
+
                 _buildMoreOption(
                   icon: Icons.people_outline_rounded,
                   title: 'Follower Overview',
@@ -628,6 +788,7 @@ class _FollowersState extends State<Followers> {
                     _showMessage('Follower overview is available here.');
                   },
                 ),
+
                 _buildMoreOption(
                   icon: Icons.refresh_rounded,
                   title: 'Refresh Followers',
@@ -645,7 +806,10 @@ class _FollowersState extends State<Followers> {
     );
   }
 
-  // More option.
+  // ============================================================
+  // MORE OPTION
+  // ============================================================
+
   Widget _buildMoreOption({
     required IconData icon,
     required String title,
@@ -677,7 +841,10 @@ class _FollowersState extends State<Followers> {
     );
   }
 
-  // Snackbar.
+  // ============================================================
+  // SNACKBAR
+  // ============================================================
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()

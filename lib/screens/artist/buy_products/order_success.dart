@@ -1,8 +1,14 @@
+import 'package:ecoloop/screens/artist/buy_products/buying_orders.dart';
 import 'package:ecoloop/screens/artist/buy_products/marketplace.dart';
+import 'package:ecoloop/screens/artist/profile/profile.dart';
+import 'package:ecoloop/widgets/artist_bottom_navigation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../artist_dashboard.dart';
+import '../my_products/add_product.dart';
+import '../my_products/selling_orders.dart';
 
 class OrderSuccess extends StatefulWidget {
   final String? orderId;
@@ -33,6 +39,8 @@ class _OrderSuccessState extends State<OrderSuccess>
   late final AnimationController _animationController;
   late final Animation<double> _scaleAnimation;
   late final Animation<double> _fadeAnimation;
+
+  int _currentIndex = 0;
 
   @override
   void initState() {
@@ -109,27 +117,84 @@ class _OrderSuccessState extends State<OrderSuccess>
     return parts.join(', ');
   }
 
-  void _continueShopping() {
-    Navigator.push(
+  // ---------------------------------------------------------------------------
+  // NAVIGATION
+  // ---------------------------------------------------------------------------
+
+  void _goToHome() {
+    Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => const Marketplace()),
+      MaterialPageRoute(builder: (_) => const ArtistHome()),
+      (route) => false,
     );
   }
 
-  void _viewOrder() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Order details page will be connected next.'),
-        behavior: SnackBarBehavior.floating,
-      ),
+  void _goToBuyingOrders() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const BuyingOrders()),
     );
   }
+
+  void _continueShopping() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const Marketplace()),
+    );
+  }
+
+  void _onNavigationSelected(int index) {
+    if (index == 0) {
+      _goToHome();
+      return;
+    }
+
+    if (index == 1) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const Marketplace()),
+      );
+      return;
+    }
+
+    if (index == 2) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const SellingOrders()),
+      );
+      return;
+    }
+
+    if (index == 3) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const Profile()),
+      );
+      return;
+    }
+
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
+  void _onAddProduct() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddProduct()),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // BUILD
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ArtistColors.background,
       body: SafeArea(
+        bottom: false,
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: Column(
@@ -161,6 +226,11 @@ class _OrderSuccessState extends State<OrderSuccess>
           ),
         ),
       ),
+      bottomNavigationBar: ArtistBottomNavigation(
+        currentIndex: _currentIndex,
+        onItemSelected: _onNavigationSelected,
+        onAddProduct: _onAddProduct,
+      ),
     );
   }
 
@@ -174,11 +244,10 @@ class _OrderSuccessState extends State<OrderSuccess>
       child: Row(
         children: [
           IconButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            onPressed: _goToHome,
             icon: const Icon(Icons.close_rounded),
             color: ArtistColors.textPrimary,
+            tooltip: 'Go to Home',
           ),
           const SizedBox(width: 2),
           Expanded(
@@ -512,11 +581,12 @@ class _OrderSuccessState extends State<OrderSuccess>
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
-            onPressed: _viewOrder,
+            onPressed: _goToBuyingOrders,
             style: ElevatedButton.styleFrom(
               backgroundColor: ArtistColors.primary,
               foregroundColor: Colors.white,
               elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
@@ -524,7 +594,11 @@ class _OrderSuccessState extends State<OrderSuccess>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.receipt_long_outlined, size: 19),
+                const Icon(
+                  Icons.receipt_long_outlined,
+                  size: 19,
+                  color: Colors.white,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'View Order',
@@ -550,7 +624,11 @@ class _OrderSuccessState extends State<OrderSuccess>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.shopping_bag_outlined, size: 19),
+                const Icon(
+                  Icons.shopping_bag_outlined,
+                  size: 19,
+                  color: ArtistColors.primary,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Continue Shopping',

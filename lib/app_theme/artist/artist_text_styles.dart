@@ -6,10 +6,10 @@ import 'artist_colors.dart';
 class ArtistTextStyles {
   ArtistTextStyles._();
 
-  // ============================================================
+  
   // HEADING
   // Used for splash / large page titles
-  // ============================================================
+  
 
   static TextStyle get heading => GoogleFonts.poppins(
     fontSize: 26,
@@ -18,9 +18,9 @@ class ArtistTextStyles {
     letterSpacing: 0.2,
   );
 
-  // ============================================================
+  
   // SECTION TITLES
-  // ============================================================
+  
 
   static TextStyle get title => GoogleFonts.poppins(
     fontSize: 20,
@@ -28,9 +28,9 @@ class ArtistTextStyles {
     color: ArtistColors.textPrimary,
   );
 
-  // ============================================================
+  
   // BODY TEXT
-  // ============================================================
+  
 
   static TextStyle get body => GoogleFonts.poppins(
     fontSize: 14,
@@ -39,27 +39,27 @@ class ArtistTextStyles {
     height: 1.5,
   );
 
-  // ============================================================
+  
   // SMALL / CAPTION TEXT
-  // ============================================================
+  
 
   static TextStyle get caption => GoogleFonts.poppins(
     fontSize: 12,
     color: ArtistColors.textSecondary.withOpacity(0.8),
   );
 
-  // ============================================================
+  
   // INPUT HINT TEXT
-  // ============================================================
+  
 
   static TextStyle get hint => GoogleFonts.poppins(
     fontSize: 14,
     color: ArtistColors.textSecondary.withOpacity(0.6),
   );
 
-  // ============================================================
+  
   // BUTTON TEXT
-  // ============================================================
+  
 
   static TextStyle get button => GoogleFonts.poppins(
     fontSize: 15,
@@ -68,12 +68,12 @@ class ArtistTextStyles {
     letterSpacing: 0.3,
   );
 
-  // ============================================================
+  
   // EXTRA STYLES
   //
   // These are useful for Artist pages while still following
   // exactly the same Poppins typography system.
-  // ============================================================
+  
 
   static TextStyle get label => GoogleFonts.poppins(
     fontSize: 14,

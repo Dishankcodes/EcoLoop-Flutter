@@ -283,7 +283,19 @@ class _PaymentState extends State<Payment> {
                         ),
                       );
                     },
-                    child: const Text('Done'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ArtistColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      'Done',
+                      style: ArtistTextStyles.button.copyWith(fontSize: 14.5),
+                    ),
                   ),
                 ),
               ],
@@ -1157,11 +1169,12 @@ class _PaymentState extends State<Payment> {
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
       decoration: BoxDecoration(
         color: ArtistColors.surface,
+        border: Border(top: BorderSide(color: ArtistColors.border, width: 0.8)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 15,
-            offset: const Offset(0, -4),
+            color: ArtistColors.textPrimary.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, -5),
           ),
         ],
       ),
@@ -1180,19 +1193,39 @@ class _PaymentState extends State<Payment> {
                     letterSpacing: 0.6,
                   ),
                 ),
+
                 const SizedBox(height: 2),
+
                 Text(
                   _formatIndianPrice(widget.totalAmount),
-                  style: ArtistTextStyles.title.copyWith(fontSize: 19),
+                  style: ArtistTextStyles.title.copyWith(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
+
             const SizedBox(width: 16),
+
             Expanded(
               child: SizedBox(
                 height: 52,
                 child: ElevatedButton(
                   onPressed: _isProcessing ? null : _payNow,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ArtistColors.primary,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: ArtistColors.primary.withValues(
+                      alpha: 0.55,
+                    ),
+                    disabledForegroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                   child: _isProcessing
                       ? const SizedBox(
                           width: 22,
@@ -1204,14 +1237,22 @@ class _PaymentState extends State<Payment> {
                         )
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               _selectedMethod == 'cod'
                                   ? 'Place Order'
                                   : 'Pay ${_formatPrice(widget.totalAmount)}',
+                              style: ArtistTextStyles.button.copyWith(
+                                fontSize: 14.5,
+                              ),
                             ),
-                            const SizedBox(width: 5),
-                            const Icon(Icons.arrow_forward_rounded, size: 19),
+                            const SizedBox(width: 7),
+                            const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 19,
+                              color: Colors.white,
+                            ),
                           ],
                         ),
                 ),

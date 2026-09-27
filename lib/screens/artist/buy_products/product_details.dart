@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../widgets/cart_popup.dart';
-import 'checkout.dart';
+import '../../artist/profile/artist_profile.dart';
 import '../../artist/reviews/product_reviews.dart';
 import '../../artist/reviews/write_review.dart';
+import 'checkout.dart';
 import 'seller_profile.dart';
 
 class ProductDetails extends StatefulWidget {
@@ -19,14 +20,20 @@ class ProductDetails extends StatefulWidget {
 
 class _ProductDetailsState extends State<ProductDetails> {
   late PageController _imageController;
+
   int _currentImage = 0;
   int _quantity = 1;
+
   bool _isWishlisted = false;
+
+  // LIFECYCLE
 
   @override
   void initState() {
     super.initState();
+
     _imageController = PageController();
+
     _isWishlisted =
         widget.product['isWishlisted'] == true ||
         widget.product['wishlisted'] == true;
@@ -38,7 +45,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     super.dispose();
   }
 
-  // Getters for product data parsing
+  // PRODUCT GETTERS
+
   String get productId =>
       widget.product['productId']?.toString() ??
       widget.product['id']?.toString() ??
@@ -49,7 +57,11 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   int get priceValue {
     final value = widget.product['price'];
-    if (value is num) return value.toInt();
+
+    if (value is num) {
+      return value.toInt();
+    }
+
     return _extractNumericPrice(value?.toString() ?? '2500');
   }
 
@@ -75,32 +87,52 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   int get availableQuantity {
     final value = widget.product['availableQuantity'];
-    if (value is num) return value.toInt();
+
+    if (value is num) {
+      return value.toInt();
+    }
+
     return int.tryParse(value?.toString() ?? '') ?? 5;
   }
 
   double get rating {
     final value = widget.product['rating'];
-    if (value is num) return value.toDouble();
+
+    if (value is num) {
+      return value.toDouble();
+    }
+
     return double.tryParse(value?.toString() ?? '') ?? 4.7;
   }
 
   int get reviewCount {
     final value =
         widget.product['reviewCount'] ?? widget.product['reviews'] ?? 42;
-    if (value is num) return value.toInt();
+
+    if (value is num) {
+      return value.toInt();
+    }
+
     return int.tryParse(value.toString()) ?? 42;
   }
 
   int get views {
     final value = widget.product['views'];
-    if (value is num) return value.toInt();
+
+    if (value is num) {
+      return value.toInt();
+    }
+
     return int.tryParse(value?.toString() ?? '') ?? 12;
   }
 
   int get wishlistCount {
     final value = widget.product['wishlistCount'];
-    if (value is num) return value.toInt();
+
+    if (value is num) {
+      return value.toInt();
+    }
+
     return int.tryParse(value?.toString() ?? '') ?? 4;
   }
 
@@ -109,27 +141,147 @@ class _ProductDetailsState extends State<ProductDetails> {
       widget.product['createdAt']?.toString() ??
       '28 Aug 2026';
 
-  // Parses image URLs from product map
+  // SELLER ROLE
+
+  String get sellerRole {
+    final rawRole =
+        widget.product['sellerRole'] ??
+        widget.product['seller_role'] ??
+        widget.product['role'] ??
+        widget.product['sellerType'] ??
+        widget.product['seller_type'];
+
+    return rawRole?.toString().trim().toLowerCase() ?? 'user';
+  }
+
+  bool get isArtistSeller {
+    return sellerRole == 'artist' ||
+        sellerRole == 'remaker' ||
+        sellerRole == 're_maker' ||
+        sellerRole == 're-maker';
+  }
+
+  bool get isUserSeller {
+    return !isArtistSeller;
+  }
+
+  // SELLER PROFILE DATA
+
+  Map<String, dynamic> get sellerProfileData {
+    final existingSellerData = widget.product['sellerData'];
+
+    if (existingSellerData is Map) {
+      return Map<String, dynamic>.from(existingSellerData);
+    }
+
+    final data = <String, dynamic>{
+      'name': seller,
+      'location': location,
+
+      // Role
+      'role': isArtistSeller ? 'artist' : 'user',
+
+      // Common profile data
+      'image':
+          widget.product['sellerImage'] ??
+          widget.product['seller_image'] ??
+          widget.product['sellerProfileImage'] ??
+          widget.product['seller_profile_image'],
+
+      'rating':
+          widget.product['sellerRating'] ?? widget.product['rating'] ?? '4.8',
+
+      'reviews':
+          widget.product['sellerReviews'] ?? widget.product['reviews'] ?? '42',
+
+      'listings':
+          widget.product['sellerListings'] ??
+          widget.product['listings'] ??
+          '127',
+
+      'sold': widget.product['sellerSold'] ?? widget.product['sold'] ?? '42',
+
+      'positive':
+          widget.product['sellerPositive'] ??
+          widget.product['positive'] ??
+          '98%',
+    };
+
+    // ARTIST-SPECIFIC DATA
+
+    if (isArtistSeller) {
+      data.addAll({
+        'username':
+            widget.product['sellerUsername'] ??
+            widget.product['seller_username'] ??
+            '@remaker',
+
+        'bio':
+            widget.product['sellerBio'] ??
+            widget.product['seller_bio'] ??
+            'Creative ReMaker creating sustainable and meaningful products from reusable materials.',
+
+        'specialty':
+            widget.product['sellerSpecialty'] ??
+            widget.product['seller_specialty'] ??
+            category,
+
+        'followers':
+            widget.product['sellerFollowers'] ??
+            widget.product['seller_followers'] ??
+            '0',
+
+        'works':
+            widget.product['sellerWorks'] ??
+            widget.product['seller_works'] ??
+            '0',
+
+        'verified':
+            widget.product['sellerVerified'] ??
+            widget.product['seller_verified'] ??
+            true,
+
+        'certified':
+            widget.product['sellerCertified'] ??
+            widget.product['seller_certified'] ??
+            true,
+      });
+    }
+
+    return data;
+  }
+
+  // IMAGES
+
   List<String> get images {
     final productImages = widget.product['images'];
+
     if (productImages is List && productImages.isNotEmpty) {
       final result = productImages
           .map((image) => image.toString())
           .where((image) => image.isNotEmpty)
           .toList();
-      if (result.isNotEmpty) return result;
+
+      if (result.isNotEmpty) {
+        return result;
+      }
     }
 
     final imageUrls = widget.product['imageUrls'];
+
     if (imageUrls is List && imageUrls.isNotEmpty) {
       final result = imageUrls
           .map((image) => image.toString())
           .where((image) => image.isNotEmpty)
           .toList();
-      if (result.isNotEmpty) return result;
+
+      if (result.isNotEmpty) {
+        return result;
+      }
     }
 
     final singleImage = widget.product['image']?.toString();
+
     if (singleImage != null && singleImage.isNotEmpty) {
       return [singleImage];
     }
@@ -141,6 +293,8 @@ class _ProductDetailsState extends State<ProductDetails> {
       'https://images.unsplash.com/photo-1593642532400-2682810df593?auto=format&fit=crop&w=1200&q=85',
     ];
   }
+
+  // BUILD
 
   @override
   Widget build(BuildContext context) {
@@ -175,7 +329,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // App bar with share and overflow options
+  // APP BAR
+
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: ArtistColors.surface,
@@ -210,7 +365,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Interactive gallery slider with image counter and wishlist toggle
+  // IMAGE GALLERY
+
   Widget _buildImageGallery() {
     return Container(
       color: ArtistColors.surface,
@@ -246,7 +402,10 @@ class _ProductDetailsState extends State<ProductDetails> {
                         );
                       },
                       loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
+                        if (progress == null) {
+                          return child;
+                        }
+
                         return Container(
                           color: ArtistColors.surfaceSoft,
                           child: const Center(
@@ -316,6 +475,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(images.length, (index) {
                   final selected = index == _currentImage;
+
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     margin: const EdgeInsets.symmetric(horizontal: 3),
@@ -336,7 +496,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Header showing condition/category tags, title, price, and stats
+  // PRODUCT HEADER
+
   Widget _buildProductHeader() {
     return _section(
       child: Column(
@@ -415,12 +576,13 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Availability banner showing stock level or unavailable state
   Widget _buildAvailabilityBanner() {
     final available = availableQuantity;
+
     final Color color = available <= 2
         ? ArtistColors.error
         : ArtistColors.success;
+
     final String message = available <= 0
         ? 'Currently unavailable'
         : available <= 2
@@ -456,7 +618,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Helper chip widget for category and condition tags
   Widget _buildTag(String text, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
@@ -481,8 +642,11 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Seller profile overview card
+  // SELLER SECTION
+
   Widget _buildSellerSection() {
+    final artistSeller = isArtistSeller;
+
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -490,7 +654,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           Row(
             children: [
               Text(
-                'Seller',
+                artistSeller ? 'ReMaker' : 'Seller',
                 style: ArtistTextStyles.title.copyWith(fontSize: 17),
               ),
               const Spacer(),
@@ -506,93 +670,108 @@ class _ProductDetailsState extends State<ProductDetails> {
               ),
             ],
           ),
+
           const SizedBox(height: 9),
-          InkWell(
-            onTap: _openSellerProfile,
+
+          // Entire seller card is tappable.
+          Material(
+            color: Colors.transparent,
             borderRadius: BorderRadius.circular(15),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: ArtistColors.background,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: ArtistColors.border),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: const BoxDecoration(
-                      color: ArtistColors.light,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      color: ArtistColors.primary,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                seller,
-                                overflow: TextOverflow.ellipsis,
-                                style: ArtistTextStyles.bodyMedium.copyWith(
-                                  fontSize: 14,
+            child: InkWell(
+              onTap: _openSellerProfile,
+              borderRadius: BorderRadius.circular(15),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: ArtistColors.background,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: ArtistColors.border),
+                ),
+                child: Row(
+                  children: [
+                    _buildSellerAvatar(),
+
+                    const SizedBox(width: 12),
+
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  seller,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: ArtistTextStyles.bodyMedium.copyWith(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 5),
-                            const Icon(
-                              Icons.verified_rounded,
-                              size: 16,
-                              color: ArtistColors.success,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              size: 14,
-                              color: Color(0xFFFFB300),
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              '4.8',
-                              style: ArtistTextStyles.bodyMedium.copyWith(
-                                fontSize: 11,
+                              const SizedBox(width: 5),
+
+                              Icon(
+                                artistSeller
+                                    ? Icons.verified_rounded
+                                    : Icons.verified_rounded,
+                                size: 16,
+                                color: artistSeller
+                                    ? ArtistColors.primary
+                                    : ArtistColors.success,
                               ),
-                            ),
-                            const SizedBox(width: 7),
-                            Text(
-                              '127 listings',
-                              style: ArtistTextStyles.caption,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Text('EcoLoop member', style: ArtistTextStyles.caption),
-                      ],
+                            ],
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                size: 14,
+                                color: Color(0xFFFFB300),
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                '4.8',
+                                style: ArtistTextStyles.bodyMedium.copyWith(
+                                  fontSize: 11,
+                                ),
+                              ),
+                              const SizedBox(width: 7),
+                              Text(
+                                artistSeller ? 'ReMaker' : '127 listings',
+                                style: ArtistTextStyles.caption,
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 3),
+
+                          Text(
+                            artistSeller
+                                ? 'Verified EcoLoop ReMaker'
+                                : 'EcoLoop member',
+                            style: ArtistTextStyles.caption,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 14,
-                    color: ArtistColors.textSecondary,
-                  ),
-                ],
+
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: ArtistColors.textSecondary,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
+
           const SizedBox(height: 12),
+
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
@@ -624,7 +803,74 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Item location indicator block
+  // SELLER AVATAR
+
+  Widget _buildSellerAvatar() {
+    final image = sellerProfileData['image']?.toString() ?? '';
+
+    if (image.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          image,
+          width: 52,
+          height: 52,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) {
+            return _sellerAvatarFallback();
+          },
+        ),
+      );
+    }
+
+    return _sellerAvatarFallback();
+  }
+
+  Widget _sellerAvatarFallback() {
+    final initial = seller.isNotEmpty
+        ? seller.substring(0, 1).toUpperCase()
+        : 'S';
+
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: const BoxDecoration(
+        color: ArtistColors.light,
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: ArtistTextStyles.heading.copyWith(
+            color: ArtistColors.primary,
+            fontSize: 21,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ROLE-BASED PROFILE NAVIGATION
+
+  void _openSellerProfile() {
+    final profileData = sellerProfileData;
+
+    if (isArtistSeller) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ArtistProfile(artist: profileData)),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SellerProfile(seller: profileData)),
+    );
+  }
+
+  // LOCATION
+
   Widget _buildLocationSection() {
     return _section(
       child: InkWell(
@@ -671,7 +917,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Product description section
+  // DESCRIPTION
+
   Widget _buildDescriptionSection() {
     return _section(
       child: Column(
@@ -719,7 +966,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Key product specifications list
+  // ITEM INFORMATION
+
   Widget _buildItemInformation() {
     return _section(
       child: Column(
@@ -748,7 +996,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Single specification key-value row
   Widget _infoRow(IconData icon, String title, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
@@ -770,7 +1017,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Customer reviews section
+  // REVIEWS
+
   Widget _buildReviewsSection() {
     return _section(
       child: Column(
@@ -843,7 +1091,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Rating breakdown box
   Widget _buildRatingSummary() {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -893,7 +1140,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Individual progress bar for rating breakdown
   Widget _ratingBar(int number, double percentage) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -924,7 +1170,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Review card widget
   Widget _buildReviewCard({
     required String name,
     required int rating,
@@ -1024,7 +1269,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // EcoLoop buyer advantages list
+  // ECOLOOP INFO
+
   Widget _buildEcoLoopInfo() {
     return _section(
       child: Column(
@@ -1060,7 +1306,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Individual benefit item row
   Widget _benefitRow(IconData icon, String title, String subtitle) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 17),
@@ -1101,7 +1346,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Similar products horizontal list section
+  // SIMILAR PRODUCTS
+
   Widget _buildSimilarProducts() {
     final products = _similarProducts;
 
@@ -1155,7 +1401,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Similar product card widget
   Widget _buildSimilarProductCard(Map<String, dynamic> product) {
     return GestureDetector(
       onTap: () {
@@ -1231,7 +1476,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Mock similar products listing
   List<Map<String, dynamic>> get _similarProducts {
     return [
       {
@@ -1241,6 +1485,7 @@ class _ProductDetailsState extends State<ProductDetails> {
         'condition': 'Good',
         'category': category,
         'seller': 'Amit K.',
+        'sellerRole': 'user',
         'location': 'Ahmedabad, Gujarat',
         'availableQuantity': 3,
         'image':
@@ -1253,6 +1498,7 @@ class _ProductDetailsState extends State<ProductDetails> {
         'condition': 'Used',
         'category': category,
         'seller': 'Neha P.',
+        'sellerRole': 'user',
         'location': 'Ahmedabad, Gujarat',
         'availableQuantity': 2,
         'image':
@@ -1260,11 +1506,12 @@ class _ProductDetailsState extends State<ProductDetails> {
       },
       {
         'id': 'similar_3',
-        'title': 'Office Chair',
+        'title': 'Upcycled Office Chair',
         'price': 3500,
         'condition': 'Good',
         'category': category,
-        'seller': 'Vivek R.',
+        'seller': 'Vivek ReMaker',
+        'sellerRole': 'artist',
         'location': 'Gandhinagar, Gujarat',
         'availableQuantity': 4,
         'image':
@@ -1272,11 +1519,12 @@ class _ProductDetailsState extends State<ProductDetails> {
       },
       {
         'id': 'similar_4',
-        'title': 'Computer Desk',
+        'title': 'Reclaimed Computer Desk',
         'price': 2900,
         'condition': 'Good',
         'category': category,
-        'seller': 'Rahul M.',
+        'seller': 'Rahul ReMaker',
+        'sellerRole': 'artist',
         'location': 'Ahmedabad, Gujarat',
         'availableQuantity': 2,
         'image':
@@ -1285,7 +1533,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     ];
   }
 
-  // Bottom action bar containing quantity controls, add to cart, and buy now
+  // BOTTOM BAR
+
   Widget _buildBottomBar() {
     return Positioned(
       left: 0,
@@ -1417,7 +1666,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Increases quantity while respecting max available quantity
+  // QUANTITY
+
   void _increaseQuantity() {
     if (_quantity < availableQuantity) {
       setState(() {
@@ -1430,7 +1680,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
   }
 
-  // Adds active product selection into shopping cart
+  // CART
+
   void _addToCart() {
     if (availableQuantity <= 0) {
       _showMessage('This product is currently unavailable.');
@@ -1438,22 +1689,27 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
 
     final cartProduct = Map<String, dynamic>.from(widget.product);
+
     cartProduct['id'] =
         widget.product['productId'] ?? widget.product['id'] ?? productId;
+
     cartProduct['productId'] =
         widget.product['productId'] ?? widget.product['id'] ?? productId;
+
     cartProduct['title'] = title;
     cartProduct['price'] = priceValue;
     cartProduct['quantity'] = _quantity;
     cartProduct['condition'] = condition;
     cartProduct['category'] = category;
     cartProduct['seller'] = seller;
+    cartProduct['sellerRole'] = sellerRole;
     cartProduct['location'] = location;
     cartProduct['availableQuantity'] = availableQuantity;
 
     if (!cartProduct.containsKey('image') && images.isNotEmpty) {
       cartProduct['image'] = images.first;
     }
+
     if (!cartProduct.containsKey('images')) {
       cartProduct['images'] = images;
     }
@@ -1461,7 +1717,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     CartPopup.addItem(context, item: cartProduct);
   }
 
-  // Navigates directly to checkout flow
+  // BUY NOW
+
   void _buyNow() {
     if (availableQuantity <= 0) {
       _showMessage('This product is currently unavailable.');
@@ -1476,7 +1733,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Toggles item wishlist state
+  // WISHLIST
+
   void _toggleWishlist() {
     setState(() {
       _isWishlisted = !_isWishlisted;
@@ -1487,27 +1745,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Navigates to seller profile
-  void _openSellerProfile() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => SellerProfile(
-          seller: {
-            'name': seller,
-            'location': location,
-            'rating': '4.8',
-            'reviews': '42',
-            'listings': '127',
-            'sold': '42',
-            'positive': '98%',
-          },
-        ),
-      ),
-    );
-  }
+  // REVIEWS
 
-  // Opens all reviews screen
   void _openAllReviews() {
     Navigator.push(
       context,
@@ -1517,7 +1756,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Opens write review form
   void _writeReview() {
     Navigator.push(
       context,
@@ -1525,12 +1763,14 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Triggers share action
+  // SHARE
+
   void _shareProduct() {
     _showMessage('Product sharing will be connected later.');
   }
 
-  // Displays overflow options bottom sheet
+  // MORE OPTIONS
+
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
@@ -1567,6 +1807,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   ),
                   onTap: () {
                     Navigator.pop(sheetContext);
+
                     if (!_isWishlisted) {
                       _toggleWishlist();
                     }
@@ -1624,7 +1865,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Report button component
+  // REPORT
+
   Widget _buildReportSection() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 15, 20, 10),
@@ -1657,7 +1899,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Displays report choices modal sheet
   void _reportProduct() {
     showModalBottomSheet(
       context: context,
@@ -1718,7 +1959,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Option list tile builder for report modal
   Widget _reportOption(String title, IconData icon, BuildContext sheetContext) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 0),
@@ -1739,29 +1979,38 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // Extracts numeric integer price value from string
+  // PRICE HELPERS
+
   int _extractNumericPrice(String value) {
     final cleaned = value.replaceAll('₹', '').replaceAll(',', '').trim();
+
     return int.tryParse(cleaned) ?? 0;
   }
 
-  // Formats price integer into comma-separated string
   String _formatPrice(int value) {
     final valueString = value.toString();
-    if (valueString.length <= 3) return valueString;
+
+    if (valueString.length <= 3) {
+      return valueString;
+    }
 
     final buffer = StringBuffer();
+
     for (int i = 0; i < valueString.length; i++) {
       final position = valueString.length - i;
+
       buffer.write(valueString[i]);
+
       if (position > 1 && position % 3 == 1) {
         buffer.write(',');
       }
     }
+
     return buffer.toString();
   }
 
-  // Shows floating feedback snackbar banner
+  // SNACKBAR
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -1779,7 +2028,8 @@ class _ProductDetailsState extends State<ProductDetails> {
       );
   }
 
-  // Wrapper container for main white surface sections
+  // SECTION WRAPPER
+
   Widget _section({required Widget child}) {
     return Container(
       width: double.infinity,
