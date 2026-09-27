@@ -16,7 +16,6 @@ class _AddressListState extends State<AddressList> {
   //
   // This is only for the UI phase.
   // Backend/API integration will replace this later.
-  //
 
   final List<AddressItem> _addresses = [
     AddressItem(
@@ -57,9 +56,6 @@ class _AddressListState extends State<AddressList> {
       MaterialPageRoute(builder: (_) => const AddAddress()),
     );
 
-    // UI-only.
-    //
-    // Later this will refresh the address list from the backend.
     if (!mounted) return;
 
     if (result == true) {
@@ -75,9 +71,6 @@ class _AddressListState extends State<AddressList> {
       MaterialPageRoute(builder: (_) => AddAddress(address: address.toMap())),
     );
 
-    // UI-only.
-    //
-    // Later this will update the address through the backend.
     if (!mounted) return;
 
     if (result == true) {
@@ -98,7 +91,7 @@ class _AddressListState extends State<AddressList> {
           ),
           title: Text(
             'Delete Address?',
-            style: AppTextStyles.heading.copyWith(color: AppColors.textPrimary),
+            style: AppTextStyles.title.copyWith(color: AppColors.textPrimary),
           ),
           content: Text(
             'Are you sure you want to remove this saved address?',
@@ -177,24 +170,21 @@ class _AddressListState extends State<AddressList> {
 
       // APP BAR
       appBar: AppBar(
-        backgroundColor: AppColors.background,
         elevation: 0,
-        centerTitle: false,
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
 
         leading: IconButton(
           onPressed: () {
             Navigator.pop(context);
           },
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: AppColors.textPrimary,
-            size: 20,
-          ),
+          icon: const Icon(Icons.arrow_back_rounded),
         ),
 
+        // Same sizing style as Settings
         title: Text(
           'My Addresses',
-          style: AppTextStyles.heading.copyWith(color: AppColors.textPrimary),
+          style: AppTextStyles.title.copyWith(color: AppColors.textPrimary),
         ),
       ),
 
@@ -207,25 +197,25 @@ class _AddressListState extends State<AddressList> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // =========================================================
                     // HEADER
                     Text(
                       'Saved addresses',
                       style: AppTextStyles.title.copyWith(
                         color: AppColors.textPrimary,
+                        fontSize: 16,
                       ),
                     ),
 
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 5),
 
                     Text(
                       'Manage your delivery addresses for a faster checkout.',
-                      style: AppTextStyles.body.copyWith(
+                      style: AppTextStyles.caption.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
 
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 20),
 
                     // ADDRESS CARDS
                     ..._addresses.map(
@@ -371,9 +361,7 @@ class _AddressCard extends StatelessWidget {
 
       decoration: BoxDecoration(
         color: AppColors.surface,
-
         borderRadius: BorderRadius.circular(18),
-
         border: Border.all(
           color: address.isDefault ? AppColors.primary : AppColors.light,
           width: address.isDefault ? 1.4 : 1,
@@ -383,25 +371,18 @@ class _AddressCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // -------------------------------------------------------------------
           // TOP ROW
-          // -------------------------------------------------------------------
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ---------------------------------------------------------------
               // ADDRESS TYPE ICON
-              // ---------------------------------------------------------------
               Container(
                 width: 44,
                 height: 44,
-
                 decoration: BoxDecoration(
                   color: AppColors.light,
-
                   borderRadius: BorderRadius.circular(13),
                 ),
-
                 child: Icon(
                   _getAddressIcon(address.type),
                   color: AppColors.primary,
@@ -411,9 +392,7 @@ class _AddressCard extends StatelessWidget {
 
               const SizedBox(width: 12),
 
-              // ---------------------------------------------------------------
               // NAME + TYPE
-              // ---------------------------------------------------------------
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -425,8 +404,13 @@ class _AddressCard extends StatelessWidget {
                             address.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.heading.copyWith(
+
+                            // CHANGED:
+                            // Smaller than heading
+                            // to match Settings.
+                            style: AppTextStyles.body.copyWith(
                               color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
@@ -437,7 +421,7 @@ class _AddressCard extends StatelessWidget {
                       ],
                     ),
 
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 4),
 
                     Text(
                       address.phone,
@@ -449,15 +433,14 @@ class _AddressCard extends StatelessWidget {
                 ),
               ),
 
-              // ---------------------------------------------------------------
               // MORE MENU
-              // ---------------------------------------------------------------
               PopupMenuButton<String>(
                 color: AppColors.surface,
 
-                icon: Icon(
+                icon: const Icon(
                   Icons.more_vert_rounded,
                   color: AppColors.textSecondary,
+                  size: 21,
                 ),
 
                 shape: RoundedRectangleBorder(
@@ -554,16 +537,12 @@ class _AddressCard extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // -------------------------------------------------------------------
           // DIVIDER
-          // -------------------------------------------------------------------
           Container(height: 1, color: AppColors.light),
 
           const SizedBox(height: 15),
 
-          // -------------------------------------------------------------------
           // FULL ADDRESS
-          // -------------------------------------------------------------------
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -589,9 +568,7 @@ class _AddressCard extends StatelessWidget {
 
           const SizedBox(height: 15),
 
-          // -------------------------------------------------------------------
           // DEFAULT BADGE
-          // -------------------------------------------------------------------
           if (address.isDefault)
             Row(
               children: [
@@ -660,13 +637,11 @@ class _AddressTypeBadge extends StatelessWidget {
 
       decoration: BoxDecoration(
         color: AppColors.light,
-
         borderRadius: BorderRadius.circular(8),
       ),
 
       child: Text(
         type,
-
         style: AppTextStyles.caption.copyWith(
           color: AppColors.primary,
           fontWeight: FontWeight.w600,
@@ -693,16 +668,13 @@ class _EmptyAddressState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
 
           children: [
-            // -----------------------------------------------------------------
             // ICON
-            // -----------------------------------------------------------------
             Container(
               width: 82,
               height: 82,
 
               decoration: BoxDecoration(
                 color: AppColors.light,
-
                 shape: BoxShape.circle,
               ),
 
@@ -715,9 +687,7 @@ class _EmptyAddressState extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // -----------------------------------------------------------------
             // TITLE
-            // -----------------------------------------------------------------
             Text(
               'No saved addresses',
               textAlign: TextAlign.center,
@@ -727,9 +697,7 @@ class _EmptyAddressState extends StatelessWidget {
 
             const SizedBox(height: 8),
 
-            // -----------------------------------------------------------------
             // DESCRIPTION
-            // -----------------------------------------------------------------
             Text(
               'Add your first delivery address to make checkout faster and easier.',
               textAlign: TextAlign.center,

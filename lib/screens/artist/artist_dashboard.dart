@@ -7,7 +7,8 @@ import 'buy_products/marketplace.dart';
 import 'my_products/add_product.dart';
 import 'my_products/selling_orders.dart';
 
-/// Artist dashboard screen displaying store analytics, quick action shortcuts, recent orders, and top products.
+/// Artist dashboard screen displaying store analytics,
+/// quick action shortcuts, recent orders, and top products.
 class ArtistHome extends StatefulWidget {
   const ArtistHome({super.key});
 
@@ -147,24 +148,29 @@ class _ArtistHomeState extends State<ArtistHome> {
           MaterialPageRoute(builder: (_) => const AddProduct()),
         );
         break;
+
       case 'marketplace':
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const Marketplace()),
         );
         break;
+
       case 'orders':
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const SellingOrders()),
         );
         break;
+
       case 'earnings':
         _showMessage('Earnings section will be connected later.');
         break;
+
       case 'products':
         _showMessage('My Products will be connected later.');
         break;
+
       case 'reviews':
         _showMessage('Reviews will be connected later.');
         break;
@@ -196,15 +202,25 @@ class _ArtistHomeState extends State<ArtistHome> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildHeader(),
+
                       const SizedBox(height: 22),
+
                       _buildEarningsCard(),
+
                       const SizedBox(height: 18),
+
                       _buildStats(isWide),
+
                       const SizedBox(height: 30),
+
                       _buildSectionHeader('Quick Actions', 'Manage your store'),
+
                       const SizedBox(height: 12),
+
                       _buildQuickActions(isWide),
+
                       const SizedBox(height: 30),
+
                       _buildSectionHeader(
                         'Recent Orders',
                         'View all',
@@ -217,9 +233,13 @@ class _ArtistHomeState extends State<ArtistHome> {
                           );
                         },
                       ),
+
                       const SizedBox(height: 12),
+
                       _buildRecentOrders(),
+
                       const SizedBox(height: 30),
+
                       _buildSectionHeader(
                         'Top Performing Products',
                         'View all',
@@ -227,12 +247,19 @@ class _ArtistHomeState extends State<ArtistHome> {
                           _showMessage('My Products will be connected later.');
                         },
                       ),
+
                       const SizedBox(height: 12),
+
                       _buildTopProducts(),
+
                       const SizedBox(height: 30),
+
                       _buildSectionHeader('Performance Overview', 'This Month'),
+
                       const SizedBox(height: 12),
+
                       _buildPerformanceCard(),
+
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -263,7 +290,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                   letterSpacing: -0.5,
                 ),
               ),
+
               const SizedBox(height: 5),
+
               Text(
                 'Here is what is happening with your store.',
                 style: ArtistTextStyles.caption.copyWith(fontSize: 12.5),
@@ -271,7 +300,9 @@ class _ArtistHomeState extends State<ArtistHome> {
             ],
           ),
         ),
+
         const SizedBox(width: 12),
+
         const ArtistMoreMenu(),
       ],
     );
@@ -316,7 +347,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                       fontSize: 13,
                     ),
                   ),
+
                   const SizedBox(height: 7),
+
                   Text(
                     '₹24,850',
                     style: ArtistTextStyles.heading.copyWith(
@@ -325,7 +358,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                       letterSpacing: -1,
                     ),
                   ),
+
                   const SizedBox(height: 8),
+
                   Row(
                     children: [
                       Container(
@@ -345,14 +380,18 @@ class _ArtistHomeState extends State<ArtistHome> {
                           ),
                         ),
                       ),
+
                       const SizedBox(width: 8),
+
                       Text('from last month', style: ArtistTextStyles.caption),
                     ],
                   ),
                 ],
               ),
             ),
+
             const SizedBox(width: 16),
+
             Container(
               width: 60,
               height: 60,
@@ -413,6 +452,10 @@ class _ArtistHomeState extends State<ArtistHome> {
   }
 
   /// Helper widget rendering individual stat metric cards.
+  ///
+  /// FIX:
+  /// The card now has a finite height so that the Spacer()
+  /// inside the Column has a finite amount of remaining space.
   Widget _buildStatCard(Map<String, dynamic> stat) {
     return InkWell(
       onTap: () {
@@ -420,12 +463,17 @@ class _ArtistHomeState extends State<ArtistHome> {
       },
       borderRadius: BorderRadius.circular(17),
       child: Container(
+        // FIXED HEIGHT
+        height: 112,
+
         padding: const EdgeInsets.all(13),
+
         decoration: BoxDecoration(
           color: ArtistColors.surface,
           borderRadius: BorderRadius.circular(17),
           border: Border.all(color: ArtistColors.border),
         ),
+
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -442,7 +490,11 @@ class _ArtistHomeState extends State<ArtistHome> {
                 color: ArtistColors.primary,
               ),
             ),
+
+            // This is now safe because the parent
+            // Container has a finite height.
             const Spacer(),
+
             Text(
               stat['value'] as String,
               style: ArtistTextStyles.title.copyWith(
@@ -451,7 +503,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                 color: ArtistColors.primary,
               ),
             ),
+
             const SizedBox(height: 2),
+
             Text(
               stat['title'] as String,
               maxLines: 1,
@@ -484,6 +538,7 @@ class _ArtistHomeState extends State<ArtistHome> {
             ),
           ),
         ),
+
         if (onTap != null)
           InkWell(
             onTap: onTap,
@@ -567,7 +622,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                 size: 20,
               ),
             ),
+
             const SizedBox(height: 6),
+
             Flexible(
               child: Text(
                 action['title'] as String,
@@ -599,13 +656,14 @@ class _ArtistHomeState extends State<ArtistHome> {
       child: Column(
         children: List.generate(_recentOrders.length, (index) {
           final order = _recentOrders[index];
+
           return _buildOrderItem(order, index == _recentOrders.length - 1);
         }),
       ),
     );
   }
 
-  /// Helper row widget for individual order items inside recent orders list.
+  /// Helper row widget for individual order items.
   Widget _buildOrderItem(Map<String, dynamic> order, bool isLast) {
     return InkWell(
       onTap: () {
@@ -630,7 +688,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                     size: 22,
                   ),
                 ),
+
                 const SizedBox(width: 12),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -643,7 +703,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+
                       const SizedBox(height: 3),
+
                       Text(
                         '${order['id']} • ${order['customer']}',
                         maxLines: 1,
@@ -653,7 +715,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                     ],
                   ),
                 ),
+
                 const SizedBox(width: 8),
+
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -664,12 +728,15 @@ class _ArtistHomeState extends State<ArtistHome> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+
                     const SizedBox(height: 5),
+
                     _buildStatusBadge(order['status'] as String),
                   ],
                 ),
               ],
             ),
+
             if (!isLast) ...[
               const SizedBox(height: 14),
               Divider(height: 1, color: ArtistColors.border),
@@ -705,14 +772,19 @@ class _ArtistHomeState extends State<ArtistHome> {
     switch (status) {
       case 'Pending':
         return ArtistColors.warning;
+
       case 'Confirmed':
         return ArtistColors.info;
+
       case 'Processing':
         return ArtistColors.primary;
+
       case 'Completed':
         return ArtistColors.success;
+
       case 'Cancelled':
         return ArtistColors.error;
+
       default:
         return ArtistColors.textSecondary;
     }
@@ -765,7 +837,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                 color: ArtistColors.primary,
               ),
             ),
+
             const SizedBox(height: 8),
+
             Text(
               product['name'] as String,
               maxLines: 1,
@@ -774,9 +848,13 @@ class _ArtistHomeState extends State<ArtistHome> {
                 fontWeight: FontWeight.w600,
               ),
             ),
+
             const SizedBox(height: 2),
+
             Text(product['category'] as String, style: ArtistTextStyles.small),
+
             const Spacer(),
+
             Row(
               children: [
                 Text(
@@ -786,7 +864,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+
                 const Spacer(),
+
                 Text(
                   product['sold'] as String,
                   style: ArtistTextStyles.small.copyWith(
@@ -829,7 +909,9 @@ class _ArtistHomeState extends State<ArtistHome> {
                         color: ArtistColors.primary,
                       ),
                     ),
+
                     const SizedBox(height: 3),
+
                     Text(
                       'Total earnings this month',
                       style: ArtistTextStyles.small,
@@ -837,6 +919,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                   ],
                 ),
               ),
+
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
                 decoration: BoxDecoration(
@@ -853,13 +936,17 @@ class _ArtistHomeState extends State<ArtistHome> {
               ),
             ],
           ),
+
           const SizedBox(height: 20),
+
           SizedBox(
             height: 115,
             width: double.infinity,
             child: CustomPaint(painter: _PerformanceChartPainter()),
           ),
+
           const SizedBox(height: 8),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']
@@ -893,6 +980,7 @@ class _PerformanceChartPainter extends CustomPainter {
 
     for (int i = 1; i <= 3; i++) {
       final double y = size.height * i / 4;
+
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
 
@@ -918,6 +1006,7 @@ class _PerformanceChartPainter extends CustomPainter {
       ..close();
 
     canvas.drawPath(fillPath, fillPaint);
+
     canvas.drawPath(linePath, linePaint);
 
     final Paint pointPaint = Paint()

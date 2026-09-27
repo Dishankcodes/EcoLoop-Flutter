@@ -5,6 +5,7 @@ import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/artist_more_menu.dart';
 import '../../welcome_screen.dart';
+import 'edit_profile.dart';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});
@@ -14,9 +15,7 @@ class Profile extends StatelessWidget {
     return Scaffold(
       backgroundColor: ArtistColors.background,
 
-      // ==========================================================
       // APP BAR
-      // ==========================================================
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: ArtistColors.background,
@@ -26,9 +25,7 @@ class Profile extends StatelessWidget {
         actions: const [ArtistMoreMenu(), SizedBox(width: 8)],
       ),
 
-      // ==========================================================
       // BODY
-      // ==========================================================
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -83,9 +80,7 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ==========================================================
   // PROFILE HEADER
-  // ==========================================================
 
   Widget _buildProfileHeader(BuildContext context) {
     return Container(
@@ -105,9 +100,7 @@ class Profile extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // ------------------------------------------------------
           // PROFILE IMAGE
-          // ------------------------------------------------------
           Container(
             width: 92,
             height: 92,
@@ -128,9 +121,7 @@ class Profile extends StatelessWidget {
 
           const SizedBox(height: 13),
 
-          // ------------------------------------------------------
           // NAME
-          // ------------------------------------------------------
           Text(
             'Creative Studio',
             textAlign: TextAlign.center,
@@ -146,9 +137,7 @@ class Profile extends StatelessWidget {
 
           const SizedBox(height: 6),
 
-          // ------------------------------------------------------
           // ARTIST BADGE
-          // ------------------------------------------------------
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -172,9 +161,7 @@ class Profile extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          // ------------------------------------------------------
           // LOCATION
-          // ------------------------------------------------------
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -192,15 +179,16 @@ class Profile extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // ------------------------------------------------------
           // ACTION BUTTONS
-          // ------------------------------------------------------
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               OutlinedButton.icon(
                 onPressed: () {
-                  _showComingSoon(context, 'Edit Profile');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const EditProfile()),
+                  );
                 },
                 icon: const Icon(Icons.edit_outlined, size: 17),
                 label: Text(
@@ -256,9 +244,7 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ==========================================================
   // QUICK STATS
-  // ==========================================================
 
   Widget _buildQuickStats(BuildContext context) {
     return Row(
@@ -316,17 +302,13 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ==========================================================
   // ARTIST INFORMATION
-  // ==========================================================
 
   Widget _buildArtistInformation(BuildContext context) {
     return _ProfileSection(
       title: 'Artist Information',
       children: [
-        // ------------------------------------------------------
         // BIO
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.person_outline_rounded,
           title: 'About',
@@ -339,9 +321,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
-        // ------------------------------------------------------
         // SKILLS
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.handyman_outlined,
           title: 'Skills',
@@ -353,9 +333,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
-        // ------------------------------------------------------
         // EXPERIENCE
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.workspace_premium_outlined,
           title: 'Experience',
@@ -367,9 +345,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
-        // ------------------------------------------------------
         // LOCATION
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.location_on_outlined,
           title: 'Location',
@@ -382,17 +358,13 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ==========================================================
   // PRODUCTS SECTION
-  // ==========================================================
 
   Widget _buildProductsSection(BuildContext context) {
     return _ProfileSection(
       title: 'Products',
       children: [
-        // ------------------------------------------------------
         // MY PRODUCTS
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.inventory_2_outlined,
           title: 'My Products',
@@ -404,9 +376,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
-        // ------------------------------------------------------
         // ADD PRODUCT
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.add_business_outlined,
           title: 'Add Product',
@@ -418,9 +388,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
-        // ------------------------------------------------------
         // PRODUCT ANALYTICS
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.analytics_outlined,
           title: 'Product Analytics',
@@ -433,17 +401,13 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ==========================================================
   // ORDERS SECTION
-  // ==========================================================
 
   Widget _buildOrdersSection(BuildContext context) {
     return _ProfileSection(
       title: 'Orders',
       children: [
-        // ------------------------------------------------------
         // SELLING ORDERS
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.receipt_long_outlined,
           title: 'Selling Orders',
@@ -455,9 +419,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
-        // ------------------------------------------------------
         // PENDING ORDERS
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.pending_actions_outlined,
           title: 'Pending Orders',
@@ -470,9 +432,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
-        // ------------------------------------------------------
         // REVIEWS
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.rate_review_outlined,
           title: 'Reviews',
@@ -485,17 +445,13 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ==========================================================
   // BUSINESS SECTION
-  // ==========================================================
 
   Widget _buildBusinessSection(BuildContext context) {
     return _ProfileSection(
       title: 'Business',
       children: [
-        // ------------------------------------------------------
         // EARNINGS
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.account_balance_wallet_outlined,
           title: 'Earnings',
@@ -507,9 +463,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
-        // ------------------------------------------------------
         // FOLLOWERS
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.people_outline_rounded,
           title: 'Followers',
@@ -522,9 +476,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
-        // ------------------------------------------------------
         // PORTFOLIO
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.collections_outlined,
           title: 'Portfolio',
@@ -536,9 +488,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
-        // ------------------------------------------------------
         // CERTIFICATION
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.verified_outlined,
           title: 'Certification',
@@ -551,17 +501,13 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ==========================================================
   // PREFERENCES & SUPPORT
-  // ==========================================================
 
   Widget _buildPreferencesSection(BuildContext context) {
     return _ProfileSection(
       title: 'Preferences & Support',
       children: [
-        // ------------------------------------------------------
         // SETTINGS
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.settings_outlined,
           title: 'Settings',
@@ -573,9 +519,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
-        // ------------------------------------------------------
         // NOTIFICATIONS
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.notifications_none_rounded,
           title: 'Notifications',
@@ -587,9 +531,7 @@ class Profile extends StatelessWidget {
 
         _ProfileDivider(),
 
-        // ------------------------------------------------------
         // CONTACT US
-        // ------------------------------------------------------
         _ProfileTile(
           icon: Icons.contact_support_outlined,
           title: 'Contact Us',
@@ -602,9 +544,7 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ==========================================================
   // LOGOUT BUTTON
-  // ==========================================================
 
   Widget _buildLogoutButton(BuildContext context) {
     return SizedBox(
@@ -638,9 +578,7 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ==========================================================
   // BADGE
-  // ==========================================================
 
   Widget _buildBadge(String value) {
     return Container(
@@ -660,9 +598,7 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ==========================================================
   // COMING SOON
-  // ==========================================================
 
   void _showComingSoon(BuildContext context, String page) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -677,9 +613,7 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // ==========================================================
   // LOGOUT DIALOG
-  // ==========================================================
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
@@ -753,9 +687,7 @@ class Profile extends StatelessWidget {
   }
 }
 
-// ============================================================
 // PROFILE SECTION
-// ============================================================
 
 class _ProfileSection extends StatelessWidget {
   const _ProfileSection({required this.title, required this.children});
@@ -789,9 +721,7 @@ class _ProfileSection extends StatelessWidget {
   }
 }
 
-// ============================================================
 // PROFILE TILE
-// ============================================================
 
 class _ProfileTile extends StatelessWidget {
   const _ProfileTile({
@@ -867,9 +797,7 @@ class _ProfileTile extends StatelessWidget {
   }
 }
 
-// ============================================================
 // PROFILE DIVIDER
-// ============================================================
 
 class _ProfileDivider extends StatelessWidget {
   @override
@@ -885,9 +813,7 @@ class _ProfileDivider extends StatelessWidget {
   }
 }
 
-// ============================================================
 // QUICK STAT CARD
-// ============================================================
 
 class _QuickStatCard extends StatelessWidget {
   const _QuickStatCard({

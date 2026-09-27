@@ -483,10 +483,10 @@ class _AddProductState extends State<AddProduct> {
   }
 
   // LIST PRODUCT BUTTON
-
   Widget _buildListProductButton() {
     return SizedBox(
       width: double.infinity,
+      height: 52,
       child: ElevatedButton.icon(
         onPressed: () {
           if (!_formKey.currentState!.validate()) {
@@ -502,8 +502,20 @@ class _AddProductState extends State<AddProduct> {
             ),
           );
         },
-        icon: const Icon(Icons.add_business_outlined),
+        icon: const Icon(Icons.add_business_outlined, size: 20),
         label: const Text('List Product'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: ArtistColors.primary,
+          foregroundColor: ArtistColors.background,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: ArtistTextStyles.bodyMedium.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
