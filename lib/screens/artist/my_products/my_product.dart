@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
-import '../buy_products/product_details.dart';
 import 'edit_product.dart';
+import 'listing_details.dart';
 
 class MyProducts extends StatefulWidget {
   const MyProducts({super.key});
@@ -454,7 +454,7 @@ class _MyProductsState extends State<MyProducts> {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => ProductDetails(product: product)),
+            MaterialPageRoute(builder: (_) => ListingDetails(listing: product)),
           );
         },
         child: Padding(
@@ -772,7 +772,7 @@ class _MyProductsState extends State<MyProducts> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ProductDetails(product: product),
+                    builder: (_) => ListingDetails(listing: product),
                   ),
                 );
               },
@@ -951,7 +951,7 @@ class _MyProductsState extends State<MyProducts> {
       case 'view':
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => ProductDetails(product: product)),
+          MaterialPageRoute(builder: (_) => ListingDetails(listing: product)),
         );
         break;
 

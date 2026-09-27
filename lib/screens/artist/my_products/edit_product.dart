@@ -91,17 +91,13 @@ class _EditProductState extends State<EditProduct> {
     _priceController.dispose();
     _quantityController.dispose();
     _availableQuantityController.dispose();
-
     super.dispose();
   }
-
-  // BUILD
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ArtistColors.background,
-
       appBar: AppBar(
         backgroundColor: ArtistColors.background,
         elevation: 0,
@@ -125,7 +121,6 @@ class _EditProductState extends State<EditProduct> {
           style: ArtistTextStyles.title.copyWith(fontSize: 19),
         ),
       ),
-
       body: Form(
         key: _formKey,
         child: ListView(
@@ -364,8 +359,6 @@ class _EditProductState extends State<EditProduct> {
     );
   }
 
-  // PRODUCT HEADER
-
   Widget _buildProductHeader() {
     final productId = widget.product['productId']?.toString() ?? '';
 
@@ -419,8 +412,6 @@ class _EditProductState extends State<EditProduct> {
     );
   }
 
-  // SECTION TITLE
-
   Widget _buildSectionTitle({
     required IconData icon,
     required String title,
@@ -457,8 +448,6 @@ class _EditProductState extends State<EditProduct> {
     );
   }
 
-  // PHOTOS
-
   Widget _buildPhotoSection() {
     final String imageUrl =
         widget.product['image']?.toString() ?? _firstImageUrl(widget.product);
@@ -478,6 +467,7 @@ class _EditProductState extends State<EditProduct> {
               Expanded(
                 child: Text('Product Images', style: ArtistTextStyles.label),
               ),
+
               Text('Up to 4 photos', style: ArtistTextStyles.small),
             ],
           ),
@@ -647,8 +637,6 @@ class _EditProductState extends State<EditProduct> {
     );
   }
 
-  // TEXT FIELD
-
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -709,8 +697,6 @@ class _EditProductState extends State<EditProduct> {
       ],
     );
   }
-
-  // DROPDOWN
 
   Widget _buildDropdown({
     required String label,
@@ -783,8 +769,6 @@ class _EditProductState extends State<EditProduct> {
     );
   }
 
-  // QUANTITY INFO
-
   Widget _buildQuantityInfo() {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -806,7 +790,7 @@ class _EditProductState extends State<EditProduct> {
 
           Expanded(
             child: Text(
-              'Available quantity cannot be greater than the total quantity. Sold quantities are reflected automatically.',
+              'Available quantity cannot be greater than the total quantity.',
               style: ArtistTextStyles.small.copyWith(height: 1.4),
             ),
           ),
@@ -814,8 +798,6 @@ class _EditProductState extends State<EditProduct> {
       ),
     );
   }
-
-  // PRODUCT INFO
 
   Widget _buildProductInfoCard() {
     final String status = widget.product['status']?.toString() ?? 'active';
@@ -899,8 +881,6 @@ class _EditProductState extends State<EditProduct> {
     );
   }
 
-  // SAVE BUTTON
-
   Widget _buildSaveButton() {
     return SizedBox(
       height: 52,
@@ -960,8 +940,6 @@ class _EditProductState extends State<EditProduct> {
     );
   }
 
-  // CANCEL BUTTON
-
   Widget _buildCancelButton() {
     return SizedBox(
       height: 50,
@@ -997,8 +975,6 @@ class _EditProductState extends State<EditProduct> {
     );
   }
 
-  // SAVE
-
   Future<void> _saveChanges() async {
     FocusScope.of(context).unfocus();
 
@@ -1015,7 +991,7 @@ class _EditProductState extends State<EditProduct> {
     if (totalQuantity != null &&
         availableQuantity != null &&
         availableQuantity > totalQuantity) {
-      _showMessage('Available quantity cannot exceed total quantity.');
+      _showErrorMessage('Available quantity cannot exceed total quantity.');
       return;
     }
 
@@ -1023,21 +999,55 @@ class _EditProductState extends State<EditProduct> {
       _isSaving = true;
     });
 
-    // UI ONLY FOR NOW.
-    // Backend PUT /products/:id will be connected later.
-
-    await Future.delayed(const Duration(milliseconds: 800));
+    await Future.delayed(const Duration(milliseconds: 700));
 
     if (!mounted) return;
+
+    widget.product['title'] = _titleController.text.trim();
+
+    widget.product['description'] = _descriptionController.text.trim();
+
+    widget.product['price'] =
+        double.tryParse(_priceController.text.trim()) ?? 0;
+
+    widget.product['quantity'] =
+        int.tryParse(_quantityController.text.trim()) ?? 0;
+
+    widget.product['availableQuantity'] =
+        int.tryParse(_availableQuantityController.text.trim()) ?? 0;
+
+    widget.product['category'] = _selectedCategory;
+
+    widget.product['condition'] = _selectedCondition;
+
+    widget.product['listingType'] = _selectedListingType;
 
     setState(() {
       _isSaving = false;
     });
 
-    _showSuccessMessage('Product changes will be connected in the next phase.');
-  }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Product updated successfully.',
+          style: ArtistTextStyles.bodyMedium.copyWith(
+            color: Colors.white,
+            fontSize: 13,
+          ),
+        ),
+        backgroundColor: ArtistColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
 
-  // IMAGE OPTIONS
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+
+    Navigator.pop(context, true);
+  }
 
   void _showImageOptions({bool isExisting = false}) {
     showModalBottomSheet(
@@ -1084,7 +1094,7 @@ class _EditProductState extends State<EditProduct> {
                   ),
                   onTap: () {
                     Navigator.pop(context);
-                    _showComingSoon('Gallery');
+                    _showPhotoMessage('Gallery option selected.');
                   },
                 ),
 
@@ -1101,7 +1111,7 @@ class _EditProductState extends State<EditProduct> {
                   ),
                   onTap: () {
                     Navigator.pop(context);
-                    _showComingSoon('Camera');
+                    _showPhotoMessage('Camera option selected.');
                   },
                 ),
 
@@ -1124,7 +1134,7 @@ class _EditProductState extends State<EditProduct> {
                     ),
                     onTap: () {
                       Navigator.pop(context);
-                      _showComingSoon('Remove Photo');
+                      _showPhotoMessage('Photo removed from selection.');
                     },
                   ),
               ],
@@ -1149,8 +1159,6 @@ class _EditProductState extends State<EditProduct> {
     );
   }
 
-  // HELPERS
-
   String? _getInitialCategory(Map<String, dynamic> product) {
     final String category = product['category']?.toString() ?? '';
 
@@ -1168,7 +1176,12 @@ class _EditProductState extends State<EditProduct> {
       return current;
     }
 
-    return null;
+    final String matched = options.firstWhere(
+      (option) => option.toLowerCase() == current.toLowerCase(),
+      orElse: () => '',
+    );
+
+    return matched.isEmpty ? null : matched;
   }
 
   String _firstImageUrl(Map<String, dynamic> product) {
@@ -1211,13 +1224,11 @@ class _EditProductState extends State<EditProduct> {
     return status[0].toUpperCase() + status.substring(1);
   }
 
-  // SNACKBARS
-
-  void _showComingSoon(String feature) {
+  void _showPhotoMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '$feature will be connected in the next phase.',
+          message,
           style: ArtistTextStyles.bodyMedium.copyWith(
             color: Colors.white,
             fontSize: 13,
@@ -1231,25 +1242,7 @@ class _EditProductState extends State<EditProduct> {
     );
   }
 
-  void _showSuccessMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: ArtistTextStyles.bodyMedium.copyWith(
-            color: Colors.white,
-            fontSize: 13,
-          ),
-        ),
-        backgroundColor: ArtistColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
-  }
-
-  void _showMessage(String message) {
+  void _showErrorMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
