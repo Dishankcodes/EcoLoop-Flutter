@@ -5,6 +5,7 @@ import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/artist_more_menu.dart';
 import '../../welcome_screen.dart';
+import '../my_products/my_product.dart';
 import 'aboutyou.dart';
 import 'address_list.dart';
 import 'certification.dart';
@@ -219,7 +220,10 @@ class Profile extends StatelessWidget {
             value: '12',
             label: 'Products',
             onTap: () {
-              _showComingSoon(context, 'My Products');
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MyProducts()),
+              );
             },
           ),
         ),
@@ -305,7 +309,10 @@ class Profile extends StatelessWidget {
           title: 'My Products',
           subtitle: 'View and manage your listed products',
           onTap: () {
-            _showComingSoon(context, 'My Products');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyProducts()),
+            );
           },
         ),
         _ProfileDivider(),

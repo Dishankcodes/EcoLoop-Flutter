@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
-
+import 'edit_product.dart';
 class AddProduct extends StatefulWidget {
   const AddProduct({super.key});
 
