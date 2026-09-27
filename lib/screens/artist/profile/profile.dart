@@ -5,13 +5,18 @@ import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/artist_more_menu.dart';
 import '../../welcome_screen.dart';
+import '../buy_products/wishlist.dart';
+import '../my_products/add_product.dart';
 import '../my_products/my_product.dart';
+import '../my_products/product_analytics.dart';
+import '../my_products/selling_orders.dart';
 import 'aboutyou.dart';
 import 'address_list.dart';
 import 'certification.dart';
 import 'edit_profile.dart';
 import 'followers.dart';
 import 'notification.dart';
+import 'settings.dart';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});
@@ -20,15 +25,18 @@ class Profile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ArtistColors.background,
+
       // APP BAR
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: ArtistColors.background,
         elevation: 0,
+        scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text('Profile', style: ArtistTextStyles.title),
         actions: const [ArtistMoreMenu(), SizedBox(width: 8)],
       ),
+
       // BODY
       body: SafeArea(
         child: SingleChildScrollView(
@@ -38,21 +46,37 @@ class Profile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildProfileHeader(context),
+
               const SizedBox(height: 18),
+
               _buildQuickStats(context),
+
               const SizedBox(height: 24),
+
               _buildArtistInformation(context),
+
               const SizedBox(height: 22),
+
               _buildProductsSection(context),
+
               const SizedBox(height: 22),
+
               _buildOrdersSection(context),
+
               const SizedBox(height: 22),
+
               _buildBusinessSection(context),
+
               const SizedBox(height: 22),
+
               _buildPreferencesSection(context),
+
               const SizedBox(height: 22),
+
               _buildLogoutButton(context),
+
               const SizedBox(height: 14),
+
               Center(
                 child: Text(
                   'EcoLoop • Give Things a New Life',
@@ -69,6 +93,7 @@ class Profile extends StatelessWidget {
   }
 
   // PROFILE HEADER
+
   Widget _buildProfileHeader(BuildContext context) {
     return Container(
       width: double.infinity,
@@ -104,7 +129,9 @@ class Profile extends StatelessWidget {
               color: ArtistColors.primary,
             ),
           ),
+
           const SizedBox(height: 13),
+
           Text(
             'Creative Studio',
             textAlign: TextAlign.center,
@@ -113,9 +140,13 @@ class Profile extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+
           const SizedBox(height: 4),
+
           Text('artist@ecoloop.com', style: ArtistTextStyles.caption),
+
           const SizedBox(height: 6),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -134,7 +165,9 @@ class Profile extends StatelessWidget {
               ),
             ],
           ),
+
           const SizedBox(height: 8),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -147,7 +180,9 @@ class Profile extends StatelessWidget {
               Text('Ahmedabad, Gujarat', style: ArtistTextStyles.caption),
             ],
           ),
+
           const SizedBox(height: 16),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -168,6 +203,7 @@ class Profile extends StatelessWidget {
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: ArtistColors.primary,
+                  backgroundColor: ArtistColors.surface,
                   side: const BorderSide(color: ArtistColors.primary),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 18,
@@ -178,7 +214,9 @@ class Profile extends StatelessWidget {
                   ),
                 ),
               ),
+
               const SizedBox(width: 10),
+
               OutlinedButton.icon(
                 onPressed: () {
                   _showComingSoon(context, 'View Portfolio');
@@ -193,6 +231,7 @@ class Profile extends StatelessWidget {
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: ArtistColors.textSecondary,
+                  backgroundColor: ArtistColors.surface,
                   side: const BorderSide(color: ArtistColors.border),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 18,
@@ -211,6 +250,7 @@ class Profile extends StatelessWidget {
   }
 
   // QUICK STATS
+
   Widget _buildQuickStats(BuildContext context) {
     return Row(
       children: [
@@ -227,18 +267,25 @@ class Profile extends StatelessWidget {
             },
           ),
         ),
+
         const SizedBox(width: 10),
+
         Expanded(
           child: _QuickStatCard(
             icon: Icons.shopping_bag_outlined,
             value: '18',
             label: 'Orders',
             onTap: () {
-              _showComingSoon(context, 'Orders');
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SellingOrders()),
+              );
             },
           ),
         ),
+
         const SizedBox(width: 10),
+
         Expanded(
           child: _QuickStatCard(
             icon: Icons.star_outline_rounded,
@@ -249,7 +296,9 @@ class Profile extends StatelessWidget {
             },
           ),
         ),
+
         const SizedBox(width: 10),
+
         Expanded(
           child: _QuickStatCard(
             icon: Icons.people_outline_rounded,
@@ -268,6 +317,7 @@ class Profile extends StatelessWidget {
   }
 
   // ARTIST INFORMATION
+
   Widget _buildArtistInformation(BuildContext context) {
     return _ProfileSection(
       title: 'Artist Information',
@@ -283,7 +333,9 @@ class Profile extends StatelessWidget {
             );
           },
         ),
-        _ProfileDivider(),
+
+        const _ProfileDivider(),
+
         _ProfileTile(
           icon: Icons.location_on_outlined,
           title: 'My Addresses',
@@ -299,11 +351,13 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // PRODUCTS SECTION
+  // PRODUCTS
+
   Widget _buildProductsSection(BuildContext context) {
     return _ProfileSection(
       title: 'Products',
       children: [
+        // MY PRODUCTS
         _ProfileTile(
           icon: Icons.inventory_2_outlined,
           title: 'My Products',
@@ -315,52 +369,93 @@ class Profile extends StatelessWidget {
             );
           },
         ),
-        _ProfileDivider(),
+
+        const _ProfileDivider(),
+
+        // ADD PRODUCT
         _ProfileTile(
           icon: Icons.add_business_outlined,
           title: 'Add Product',
           subtitle: 'Create a new product listing',
           onTap: () {
-            _showComingSoon(context, 'Add Product');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AddProduct()),
+            );
           },
         ),
-        _ProfileDivider(),
+
+        const _ProfileDivider(),
+
+        // PRODUCT ANALYTICS
         _ProfileTile(
           icon: Icons.analytics_outlined,
           title: 'Product Analytics',
           subtitle: 'Track views, sales and product performance',
           onTap: () {
-            _showComingSoon(context, 'Product Analytics');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProductAnalytics()),
+            );
+          },
+        ),
+
+        const _ProfileDivider(),
+
+        // WISHLIST
+        _ProfileTile(
+          icon: Icons.favorite_border_rounded,
+          title: 'Wishlist',
+          subtitle: 'View products you saved',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Wishlist()),
+            );
           },
         ),
       ],
     );
   }
 
-  // ORDERS SECTION
+  // ORDERS
+
   Widget _buildOrdersSection(BuildContext context) {
     return _ProfileSection(
       title: 'Orders',
       children: [
+        // SELLING ORDERS
         _ProfileTile(
           icon: Icons.receipt_long_outlined,
           title: 'Selling Orders',
           subtitle: 'Orders received from your buyers',
           onTap: () {
-            _showComingSoon(context, 'Selling Orders');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SellingOrders()),
+            );
           },
         ),
-        _ProfileDivider(),
+
+        const _ProfileDivider(),
+
+        // PENDING ORDERS
         _ProfileTile(
           icon: Icons.pending_actions_outlined,
           title: 'Pending Orders',
           subtitle: 'Orders waiting for your action',
           trailing: _buildBadge('6'),
           onTap: () {
-            _showComingSoon(context, 'Pending Orders');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SellingOrders()),
+            );
           },
         ),
-        _ProfileDivider(),
+
+        const _ProfileDivider(),
+
+        // REVIEWS
         _ProfileTile(
           icon: Icons.rate_review_outlined,
           title: 'Reviews',
@@ -373,11 +468,13 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // BUSINESS SECTION
+  // BUSINESS
+
   Widget _buildBusinessSection(BuildContext context) {
     return _ProfileSection(
       title: 'Business',
       children: [
+        // EARNINGS
         _ProfileTile(
           icon: Icons.account_balance_wallet_outlined,
           title: 'Earnings',
@@ -386,7 +483,10 @@ class Profile extends StatelessWidget {
             _showComingSoon(context, 'Earnings');
           },
         ),
-        _ProfileDivider(),
+
+        const _ProfileDivider(),
+
+        // FOLLOWERS
         _ProfileTile(
           icon: Icons.people_outline_rounded,
           title: 'Followers',
@@ -399,7 +499,10 @@ class Profile extends StatelessWidget {
             );
           },
         ),
-        _ProfileDivider(),
+
+        const _ProfileDivider(),
+
+        // PORTFOLIO
         _ProfileTile(
           icon: Icons.collections_outlined,
           title: 'Portfolio',
@@ -408,7 +511,10 @@ class Profile extends StatelessWidget {
             _showComingSoon(context, 'Portfolio');
           },
         ),
-        _ProfileDivider(),
+
+        const _ProfileDivider(),
+
+        // CERTIFICATION
         _ProfileTile(
           icon: Icons.verified_outlined,
           title: 'Certification',
@@ -425,19 +531,27 @@ class Profile extends StatelessWidget {
   }
 
   // PREFERENCES & SUPPORT
+
   Widget _buildPreferencesSection(BuildContext context) {
     return _ProfileSection(
       title: 'Preferences & Support',
       children: [
+        // SETTINGS
         _ProfileTile(
           icon: Icons.settings_outlined,
           title: 'Settings',
           subtitle: 'App preferences and account settings',
           onTap: () {
-            _showComingSoon(context, 'Settings');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Settings()),
+            );
           },
         ),
-        _ProfileDivider(),
+
+        const _ProfileDivider(),
+
+        // NOTIFICATIONS
         _ProfileTile(
           icon: Icons.notifications_none_rounded,
           title: 'Notifications',
@@ -449,7 +563,10 @@ class Profile extends StatelessWidget {
             );
           },
         ),
-        _ProfileDivider(),
+
+        const _ProfileDivider(),
+
+        // CONTACT US
         _ProfileTile(
           icon: Icons.contact_support_outlined,
           title: 'Contact Us',
@@ -462,7 +579,8 @@ class Profile extends StatelessWidget {
     );
   }
 
-  // LOGOUT BUTTON
+  // LOGOUT
+
   Widget _buildLogoutButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
@@ -484,8 +602,8 @@ class Profile extends StatelessWidget {
         ),
         style: OutlinedButton.styleFrom(
           foregroundColor: ArtistColors.error,
-          side: BorderSide(color: ArtistColors.error.withOpacity(0.35)),
           backgroundColor: ArtistColors.surface,
+          side: BorderSide(color: ArtistColors.error.withOpacity(0.35)),
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(13),
@@ -496,6 +614,7 @@ class Profile extends StatelessWidget {
   }
 
   // BADGE
+
   Widget _buildBadge(String value) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -515,20 +634,31 @@ class Profile extends StatelessWidget {
   }
 
   // COMING SOON
+
   void _showComingSoon(BuildContext context, String page) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$page will be connected next.',
-          style: ArtistTextStyles.bodyMedium.copyWith(color: Colors.white),
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            '$page will be connected next.',
+            style: ArtistTextStyles.bodyMedium.copyWith(
+              color: Colors.white,
+              fontSize: 13,
+            ),
+          ),
+          backgroundColor: ArtistColors.accent,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-      ),
-    );
+      );
   }
 
   // LOGOUT DIALOG
+
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -539,14 +669,17 @@ class Profile extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
+
           title: Text(
             'Logout',
             style: ArtistTextStyles.title.copyWith(fontSize: 20),
           ),
+
           content: Text(
             'Are you sure you want to logout?',
             style: ArtistTextStyles.body,
           ),
+
           actions: [
             TextButton(
               onPressed: () {
@@ -559,15 +692,23 @@ class Profile extends StatelessWidget {
                 ),
               ),
             ),
+
             ElevatedButton(
               onPressed: () async {
                 Navigator.pop(dialogContext);
+
                 await Prefs.setBool('isLoggedIn', false);
+
                 await Prefs.setString('authToken', '');
+
                 await Prefs.setString('userRole', '');
+
                 await Prefs.setString('userEmail', '');
+
                 await Prefs.setString('userName', '');
+
                 if (!context.mounted) return;
+
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const WelcomeScreen()),
@@ -582,7 +723,10 @@ class Profile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(9),
                 ),
               ),
-              child: const Text('Logout'),
+              child: Text(
+                'Logout',
+                style: ArtistTextStyles.button.copyWith(fontSize: 13),
+              ),
             ),
           ],
         );
@@ -592,6 +736,7 @@ class Profile extends StatelessWidget {
 }
 
 // PROFILE SECTION
+
 class _ProfileSection extends StatelessWidget {
   const _ProfileSection({required this.title, required this.children});
 
@@ -610,6 +755,7 @@ class _ProfileSection extends StatelessWidget {
             style: ArtistTextStyles.title.copyWith(fontSize: 16),
           ),
         ),
+
         Container(
           decoration: BoxDecoration(
             color: ArtistColors.surface,
@@ -624,6 +770,7 @@ class _ProfileSection extends StatelessWidget {
 }
 
 // PROFILE TILE
+
 class _ProfileTile extends StatelessWidget {
   const _ProfileTile({
     required this.icon,
@@ -641,51 +788,63 @@ class _ProfileTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: ArtistColors.light,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(icon, size: 21, color: ArtistColors.primary),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: ArtistTextStyles.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: ArtistTextStyles.caption,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            trailing ??
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 21,
-                  color: ArtistColors.textSecondary,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        splashColor: ArtistColors.primary.withOpacity(0.06),
+        highlightColor: ArtistColors.primary.withOpacity(0.03),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: ArtistColors.light,
+                  borderRadius: BorderRadius.circular(11),
                 ),
-          ],
+                child: Icon(icon, size: 21, color: ArtistColors.primary),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: ArtistTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: ArtistColors.textPrimary,
+                      ),
+                    ),
+
+                    const SizedBox(height: 2),
+
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: ArtistTextStyles.caption,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              trailing ??
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 21,
+                    color: ArtistColors.textSecondary,
+                  ),
+            ],
+          ),
         ),
       ),
     );
@@ -693,7 +852,10 @@ class _ProfileTile extends StatelessWidget {
 }
 
 // PROFILE DIVIDER
+
 class _ProfileDivider extends StatelessWidget {
+  const _ProfileDivider();
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -708,6 +870,7 @@ class _ProfileDivider extends StatelessWidget {
 }
 
 // QUICK STAT CARD
+
 class _QuickStatCard extends StatelessWidget {
   const _QuickStatCard({
     required this.icon,
@@ -728,6 +891,8 @@ class _QuickStatCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
+        splashColor: ArtistColors.primary.withOpacity(0.06),
+        highlightColor: ArtistColors.primary.withOpacity(0.03),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 12),
           decoration: BoxDecoration(
@@ -738,9 +903,13 @@ class _QuickStatCard extends StatelessWidget {
           child: Column(
             children: [
               Icon(icon, size: 20, color: ArtistColors.primary),
+
               const SizedBox(height: 5),
+
               Text(value, style: ArtistTextStyles.title.copyWith(fontSize: 17)),
+
               const SizedBox(height: 1),
+
               Text(
                 label,
                 style: ArtistTextStyles.small.copyWith(fontSize: 9.5),
