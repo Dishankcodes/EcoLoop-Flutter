@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 
-class ArtistSettings extends StatefulWidget {
-  const ArtistSettings({super.key});
+class Settings extends StatefulWidget {
+  const Settings({super.key});
 
   @override
-  State<ArtistSettings> createState() => _ArtistSettingsState();
+  State<Settings> createState() => _SettingsState();
 }
 
-class _ArtistSettingsState extends State<ArtistSettings> {
+class _SettingsState extends State<Settings> {
   bool _notifications = true;
   bool _orderUpdates = true;
   bool _marketing = false;
@@ -159,9 +159,7 @@ class _ArtistSettingsState extends State<ArtistSettings> {
   }
 }
 
-
 // SETTINGS CONTAINER
-
 
 class _SettingsContainer extends StatelessWidget {
   const _SettingsContainer({required this.children});
@@ -181,9 +179,7 @@ class _SettingsContainer extends StatelessWidget {
   }
 }
 
-
 // SETTINGS TILE
-
 
 class _SettingsTile extends StatelessWidget {
   const _SettingsTile({
@@ -254,9 +250,7 @@ class _SettingsTile extends StatelessWidget {
   }
 }
 
-
 // SETTINGS SWITCH TILE
-
 
 class _SettingsSwitchTile extends StatelessWidget {
   const _SettingsSwitchTile({
@@ -326,9 +320,7 @@ class _SettingsSwitchTile extends StatelessWidget {
   }
 }
 
-
 // DIVIDER
-
 
 class _SettingsDivider extends StatelessWidget {
   @override

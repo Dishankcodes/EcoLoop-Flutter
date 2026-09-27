@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../buy_products/product_details.dart';
+import 'edit_product.dart';
 
 class MyProducts extends StatefulWidget {
   const MyProducts({super.key});
@@ -34,10 +35,7 @@ class _MyProductsState extends State<MyProducts> {
     'Most Sold',
   ];
 
-  // ==========================================================
-  // UI-ONLY DEMO PRODUCTS
-  // ==========================================================
-
+  // Demo products data list
   final List<Map<String, dynamic>> _products = [
     {
       'productId': 'PRD001',
@@ -139,10 +137,7 @@ class _MyProductsState extends State<MyProducts> {
     super.dispose();
   }
 
-  // ==========================================================
-  // FILTERED PRODUCTS
-  // ==========================================================
-
+  // Returns filtered and sorted products list
   List<Map<String, dynamic>> get _filteredProducts {
     List<Map<String, dynamic>> products = List.from(_products);
 
@@ -228,17 +223,12 @@ class _MyProductsState extends State<MyProducts> {
     return products;
   }
 
-  // ==========================================================
-  // BUILD
-  // ==========================================================
-
   @override
   Widget build(BuildContext context) {
     final products = _filteredProducts;
 
     return Scaffold(
       backgroundColor: ArtistColors.background,
-
       appBar: AppBar(
         backgroundColor: ArtistColors.background,
         elevation: 0,
@@ -251,7 +241,10 @@ class _MyProductsState extends State<MyProducts> {
             color: ArtistColors.textPrimary,
           ),
         ),
-        title: Text('My Products', style: ArtistTextStyles.title),
+        title: Text(
+          'My Products',
+          style: ArtistTextStyles.title.copyWith(fontSize: 19),
+        ),
         actions: [
           IconButton(
             onPressed: _showSortSheet,
@@ -263,15 +256,11 @@ class _MyProductsState extends State<MyProducts> {
           ),
         ],
       ),
-
       body: Column(
         children: [
           _buildSearch(),
-
           _buildSummary(),
-
           _buildFilterChips(),
-
           Expanded(
             child: products.isEmpty
                 ? _buildEmptyState()
@@ -296,10 +285,7 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  // ==========================================================
-  // SEARCH
-  // ==========================================================
-
+  // Search input bar
   Widget _buildSearch() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
@@ -332,10 +318,7 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  // ==========================================================
-  // SUMMARY
-  // ==========================================================
-
+  // Products overview summary statistics
   Widget _buildSummary() {
     final total = _products.length;
 
@@ -359,9 +342,7 @@ class _MyProductsState extends State<MyProducts> {
               label: 'Products',
             ),
           ),
-
           const SizedBox(width: 10),
-
           Expanded(
             child: _buildSummaryCard(
               icon: Icons.check_circle_outline_rounded,
@@ -369,9 +350,7 @@ class _MyProductsState extends State<MyProducts> {
               label: 'Active',
             ),
           ),
-
           const SizedBox(width: 10),
-
           Expanded(
             child: _buildSummaryCard(
               icon: Icons.remove_shopping_cart_outlined,
@@ -384,6 +363,7 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
+  // Individual summary statistic card widget
   Widget _buildSummaryCard({
     required IconData icon,
     required String value,
@@ -399,23 +379,16 @@ class _MyProductsState extends State<MyProducts> {
       child: Column(
         children: [
           Icon(icon, size: 20, color: ArtistColors.primary),
-
           const SizedBox(height: 5),
-
           Text(value, style: ArtistTextStyles.title.copyWith(fontSize: 17)),
-
           const SizedBox(height: 1),
-
           Text(label, style: ArtistTextStyles.small),
         ],
       ),
     );
   }
 
-  // ==========================================================
-  // FILTER CHIPS
-  // ==========================================================
-
+  // Filter selection chips bar
   Widget _buildFilterChips() {
     return SizedBox(
       height: 46,
@@ -457,17 +430,10 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  // ==========================================================
-  // PRODUCT CARD
-  // ==========================================================
-
+  // Product card layout container
   Widget _buildProductCard(Map<String, dynamic> product) {
     final int availableQuantity = product['availableQuantity'] as int;
-
-    final int quantity = product['quantity'] as int;
-
     final String status = product['status'].toString();
-
     final bool soldOut = availableQuantity <= 0;
 
     return Container(
@@ -499,26 +465,17 @@ class _MyProductsState extends State<MyProducts> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildProductImage(product),
-
                   const SizedBox(width: 12),
-
                   Expanded(child: _buildProductInfo(product, soldOut)),
-
                   _buildProductMenu(product),
                 ],
               ),
-
               const SizedBox(height: 13),
-
               Divider(height: 1, color: ArtistColors.border),
-
               const SizedBox(height: 12),
-
               _buildProductStats(product),
-
               const SizedBox(height: 12),
-
-              _buildProductActions(product, status),
+              _buildProductActions(product),
             ],
           ),
         ),
@@ -526,10 +483,7 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  // ==========================================================
-  // PRODUCT IMAGE
-  // ==========================================================
-
+  // Product thumbnail image
   Widget _buildProductImage(Map<String, dynamic> product) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(13),
@@ -550,9 +504,7 @@ class _MyProductsState extends State<MyProducts> {
             );
           },
           loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) {
-              return child;
-            }
+            if (loadingProgress == null) return child;
 
             return const Center(
               child: SizedBox(
@@ -570,31 +522,20 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  // ==========================================================
-  // PRODUCT INFO
-  // ==========================================================
-
+  // Product information details
   Widget _buildProductInfo(Map<String, dynamic> product, bool soldOut) {
     final String status = product['status'].toString();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                product['title'].toString(),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 14),
-              ),
-            ),
-          ],
+        Text(
+          product['title'].toString(),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 14),
         ),
-
         const SizedBox(height: 6),
-
         Text(
           '₹${_formatPrice(product['price'])}',
           style: ArtistTextStyles.title.copyWith(
@@ -602,19 +543,13 @@ class _MyProductsState extends State<MyProducts> {
             color: ArtistColors.primary,
           ),
         ),
-
         const SizedBox(height: 5),
-
         Text(product['category'].toString(), style: ArtistTextStyles.small),
-
         const SizedBox(height: 6),
-
         Row(
           children: [
             _buildStatusBadge(status, soldOut),
-
             const SizedBox(width: 6),
-
             Flexible(
               child: Text(
                 '${product['availableQuantity']}/${product['quantity']} available',
@@ -629,14 +564,7 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  String get productQuantityLabel {
-    return '';
-  }
-
-  // ==========================================================
-  // STATUS BADGE
-  // ==========================================================
-
+  // Product status badge indicator
   Widget _buildStatusBadge(String status, bool soldOut) {
     String label;
     Color backgroundColor;
@@ -677,10 +605,7 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  // ==========================================================
-  // PRODUCT MENU
-  // ==========================================================
-
+  // Contextual popup menu for product item
   Widget _buildProductMenu(Map<String, dynamic> product) {
     return PopupMenuButton<String>(
       padding: EdgeInsets.zero,
@@ -738,10 +663,7 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  // ==========================================================
-  // PRODUCT STATS
-  // ==========================================================
-
+  // Product engagement metrics stats row
   Widget _buildProductStats(Map<String, dynamic> product) {
     return Row(
       children: [
@@ -752,7 +674,6 @@ class _MyProductsState extends State<MyProducts> {
             'Views',
           ),
         ),
-
         Expanded(
           child: _buildStatItem(
             Icons.favorite_border_rounded,
@@ -760,7 +681,6 @@ class _MyProductsState extends State<MyProducts> {
             'Wishlist',
           ),
         ),
-
         Expanded(
           child: _buildStatItem(
             Icons.shopping_bag_outlined,
@@ -768,7 +688,6 @@ class _MyProductsState extends State<MyProducts> {
             'Sales',
           ),
         ),
-
         Expanded(
           child: _buildStatItem(
             Icons.inventory_2_outlined,
@@ -780,56 +699,107 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
+  // Single stat metric layout unit
   Widget _buildStatItem(IconData icon, String value, String label) {
     return Column(
       children: [
         Icon(icon, size: 17, color: ArtistColors.textSecondary),
-
         const SizedBox(height: 3),
-
         Text(value, style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 12)),
-
         Text(label, style: ArtistTextStyles.small.copyWith(fontSize: 9.5)),
       ],
     );
   }
 
-  // ==========================================================
-  // PRODUCT ACTIONS
-  // ==========================================================
-
-  Widget _buildProductActions(Map<String, dynamic> product, String status) {
+  // Artist-themed Edit and View action buttons
+  Widget _buildProductActions(Map<String, dynamic> product) {
     return Row(
       children: [
+        // EDIT BUTTON
         Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () {
-              _showComingSoon('Edit Product');
-            },
-            icon: const Icon(Icons.edit_outlined, size: 17),
-            label: const Text('Edit'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+          child: SizedBox(
+            height: 42,
+            child: OutlinedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditProduct(product: product),
+                  ),
+                );
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ArtistColors.primary,
+                backgroundColor: ArtistColors.background,
+                side: const BorderSide(color: ArtistColors.primary, width: 1.2),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.edit_outlined,
+                    size: 17,
+                    color: ArtistColors.primary,
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    'Edit',
+                    style: ArtistTextStyles.bodyMedium.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: ArtistColors.primary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
 
         const SizedBox(width: 9),
 
+        // VIEW BUTTON
         Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProductDetails(product: product),
+          child: SizedBox(
+            height: 42,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProductDetails(product: product),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ArtistColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
                 ),
-              );
-            },
-            icon: const Icon(Icons.visibility_outlined, size: 17),
-            label: const Text('View'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.visibility_outlined,
+                    size: 17,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    'View',
+                    style: ArtistTextStyles.button.copyWith(fontSize: 13),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -837,10 +807,7 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  // ==========================================================
-  // EMPTY STATE
-  // ==========================================================
-
+  // Empty products list fallback placeholder
   Widget _buildEmptyState() {
     return Center(
       child: SingleChildScrollView(
@@ -851,7 +818,7 @@ class _MyProductsState extends State<MyProducts> {
             Container(
               width: 82,
               height: 82,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: ArtistColors.light,
                 shape: BoxShape.circle,
               ),
@@ -861,16 +828,12 @@ class _MyProductsState extends State<MyProducts> {
                 size: 38,
               ),
             ),
-
             const SizedBox(height: 18),
-
             Text(
               'No Products Found',
               style: ArtistTextStyles.title.copyWith(fontSize: 19),
             ),
-
             const SizedBox(height: 7),
-
             Text(
               _searchController.text.isNotEmpty
                   ? 'Try searching with a different product name or category.'
@@ -878,9 +841,7 @@ class _MyProductsState extends State<MyProducts> {
               textAlign: TextAlign.center,
               style: ArtistTextStyles.body,
             ),
-
             const SizedBox(height: 20),
-
             OutlinedButton.icon(
               onPressed: () {
                 setState(() {
@@ -888,8 +849,21 @@ class _MyProductsState extends State<MyProducts> {
                   _searchController.clear();
                 });
               },
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Reset Filters'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ArtistColors.primary,
+                side: const BorderSide(color: ArtistColors.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
+                ),
+              ),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: Text(
+                'Reset Filters',
+                style: ArtistTextStyles.bodyMedium.copyWith(
+                  color: ArtistColors.primary,
+                  fontSize: 13,
+                ),
+              ),
             ),
           ],
         ),
@@ -897,13 +871,11 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  // ==========================================================
-  // SORT SHEET
-  // ==========================================================
-
+  // Scrollable Sort Options modal bottom sheet
   void _showSortSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: ArtistColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
@@ -912,62 +884,60 @@ class _MyProductsState extends State<MyProducts> {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Sort Products',
-                      style: ArtistTextStyles.title.copyWith(fontSize: 19),
-                    ),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Sort Products',
+                        style: ArtistTextStyles.title.copyWith(fontSize: 19),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: ArtistColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ..._sortOptions.map((option) {
+                    final selected = _selectedSort == option;
 
-                    const Spacer(),
-
-                    IconButton(
-                      onPressed: () {
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      onTap: () {
+                        setState(() {
+                          _selectedSort = option;
+                        });
                         Navigator.pop(context);
                       },
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: ArtistColors.textSecondary,
+                      leading: Icon(
+                        selected
+                            ? Icons.radio_button_checked_rounded
+                            : Icons.radio_button_off_rounded,
+                        color: selected
+                            ? ArtistColors.primary
+                            : ArtistColors.textMuted,
                       ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 8),
-
-                ..._sortOptions.map((option) {
-                  final selected = _selectedSort == option;
-
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    onTap: () {
-                      setState(() {
-                        _selectedSort = option;
-                      });
-
-                      Navigator.pop(context);
-                    },
-                    leading: Icon(
-                      selected
-                          ? Icons.radio_button_checked_rounded
-                          : Icons.radio_button_off_rounded,
-                      color: selected
-                          ? ArtistColors.primary
-                          : ArtistColors.textMuted,
-                    ),
-                    title: Text(
-                      option,
-                      style: selected
-                          ? ArtistTextStyles.bodyMedium
-                          : ArtistTextStyles.body,
-                    ),
-                  );
-                }),
-              ],
+                      title: Text(
+                        option,
+                        style: selected
+                            ? ArtistTextStyles.bodyMedium
+                            : ArtistTextStyles.body,
+                      ),
+                    );
+                  }),
+                ],
+              ),
             ),
           ),
         );
@@ -975,10 +945,7 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  // ==========================================================
-  // PRODUCT MENU HANDLER
-  // ==========================================================
-
+  // Handles popup menu choice routing
   void _handleProductMenu(String value, Map<String, dynamic> product) {
     switch (value) {
       case 'view':
@@ -989,7 +956,10 @@ class _MyProductsState extends State<MyProducts> {
         break;
 
       case 'edit':
-        _showComingSoon('Edit Product');
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => EditProduct(product: product)),
+        );
         break;
 
       case 'status':
@@ -1002,13 +972,11 @@ class _MyProductsState extends State<MyProducts> {
     }
   }
 
-  // ==========================================================
-  // STATUS SHEET
-  // ==========================================================
-
+  // Scrollable Change Product Status modal bottom sheet
   void _showStatusSheet(Map<String, dynamic> product) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: ArtistColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
@@ -1017,57 +985,54 @@ class _MyProductsState extends State<MyProducts> {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Change Product Status',
-                  style: ArtistTextStyles.title.copyWith(fontSize: 19),
-                ),
-
-                const SizedBox(height: 5),
-
-                Text(
-                  product['title'].toString(),
-                  textAlign: TextAlign.center,
-                  style: ArtistTextStyles.caption,
-                ),
-
-                const SizedBox(height: 18),
-
-                _buildStatusOption(
-                  icon: Icons.check_circle_outline_rounded,
-                  title: 'Active',
-                  subtitle: 'Make this product visible for buyers',
-                  color: ArtistColors.success,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showComingSoon('Activate Product');
-                  },
-                ),
-
-                _buildStatusOption(
-                  icon: Icons.pause_circle_outline_rounded,
-                  title: 'Inactive',
-                  subtitle: 'Temporarily hide this product',
-                  color: ArtistColors.textSecondary,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showComingSoon('Deactivate Product');
-                  },
-                ),
-
-                _buildStatusOption(
-                  icon: Icons.pending_outlined,
-                  title: 'Pending',
-                  subtitle: 'Keep this product pending',
-                  color: ArtistColors.warning,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showComingSoon('Update Product Status');
-                  },
-                ),
-              ],
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Change Product Status',
+                    style: ArtistTextStyles.title.copyWith(fontSize: 19),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    product['title'].toString(),
+                    textAlign: TextAlign.center,
+                    style: ArtistTextStyles.caption,
+                  ),
+                  const SizedBox(height: 18),
+                  _buildStatusOption(
+                    icon: Icons.check_circle_outline_rounded,
+                    title: 'Active',
+                    subtitle: 'Make this product visible for buyers',
+                    color: ArtistColors.success,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showComingSoon('Activate Product');
+                    },
+                  ),
+                  _buildStatusOption(
+                    icon: Icons.pause_circle_outline_rounded,
+                    title: 'Inactive',
+                    subtitle: 'Temporarily hide this product',
+                    color: ArtistColors.textSecondary,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showComingSoon('Deactivate Product');
+                    },
+                  ),
+                  _buildStatusOption(
+                    icon: Icons.pending_outlined,
+                    title: 'Pending',
+                    subtitle: 'Keep this product pending',
+                    color: ArtistColors.warning,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showComingSoon('Update Product Status');
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -1075,6 +1040,7 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
+  // Helper tile for status modal choices
   Widget _buildStatusOption({
     required IconData icon,
     required String title,
@@ -1103,10 +1069,7 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  // ==========================================================
-  // DELETE DIALOG
-  // ==========================================================
-
+  // Delete product confirmation alert dialog
   void _showDeleteDialog(Map<String, dynamic> product) {
     showDialog(
       context: context,
@@ -1122,7 +1085,8 @@ class _MyProductsState extends State<MyProducts> {
             style: ArtistTextStyles.title.copyWith(fontSize: 20),
           ),
           content: Text(
-            'Are you sure you want to delete "${product['title']}"?',
+            'Are you sure you want to delete "${product['title']}"?\n\n'
+            'This action cannot be undone.',
             style: ArtistTextStyles.body,
           ),
           actions: [
@@ -1140,7 +1104,20 @@ class _MyProductsState extends State<MyProducts> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
-                _showComingSoon('Delete Product');
+
+                setState(() {
+                  _products.remove(product);
+                });
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '"${product['title']}" deleted successfully.',
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: ArtistColors.primary,
+                  ),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: ArtistColors.error,
@@ -1158,10 +1135,7 @@ class _MyProductsState extends State<MyProducts> {
     );
   }
 
-  // ==========================================================
-  // REFRESH
-  // ==========================================================
-
+  // Simulates pull-to-refresh action
   Future<void> _refreshProducts() async {
     await Future.delayed(const Duration(milliseconds: 700));
 
@@ -1170,23 +1144,25 @@ class _MyProductsState extends State<MyProducts> {
     setState(() {});
   }
 
-  // ==========================================================
-  // COMING SOON
-  // ==========================================================
-
+  // Displays coming soon snackbar message
   void _showComingSoon(String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$feature will be connected in the next phase.'),
+        content: Text(
+          '$feature will be connected in the next phase.',
+          style: ArtistTextStyles.bodyMedium.copyWith(
+            color: Colors.white,
+            fontSize: 13,
+          ),
+        ),
+        backgroundColor: ArtistColors.accent,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
 
-  // ==========================================================
-  // PRICE FORMAT
-  // ==========================================================
-
+  // Price formatting helper
   String _formatPrice(dynamic value) {
     final double price = double.tryParse(value.toString()) ?? 0;
 

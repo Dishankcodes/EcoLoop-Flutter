@@ -1,25 +1,16 @@
 import 'package:flutter/material.dart';
 
-void main() => runApp(const MaterialApp(
-  debugShowCheckedModeBanner: false,
-  home: FollowersScreen(),
-));
+import '../../../app_theme/artist/artist_colors.dart';
+import '../../../app_theme/artist/artist_text_styles.dart';
 
-class FollowersScreen extends StatefulWidget {
-  const FollowersScreen({super.key});
+class Followers extends StatefulWidget {
+  const Followers({super.key});
 
   @override
-  State<FollowersScreen> createState() => _FollowersScreenState();
+  State<Followers> createState() => _FollowersState();
 }
 
-class _FollowersScreenState extends State<FollowersScreen> {
-  final Color primary = const Color(0xFFAD563E);
-  final Color background = const Color(0xFFF7F0E7);
-  final Color cardColor = const Color(0xFFFFFCF8);
-  final Color borderColor = const Color(0xFFE2D5C8);
-  final Color textColor = const Color(0xFF292522);
-  final Color mutedColor = const Color(0xFF8B817A);
-
+class _FollowersState extends State<Followers> {
   final TextEditingController _searchController = TextEditingController();
 
   final List<Map<String, dynamic>> _followers = [
@@ -28,7 +19,7 @@ class _FollowersScreenState extends State<FollowersScreen> {
       'username': '@sumiitmeraiiya',
       'followers': '128 followers',
       'image':
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80',
+          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80',
       'following': true,
     },
     {
@@ -36,7 +27,7 @@ class _FollowersScreenState extends State<FollowersScreen> {
       'username': '@dishank.prajapati',
       'followers': '94 followers',
       'image':
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&q=80',
+          'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&q=80',
       'following': true,
     },
     {
@@ -44,7 +35,7 @@ class _FollowersScreenState extends State<FollowersScreen> {
       'username': '@nivyaa07',
       'followers': '76 followers',
       'image':
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80',
+          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80',
       'following': false,
     },
     {
@@ -52,7 +43,7 @@ class _FollowersScreenState extends State<FollowersScreen> {
       'username': '@isha.mehta',
       'followers': '61 followers',
       'image':
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80',
+          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80',
       'following': true,
     },
     {
@@ -60,7 +51,7 @@ class _FollowersScreenState extends State<FollowersScreen> {
       'username': '@kunal.joshi',
       'followers': '53 followers',
       'image':
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80',
+          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80',
       'following': false,
     },
     {
@@ -68,388 +59,347 @@ class _FollowersScreenState extends State<FollowersScreen> {
       'username': '@nisha.patel',
       'followers': '47 followers',
       'image':
-      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&q=80',
+          'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&q=80',
       'following': true,
     },
   ];
 
-  List<Map<String, dynamic>> get filteredFollowers {
-    final query = _searchController.text.toLowerCase();
+  List<Map<String, dynamic>> get _filteredFollowers {
+    final query = _searchController.text.trim().toLowerCase();
 
     if (query.isEmpty) {
       return _followers;
     }
 
     return _followers.where((follower) {
-      return follower['name']
-          .toString()
-          .toLowerCase()
-          .contains(query) ||
-          follower['username']
-              .toString()
-              .toLowerCase()
-              .contains(query);
+      final name = follower['name']?.toString().toLowerCase() ?? '';
+
+      final username = follower['username']?.toString().toLowerCase() ?? '';
+
+      return name.contains(query) || username.contains(query);
     }).toList();
   }
 
-  void _toast(String message) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
 
+  void _onSearchChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filtered = _filteredFollowers;
+
     return Scaffold(
-      backgroundColor: background,
-
-      // ============================================================
-      // APP BAR
-      // ============================================================
-
+      backgroundColor: ArtistColors.background,
       appBar: AppBar(
-        backgroundColor: background,
+        backgroundColor: ArtistColors.background,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         centerTitle: true,
-
         leading: IconButton(
-          icon: Icon(
+          tooltip: 'Back',
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          icon: const Icon(
             Icons.arrow_back_rounded,
-            color: textColor,
-            size: 25,
+            color: ArtistColors.textPrimary,
+            size: 23,
           ),
-          onPressed: () => _toast('Back clicked'),
         ),
-
         title: Text(
           'Followers',
-          style: TextStyle(
-            color: textColor,
-            fontSize: 21,
-            fontWeight: FontWeight.w800,
+          style: ArtistTextStyles.title.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
           ),
         ),
-
         actions: [
           IconButton(
-            icon: Icon(
+            tooltip: 'More',
+            onPressed: _showMoreOptions,
+            icon: const Icon(
               Icons.more_vert_rounded,
-              color: textColor,
-              size: 25,
+              color: ArtistColors.textPrimary,
+              size: 22,
             ),
-            onPressed: () => _toast('More options'),
           ),
+          const SizedBox(width: 5),
         ],
       ),
-
-      // ============================================================
-      // BODY
-      // ============================================================
-
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ==================================================
-                    // HEADER
-                    // ==================================================
-
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Your Community',
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                'People who follow your artwork and creations.',
-                                style: TextStyle(
-                                  color: mutedColor,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Followers icon
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0DED4),
-                            borderRadius: BorderRadius.circular(17),
-                          ),
-                          child: Icon(
-                            Icons.groups_rounded,
-                            color: primary,
-                            size: 28,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 22),
-
-                    // ==================================================
-                    // FOLLOWER STAT CARD
-                    // ==================================================
-
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: borderColor,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.035),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF0DED4),
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            child: Icon(
-                              Icons.people_alt_rounded,
-                              color: primary,
-                              size: 26,
-                            ),
-                          ),
-
-                          const SizedBox(width: 14),
-
-                          Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${_followers.length}',
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              Text(
-                                'Total Followers',
-                                style: TextStyle(
-                                  color: mutedColor,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const Spacer(),
-
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF0DED4),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.trending_up_rounded,
-                                  color: primary,
-                                  size: 17,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '+12%',
-                                  style: TextStyle(
-                                    color: primary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // ==================================================
-                    // SEARCH
-                    // ==================================================
-
-                    Container(
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(
-                          color: borderColor,
-                          width: 1.2,
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (_) => setState(() {}),
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 14,
-                        ),
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            color: primary,
-                            size: 25,
-                          ),
-                          hintText: 'Search followers...',
-                          hintStyle: TextStyle(
-                            color:
-                            mutedColor.withValues(alpha: 0.75),
-                            fontSize: 14,
-                          ),
-                          contentPadding:
-                          const EdgeInsets.symmetric(
-                            vertical: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // ==================================================
-                    // FOLLOWER COUNT
-                    // ==================================================
-
-                    Row(
-                      mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'All Followers',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        Text(
-                          '${filteredFollowers.length} people',
-                          style: TextStyle(
-                            color: mutedColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // ==================================================
-                    // FOLLOWERS LIST
-                    // ==================================================
-
-                    filteredFollowers.isEmpty
-                        ? _emptyState()
-                        : ListView.separated(
-                      shrinkWrap: true,
-                      physics:
-                      const NeverScrollableScrollPhysics(),
-                      itemCount: filteredFollowers.length,
-                      separatorBuilder: (context, index) =>
-                      const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        return _followerCard(
-                          filteredFollowers[index],
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // ========================================================
-            // BOTTOM NAV
-            // ========================================================
-
-            _bottomNavigation(),
-          ],
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 5, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 16),
+              _buildFollowerSummary(),
+              const SizedBox(height: 14),
+              _buildSearch(),
+              const SizedBox(height: 18),
+              _buildFollowerTitle(filtered.length),
+              const SizedBox(height: 10),
+              filtered.isEmpty
+                  ? _buildEmptyState()
+                  : _buildFollowerList(filtered),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // ================================================================
-  // FOLLOWER CARD
-  // ================================================================
-
-  Widget _followerCard(
-      Map<String, dynamic> follower,
-      ) {
-    final bool isFollowing = follower['following'];
-
-    return Container(
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(
-          color: borderColor,
+  // Page header.
+  Widget _buildHeader() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Your Community',
+                style: ArtistTextStyles.heading.copyWith(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'People who follow your artwork and creations.',
+                style: ArtistTextStyles.body.copyWith(
+                  fontSize: 12,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
         ),
+        Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: ArtistColors.light,
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: const Icon(
+            Icons.groups_rounded,
+            color: ArtistColors.primary,
+            size: 27,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Follower summary.
+  Widget _buildFollowerSummary() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: ArtistColors.surface,
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: ArtistColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.025),
+            color: ArtistColors.primary.withOpacity(0.035),
+            blurRadius: 9,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: ArtistColors.light,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.people_alt_rounded,
+              color: ArtistColors.primary,
+              size: 25,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${_followers.length}',
+                style: ArtistTextStyles.heading.copyWith(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                'Total Followers',
+                style: ArtistTextStyles.caption.copyWith(fontSize: 10),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            decoration: BoxDecoration(
+              color: ArtistColors.light,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.trending_up_rounded,
+                  color: ArtistColors.primary,
+                  size: 16,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '+12%',
+                  style: ArtistTextStyles.caption.copyWith(
+                    color: ArtistColors.primary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Search field.
+  Widget _buildSearch() {
+    return TextField(
+      controller: _searchController,
+      style: ArtistTextStyles.body.copyWith(
+        color: ArtistColors.textPrimary,
+        fontSize: 13,
+      ),
+      decoration: InputDecoration(
+        hintText: 'Search followers...',
+        hintStyle: ArtistTextStyles.hint.copyWith(fontSize: 13),
+        prefixIcon: const Icon(
+          Icons.search_rounded,
+          color: ArtistColors.primary,
+          size: 22,
+        ),
+        suffixIcon: _searchController.text.isNotEmpty
+            ? IconButton(
+                onPressed: () {
+                  _searchController.clear();
+                },
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: ArtistColors.textSecondary,
+                  size: 19,
+                ),
+              )
+            : null,
+        filled: true,
+        fillColor: ArtistColors.surface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 13,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(13),
+          borderSide: const BorderSide(color: ArtistColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(13),
+          borderSide: const BorderSide(color: ArtistColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(13),
+          borderSide: const BorderSide(color: ArtistColors.primary, width: 1.2),
+        ),
+      ),
+    );
+  }
+
+  // Follower count.
+  Widget _buildFollowerTitle(int count) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            'All Followers',
+            style: ArtistTextStyles.title.copyWith(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Text(
+          '$count ${count == 1 ? 'person' : 'people'}',
+          style: ArtistTextStyles.caption.copyWith(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Followers list.
+  Widget _buildFollowerList(List<Map<String, dynamic>> followers) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: followers.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 9),
+      itemBuilder: (context, index) {
+        return _buildFollowerCard(followers[index]);
+      },
+    );
+  }
+
+  // Follower card.
+  Widget _buildFollowerCard(Map<String, dynamic> follower) {
+    final bool isFollowing = follower['following'] == true;
+
+    final String name = follower['name']?.toString() ?? 'User';
+
+    final String username = follower['username']?.toString() ?? '';
+
+    final String followerCount = follower['followers']?.toString() ?? '';
+
+    final String image = follower['image']?.toString() ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ArtistColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ArtistColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.025),
             blurRadius: 7,
             offset: const Offset(0, 2),
           ),
@@ -457,322 +407,297 @@ class _FollowersScreenState extends State<FollowersScreen> {
       ),
       child: Row(
         children: [
-          // ==========================================================
-          // PROFILE IMAGE
-          // ==========================================================
-
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Image.network(
-              follower['image'],
-              width: 58,
-              height: 58,
-              fit: BoxFit.cover,
-              errorBuilder:
-                  (context, error, stackTrace) {
-                return Container(
-                  width: 58,
-                  height: 58,
-                  color: const Color(0xFFF0DED4),
-                  child: Icon(
-                    Icons.person_rounded,
-                    color: primary,
-                    size: 30,
-                  ),
-                );
-              },
-            ),
-          ),
-
-          const SizedBox(width: 13),
-
-          // ==========================================================
-          // NAME + USERNAME
-          // ==========================================================
-
+          _buildProfileImage(image, name),
+          const SizedBox(width: 11),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  follower['name'],
+                  name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
+                  style: ArtistTextStyles.bodyMedium.copyWith(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-
-                const SizedBox(height: 3),
-
+                const SizedBox(height: 2),
                 Text(
-                  follower['username'],
+                  username,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: mutedColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: ArtistTextStyles.caption.copyWith(fontSize: 10),
                 ),
-
-                const SizedBox(height: 5),
-
+                const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.people_outline_rounded,
-                      color: mutedColor,
+                      color: ArtistColors.textMuted,
                       size: 13,
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      follower['followers'],
-                      style: TextStyle(
-                        color: mutedColor,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      followerCount,
+                      style: ArtistTextStyles.caption.copyWith(fontSize: 9.5),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-
           const SizedBox(width: 8),
-
-          // ==========================================================
-          // FOLLOW BUTTON
-          // ==========================================================
-
-          InkWell(
-            onTap: () {
-              setState(() {
-                follower['following'] = !isFollowing;
-              });
-
-              _toast(
-                isFollowing
-                    ? 'Unfollowed ${follower['name']}'
-                    : 'Following ${follower['name']}',
-              );
-            },
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 11,
-                vertical: 9,
-              ),
-              decoration: BoxDecoration(
-                color: isFollowing
-                    ? const Color(0xFFF0DED4)
-                    : primary,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: primary,
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                isFollowing ? 'Following' : 'Follow',
-                style: TextStyle(
-                  color: isFollowing
-                      ? primary
-                      : Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
+          _buildFollowButton(follower, isFollowing),
         ],
       ),
     );
   }
 
-  // ================================================================
-  // EMPTY STATE
-  // ================================================================
+  // Profile image.
+  Widget _buildProfileImage(String image, String name) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: image.isEmpty
+          ? _profileFallback(name)
+          : Image.network(
+              image,
+              width: 56,
+              height: 56,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return _profileFallback(name);
+              },
+            ),
+    );
+  }
 
-  Widget _emptyState() {
+  // Profile fallback.
+  Widget _profileFallback(String name) {
+    final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'U';
+
+    return Container(
+      width: 56,
+      height: 56,
+      color: ArtistColors.light,
+      child: Center(
+        child: Text(
+          initial,
+          style: ArtistTextStyles.title.copyWith(
+            color: ArtistColors.primary,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Follow button.
+  Widget _buildFollowButton(Map<String, dynamic> follower, bool isFollowing) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () {
+          setState(() {
+            follower['following'] = !isFollowing;
+          });
+
+          final name = follower['name']?.toString() ?? 'user';
+
+          _showMessage(isFollowing ? 'Unfollowed $name' : 'Following $name');
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+          decoration: BoxDecoration(
+            color: isFollowing ? ArtistColors.light : ArtistColors.primary,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: ArtistColors.primary),
+          ),
+          child: Text(
+            isFollowing ? 'Following' : 'Follow',
+            style: ArtistTextStyles.caption.copyWith(
+              color: isFollowing ? ArtistColors.primary : Colors.white,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Empty state.
+  Widget _buildEmptyState() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        vertical: 55,
-        horizontal: 20,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 42, horizontal: 20),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: borderColor,
-        ),
+        color: ArtistColors.surface,
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: ArtistColors.border),
       ),
       child: Column(
         children: [
           Container(
-            width: 70,
-            height: 70,
+            width: 68,
+            height: 68,
             decoration: const BoxDecoration(
-              color: Color(0xFFF0DED4),
+              color: ArtistColors.light,
               shape: BoxShape.circle,
             ),
-            child: Icon(
+            child: const Icon(
               Icons.people_outline_rounded,
-              color: primary,
-              size: 34,
+              color: ArtistColors.primary,
+              size: 33,
             ),
           ),
-
-          const SizedBox(height: 16),
-
+          const SizedBox(height: 14),
           Text(
             'No followers found',
-            style: TextStyle(
-              color: textColor,
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-            ),
+            style: ArtistTextStyles.title.copyWith(fontSize: 17),
           ),
-
-          const SizedBox(height: 6),
-
+          const SizedBox(height: 5),
           Text(
-            'Try searching with a different name.',
+            'Try searching with a different name or username.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: mutedColor,
-              fontSize: 13,
-            ),
+            style: ArtistTextStyles.body.copyWith(fontSize: 11.5),
           ),
-        ],
-      ),
-    );
-  }
-
-  // ================================================================
-  // BOTTOM NAVIGATION
-  // ================================================================
-
-  Widget _bottomNavigation() {
-    return Container(
-      height: 76,
-      decoration: BoxDecoration(
-        color: cardColor,
-        border: Border(
-          top: BorderSide(
-            color: borderColor,
-            width: 1,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment:
-        MainAxisAlignment.spaceAround,
-        children: [
-          _navItem(
-            Icons.home_outlined,
-            'Dashboard',
-            false,
-          ),
-
-          _navItem(
-            Icons.search_outlined,
-            'Materials',
-            false,
-          ),
-
-          // Center Add Button
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: primary,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: primary.withValues(alpha: 0.28),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+          if (_searchController.text.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            OutlinedButton(
+              onPressed: () {
+                _searchController.clear();
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ArtistColors.primary,
+                side: const BorderSide(color: ArtistColors.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ],
-            ),
-            child: IconButton(
-              onPressed: () =>
-                  _toast('Add New Item'),
-              icon: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 28,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 9,
+                ),
               ),
-            ),
-          ),
-
-          _navItem(
-            Icons.receipt_long_outlined,
-            'Orders',
-            false,
-          ),
-
-          _navItem(
-            Icons.person_outline_rounded,
-            'Profile',
-            false,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItem(
-      IconData icon,
-      String label,
-      bool active,
-      ) {
-    final color = active ? primary : mutedColor;
-
-    return InkWell(
-      onTap: () => _toast('$label clicked'),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: 5,
-        ),
-        child: Column(
-          mainAxisAlignment:
-          MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: color,
-              size: 22,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: active
-                    ? FontWeight.w700
-                    : FontWeight.w500,
+              child: Text(
+                'Clear Search',
+                style: ArtistTextStyles.bodyMedium.copyWith(
+                  color: ArtistColors.primary,
+                  fontSize: 11,
+                ),
               ),
             ),
           ],
-        ),
+        ],
       ),
     );
+  }
+
+  // More options.
+  void _showMoreOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ArtistColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: ArtistColors.border,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const SizedBox(height: 17),
+                _buildMoreOption(
+                  icon: Icons.people_outline_rounded,
+                  title: 'Follower Overview',
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _showMessage('Follower overview is available here.');
+                  },
+                ),
+                _buildMoreOption(
+                  icon: Icons.refresh_rounded,
+                  title: 'Refresh Followers',
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    setState(() {});
+                    _showMessage('Followers refreshed.');
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // More option.
+  Widget _buildMoreOption({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 2),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: ArtistColors.light,
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Icon(icon, color: ArtistColors.primary, size: 20),
+      ),
+      title: Text(
+        title,
+        style: ArtistTextStyles.bodyMedium.copyWith(
+          color: ArtistColors.textPrimary,
+          fontSize: 13,
+        ),
+      ),
+      trailing: const Icon(
+        Icons.chevron_right_rounded,
+        color: ArtistColors.textMuted,
+      ),
+      onTap: onTap,
+    );
+  }
+
+  // Snackbar.
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: ArtistTextStyles.body.copyWith(
+              color: Colors.white,
+              fontSize: 11.5,
+            ),
+          ),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ArtistColors.accent,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(11),
+          ),
+        ),
+      );
   }
 }

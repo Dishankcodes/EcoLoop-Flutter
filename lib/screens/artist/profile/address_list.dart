@@ -1,122 +1,108 @@
 import 'package:flutter/material.dart';
 
-import '../../../app_theme/user/app_colors.dart';
-import '../../../app_theme/user/app_text_styles.dart';
+import '../../../app_theme/artist/artist_colors.dart';
+import '../../../app_theme/artist/artist_text_styles.dart';
 import 'add_address.dart';
 
 class AddressList extends StatefulWidget {
   const AddressList({super.key});
 
   @override
-  State<AddressList> createState() => _AddressListState();
+  State<AddressList> createState() => MyAddresses();
 }
 
-class _AddressListState extends State<AddressList> {
+class MyAddresses extends State<AddressList> {
   // TEMPORARY UI DATA
-  //
-  // This is only for the UI phase.
-  // Backend/API integration will replace this later.
-
   final List<AddressItem> _addresses = [
     AddressItem(
       id: '1',
-      name: 'Dishank Prajapati',
+      name: 'Creative Studio',
       phone: '9876543210',
-      house: 'Flat 204, Green Heights',
+      house: 'Studio 204, Green Heights',
       street: 'Satellite Road',
       area: 'Satellite',
       landmark: 'Near Iscon Mall',
       city: 'Ahmedabad',
       state: 'Gujarat',
       pincode: '380015',
-      type: 'Home',
+      type: 'Studio',
       isDefault: true,
     ),
     AddressItem(
       id: '2',
-      name: 'Dishank Prajapati',
+      name: 'Creative Studio',
       phone: '9876543210',
-      house: 'Office 302',
+      house: 'Workshop 302',
       street: 'C G Road',
       area: 'Navrangpura',
       landmark: 'Near Commerce Six Road',
       city: 'Ahmedabad',
       state: 'Gujarat',
       pincode: '380009',
-      type: 'Work',
+      type: 'Workshop',
       isDefault: false,
     ),
   ];
 
   // ADD ADDRESS
-
   Future<void> _addAddress() async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const AddAddress()),
     );
-
     if (!mounted) return;
-
-    if (result == true) {
-      setState(() {});
-    }
+    if (result == true) setState(() {});
   }
 
   // EDIT ADDRESS
-
   Future<void> _editAddress(AddressItem address) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => AddAddress(address: address.toMap())),
     );
-
     if (!mounted) return;
-
-    if (result == true) {
-      setState(() {});
-    }
+    if (result == true) setState(() {});
   }
 
   // DELETE ADDRESS
-
   Future<void> _deleteAddress(AddressItem address) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: AppColors.surface,
+          backgroundColor: ArtistColors.surface,
+          surfaceTintColor: Colors.transparent,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
           title: Text(
             'Delete Address?',
-            style: AppTextStyles.title.copyWith(color: AppColors.textPrimary),
+            style: ArtistTextStyles.title.copyWith(
+              color: ArtistColors.textPrimary,
+            ),
           ),
           content: Text(
             'Are you sure you want to remove this saved address?',
-            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+            style: ArtistTextStyles.body.copyWith(
+              color: ArtistColors.textSecondary,
+            ),
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(context, false);
-              },
+              onPressed: () => Navigator.pop(context, false),
               child: Text(
                 'Cancel',
-                style: AppTextStyles.body.copyWith(
-                  color: AppColors.textSecondary,
+                style: ArtistTextStyles.body.copyWith(
+                  color: ArtistColors.textSecondary,
                 ),
               ),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.pop(context, true);
-              },
+              onPressed: () => Navigator.pop(context, true),
               child: Text(
                 'Delete',
-                style: AppTextStyles.body.copyWith(
-                  color: AppColors.error,
+                style: ArtistTextStyles.body.copyWith(
+                  color: ArtistColors.error,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -138,13 +124,12 @@ class _AddressListState extends State<AddressList> {
       SnackBar(
         content: const Text('Address deleted successfully'),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.success,
+        backgroundColor: ArtistColors.success,
       ),
     );
   }
 
   // SET DEFAULT
-
   void _setDefaultAddress(AddressItem address) {
     setState(() {
       for (final item in _addresses) {
@@ -156,39 +141,32 @@ class _AddressListState extends State<AddressList> {
       SnackBar(
         content: const Text('Default address updated'),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.success,
+        backgroundColor: ArtistColors.success,
       ),
     );
   }
 
   // BUILD
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-
-      // APP BAR
+      backgroundColor: ArtistColors.background,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-
+        backgroundColor: ArtistColors.background,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: ArtistColors.textPrimary,
         leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_rounded),
         ),
-
-        // Same sizing style as Settings
         title: Text(
           'My Addresses',
-          style: AppTextStyles.title.copyWith(color: AppColors.textPrimary),
+          style: ArtistTextStyles.title.copyWith(
+            color: ArtistColors.textPrimary,
+          ),
         ),
       ),
-
-      // BODY
       body: SafeArea(
         child: _addresses.isEmpty
             ? _EmptyAddressState(onAddAddress: _addAddress)
@@ -197,41 +175,29 @@ class _AddressListState extends State<AddressList> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // HEADER
                     Text(
                       'Saved addresses',
-                      style: AppTextStyles.title.copyWith(
-                        color: AppColors.textPrimary,
+                      style: ArtistTextStyles.title.copyWith(
+                        color: ArtistColors.textPrimary,
                         fontSize: 16,
                       ),
                     ),
-
                     const SizedBox(height: 5),
-
                     Text(
-                      'Manage your delivery addresses for a faster checkout.',
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.textSecondary,
+                      'Manage your studio and workshop addresses for faster checkout.',
+                      style: ArtistTextStyles.caption.copyWith(
+                        color: ArtistColors.textSecondary,
                       ),
                     ),
-
                     const SizedBox(height: 20),
-
-                    // ADDRESS CARDS
                     ..._addresses.map(
                       (address) => Padding(
                         padding: const EdgeInsets.only(bottom: 14),
                         child: _AddressCard(
                           address: address,
-                          onEdit: () {
-                            _editAddress(address);
-                          },
-                          onDelete: () {
-                            _deleteAddress(address);
-                          },
-                          onSetDefault: () {
-                            _setDefaultAddress(address);
-                          },
+                          onEdit: () => _editAddress(address),
+                          onDelete: () => _deleteAddress(address),
+                          onSetDefault: () => _setDefaultAddress(address),
                         ),
                       ),
                     ),
@@ -239,34 +205,29 @@ class _AddressListState extends State<AddressList> {
                 ),
               ),
       ),
-
-      // ADD ADDRESS BUTTON
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
           decoration: BoxDecoration(
-            color: AppColors.background,
-            border: Border(top: BorderSide(color: AppColors.light)),
+            color: ArtistColors.background,
+            border: Border(top: BorderSide(color: ArtistColors.border)),
           ),
           child: SizedBox(
             height: 54,
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _addAddress,
-
               icon: const Icon(Icons.add_rounded, size: 22),
-
               label: Text(
                 'Add New Address',
-                style: AppTextStyles.body.copyWith(
-                  color: AppColors.surface,
+                style: ArtistTextStyles.body.copyWith(
+                  color: ArtistColors.background,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.surface,
+                backgroundColor: ArtistColors.primary,
+                foregroundColor: ArtistColors.background,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -281,24 +242,18 @@ class _AddressListState extends State<AddressList> {
 }
 
 // ADDRESS ITEM MODEL
-
 class AddressItem {
   final String id;
-
   final String name;
   final String phone;
-
   final String house;
   final String street;
   final String area;
   final String landmark;
-
   final String city;
   final String state;
   final String pincode;
-
   final String type;
-
   bool isDefault;
 
   AddressItem({
@@ -317,7 +272,6 @@ class AddressItem {
   });
 
   // CONVERT TO MAP
-
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -337,10 +291,8 @@ class AddressItem {
 }
 
 // ADDRESS CARD
-
 class _AddressCard extends StatelessWidget {
   final AddressItem address;
-
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onSetDefault;
@@ -356,18 +308,15 @@ class _AddressCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-
       padding: const EdgeInsets.all(18),
-
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: address.isDefault ? AppColors.primary : AppColors.light,
+          color: address.isDefault ? ArtistColors.primary : ArtistColors.border,
           width: address.isDefault ? 1.4 : 1,
         ),
       ),
-
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -375,24 +324,20 @@ class _AddressCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ADDRESS TYPE ICON
               Container(
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.light,
+                  color: ArtistColors.light,
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(
                   _getAddressIcon(address.type),
-                  color: AppColors.primary,
+                  color: ArtistColors.primary,
                   size: 22,
                 ),
               ),
-
               const SizedBox(width: 12),
-
-              // NAME + TYPE
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -404,126 +349,96 @@ class _AddressCard extends StatelessWidget {
                             address.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-
-                            // CHANGED:
-                            // Smaller than heading
-                            // to match Settings.
-                            style: AppTextStyles.body.copyWith(
-                              color: AppColors.textPrimary,
+                            style: ArtistTextStyles.body.copyWith(
+                              color: ArtistColors.textPrimary,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
-
                         const SizedBox(width: 8),
-
                         _AddressTypeBadge(type: address.type),
                       ],
                     ),
-
                     const SizedBox(height: 4),
-
                     Text(
                       address.phone,
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.textSecondary,
+                      style: ArtistTextStyles.caption.copyWith(
+                        color: ArtistColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
-
-              // MORE MENU
               PopupMenuButton<String>(
-                color: AppColors.surface,
-
+                color: ArtistColors.surface,
                 icon: const Icon(
                   Icons.more_vert_rounded,
-                  color: AppColors.textSecondary,
+                  color: ArtistColors.textSecondary,
                   size: 21,
                 ),
-
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
-
                 onSelected: (value) {
-                  if (value == 'edit') {
-                    onEdit();
-                  }
-
-                  if (value == 'delete') {
-                    onDelete();
-                  }
-
-                  if (value == 'default') {
-                    onSetDefault();
-                  }
+                  if (value == 'edit') onEdit();
+                  if (value == 'delete') onDelete();
+                  if (value == 'default') onSetDefault();
                 },
-
                 itemBuilder: (context) {
                   return [
                     PopupMenuItem(
                       value: 'edit',
                       child: Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.edit_outlined,
-                            color: AppColors.textPrimary,
+                            color: ArtistColors.textPrimary,
                             size: 20,
                           ),
-
                           const SizedBox(width: 10),
-
                           Text(
                             'Edit',
-                            style: AppTextStyles.body.copyWith(
-                              color: AppColors.textPrimary,
+                            style: ArtistTextStyles.body.copyWith(
+                              color: ArtistColors.textPrimary,
                             ),
                           ),
                         ],
                       ),
                     ),
-
                     if (!address.isDefault)
                       PopupMenuItem(
                         value: 'default',
                         child: Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.star_outline_rounded,
-                              color: AppColors.textPrimary,
+                              color: ArtistColors.textPrimary,
                               size: 20,
                             ),
-
                             const SizedBox(width: 10),
-
                             Text(
                               'Set as Default',
-                              style: AppTextStyles.body.copyWith(
-                                color: AppColors.textPrimary,
+                              style: ArtistTextStyles.body.copyWith(
+                                color: ArtistColors.textPrimary,
                               ),
                             ),
                           ],
                         ),
                       ),
-
                     PopupMenuItem(
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.delete_outline_rounded,
-                            color: AppColors.error,
+                            color: ArtistColors.error,
                             size: 20,
                           ),
-
                           const SizedBox(width: 10),
-
                           Text(
                             'Delete',
-                            style: AppTextStyles.body.copyWith(
-                              color: AppColors.error,
+                            style: ArtistTextStyles.body.copyWith(
+                              color: ArtistColors.error,
                             ),
                           ),
                         ],
@@ -534,66 +449,55 @@ class _AddressCard extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          // DIVIDER
-          Container(height: 1, color: AppColors.light),
-
+          Container(height: 1, color: ArtistColors.border),
           const SizedBox(height: 15),
-
-          // FULL ADDRESS
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
+              const Icon(
                 Icons.location_on_outlined,
-                color: AppColors.textSecondary,
+                color: ArtistColors.textSecondary,
                 size: 20,
               ),
-
               const SizedBox(width: 9),
-
               Expanded(
                 child: Text(
                   _buildFullAddress(),
-                  style: AppTextStyles.body.copyWith(
-                    color: AppColors.textSecondary,
+                  style: ArtistTextStyles.body.copyWith(
+                    color: ArtistColors.textSecondary,
                     height: 1.45,
                   ),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 15),
-
-          // DEFAULT BADGE
-          if (address.isDefault)
+          if (address.isDefault) ...[
+            const SizedBox(height: 15),
             Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.check_circle_rounded,
-                  color: AppColors.success,
+                  color: ArtistColors.success,
                   size: 17,
                 ),
-
                 const SizedBox(width: 6),
-
                 Text(
                   'Default address',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.success,
+                  style: ArtistTextStyles.caption.copyWith(
+                    color: ArtistColors.success,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
+          ],
         ],
       ),
     );
   }
 
+  // FULL ADDRESS
   String _buildFullAddress() {
     final parts = <String>[
       address.house,
@@ -604,18 +508,20 @@ class _AddressCard extends StatelessWidget {
       address.state,
       address.pincode,
     ];
-
     return parts.join(', ');
   }
 
+  // ADDRESS ICON
   IconData _getAddressIcon(String type) {
     switch (type.toLowerCase()) {
+      case 'workshop':
+        return Icons.handyman_outlined;
+      case 'studio':
+        return Icons.palette_outlined;
       case 'work':
         return Icons.work_outline_rounded;
-
       case 'other':
         return Icons.location_on_outlined;
-
       case 'home':
       default:
         return Icons.home_outlined;
@@ -624,7 +530,6 @@ class _AddressCard extends StatelessWidget {
 }
 
 // ADDRESS TYPE BADGE
-
 class _AddressTypeBadge extends StatelessWidget {
   final String type;
 
@@ -634,16 +539,14 @@ class _AddressTypeBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-
       decoration: BoxDecoration(
-        color: AppColors.light,
+        color: ArtistColors.light,
         borderRadius: BorderRadius.circular(8),
       ),
-
       child: Text(
         type,
-        style: AppTextStyles.caption.copyWith(
-          color: AppColors.primary,
+        style: ArtistTextStyles.caption.copyWith(
+          color: ArtistColors.primary,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -652,7 +555,6 @@ class _AddressTypeBadge extends StatelessWidget {
 }
 
 // EMPTY STATE
-
 class _EmptyAddressState extends StatelessWidget {
   final VoidCallback onAddAddress;
 
@@ -663,79 +565,58 @@ class _EmptyAddressState extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(30),
-
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-
           children: [
-            // ICON
             Container(
               width: 82,
               height: 82,
-
-              decoration: BoxDecoration(
-                color: AppColors.light,
+              decoration: const BoxDecoration(
+                color: ArtistColors.light,
                 shape: BoxShape.circle,
               ),
-
-              child: Icon(
+              child: const Icon(
                 Icons.location_on_outlined,
-                color: AppColors.primary,
+                color: ArtistColors.primary,
                 size: 40,
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // TITLE
             Text(
               'No saved addresses',
               textAlign: TextAlign.center,
-
-              style: AppTextStyles.title.copyWith(color: AppColors.textPrimary),
+              style: ArtistTextStyles.title.copyWith(
+                color: ArtistColors.textPrimary,
+              ),
             ),
-
             const SizedBox(height: 8),
-
-            // DESCRIPTION
             Text(
-              'Add your first delivery address to make checkout faster and easier.',
+              'Add your studio or workshop address to make '
+              'product management and checkout easier.',
               textAlign: TextAlign.center,
-
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.textSecondary,
+              style: ArtistTextStyles.body.copyWith(
+                color: ArtistColors.textSecondary,
                 height: 1.45,
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // ADD BUTTON
             SizedBox(
               height: 50,
-
               child: ElevatedButton.icon(
                 onPressed: onAddAddress,
-
                 icon: const Icon(Icons.add_rounded),
-
                 label: Text(
                   'Add Address',
-                  style: AppTextStyles.body.copyWith(
-                    color: AppColors.surface,
+                  style: ArtistTextStyles.body.copyWith(
+                    color: ArtistColors.background,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-
-                  foregroundColor: AppColors.surface,
-
+                  backgroundColor: ArtistColors.primary,
+                  foregroundColor: ArtistColors.background,
                   elevation: 0,
-
                   padding: const EdgeInsets.symmetric(horizontal: 22),
-
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
