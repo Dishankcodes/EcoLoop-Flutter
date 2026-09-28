@@ -1,105 +1,113 @@
 import 'package:flutter/material.dart';
 
-import '../screens/common/about_ecoloop.dart';
-import '../screens/common/faq.dart';
-import '../screens/common/help_support.dart';
-import '../screens/common/how_it_works.dart';
-import '../screens/common/terms_conditions.dart';
+import '../screens/common/artist/about_ecoloop.dart';
+import '../screens/common/artist/faq.dart';
+import '../screens/common/artist/help_support.dart';
+import '../screens/common/artist/how_it_works.dart';
+import '../screens/common/artist/terms_conditions.dart';
 
-class MoreMenu extends StatelessWidget {
-  const MoreMenu({super.key});
+class ArtistBeforeMoreMenu extends StatelessWidget {
+  const ArtistBeforeMoreMenu({super.key});
 
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert),
-      tooltip: "More",
+      tooltip: 'More',
+
       onSelected: (value) {
         switch (value) {
-          case "about":
+          case 'about':
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const AboutEcoLoop()),
+              MaterialPageRoute(builder: (_) => const ArtistAboutEcoLoop()),
             );
             break;
 
-          case "faq":
+          case 'faq':
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const FAQ()),
+              MaterialPageRoute(builder: (_) => const ArtistFAQ()),
             );
             break;
 
-          case "help":
+          case 'help':
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const HelpSupport()),
+              MaterialPageRoute(
+                builder: (_) => const ArtistHelpSupportScreen(),
+              ),
             );
             break;
 
-          case "how_it_works":
+          case 'how_it_works':
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const UserHowItWorks()),
+              MaterialPageRoute(builder: (_) => const ArtistHowItWorks()),
             );
             break;
 
-          case "terms":
+          case 'terms':
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const TermsConditions()),
+              MaterialPageRoute(builder: (_) => const ArtistTermsConditions()),
             );
             break;
         }
       },
+
       itemBuilder: (context) => const [
         PopupMenuItem<String>(
-          value: "about",
+          value: 'about',
           child: Row(
             children: [
               Icon(Icons.eco_outlined),
               SizedBox(width: 12),
-              Text("About EcoLoop"),
+              Text('About EcoLoop'),
             ],
           ),
         ),
+
         PopupMenuItem<String>(
-          value: "faq",
+          value: 'faq',
           child: Row(
             children: [
               Icon(Icons.help_outline),
               SizedBox(width: 12),
-              Text("FAQ"),
+              Text('FAQ'),
             ],
           ),
         ),
+
         PopupMenuItem<String>(
-          value: "help",
+          value: 'help',
           child: Row(
             children: [
               Icon(Icons.support_agent_outlined),
               SizedBox(width: 12),
-              Text("Help & Support"),
+              Text('Help & Support'),
             ],
           ),
         ),
+
         PopupMenuItem<String>(
-          value: "how_it_works",
+          value: 'how_it_works',
           child: Row(
             children: [
               Icon(Icons.description_outlined),
               SizedBox(width: 12),
-              Text("How It Works!"),
+              Text('How It Works!'),
             ],
           ),
         ),
+
         PopupMenuItem<String>(
-          value: "terms",
+          value: 'terms',
           child: Row(
             children: [
               Icon(Icons.description_outlined),
               SizedBox(width: 12),
-              Text("Terms & Conditions"),
+              Text('Terms & Conditions'),
             ],
           ),
         ),
