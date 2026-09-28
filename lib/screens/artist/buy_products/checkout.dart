@@ -2340,31 +2340,18 @@ class _CheckoutState extends State<Checkout> {
                 _buildStepIndicator(),
 
                 const SizedBox(height: 14),
-
                 _buildAddressSection(),
-
                 const SizedBox(height: 14),
-
                 _buildDeliverySection(),
-
                 const SizedBox(height: 14),
-
                 _buildProductSection(),
-
                 const SizedBox(height: 14),
-
                 _buildCouponSection(),
-
                 const SizedBox(height: 14),
-
                 _buildEcoPointsSection(),
-
                 const SizedBox(height: 14),
-
                 _buildPriceDetails(),
-
                 const SizedBox(height: 16),
-
                 _buildTrustSection(),
               ],
             ),

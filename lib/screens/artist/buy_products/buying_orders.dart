@@ -35,9 +35,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     'Amount: High to Low',
   ];
 
-  // ==========================================================
   // DEMO BUYING ORDERS
-  // ==========================================================
 
   final List<Map<String, dynamic>> _orders = [
     {
@@ -168,9 +166,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     },
   ];
 
-  // ==========================================================
   // LIFECYCLE
-  // ==========================================================
 
   @override
   void dispose() {
@@ -178,9 +174,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     super.dispose();
   }
 
-  // ==========================================================
   // FILTERED ORDERS
-  // ==========================================================
 
   List<Map<String, dynamic>> get _filteredOrders {
     List<Map<String, dynamic>> orders = List<Map<String, dynamic>>.from(
@@ -251,9 +245,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     return orders;
   }
 
-  // ==========================================================
   // BUILD
-  // ==========================================================
 
   @override
   Widget build(BuildContext context) {
@@ -329,9 +321,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     );
   }
 
-  // ==========================================================
   // SEARCH
-  // ==========================================================
 
   Widget _buildSearch() {
     return Padding(
@@ -395,9 +385,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     );
   }
 
-  // ==========================================================
   // SUMMARY
-  // ==========================================================
 
   Widget _buildSummary() {
     final total = _orders.length;
@@ -508,9 +496,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     );
   }
 
-  // ==========================================================
   // FILTER CHIPS
-  // ==========================================================
 
   Widget _buildFilterChips() {
     return SizedBox(
@@ -565,9 +551,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     );
   }
 
-  // ==========================================================
   // ORDER CARD
-  // ==========================================================
 
   Widget _buildOrderCard(Map<String, dynamic> order) {
     final String status = order['status']?.toString() ?? 'pending';
@@ -600,9 +584,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
         ),
         child: Column(
           children: [
-            // ------------------------------------------------
             // TOP
-            // ------------------------------------------------
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -672,9 +654,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
 
             const SizedBox(height: 12),
 
-            // ------------------------------------------------
             // STATUS + PAYMENT + QUANTITY
-            // ------------------------------------------------
             Row(
               children: [
                 Container(
@@ -741,9 +721,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
 
             const SizedBox(height: 12),
 
-            // ------------------------------------------------
             // SELLER + LOCATION
-            // ------------------------------------------------
             Row(
               children: [
                 const Icon(
@@ -787,9 +765,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
 
             const SizedBox(height: 13),
 
-            // ------------------------------------------------
             // VIEW DETAILS
-            // ------------------------------------------------
             SizedBox(
               width: double.infinity,
               height: 40,
@@ -833,9 +809,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     );
   }
 
-  // ==========================================================
   // OPEN ORDER DETAILS
-  // ==========================================================
 
   void _openOrderDetails(Map<String, dynamic> order) {
     Navigator.push(
@@ -844,9 +818,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     );
   }
 
-  // ==========================================================
   // EMPTY STATE
-  // ==========================================================
 
   Widget _buildEmptyState() {
     final bool hasSearch = _searchController.text.trim().isNotEmpty;
@@ -923,9 +895,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     );
   }
 
-  // ==========================================================
   // SORT SHEET
-  // ==========================================================
 
   void _showSortSheet() {
     showModalBottomSheet(
@@ -1007,9 +977,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     );
   }
 
-  // ==========================================================
   // REFRESH
-  // ==========================================================
 
   Future<void> _refreshOrders() async {
     await Future.delayed(const Duration(milliseconds: 700));
@@ -1019,9 +987,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     setState(() {});
   }
 
-  // ==========================================================
   // STATUS HELPERS
-  // ==========================================================
 
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
@@ -1126,9 +1092,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     }
   }
 
-  // ==========================================================
   // VALUE HELPERS
-  // ==========================================================
 
   double _amountValue(dynamic value) {
     if (value is num) {

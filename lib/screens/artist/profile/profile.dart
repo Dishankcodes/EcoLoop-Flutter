@@ -4,6 +4,7 @@ import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/artist_more_menu.dart';
+import '../../common/artist/contact_us.dart';
 import '../../welcome_screen.dart';
 import '../buy_products/buying_orders.dart';
 import '../buy_products/wishlist.dart';
@@ -18,6 +19,7 @@ import 'certification.dart';
 import 'edit_profile.dart';
 import 'followers.dart';
 import 'notification.dart';
+import 'portfolio.dart';
 import 'settings.dart';
 
 class Profile extends StatelessWidget {
@@ -217,7 +219,10 @@ class Profile extends StatelessWidget {
 
               OutlinedButton.icon(
                 onPressed: () {
-                  _showComingSoon(context, 'View Portfolio');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const Portfolio()),
+                  );
                 },
                 icon: const Icon(Icons.collections_outlined, size: 17),
                 label: Text(
@@ -328,6 +333,19 @@ class Profile extends StatelessWidget {
           },
         ),
 
+        const _ProfileDivider(),
+
+        _ProfileTile(
+          icon: Icons.collections_outlined,
+          title: 'Portfolio',
+          subtitle: 'Showcase your creative work',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Portfolio()),
+            );
+          },
+        ),
         const _ProfileDivider(),
 
         _ProfileTile(
@@ -552,7 +570,10 @@ class Profile extends StatelessWidget {
           title: 'Contact Us',
           subtitle: 'Get help or contact EcoLoop support',
           onTap: () {
-            _showComingSoon(context, 'Contact Us');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ContactUs()),
+            );
           },
         ),
       ],

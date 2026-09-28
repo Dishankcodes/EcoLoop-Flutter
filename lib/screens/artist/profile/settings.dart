@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../common/about_ecoloop.dart';
-import '../../common/help_support.dart';
+import '../../common/artist/help_support.dart';
 import '../../common/terms_conditions.dart';
 import 'edit_profile.dart';
 
@@ -201,7 +201,9 @@ class _SettingsState extends State<Settings> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const HelpSupport()),
+                    MaterialPageRoute(
+                      builder: (_) => const ArtistHelpSupportScreen(),
+                    ),
                   );
                 },
               ),

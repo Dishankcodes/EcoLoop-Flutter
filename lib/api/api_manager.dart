@@ -44,9 +44,7 @@ class ApiManager {
 
     dio.interceptors.add(
       InterceptorsWrapper(
-        // ------------------------------------------------------------
         // REQUEST
-        // ------------------------------------------------------------
         onRequest: (options, handler) {
           if (kDebugMode) {
             debugPrint('');
@@ -80,9 +78,7 @@ class ApiManager {
           handler.next(options);
         },
 
-        // ------------------------------------------------------------
         // RESPONSE
-        // ------------------------------------------------------------
         onResponse: (response, handler) async {
           if (kDebugMode) {
             debugPrint('');
@@ -92,9 +88,9 @@ class ApiManager {
             debugPrint('==================================');
           }
 
-          // ----------------------------------------------------------
+          
           // GOOGLE APPS SCRIPT 302 REDIRECT
-          // ----------------------------------------------------------
+          
           if (response.statusCode == 302) {
             final location = response.headers.value('location');
 
@@ -184,9 +180,8 @@ class ApiManager {
             }
           }
 
-          // ------------------------------------------------------------
           // NORMAL JSON RESPONSE
-          // ------------------------------------------------------------
+
           if (response.data is String) {
             final raw = response.data as String;
 
@@ -202,9 +197,7 @@ class ApiManager {
           handler.next(response);
         },
 
-        // ------------------------------------------------------------
         // ERROR
-        // ------------------------------------------------------------
         onError: (DioException error, handler) {
           if (kDebugMode) {
             debugPrint('');

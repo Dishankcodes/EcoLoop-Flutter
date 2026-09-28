@@ -15,9 +15,7 @@ class OrderTracking extends StatefulWidget {
 }
 
 class _OrderTrackingState extends State<OrderTracking> {
-  // ==========================================================
   // ORDER DATA
-  // ==========================================================
 
   String get productName =>
       widget.order['productTitle']?.toString() ??
@@ -70,9 +68,7 @@ class _OrderTrackingState extends State<OrderTracking> {
   String get paymentStatus =>
       widget.order['paymentStatus']?.toString() ?? 'paid';
 
-  // ==========================================================
   // BUILD
-  // ==========================================================
 
   @override
   Widget build(BuildContext context) {
@@ -96,9 +92,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // APP BAR
-  // ==========================================================
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -132,9 +126,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // TRACKING HEADER
-  // ==========================================================
 
   Widget _buildTrackingHeader() {
     return Container(
@@ -242,9 +234,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     }
   }
 
-  // ==========================================================
   // CURRENT STATUS
-  // ==========================================================
 
   Widget _buildCurrentStatus() {
     return Container(
@@ -301,9 +291,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // TRACKING TIMELINE
-  // ==========================================================
 
   Widget _buildTrackingTimeline() {
     return _section(
@@ -374,9 +362,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // STATUS PROGRESS
-  // ==========================================================
 
   bool _isStatusAtLeast(String status) {
     const statuses = [
@@ -399,9 +385,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     return currentIndex >= targetIndex;
   }
 
-  // ==========================================================
   // TIMELINE ITEM
-  // ==========================================================
 
   Widget _buildTimelineItem({
     required IconData icon,
@@ -534,9 +518,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // PRODUCT CARD
-  // ==========================================================
 
   Widget _buildProductCard() {
     return _section(
@@ -614,9 +596,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // DELIVERY CARD
-  // ==========================================================
 
   Widget _buildDeliveryCard() {
     return _section(
@@ -714,9 +694,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // ORDER INFORMATION
-  // ==========================================================
 
   Widget _buildOrderInformation() {
     return _section(
@@ -772,9 +750,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // HELP CARD
-  // ==========================================================
 
   Widget _buildHelpCard() {
     return _section(
@@ -841,9 +817,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // MORE OPTIONS
-  // ==========================================================
 
   void _showMoreOptions() {
     showModalBottomSheet(
@@ -897,9 +871,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // SHEET OPTION
-  // ==========================================================
 
   Widget _sheetOption({
     required IconData icon,
@@ -928,9 +900,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // SECTION
-  // ==========================================================
 
   Widget _section({required Widget child}) {
     return Container(
@@ -942,9 +912,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // SECTION TITLE
-  // ==========================================================
 
   Widget _sectionTitle(String title, IconData icon) {
     return Row(
@@ -964,9 +932,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 
-  // ==========================================================
   // STATUS HELPERS
-  // ==========================================================
 
   Color _statusColor() {
     switch (rawStatus.toLowerCase()) {
@@ -1077,9 +1043,7 @@ class _OrderTrackingState extends State<OrderTracking> {
     return value[0].toUpperCase() + value.substring(1);
   }
 
-  // ==========================================================
   // MESSAGE
-  // ==========================================================
 
   void _showMessage(String message) {
     if (!mounted) return;
