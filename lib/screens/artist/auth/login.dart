@@ -6,8 +6,8 @@ import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../app_theme/artist/artist_theme.dart';
 import '../../../models/auth/artist/artist_send_otp_request.dart';
+import '../../../widgets/artist_before_more_menu.dart';
 import '../../../widgets/back_button.dart';
-import '../../../widgets/more_menu.dart';
 import 'artist_otp.dart';
 import 'register.dart';
 
@@ -269,7 +269,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
-                      children: const [AppBackButton(), MoreMenu()],
+                      children: const [AppBackButton(), ArtistBeforeMoreMenu()],
                     ),
                     const SizedBox(height: 30),
 
