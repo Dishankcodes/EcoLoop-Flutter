@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
+import '../../../services/ecoloop_api.dart';
 import 'selling_order_details.dart';
 
 class SellingOrders extends StatefulWidget {
@@ -11,269 +12,293 @@ class SellingOrders extends StatefulWidget {
 }
 
 class _SellingOrdersState extends State<SellingOrders> {
-  // ============================================================
-  // DUMMY SELLING ORDERS
-  // ============================================================
-
-  final List<Map<String, dynamic>> _sellingOrders = [
-    {
-      'product': 'Old Wooden Chair',
-      'price': '₹1,200',
-      'date': '27 Aug 2026',
-      'status': 'Completed',
-      'statusColor': AppColors.success,
-      'icon': Icons.chair_outlined,
-      'orderId': '#EL1008',
-      'buyer': 'Aarav Shah',
-      'quantity': 1,
-      'payment': 'Paid',
-    },
-    {
-      'product': 'Desk Lamp',
-      'price': '₹650',
-      'date': '31 Aug 2026',
-      'status': 'Processing',
-      'statusColor': Colors.orange,
-      'icon': Icons.light_outlined,
-      'orderId': '#EL1029',
-      'buyer': 'Riya Patel',
-      'quantity': 1,
-      'payment': 'Paid',
-    },
-    {
-      'product': 'Canvas Art Frame',
-      'price': '₹900',
-      'date': '01 Sep 2026',
-      'status': 'New Order',
-      'statusColor': AppColors.primary,
-      'icon': Icons.image_outlined,
-      'orderId': '#EL1034',
-      'buyer': 'Dev Mehta',
-      'quantity': 1,
-      'payment': 'Paid',
-    },
-    {
-      'product': 'Wooden Storage Box',
-      'price': '₹1,450',
-      'date': '02 Sep 2026',
-      'status': 'Shipped',
-      'statusColor': Colors.blue,
-      'icon': Icons.inventory_2_outlined,
-      'orderId': '#EL1038',
-      'buyer': 'Meera Joshi',
-      'quantity': 2,
-      'payment': 'Paid',
-    },
-  ];
-
-  // ============================================================
-  // BUILD
-  // ============================================================
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _orders = [];
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
-                children: [
-                  _buildEarningsCard(),
-                  const SizedBox(height: 24),
-                  _buildOrderSectionHeader(),
-                  const SizedBox(height: 12),
-                  _buildOrders(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void initState() {
+    super.initState();
+    _loadOrders();
   }
 
-  // ============================================================
-  // HEADER
-  // ============================================================
+  Future<void> _loadOrders() async {
+    if (mounted)
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    try {
+      final data = await EcoLoopApi.instance.get('/artist/orders');
+      final rows = data is List
+          ? data
+          : (data is Map && data['orders'] is List
+                ? data['orders'] as List
+                : <dynamic>[]);
+      final mapped = rows
+          .whereType<Map>()
+          .map((e) => _normalize(Map<String, dynamic>.from(e)))
+          .toList();
+      if (mounted)
+        setState(() {
+          _orders = mapped;
+          _loading = false;
+        });
+    } catch (e) {
+      if (mounted)
+        setState(() {
+          _error = e.toString().replaceFirst('Exception: ', '');
+          _loading = false;
+        });
+    }
+  }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-      child: Row(
+  Map<String, dynamic> _normalize(Map<String, dynamic> raw) {
+    final amount = _num(raw['totalAmount'] ?? raw['price'] ?? raw['amount']);
+    final created = DateTime.tryParse(
+      '${raw['createdAt'] ?? raw['date'] ?? ''}',
+    );
+    final status = _prettyStatus('${raw['status'] ?? 'new_order'}');
+    return {
+      ...raw,
+      'orderId': raw['orderId'] ?? raw['id'] ?? '',
+      'product':
+          raw['productName'] ??
+          raw['title'] ??
+          'Product #${raw['productId'] ?? '—'}',
+      'priceValue': amount,
+      'price':
+          '₹${amount.toStringAsFixed(2).replaceAll(RegExp(r'\\.00$'), '')}',
+      'date': created == null
+          ? 'Date unavailable'
+          : '${created.day.toString().padLeft(2, '0')} ${_month(created.month)} ${created.year}',
+      'status': status,
+      'buyer':
+          raw['buyerName'] ??
+          (raw['buyerId'] == null
+              ? 'Buyer details unavailable'
+              : 'Buyer #${raw['buyerId']}'),
+      'quantity': raw['quantity'] ?? 1,
+      'payment': _prettyStatus('${raw['paymentStatus'] ?? 'unknown'}'),
+      'icon': Icons.inventory_2_outlined,
+    };
+  }
+
+  double _num(dynamic v) => double.tryParse('$v') ?? 0;
+
+  String _month(int m) => const [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ][m - 1];
+
+  String _prettyStatus(String s) => s
+      .replaceAll('_', ' ')
+      .split(' ')
+      .where((x) => x.isNotEmpty)
+      .map((x) => x[0].toUpperCase() + x.substring(1).toLowerCase())
+      .join(' ');
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.background,
+    body: SafeArea(
+      child: Column(
         children: [
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 42, minHeight: 42),
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            icon: const Icon(
-              Icons.arrow_back_rounded,
-              color: AppColors.textPrimary,
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
+          _header(),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Selling Orders',
-                  style: TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Manage orders from your buyers',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          Container(
-            height: 44,
-            width: 44,
-            decoration: BoxDecoration(
-              color: AppColors.light,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(
-              Icons.storefront_outlined,
-              color: AppColors.primary,
+            child: RefreshIndicator(
+              onRefresh: _loadOrders,
+              child: _loading
+                  ? ListView(
+                      children: [
+                        SizedBox(height: 180),
+                        Center(child: CircularProgressIndicator()),
+                      ],
+                    )
+                  : _error != null
+                  ? ListView(
+                      children: [
+                        _message(
+                          Icons.cloud_off_outlined,
+                          'Could not load selling orders',
+                          _error!,
+                          onRetry: _loadOrders,
+                        ),
+                      ],
+                    )
+                  : _orders.isEmpty
+                  ? ListView(
+                      children: [
+                        _message(
+                          Icons.storefront_outlined,
+                          'No sales yet',
+                          'Orders for your products will appear here when buyers place them.',
+                        ),
+                      ],
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                      children: [
+                        _summaryCard(),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Order History',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '${_orders.length} orders',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ..._orders.map(_orderCard),
+                      ],
+                    ),
             ),
           ),
         ],
       ),
+    ),
+  );
+
+  Widget _header() => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+    child: Row(
+      children: [
+        IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Selling Orders',
+                style: TextStyle(
+                  fontSize: 25,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Manage orders from your buyers',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          height: 44,
+          width: 44,
+          decoration: BoxDecoration(
+            color: AppColors.light,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(
+            Icons.storefront_outlined,
+            color: AppColors.primary,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _summaryCard() {
+    final total = _orders.fold<double>(
+      0,
+      (s, o) => s + _num(o['totalAmount'] ?? o['priceValue']),
     );
-  }
-
-  // ============================================================
-  // EARNINGS CARD
-  // ============================================================
-
-  Widget _buildEarningsCard() {
+    final pending = _orders
+        .where(
+          (o) => !['Delivered', 'Completed', 'Cancelled'].contains(o['status']),
+        )
+        .fold<double>(
+          0,
+          (s, o) => s + _num(o['totalAmount'] ?? o['priceValue']),
+        );
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primary.withOpacity(0.82)],
+          colors: [AppColors.primary, AppColors.primary.withOpacity(.82)],
         ),
         borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.18),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Row
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Your Selling Summary',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.16),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.trending_up_rounded,
-                      size: 14,
-                      color: Colors.white,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'Seller Hub',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
           const Text(
-            '₹4,200',
+            'Your Selling Summary',
             style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            '₹${total.toStringAsFixed(2)}',
+            style: const TextStyle(
               fontSize: 30,
               fontWeight: FontWeight.w800,
               color: Colors.white,
             ),
           ),
-
-          const SizedBox(height: 3),
-
           const Text(
-            'Total sales value',
+            'Total order value',
             style: TextStyle(fontSize: 12, color: Colors.white70),
           ),
-
           const SizedBox(height: 18),
-
-          Divider(height: 1, color: Colors.white.withOpacity(0.20)),
-
+          Divider(height: 1, color: Colors.white.withOpacity(.2)),
           const SizedBox(height: 14),
-
           Row(
             children: [
               Expanded(
-                child: _buildEarningItem(
-                  icon: Icons.check_circle_outline_rounded,
-                  title: 'Completed',
-                  value: '₹1,200',
+                child: _earning(
+                  'Orders',
+                  '${_orders.length}',
+                  Icons.receipt_long_outlined,
                 ),
               ),
               Container(
                 height: 38,
                 width: 1,
-                color: Colors.white.withOpacity(0.18),
+                color: Colors.white.withOpacity(.18),
               ),
               Expanded(
-                child: _buildEarningItem(
-                  icon: Icons.schedule_rounded,
-                  title: 'Pending',
-                  value: '₹3,000',
+                child: _earning(
+                  'In progress',
+                  '₹${pending.toStringAsFixed(2)}',
+                  Icons.schedule_rounded,
                 ),
               ),
             ],
@@ -283,122 +308,58 @@ class _SellingOrdersState extends State<SellingOrders> {
     );
   }
 
-  Widget _buildEarningItem({
-    required IconData icon,
-    required String title,
-    required String value,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Row(
-        children: [
-          Icon(icon, size: 19, color: Colors.white70),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 11, color: Colors.white70),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // SECTION HEADER
-  // ============================================================
-
-  Widget _buildOrderSectionHeader() {
-    return Row(
+  Widget _earning(String label, String value, IconData icon) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 6),
+    child: Row(
       children: [
-        const Expanded(
-          child: Text(
-            'Order History',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.light,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            '${_sellingOrders.length} Orders',
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primary,
-            ),
+        Icon(icon, size: 19, color: Colors.white70),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11, color: Colors.white70),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ],
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
 
-  // ============================================================
-  // ORDERS
-  // ============================================================
-
-  Widget _buildOrders() {
-    if (_sellingOrders.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return Column(
-      children: _sellingOrders.map((order) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: _buildSellingOrderCard(order),
-        );
-      }).toList(),
-    );
-  }
-
-  // ============================================================
-  // SELLING ORDER CARD
-  // ============================================================
-
-  Widget _buildSellingOrderCard(Map<String, dynamic> order) {
+  Widget _orderCard(Map<String, dynamic> order) {
+    final status = '${order['status']}';
+    final color = ['Delivered', 'Completed'].contains(status)
+        ? AppColors.success
+        : status == 'Cancelled'
+        ? AppColors.error
+        : status == 'Packed'
+        ? Colors.orange
+        : AppColors.primary;
     return Container(
+      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(19),
-        border: Border.all(color: AppColors.accent.withOpacity(0.45)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.035),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: AppColors.accent.withOpacity(.45)),
       ),
       child: Column(
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Product Icon
               Container(
                 height: 68,
                 width: 68,
@@ -406,18 +367,19 @@ class _SellingOrdersState extends State<SellingOrders> {
                   color: AppColors.light,
                   borderRadius: BorderRadius.circular(15),
                 ),
-                child: Icon(order['icon'], size: 31, color: AppColors.primary),
+                child: const Icon(
+                  Icons.inventory_2_outlined,
+                  size: 31,
+                  color: AppColors.primary,
+                ),
               ),
-
               const SizedBox(width: 13),
-
-              // Product Information
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      order['product'],
+                      '${order['product']}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -426,21 +388,17 @@ class _SellingOrdersState extends State<SellingOrders> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-
                     const SizedBox(height: 5),
-
                     Text(
-                      'Order ${order['orderId']}',
+                      'Order #${order['orderId']}',
                       style: const TextStyle(
                         fontSize: 11.5,
                         color: AppColors.textSecondary,
                       ),
                     ),
-
                     const SizedBox(height: 3),
-
                     Text(
-                      order['date'],
+                      '${order['date']}',
                       style: const TextStyle(
                         fontSize: 11.5,
                         color: AppColors.textSecondary,
@@ -449,15 +407,12 @@ class _SellingOrdersState extends State<SellingOrders> {
                   ],
                 ),
               ),
-
               const SizedBox(width: 8),
-
-              // Amount
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    order['price'],
+                    '${order['price']}',
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
@@ -476,14 +431,9 @@ class _SellingOrdersState extends State<SellingOrders> {
               ),
             ],
           ),
-
           const SizedBox(height: 14),
-
-          Divider(height: 1, color: AppColors.accent.withOpacity(0.25)),
-
+          Divider(height: 1, color: AppColors.accent.withOpacity(.25)),
           const SizedBox(height: 12),
-
-          // Buyer + Payment
           Row(
             children: [
               const Icon(
@@ -503,188 +453,81 @@ class _SellingOrdersState extends State<SellingOrders> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.09),
+                  color: color.withOpacity(.09),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.check_circle_outline_rounded,
-                      size: 12,
-                      color: AppColors.success,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      order['payment'],
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.success,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 12),
-
-          // Status + Details
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: order['statusColor'].withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      height: 7,
-                      width: 7,
-                      decoration: BoxDecoration(
-                        color: order['statusColor'],
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      order['status'],
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: order['statusColor'],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const Spacer(),
-
-              TextButton(
-                onPressed: () {
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () =>
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => SellingOrderDetails(order: order),
                     ),
-                  );
-                },
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 4,
-                  ),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'View Details',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Icon(Icons.arrow_forward_rounded, size: 15),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // EMPTY STATE
-  // ============================================================
-
-  Widget _buildEmptyState() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 45),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.accent.withOpacity(0.4)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            height: 88,
-            width: 88,
-            decoration: BoxDecoration(
-              color: AppColors.light,
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child: const Icon(
-              Icons.storefront_outlined,
-              size: 42,
-              color: AppColors.primary,
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          const Text(
-            'No sales yet',
-            style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          const Text(
-            'When someone buys an item from your listings, '
-            'the order will appear here.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-              height: 1.5,
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          SizedBox(
-            height: 45,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              icon: const Icon(Icons.arrow_back_rounded, size: 17),
-              label: const Text('Back to Orders'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(13),
-                ),
-              ),
+                  ).then((changed) {
+                    if (changed == true) _loadOrders();
+                  }),
+              icon: const Icon(Icons.arrow_forward_rounded, size: 15),
+              label: const Text('View Details'),
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _message(
+    IconData icon,
+    String title,
+    String body, {
+    Future<void> Function()? onRetry,
+  }) => Padding(
+    padding: const EdgeInsets.fromLTRB(28, 100, 28, 30),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 52, color: AppColors.primary),
+        const SizedBox(height: 16),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          body,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+            height: 1.5,
+          ),
+        ),
+        if (onRetry != null) ...[
+          const SizedBox(height: 16),
+          OutlinedButton(onPressed: onRetry, child: const Text('Try again')),
+        ],
+      ],
+    ),
+  );
 }
