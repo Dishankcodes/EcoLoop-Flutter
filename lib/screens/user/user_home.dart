@@ -49,43 +49,15 @@ class _UserHomeState extends State<UserHome> {
   Future<void> _loadProducts() async {
     try {
       final data = await EcoLoopApi.instance.get('/products');
-      final rows = (data is List ? data : <dynamic>[]).whereType<Map>().map((
-        raw,
-      ) {
+      final rows = (data is List ? data : <dynamic>[]).whereType<Map>().map((raw) {
         final p = Map<String, dynamic>.from(raw);
-        final images = (p['imageUrls'] is List)
-            ? List<dynamic>.from(p['imageUrls'])
-            : <dynamic>[];
-        final location = [
-          p['city'],
-          p['state'],
-        ].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
-        return <String, dynamic>{
-          ...p,
-          'id': p['productId'],
-          'seller': p['sellerName'] ?? 'EcoLoop seller',
-          'category': p['categoryName'] ?? 'Other',
-          'location': location.isEmpty ? 'Location not provided' : location,
-          'image': images.isNotEmpty ? images.first.toString() : '',
-          'images': images,
-          'price': p['price'] ?? 0,
-          'condition': p['condition'] ?? 'Not specified',
-        };
+        final images = (p['imageUrls'] is List) ? List<dynamic>.from(p['imageUrls']) : <dynamic>[];
+        final location = [p['city'], p['state']].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
+        return <String, dynamic>{...p, 'id': p['productId'], 'seller': p['sellerName'] ?? 'EcoLoop seller', 'category': p['categoryName'] ?? 'Other', 'location': location.isEmpty ? 'Location not provided' : location, 'image': images.isNotEmpty ? images.first.toString() : '', 'images': images, 'price': p['price'] ?? 0, 'condition': p['condition'] ?? 'Not specified'};
       }).toList();
       if (!mounted) return;
-      setState(() {
-        _products
-          ..clear()
-          ..addAll(rows);
-        _loadingProducts = false;
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _loadingProducts = false;
-        });
-      }
-    }
+      setState(() { _products..clear()..addAll(rows); _loadingProducts = false; });
+    } catch (_) { if (mounted) setState(() { _loadingProducts = false; }); }
   }
 
   // DISPOSE
@@ -409,7 +381,7 @@ class _UserHomeState extends State<UserHome> {
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         itemCount: _categories.length,
-        separatorBuilder: (context, index) {
+        separatorBuilder: (_, __) {
           return const SizedBox(width: 10);
         },
         itemBuilder: (context, index) {
@@ -638,35 +610,8 @@ class _UserHomeState extends State<UserHome> {
   // RECOMMENDED PRODUCTS
 
   Widget _buildProducts() {
-    if (_loadingProducts)
-      return const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    if (_products.isEmpty)
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 28),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.inventory_2_outlined,
-                size: 36,
-                color: AppColors.primary,
-              ),
-              const SizedBox(height: 8),
-              Text('No listings available yet', style: AppTextStyles.title),
-              const SizedBox(height: 4),
-              Text(
-                'New items from the marketplace will appear here.',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.caption,
-              ),
-            ],
-          ),
-        ),
-      );
+    if (_loadingProducts) return const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()));
+    if (_products.isEmpty) return Padding(padding: const EdgeInsets.symmetric(vertical: 28), child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.inventory_2_outlined, size: 36, color: AppColors.primary), const SizedBox(height: 8), Text('No listings available yet', style: AppTextStyles.title), const SizedBox(height: 4), Text('New items from the marketplace will appear here.', textAlign: TextAlign.center, style: AppTextStyles.caption)])));
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -827,10 +772,7 @@ class _HomeProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final priceValue = product['price'];
-    final int price = priceValue is num
-        ? priceValue.toInt()
-        : int.tryParse(priceValue?.toString() ?? '') ?? 0;
+    final int price = (product['price'] as num).toInt();
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -858,51 +800,39 @@ class _HomeProductCard extends StatelessWidget {
                 children: [
                   // PRODUCT IMAGE
                   Positioned.fill(
-                    child:
-                        (product['image']?.toString().trim().isNotEmpty ??
-                            false)
-                        ? Image.network(
-                            product['image'].toString(),
-                            fit: BoxFit.cover,
+                    child: Image.network(
+                      product['image'].toString(),
+                      fit: BoxFit.cover,
 
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) {
-                                return child;
-                              }
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) {
+                          return child;
+                        }
 
-                              return Container(
-                                color: AppColors.light,
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              );
-                            },
+                        return Container(
+                          color: AppColors.light,
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        );
+                      },
 
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: AppColors.light,
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.image_not_supported_outlined,
-                                    size: 35,
-                                    color: AppColors.secondary,
-                                  ),
-                                ),
-                              );
-                            },
-                          )
-                        : Container(
-                            color: AppColors.light,
-                            alignment: Alignment.center,
-                            child: const Icon(
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: AppColors.light,
+                          child: const Center(
+                            child: Icon(
                               Icons.image_not_supported_outlined,
                               size: 35,
                               color: AppColors.secondary,
                             ),
                           ),
+                        );
+                      },
+                    ),
                   ),
 
                   // CONDITION
