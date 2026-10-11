@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../services/ecoloop_api.dart';
-
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import '../../../widgets/user_more_menu.dart';
 import 'product_details.dart';
 import 'wishlist.dart';
@@ -65,25 +64,47 @@ class _MarketplaceState extends State<Marketplace> {
   Future<void> _loadProducts() async {
     try {
       final data = await EcoLoopApi.instance.get('/products');
-      final rows = (data is List ? data : <dynamic>[]).whereType<Map>().map((raw) {
+      final rows = (data is List ? data : <dynamic>[]).whereType<Map>().map((
+        raw,
+      ) {
         final p = Map<String, dynamic>.from(raw);
-        final images = (p['imageUrls'] is List) ? List<dynamic>.from(p['imageUrls']) : <dynamic>[];
-        final category = (p['categoryName'] ?? p['category'] ?? 'Other').toString();
+        final images = (p['imageUrls'] is List)
+            ? List<dynamic>.from(p['imageUrls'])
+            : <dynamic>[];
+        final category = (p['categoryName'] ?? p['category'] ?? 'Other')
+            .toString();
         final seller = (p['sellerName'] ?? 'EcoLoop seller').toString();
-        final location = [p['city'], p['state']].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
+        final location = [
+          p['city'],
+          p['state'],
+        ].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
         return <String, dynamic>{
-          ...p, 'id': p['productId'], 'category': category, 'seller': seller,
+          ...p,
+          'id': p['productId'],
+          'category': category,
+          'seller': seller,
           'location': location.isEmpty ? 'Location not provided' : location,
-          'image': images.isNotEmpty ? images.first.toString() : '', 'images': images,
-          'price': p['price'] ?? 0, 'condition': p['condition'] ?? 'Not specified',
+          'image': images.isNotEmpty ? images.first.toString() : '',
+          'images': images,
+          'price': p['price'] ?? 0,
+          'condition': p['condition'] ?? 'Not specified',
           'availableQuantity': p['availableQuantity'] ?? 0,
         };
       }).toList();
       if (!mounted) return;
-      setState(() { products..clear()..addAll(rows); _loadingProducts = false; _loadError = null; });
+      setState(() {
+        products
+          ..clear()
+          ..addAll(rows);
+        _loadingProducts = false;
+        _loadError = null;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _loadingProducts = false; _loadError = e.toString(); });
+      setState(() {
+        _loadingProducts = false;
+        _loadError = e.toString();
+      });
     }
   }
 
@@ -548,12 +569,19 @@ class _MarketplaceState extends State<Marketplace> {
 
             const SizedBox(height: 17),
 
-            Text(_loadError == null ? 'No products found' : 'Products could not be loaded', style: AppTextStyles.title),
+            Text(
+              _loadError == null
+                  ? 'No products found'
+                  : 'Products could not be loaded',
+              style: AppTextStyles.title,
+            ),
 
             const SizedBox(height: 6),
 
             Text(
-              _loadError == null ? 'No live listings match your filters yet.' : 'Check your internet connection and Apps Script deployment, then retry.',
+              _loadError == null
+                  ? 'No live listings match your filters yet.'
+                  : 'Check your internet connection and Apps Script deployment, then retry.',
               textAlign: TextAlign.center,
               style: AppTextStyles.body,
             ),

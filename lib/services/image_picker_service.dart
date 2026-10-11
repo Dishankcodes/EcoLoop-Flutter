@@ -318,6 +318,9 @@ class ImagePickerService {
       ).replace(queryParameters: const {'path': '/profile'});
 
       final Map<String, dynamic> body = {
+        // Google Apps Script web apps accept GET/POST transport methods.
+        // _method tells the API router to process this POST as a profile PUT.
+        '_method': 'PUT',
         'token': token,
         'firstName': firstName.trim(),
         'lastName': lastName.trim(),
@@ -332,11 +335,11 @@ class ImagePickerService {
       debugPrint('==========================================');
       debugPrint('ECOLOOP PROFILE UPDATE');
       debugPrint('==========================================');
-      debugPrint('PUT $uri');
+      debugPrint('POST $uri (method override: PUT)');
       debugPrint('BODY: $body');
       debugPrint('==========================================');
 
-      final Response<dynamic> response = await dio.put<dynamic>(
+      final Response<dynamic> response = await dio.post<dynamic>(
         uri.toString(),
         data: body,
         options: Options(followRedirects: false, maxRedirects: 0),
