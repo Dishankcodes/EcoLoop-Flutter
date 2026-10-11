@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../services/eco_image_picker.dart';
-import '../../../services/ecoloop_api.dart';
-
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
+import '../../../services/eco_image_picker.dart';
+import '../../../services/ecoloop_api.dart';
 import '../donations/donate_item.dart';
 
 class AddProduct extends StatefulWidget {
@@ -29,16 +28,46 @@ class _AddProductState extends State<AddProduct> {
   String? selectedCategory;
   String? selectedCondition;
 
-  final List<String> categories = [
-    'Furniture',
-    'Electronics',
-    'Home & Decor',
-    'Books',
-    'Clothing',
-    'Kitchen',
-    'Sports',
-    'Other',
-  ];
+  List<String> categories = [];
+  final Map<String, int> _categoryIds = {};
+  bool _isLoadingCategories = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final result = await EcoLoopApi.instance.get('/categories');
+      final rows = result is List
+          ? result
+          : (result is Map
+                ? (result['data'] ?? result['categories'] ?? [])
+                : []);
+      final names = <String>[];
+      final ids = <String, int>{};
+      for (final row in rows) {
+        if (row is Map && row['name'] != null && row['categoryId'] != null) {
+          final name = row['name'].toString();
+          names.add(name);
+          ids[name] = int.tryParse(row['categoryId'].toString()) ?? 0;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          categories = names;
+          _categoryIds
+            ..clear()
+            ..addAll(ids);
+          _isLoadingCategories = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingCategories = false);
+    }
+  }
 
   final List<String> conditions = [
     'New',
@@ -151,10 +180,10 @@ class _AddProductState extends State<AddProduct> {
               icon: Icons.currency_rupee_rounded,
               keyboardType: TextInputType.number,
               validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter expected price';
+                final price = double.tryParse((value ?? '').trim());
+                if (price == null || price < 0) {
+                  return 'Enter a valid price';
                 }
-
                 return null;
               },
             ),
@@ -363,7 +392,11 @@ class _AddProductState extends State<AddProduct> {
     return ElevatedButton.icon(
       onPressed: _isSubmitting ? null : _submitProduct,
       icon: _isSubmitting
-          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
           : const Icon(Icons.sell_outlined),
       label: Text(_isSubmitting ? 'Saving listing…' : 'List Item for Sale'),
     );
@@ -371,8 +404,20 @@ class _AddProductState extends State<AddProduct> {
 
   Future<void> _submitProduct() async {
     if (!_formKey.currentState!.validate()) return;
+    if (categories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No active categories found. Please add categories in the backend sheet.',
+          ),
+        ),
+      );
+      return;
+    }
     if (_images.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least one product photo.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add at least one product photo.')),
+      );
       return;
     }
     setState(() => _isSubmitting = true);
@@ -380,20 +425,29 @@ class _AddProductState extends State<AddProduct> {
       await EcoLoopApi.instance.post('/products', {
         'title': titleController.text.trim(),
         'description': descriptionController.text.trim(),
-        'categoryId': EcoLoopApi.categoryId(selectedCategory),
+        'categoryId': _categoryIds[selectedCategory],
         'listingType': 'c2c',
-        'condition': (selectedCondition ?? 'used').toLowerCase().replaceAll(' ', '_'),
+        'condition': (selectedCondition ?? 'used').toLowerCase().replaceAll(
+          ' ',
+          '_',
+        ),
         'price': double.parse(priceController.text.trim()),
         'quantity': 1,
         'status': 'published',
         'imageBase64': await EcoImagePicker.payload(_images),
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your item has been listed successfully.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your item has been listed successfully.'),
+        ),
+      );
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
