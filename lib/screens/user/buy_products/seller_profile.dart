@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
-import '../reviews/seller_reviews.dart';
+import '../../../services/ecoloop_api.dart';
 import 'product_details.dart';
 
+/// Public profile for a regular EcoLoop user who has published listings.
+/// Listings and counts are derived from the API; no demo items are displayed.
 class SellerProfile extends StatefulWidget {
   const SellerProfile({super.key, required this.seller});
 
@@ -15,950 +17,366 @@ class SellerProfile extends StatefulWidget {
 }
 
 class _SellerProfileState extends State<SellerProfile> {
-  bool _isFollowing = false;
-  late final List<Map<String, dynamic>> _listings;
+  final EcoLoopApi _api = EcoLoopApi.instance;
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _listings = [];
+
+  Map<String, dynamic> _map(dynamic v) {
+    if (v is Map<String, dynamic>) return v;
+    if (v is Map) return v.map((k, val) => MapEntry(k.toString(), val));
+    return <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _rows(dynamic v) {
+    if (v is List) return v.map(_map).where((e) => e.isNotEmpty).toList();
+    final m = _map(v);
+    final data = _map(m['data']);
+    for (final k in ['products', 'items', 'results']) {
+      final x = m[k] ?? data[k];
+      if (x is List) return x.map(_map).where((e) => e.isNotEmpty).toList();
+    }
+    return [];
+  }
+
+  String _id(dynamic v) => v == null ? '' : v.toString().trim();
+
+  String _productId(Map<String, dynamic> p) =>
+      _id(p['productId'] ?? p['product_id'] ?? p['id']);
+
+  String _sellerId(Map<String, dynamic> p) =>
+      _id(p['sellerId'] ?? p['seller_id'] ?? p['userId'] ?? p['ownerId']);
+
+  List<String> _images(Map<String, dynamic> p) {
+    final raw = p['imageUrls'] ?? p['images'] ?? p['imageUrl'] ?? p['image'];
+    if (raw is List)
+      return raw
+          .map((e) => e.toString())
+          .where((e) => e.startsWith('http'))
+          .toList();
+    if (raw is String && raw.trim().isNotEmpty) {
+      final t = raw.trim();
+      if (t.startsWith('[') && t.endsWith(']'))
+        return t
+            .substring(1, t.length - 1)
+            .split(',')
+            .map((e) => e.trim().replaceAll('"', '').replaceAll("'", ''))
+            .where((e) => e.startsWith('http'))
+            .toList();
+      return t
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.startsWith('http'))
+          .toList();
+    }
+    return [];
+  }
+
+  Future<void> _loadListings() async {
+    if (mounted) setState(() => _loading = true);
+    try {
+      final rows = _rows(
+        await _api.get(
+          '/products',
+          query: {'limit': 200, 'status': 'published'},
+        ),
+      );
+      final sellerId = _id(
+        widget.seller['userId'] ??
+            widget.seller['id'] ??
+            widget.seller['sellerId'],
+      );
+      final filtered = rows.where((p) {
+        final status = (p['status'] ?? 'published').toString().toLowerCase();
+        final type = (p['sellerType'] ?? p['seller_type'] ?? 'user')
+            .toString()
+            .toLowerCase();
+        final sameId = sellerId.isNotEmpty && _sellerId(p) == sellerId;
+        final available =
+            num.tryParse(
+              (p['availableQuantity'] ?? p['quantity'] ?? 1).toString(),
+            ) ??
+            1;
+        return sameId &&
+            type == 'user' &&
+            (status.isEmpty || status == 'published' || status == 'active') &&
+            available > 0;
+      }).toList();
+      if (mounted)
+        setState(
+          () => _listings = filtered
+            ..sort(
+              (a, b) => _id(b['createdAt']).compareTo(_id(a['createdAt'])),
+            ),
+        );
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-
-    _listings = [
-      {
-        'id': 101,
-        'title': 'Wooden Study Table',
-        'price': 2500,
-        'seller': widget.seller['name'] ?? 'Rahul',
-        'condition': 'Used',
-        'category': 'Furniture',
-        'location': widget.seller['location'] ?? 'Ahmedabad, Gujarat',
-        'views': 182,
-        'wishlistCount': 21,
-        'availableQuantity': 1,
-        'description':
-            'Solid wooden study table in good condition. Suitable for home offices, study rooms and creative spaces.',
-        'image':
-            'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?auto=format&fit=crop&w=1000&q=85',
-        'images': [
-          'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?auto=format&fit=crop&w=1200&q=85',
-        ],
-      },
-      {
-        'id': 102,
-        'title': 'Wooden Side Chair',
-        'price': 1200,
-        'seller': widget.seller['name'] ?? 'Rahul',
-        'condition': 'Good',
-        'category': 'Furniture',
-        'location': widget.seller['location'] ?? 'Ahmedabad, Gujarat',
-        'views': 94,
-        'wishlistCount': 12,
-        'availableQuantity': 2,
-        'description':
-            'Comfortable wooden chair that can be reused at home, in a workspace or for creative projects.',
-        'image':
-            'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=1000&q=85',
-        'images': [
-          'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=1200&q=85',
-        ],
-      },
-      {
-        'id': 103,
-        'title': 'Reclaimed Wood Pieces',
-        'price': 450,
-        'seller': widget.seller['name'] ?? 'Rahul',
-        'condition': 'Recycled',
-        'category': 'Materials',
-        'location': widget.seller['location'] ?? 'Ahmedabad, Gujarat',
-        'views': 71,
-        'wishlistCount': 8,
-        'availableQuantity': 5,
-        'description':
-            'Collection of reclaimed wood pieces for DIY, crafting and upcycling projects.',
-        'image':
-            'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=1000&q=85',
-        'images': [
-          'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=1200&q=85',
-        ],
-      },
-      {
-        'id': 104,
-        'title': 'Vintage Storage Cabinet',
-        'price': 2200,
-        'seller': widget.seller['name'] ?? 'Rahul',
-        'condition': 'Used',
-        'category': 'Furniture',
-        'location': widget.seller['location'] ?? 'Ahmedabad, Gujarat',
-        'views': 143,
-        'wishlistCount': 16,
-        'availableQuantity': 1,
-        'description':
-            'Vintage storage cabinet with plenty of room for books, decor and household items.',
-        'image':
-            'https://images.unsplash.com/photo-1558997519-83ea9252edf8?auto=format&fit=crop&w=1000&q=85',
-        'images': [
-          'https://images.unsplash.com/photo-1558997519-83ea9252edf8?auto=format&fit=crop&w=1200&q=85',
-        ],
-      },
-    ];
+    _loadListings();
   }
 
   @override
   Widget build(BuildContext context) {
-    final sellerName = widget.seller['name']?.toString() ?? 'Rahul';
-    final sellerImage = widget.seller['image']?.toString();
+    final name =
+        (widget.seller['name'] ??
+                widget.seller['sellerName'] ??
+                'EcoLoop Member')
+            .toString();
     final location =
-        widget.seller['location']?.toString() ?? 'Ahmedabad, Gujarat';
-    final rating = widget.seller['rating']?.toString() ?? '4.8';
-    final reviews = widget.seller['reviews']?.toString() ?? '42';
-    final listings = widget.seller['listings']?.toString() ?? '127';
-    final sold = widget.seller['sold']?.toString() ?? '42';
-    final positive = widget.seller['positive']?.toString() ?? '98%';
-
+        (widget.seller['location'] ??
+                [widget.seller['city'], widget.seller['state']]
+                    .where((v) => v != null && v.toString().trim().isNotEmpty)
+                    .join(', '))
+            .toString();
+    final photo =
+        (widget.seller['image'] ?? widget.seller['profilePhoto'] ?? '')
+            .toString();
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          tooltip: 'Back',
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        title: Text(
-          'Seller Profile',
-          style: AppTextStyles.title.copyWith(fontSize: 20),
-        ),
+        title: const Text('Seller Profile'),
         actions: [
           IconButton(
-            tooltip: 'More',
-            onPressed: _showMoreOptions,
-            icon: const Icon(
-              Icons.more_vert_rounded,
-              color: AppColors.textPrimary,
-            ),
+            onPressed: _loadListings,
+            icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 5, 20, 35),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSellerHeader(
-                sellerName: sellerName,
-                sellerImage: sellerImage,
-                location: location,
-                rating: rating,
-                reviews: reviews,
+      body: RefreshIndicator(
+        onRefresh: _loadListings,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: AppColors.accent.withOpacity(.35)),
               ),
-              const SizedBox(height: 18),
-              _buildActionButtons(),
-              const SizedBox(height: 22),
-              _buildStats(listings: listings, sold: sold, positive: positive),
-              const SizedBox(height: 24),
-              _buildAboutSeller(),
-              const SizedBox(height: 18),
-              _buildReviewsSection(
-                sellerName: sellerName,
-                sellerImage: sellerImage,
-                location: location,
-                rating: rating,
-                reviews: reviews,
-              ),
-              const SizedBox(height: 25),
-              _buildListingsHeader(),
-              const SizedBox(height: 12),
-              _buildListings(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSellerHeader({
-    required String sellerName,
-    required String? sellerImage,
-    required String location,
-    required String rating,
-    required String reviews,
-  }) {
-    final hasImage = sellerImage != null && sellerImage.trim().isNotEmpty;
-
-    return Center(
-      child: Column(
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 94,
-                height: 94,
-                decoration: BoxDecoration(
-                  color: AppColors.light,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.accent, width: 3),
-                ),
-                child: hasImage
-                    ? ClipOval(
-                        child: Image.network(
-                          sellerImage,
-                          width: 94,
-                          height: 94,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return _buildSellerInitial(sellerName);
-                          },
-                        ),
-                      )
-                    : _buildSellerInitial(sellerName),
-              ),
-              Positioned(
-                right: 1,
-                bottom: 3,
-                child: Container(
-                  width: 29,
-                  height: 29,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.surface, width: 3),
-                  ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    color: Colors.white,
-                    size: 15,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text(
-                  sellerName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.title.copyWith(fontSize: 20),
-                ),
-              ),
-              const SizedBox(width: 5),
-              const Icon(
-                Icons.verified_rounded,
-                size: 18,
-                color: AppColors.primary,
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          GestureDetector(
-            onTap: () => _openSellerReviews(
-              sellerName: sellerName,
-              sellerImage: sellerImage,
-              location: location,
-              rating: rating,
-              reviews: reviews,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.star_rounded,
-                  color: AppColors.primary,
-                  size: 17,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  rating,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(width: 3),
-                Text('($reviews reviews)', style: AppTextStyles.caption),
-                const SizedBox(width: 2),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 17,
-                  color: AppColors.textSecondary,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 5),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.location_on_outlined,
-                color: AppColors.textSecondary,
-                size: 14,
-              ),
-              const SizedBox(width: 3),
-              Flexible(
-                child: Text(
-                  location,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Member since January 2025',
-            style: AppTextStyles.caption.copyWith(fontSize: 9),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSellerInitial(String sellerName) {
-    return Center(
-      child: Text(
-        sellerName.isNotEmpty ? sellerName[0].toUpperCase() : 'R',
-        style: const TextStyle(
-          color: AppColors.primary,
-          fontSize: 36,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButtons() {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () {
-              setState(() {
-                _isFollowing = !_isFollowing;
-              });
-
-              _showMessage(
-                _isFollowing
-                    ? 'You are now following this seller.'
-                    : 'Seller removed from following.',
-              );
-            },
-            icon: Icon(
-              _isFollowing
-                  ? Icons.check_rounded
-                  : Icons.person_add_alt_1_outlined,
-              size: 17,
-            ),
-            label: Text(_isFollowing ? 'Following' : 'Follow'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: const BorderSide(color: AppColors.primary),
-              minimumSize: const Size(0, 46),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: _contactSeller,
-            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 17),
-            label: const Text('Contact Seller'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              minimumSize: const Size(0, 46),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStats({
-    required String listings,
-    required String sold,
-    required String positive,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 17),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: AppColors.accent.withOpacity(0.45)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _statItem(
-              value: listings,
-              label: 'Listings',
-              icon: Icons.inventory_2_outlined,
-            ),
-          ),
-          _statDivider(),
-          Expanded(
-            child: _statItem(
-              value: sold,
-              label: 'Sold',
-              icon: Icons.shopping_bag_outlined,
-            ),
-          ),
-          _statDivider(),
-          Expanded(
-            child: _statItem(
-              value: positive,
-              label: 'Positive',
-              icon: Icons.thumb_up_alt_outlined,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statItem({
-    required String value,
-    required String label,
-    required IconData icon,
-  }) {
-    return Column(
-      children: [
-        Icon(icon, size: 18, color: AppColors.primary),
-        const SizedBox(height: 5),
-        Text(value, style: AppTextStyles.title.copyWith(fontSize: 17)),
-        const SizedBox(height: 2),
-        Text(label, style: AppTextStyles.caption.copyWith(fontSize: 9)),
-      ],
-    );
-  }
-
-  Widget _statDivider() {
-    return Container(
-      width: 1,
-      height: 42,
-      color: AppColors.accent.withOpacity(0.55),
-    );
-  }
-
-  Widget _buildAboutSeller() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('About Seller', style: AppTextStyles.title.copyWith(fontSize: 16)),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.accent.withOpacity(0.45)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'I believe useful things should not be thrown away. I enjoy giving furniture, materials and household items a second life.',
-                style: AppTextStyles.body.copyWith(fontSize: 12, height: 1.55),
-              ),
-              const SizedBox(height: 13),
-              Wrap(
-                spacing: 7,
-                runSpacing: 7,
+              child: Column(
                 children: [
-                  _interestTag('♻️ Sustainability'),
-                  _interestTag('🪵 Upcycling'),
-                  _interestTag('🎨 DIY'),
+                  CircleAvatar(
+                    radius: 38,
+                    backgroundColor: AppColors.light,
+                    backgroundImage: photo.startsWith('http')
+                        ? NetworkImage(photo)
+                        : null,
+                    child: photo.startsWith('http')
+                        ? null
+                        : const Icon(
+                            Icons.person_outline_rounded,
+                            size: 38,
+                            color: AppColors.primary,
+                          ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    name,
+                    style: AppTextStyles.title.copyWith(fontSize: 21),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    location.isEmpty ? 'EcoLoop community seller' : location,
+                    style: AppTextStyles.caption,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _metric('${_listings.length}', 'Published items'),
+                      Container(
+                        height: 30,
+                        width: 1,
+                        color: AppColors.accent,
+                        margin: const EdgeInsets.symmetric(horizontal: 24),
+                      ),
+                      _metric('User', 'Seller type'),
+                    ],
+                  ),
                 ],
               ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReviewsSection({
-    required String sellerName,
-    required String? sellerImage,
-    required String location,
-    required String rating,
-    required String reviews,
-  }) {
-    final ratingValue = double.tryParse(rating) ?? 4.8;
-    final reviewCount = int.tryParse(reviews) ?? 42;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Reviews', style: AppTextStyles.title.copyWith(fontSize: 16)),
-        const SizedBox(height: 10),
-        GestureDetector(
-          onTap: () => _openSellerReviews(
-            sellerName: sellerName,
-            sellerImage: sellerImage,
-            location: location,
-            rating: rating,
-            reviews: reviews,
-          ),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.accent.withOpacity(0.45)),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: const BoxDecoration(
-                    color: AppColors.light,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.star_rounded,
-                    color: AppColors.primary,
-                    size: 25,
-                  ),
+            const SizedBox(height: 22),
+            Text(
+              'Published listings',
+              style: AppTextStyles.title.copyWith(fontSize: 18),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Items currently available from this seller.',
+              style: AppTextStyles.caption,
+            ),
+            const SizedBox(height: 14),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(30),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              _message(
+                Icons.cloud_off_outlined,
+                'Could not load listings',
+                _error!,
+                onRetry: _loadListings,
+              )
+            else if (_listings.isEmpty)
+              _message(
+                Icons.inventory_2_outlined,
+                'No published items',
+                'This seller has no currently available listings.',
+              )
+            else
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _listings.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: MediaQuery.sizeOf(context).width > 650
+                      ? 3
+                      : 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: .66,
                 ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Seller Reviews',
-                        style: AppTextStyles.title.copyWith(fontSize: 15),
+                itemBuilder: (context, index) {
+                  final p = _listings[index];
+                  final imgs = _images(p);
+                  final product = <String, dynamic>{
+                    ...p,
+                    'productId': _productId(p),
+                    'sellerType': 'user',
+                    'sellerName': p['sellerName'] ?? name,
+                  };
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProductDetails(product: product),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
+                    ),
+                    child: Container(
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.accent.withOpacity(.4),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(
-                            Icons.star_rounded,
-                            color: AppColors.primary,
-                            size: 16,
+                          Expanded(
+                            child: imgs.isEmpty
+                                ? Container(
+                                    color: AppColors.light,
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.image_outlined,
+                                        size: 34,
+                                      ),
+                                    ),
+                                  )
+                                : Image.network(
+                                    imgs.first,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: AppColors.light,
+                                      child: const Icon(
+                                        Icons.broken_image_outlined,
+                                      ),
+                                    ),
+                                  ),
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            ratingValue.toStringAsFixed(1),
-                            style: AppTextStyles.body.copyWith(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
+                          Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  (p['title'] ?? 'Untitled item').toString(),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.body.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  '₹${p['price'] ?? '—'}',
+                                  style: AppTextStyles.title.copyWith(
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  (p['condition'] ?? 'Pre-loved').toString(),
+                                  style: AppTextStyles.caption,
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            '$reviewCount reviews',
-                            style: AppTextStyles.caption,
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textSecondary,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _openSellerReviews({
-    required String sellerName,
-    required String? sellerImage,
-    required String location,
-    required String rating,
-    required String reviews,
-  }) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => SellerReviews(
-          sellerName: sellerName,
-          sellerImage: sellerImage,
-          sellerLocation: location,
-          rating: double.tryParse(rating) ?? 4.8,
-          reviewCount: int.tryParse(reviews) ?? 42,
-          isVerified: true,
+                    ),
+                  );
+                },
+              ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _interestTag(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.light,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 9,
-          color: AppColors.primary,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
+  Widget _metric(String value, String label) => Column(
+    children: [
+      Text(value, style: AppTextStyles.title.copyWith(fontSize: 17)),
+      const SizedBox(height: 3),
+      Text(label, style: AppTextStyles.caption),
+    ],
+  );
 
-  Widget _buildListingsHeader() {
-    return Row(
+  Widget _message(
+    IconData icon,
+    String title,
+    String subtitle, {
+    Future<void> Function()? onRetry,
+  }) => Container(
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(18),
+    ),
+    child: Column(
       children: [
+        Icon(icon, size: 34, color: AppColors.primary),
+        const SizedBox(height: 10),
+        Text(title, style: AppTextStyles.title.copyWith(fontSize: 16)),
+        const SizedBox(height: 5),
         Text(
-          'Active Listings',
-          style: AppTextStyles.title.copyWith(fontSize: 16),
+          subtitle,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.caption,
         ),
-        const SizedBox(width: 7),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: AppColors.light,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            '${_listings.length}',
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const Spacer(),
-        Text(
-          'Newest',
-          style: AppTextStyles.caption.copyWith(
-            color: AppColors.primary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(width: 3),
-        const Icon(
-          Icons.keyboard_arrow_down_rounded,
-          size: 16,
-          color: AppColors.primary,
-        ),
+        if (onRetry != null)
+          TextButton(onPressed: onRetry, child: const Text('Try again')),
       ],
-    );
-  }
-
-  Widget _buildListings() {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _listings.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 14,
-        childAspectRatio: 0.67,
-      ),
-      itemBuilder: (context, index) {
-        final product = _listings[index];
-
-        return _SellerProductCard(
-          product: product,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProductDetails(product: product),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _contactSeller() {
-    _showMessage('Chat with seller will be connected later.');
-  }
-
-  void _showMoreOptions() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                _sellerOption(
-                  icon: Icons.flag_outlined,
-                  title: 'Report Seller',
-                  destructive: true,
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showMessage('Report seller option selected.');
-                  },
-                ),
-                const SizedBox(height: 9),
-                _sellerOption(
-                  icon: Icons.block_outlined,
-                  title: 'Block Seller',
-                  destructive: true,
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showMessage('Block seller option selected.');
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _sellerOption({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    bool destructive = false,
-  }) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(13),
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          color: destructive
-              ? AppColors.error.withOpacity(0.05)
-              : AppColors.background,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(
-            color: destructive
-                ? AppColors.error.withOpacity(0.2)
-                : AppColors.accent.withOpacity(0.4),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: destructive ? AppColors.error : AppColors.primary,
-            ),
-            const SizedBox(width: 10),
-            Text(
-              title,
-              style: TextStyle(
-                color: destructive ? AppColors.error : AppColors.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const Spacer(),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 19,
-              color: destructive ? AppColors.error : AppColors.textSecondary,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showMessage(String message) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
-  }
-}
-
-class _SellerProductCard extends StatelessWidget {
-  const _SellerProductCard({required this.product, required this.onTap});
-
-  final Map<String, dynamic> product;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final price = (product['price'] as num).toInt();
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: AppColors.accent.withOpacity(0.42)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.035),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Image.network(
-                      product['image'].toString(),
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: AppColors.light,
-                          child: const Center(
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 32,
-                              color: AppColors.secondary,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.92),
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      child: Text(
-                        product['condition'].toString(),
-                        style: const TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.55),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        product['category'].toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product['title'].toString(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.body.copyWith(
-                      color: AppColors.textPrimary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '₹$price',
-                    style: AppTextStyles.title.copyWith(fontSize: 16),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.visibility_outlined,
-                        size: 11,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${product['views']} views',
-                        style: AppTextStyles.caption.copyWith(fontSize: 9),
-                      ),
-                      const Spacer(),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 12,
-                        color: AppColors.primary,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    ),
+  );
 }

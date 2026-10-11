@@ -482,7 +482,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
     setState(() => _error = null);
     try {
       final result = await EcoLoopApi.instance.post(
-        '/artist/orders/$_id/status',
+        '/selling/orders/$_id/status',
         {'status': _selectedStatus},
       );
       if (result is Map) {

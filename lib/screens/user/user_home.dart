@@ -80,10 +80,11 @@ class _UserHomeState extends State<UserHome> {
         _loadingProducts = false;
       });
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loadingProducts = false;
         });
+      }
     }
   }
 
@@ -408,7 +409,7 @@ class _UserHomeState extends State<UserHome> {
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         itemCount: _categories.length,
-        separatorBuilder: (_, __) {
+        separatorBuilder: (context, index) {
           return const SizedBox(width: 10);
         },
         itemBuilder: (context, index) {
@@ -826,7 +827,10 @@ class _HomeProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int price = (product['price'] as num).toInt();
+    final priceValue = product['price'];
+    final int price = priceValue is num
+        ? priceValue.toInt()
+        : int.tryParse(priceValue?.toString() ?? '') ?? 0;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -854,39 +858,51 @@ class _HomeProductCard extends StatelessWidget {
                 children: [
                   // PRODUCT IMAGE
                   Positioned.fill(
-                    child: Image.network(
-                      product['image'].toString(),
-                      fit: BoxFit.cover,
+                    child:
+                        (product['image']?.toString().trim().isNotEmpty ??
+                            false)
+                        ? Image.network(
+                            product['image'].toString(),
+                            fit: BoxFit.cover,
 
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) {
-                          return child;
-                        }
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) {
+                                return child;
+                              }
 
-                        return Container(
-                          color: AppColors.light,
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        );
-                      },
+                              return Container(
+                                color: AppColors.light,
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              );
+                            },
 
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: AppColors.light,
-                          child: const Center(
-                            child: Icon(
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: AppColors.light,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.image_not_supported_outlined,
+                                    size: 35,
+                                    color: AppColors.secondary,
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : Container(
+                            color: AppColors.light,
+                            alignment: Alignment.center,
+                            child: const Icon(
                               Icons.image_not_supported_outlined,
                               size: 35,
                               color: AppColors.secondary,
                             ),
                           ),
-                        );
-                      },
-                    ),
                   ),
 
                   // CONDITION

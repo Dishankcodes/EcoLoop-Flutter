@@ -29,7 +29,7 @@ class _SellingOrdersState extends State<SellingOrders> {
         _error = null;
       });
     try {
-      final data = await EcoLoopApi.instance.get('/artist/orders');
+      final data = await EcoLoopApi.instance.get('/selling/orders');
       final rows = data is List
           ? data
           : (data is Map && data['orders'] is List
@@ -67,8 +67,7 @@ class _SellingOrdersState extends State<SellingOrders> {
           raw['title'] ??
           'Product #${raw['productId'] ?? '—'}',
       'priceValue': amount,
-      'price':
-          '₹${amount.toStringAsFixed(2).replaceAll(RegExp(r'\\.00$'), '')}',
+      'price': '₹${amount.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '')}',
       'date': created == null
           ? 'Date unavailable'
           : '${created.day.toString().padLeft(2, '0')} ${_month(created.month)} ${created.year}',

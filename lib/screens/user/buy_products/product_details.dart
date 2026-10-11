@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import '../../../widgets/cart_popup.dart';
 import '../../artist/profile/artist_profile.dart';
 import '../reviews/product_reviews.dart';
@@ -25,6 +26,8 @@ class _ProductDetailsState extends State<ProductDetails> {
   int _currentImage = 0;
   int _quantity = 1;
   bool _isWishlisted = false;
+  bool _wishlistBusy = false;
+  final EcoLoopApi _api = EcoLoopApi.instance;
 
   @override
   void initState() {
@@ -34,6 +37,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     _isWishlisted =
         widget.product['isWishlisted'] == true ||
         widget.product['wishlisted'] == true;
+    _syncWishlistState();
   }
 
   @override
@@ -42,15 +46,14 @@ class _ProductDetailsState extends State<ProductDetails> {
     super.dispose();
   }
 
-  String get title =>
-      widget.product['title']?.toString() ?? 'Wooden Study Table';
+  String get title => widget.product['title']?.toString() ?? 'Product';
 
   int get priceValue {
     final value = widget.product['price'];
     if (value is num) {
       return value.toInt();
     }
-    return _extractNumericPrice(value?.toString() ?? '2500');
+    return _extractNumericPrice(value?.toString() ?? '0');
   }
 
   String get price => '₹${_formatPrice(priceValue)}';
@@ -59,7 +62,10 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   String get category => widget.product['category']?.toString() ?? 'Furniture';
 
-  String get seller => widget.product['seller']?.toString() ?? 'Rahul Mehta';
+  String get seller =>
+      widget.product['sellerName']?.toString() ??
+      widget.product['seller']?.toString() ??
+      'EcoLoop Member';
 
   /// Seller account type used for profile navigation.
   ///
@@ -86,22 +92,21 @@ class _ProductDetailsState extends State<ProductDetails> {
       sellerType == 're_maker' ||
       sellerType == 're-maker';
 
-  String get location =>
-      widget.product['location']?.toString() ?? 'Ahmedabad, Gujarat';
+  String get location => [
+    widget.product['sellerCity'],
+    widget.product['sellerState'],
+  ].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
 
   String get description =>
       widget.product['description']?.toString() ??
-      'A well-maintained pre-owned wooden study table. '
-          'Perfect for students, home offices and creative workspaces. '
-          'The table is sturdy, spacious and suitable for students, '
-          'home offices and creative workspaces.';
+      'No description provided by the seller.';
 
   int get availableQuantity {
     final value = widget.product['availableQuantity'];
     if (value is num) {
       return value.toInt();
     }
-    return int.tryParse(value?.toString() ?? '') ?? 5;
+    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   double get rating {
@@ -109,12 +114,12 @@ class _ProductDetailsState extends State<ProductDetails> {
     if (value is num) {
       return value.toDouble();
     }
-    return double.tryParse(value?.toString() ?? '') ?? 4.7;
+    return double.tryParse(value?.toString() ?? '') ?? 0.0;
   }
 
   int get reviewCount {
     final value =
-        widget.product['reviewCount'] ?? widget.product['reviews'] ?? 42;
+        widget.product['reviewCount'] ?? widget.product['reviews'] ?? 0;
     if (value is num) {
       return value.toInt();
     }
@@ -122,7 +127,8 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   List<String> get images {
-    final productImages = widget.product['images'];
+    final productImages =
+        widget.product['images'] ?? widget.product['imageUrls'];
     if (productImages is List && productImages.isNotEmpty) {
       return productImages
           .map((image) => image.toString())
@@ -135,12 +141,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       return [singleImage];
     }
 
-    return [
-      'https://images.unsplash.com/photo-1518455027359-f3f8164ba6b0?auto=format&fit=crop&w=1200&q=85',
-      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=85',
-      'https://images.unsplash.com/photo-1541558869434-2840d308329a?auto=format&fit=crop&w=1200&q=85',
-      'https://images.unsplash.com/photo-1593642532400-2682810df593?auto=format&fit=crop&w=1200&q=85',
-    ];
+    return const <String>[];
   }
 
   @override
@@ -220,13 +221,25 @@ class _ProductDetailsState extends State<ProductDetails> {
               children: [
                 PageView.builder(
                   controller: _imageController,
-                  itemCount: images.length,
+                  itemCount: images.isEmpty ? 1 : images.length,
                   onPageChanged: (index) {
                     setState(() {
                       _currentImage = index;
                     });
                   },
                   itemBuilder: (context, index) {
+                    if (images.isEmpty) {
+                      return Container(
+                        color: AppColors.light,
+                        child: const Center(
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            size: 60,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      );
+                    }
                     return Image.network(
                       images[index],
                       width: double.infinity,
@@ -296,7 +309,9 @@ class _ProductDetailsState extends State<ProductDetails> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      '${_currentImage + 1}/${images.length}',
+                      images.isEmpty
+                          ? 'No image'
+                          : '${_currentImage + 1}/${images.length}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 11,
@@ -406,7 +421,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               ),
               const SizedBox(width: 4),
               Text(
-                '${widget.product['views'] ?? 12} views',
+                '${widget.product['views'] ?? 0} views',
                 style: AppTextStyles.caption,
               ),
               const SizedBox(width: 16),
@@ -417,7 +432,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               ),
               const SizedBox(width: 4),
               Text(
-                '${widget.product['wishlistCount'] ?? 4} saved',
+                '${widget.product['wishlistCount'] ?? 0} saved',
                 style: AppTextStyles.caption,
               ),
             ],
@@ -763,7 +778,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           _infoRow(
             Icons.calendar_today_outlined,
             'Listed',
-            widget.product['date']?.toString() ?? '28 Aug 2026',
+            widget.product['createdAt']?.toString() ?? 'Not available',
           ),
           _infoRow(
             Icons.local_shipping_outlined,
@@ -912,11 +927,13 @@ class _ProductDetailsState extends State<ProductDetails> {
           Expanded(
             child: Column(
               children: [
-                _ratingBar(5, 0.82),
-                _ratingBar(4, 0.12),
-                _ratingBar(3, 0.04),
-                _ratingBar(2, 0.01),
-                _ratingBar(1, 0.01),
+                const Text(
+                  'Ratings appear after verified reviews.',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1155,7 +1172,10 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   /// Horizontal scrolling carousel of related product recommendations.
   Widget _buildSimilarProducts() {
+    // Similar items should be loaded from GET /products by the marketplace
+    // screen. Do not display hard-coded sample listings here.
     final products = _similarProducts;
+    if (products.isEmpty) return const SizedBox.shrink();
 
     return Container(
       color: AppColors.surface,
@@ -1288,62 +1308,8 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   /// Mock dataset for similar products recommendations.
-  List<Map<String, dynamic>> get _similarProducts {
-    return [
-      {
-        'id': 'similar_1',
-        'title': 'Laptop Table',
-        'price': 1800,
-        'condition': 'Good',
-        'category': category,
-        'seller': 'Amit K.',
-        'sellerType': 'user',
-        'location': 'Ahmedabad, Gujarat',
-        'availableQuantity': 3,
-        'image':
-            'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=600&q=80',
-      },
-      {
-        'id': 'similar_2',
-        'title': 'Bookshelf',
-        'price': 2200,
-        'condition': 'Used',
-        'category': category,
-        'seller': 'Neha P.',
-        'sellerType': 'artist',
-        'location': 'Ahmedabad, Gujarat',
-        'availableQuantity': 2,
-        'image':
-            'https://images.unsplash.com/photo-1594620302200-9a762244a156?auto=format&fit=crop&w=600&q=80',
-      },
-      {
-        'id': 'similar_3',
-        'title': 'Office Chair',
-        'price': 3500,
-        'condition': 'Good',
-        'category': category,
-        'seller': 'Vivek R.',
-        'sellerType': 'user',
-        'location': 'Gandhinagar, Gujarat',
-        'availableQuantity': 4,
-        'image':
-            'https://images.unsplash.com/photo-1580480055273-228ff5388ef8?auto=format&fit=crop&w=600&q=80',
-      },
-      {
-        'id': 'similar_4',
-        'title': 'Computer Desk',
-        'price': 2900,
-        'condition': 'Good',
-        'category': category,
-        'seller': 'Kavya R.',
-        'sellerType': 'artist',
-        'location': 'Ahmedabad, Gujarat',
-        'availableQuantity': 2,
-        'image':
-            'https://images.unsplash.com/photo-1518455027359-f3f8164ba6b0?auto=format&fit=crop&w=600&q=80',
-      },
-    ];
-  }
+  List<Map<String, dynamic>> get _similarProducts =>
+      const <Map<String, dynamic>>[];
 
   /// Persistent bottom purchase bar for quantity selection, cart addition, and instant checkout.
   Widget _buildBottomBar() {
@@ -1545,15 +1511,87 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  /// Toggles saved/wishlist state for current product item.
-  void _toggleWishlist() {
-    setState(() {
-      _isWishlisted = !_isWishlisted;
-    });
+  String get _currentProductId =>
+      (widget.product['productId'] ??
+              widget.product['product_id'] ??
+              widget.product['id'] ??
+              '')
+          .toString();
 
-    _showMessage(
-      _isWishlisted ? 'Added to your wishlist.' : 'Removed from your wishlist.',
-    );
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), v));
+    return <String, dynamic>{};
+  }
+
+  Future<void> _syncWishlistState() async {
+    final id = _currentProductId;
+    if (id.isEmpty) return;
+    try {
+      final response = await _api.get('/wishlist');
+      final root = _asMap(response);
+      final data = _asMap(root['data']);
+      final rows = response is List
+          ? response
+          : (root['items'] ??
+                root['products'] ??
+                root['wishlist'] ??
+                data['items'] ??
+                data['products'] ??
+                data['wishlist'] ??
+                const []);
+      if (rows is! List) return;
+      final saved = rows.any((row) {
+        final item = _asMap(row);
+        final nested = _asMap(item['product']);
+        final productId =
+            (item['productId'] ??
+                    item['product_id'] ??
+                    item['id'] ??
+                    nested['productId'] ??
+                    nested['product_id'] ??
+                    nested['id'] ??
+                    '')
+                .toString();
+        return productId == id;
+      });
+      if (mounted) setState(() => _isWishlisted = saved);
+    } catch (_) {
+      // Keep the state passed from the marketplace if wishlist is temporarily unavailable.
+    }
+  }
+
+  /// Saves/removes the product through the backend and rolls back on failure.
+  Future<void> _toggleWishlist() async {
+    final id = _currentProductId;
+    if (id.isEmpty) {
+      _showMessage('This item has no product ID and cannot be saved.');
+      return;
+    }
+    if (_wishlistBusy) return;
+    final wasSaved = _isWishlisted;
+    setState(() {
+      _wishlistBusy = true;
+      _isWishlisted = !wasSaved;
+    });
+    try {
+      if (wasSaved) {
+        await _api.delete('/wishlist/$id');
+      } else {
+        await _api.post('/wishlist', <String, dynamic>{'productId': id});
+      }
+      if (mounted)
+        _showMessage(
+          wasSaved ? 'Removed from your wishlist.' : 'Added to your wishlist.',
+        );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isWishlisted = wasSaved);
+        _showMessage('Wishlist update failed. Please sign in and try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _wishlistBusy = false);
+    }
   }
 
   /// Opens full profile page for the seller.
