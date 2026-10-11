@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/eco_image_picker.dart';
+import '../../../services/ecoloop_api.dart';
+
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 
@@ -16,6 +19,11 @@ class _DonateItemState extends State<DonateItem> {
 
   final TextEditingController titleController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
+  final TextEditingController addressController = TextEditingController();
+  final TextEditingController cityController = TextEditingController();
+  final TextEditingController stateController = TextEditingController();
+  List<SelectedEcoImage> _images = [];
+  bool _isSubmitting = false;
 
   String? selectedCategory;
   String? selectedCondition;
@@ -42,6 +50,9 @@ class _DonateItemState extends State<DonateItem> {
   void dispose() {
     titleController.dispose();
     descriptionController.dispose();
+    addressController.dispose();
+    cityController.dispose();
+    stateController.dispose();
     super.dispose();
   }
 
@@ -132,6 +143,32 @@ class _DonateItemState extends State<DonateItem> {
             const SizedBox(height: 14),
             _buildRewardInfo(),
             const SizedBox(height: 28),
+            _buildSectionTitle('Pickup Address'),
+            const SizedBox(height: 10),
+            _buildTextField(
+              controller: addressController,
+              label: 'Full Address',
+              hint: 'House / street / area',
+              icon: Icons.location_on_outlined,
+              validator: (value) => value == null || value.trim().isEmpty ? 'Please enter pickup address' : null,
+            ),
+            const SizedBox(height: 14),
+            _buildTextField(
+              controller: cityController,
+              label: 'City',
+              hint: 'Enter your city',
+              icon: Icons.location_city_outlined,
+              validator: (value) => value == null || value.trim().isEmpty ? 'Please enter city' : null,
+            ),
+            const SizedBox(height: 14),
+            _buildTextField(
+              controller: stateController,
+              label: 'State',
+              hint: 'Enter your state',
+              icon: Icons.map_outlined,
+              validator: (value) => value == null || value.trim().isEmpty ? 'Please enter state' : null,
+            ),
+            const SizedBox(height: 24),
             _buildDonateButton(),
           ],
         ),
@@ -195,55 +232,12 @@ class _DonateItemState extends State<DonateItem> {
 
   /// Dashed/bordered box placeholder for selecting item photos.
   Widget _buildImagePicker() {
-    return GestureDetector(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image picker will be connected in the next phase.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      },
-      child: Container(
-        height: 150,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.accent.withOpacity(0.7)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.light,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.add_a_photo_outlined,
-                color: AppColors.primary,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Add Item Photos',
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              'Add clear photos of your donation',
-              style: AppTextStyles.caption,
-            ),
-          ],
-        ),
-      ),
+    return EcoImagePicker.gallery(
+      context: context,
+      images: _images,
+      onChanged: (images) => setState(() => _images = images),
+      maxImages: 4,
+      accent: AppColors.primary,
     );
   }
 
@@ -407,22 +401,38 @@ class _DonateItemState extends State<DonateItem> {
   /// Primary submission action button.
   Widget _buildDonateButton() {
     return ElevatedButton.icon(
-      onPressed: () {
-        if (!_formKey.currentState!.validate()) {
-          return;
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Donation submission will be connected in the next phase.',
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      },
-      icon: const Icon(Icons.volunteer_activism_outlined),
-      label: const Text('Donate Item'),
+      onPressed: _isSubmitting ? null : _submitDonation,
+      icon: _isSubmitting ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.volunteer_activism_outlined),
+      label: Text(_isSubmitting ? 'Submitting donation…' : 'Donate Item'),
     );
+  }
+
+  Future<void> _submitDonation() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_images.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least one item photo.')));
+      return;
+    }
+    setState(() => _isSubmitting = true);
+    try {
+      await EcoLoopApi.instance.post('/donations', {
+        'title': titleController.text.trim(),
+        'description': descriptionController.text.trim(),
+        'categoryId': EcoLoopApi.categoryId(selectedCategory),
+        'condition': (selectedCondition ?? 'used').toLowerCase().replaceAll(' ', '_'),
+        'address': addressController.text.trim(),
+        'city': cityController.text.trim(),
+        'state': stateController.text.trim(),
+        'imageBase64': await EcoImagePicker.payload(_images),
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Donation saved successfully.')));
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 }

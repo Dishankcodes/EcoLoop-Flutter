@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/eco_image_picker.dart';
+import '../../../services/ecoloop_api.dart';
+
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import 'edit_product.dart';
@@ -19,6 +22,9 @@ class _AddProductState extends State<AddProduct> {
   final TextEditingController quantityController = TextEditingController(
     text: '1',
   );
+
+  List<SelectedEcoImage> _images = [];
+  bool _isSubmitting = false;
 
   String? selectedCategory;
   String? selectedCondition;
@@ -347,58 +353,32 @@ class _AddProductState extends State<AddProduct> {
   // INDIVIDUAL PHOTO SLOT
 
   Widget _buildPhotoSlot({required int index, required String label}) {
+    if (index < _images.length) {
+      final image = _images[index];
+      return Stack(children: [
+        ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.memory(image.bytes, height: 125, width: double.infinity, fit: BoxFit.cover)),
+        Positioned(right: 6, top: 6, child: IconButton.filledTonal(onPressed: () => setState(() => _images.removeAt(index)), icon: const Icon(Icons.close, size: 16))),
+      ]);
+    }
     return GestureDetector(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '$label image picker will be connected in the next phase.',
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      onTap: () async {
+        try {
+          final picked = await EcoImagePicker.pick(current: _images, maxImages: 4);
+          if (mounted) setState(() => _images = picked);
+        } catch (e) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+        }
       },
       child: Container(
         height: 125,
-        decoration: BoxDecoration(
-          color: ArtistColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: ArtistColors.border),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: ArtistColors.light,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(
-                index == 0
-                    ? Icons.add_a_photo_outlined
-                    : Icons.add_photo_alternate_outlined,
-                color: ArtistColors.primary,
-                size: 22,
-              ),
-            ),
-
-            const SizedBox(height: 9),
-
-            Text(
-              label,
-              style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 12),
-            ),
-
-            const SizedBox(height: 2),
-
-            Text(
-              index == 0 ? 'Required' : 'Optional',
-              style: ArtistTextStyles.small,
-            ),
-          ],
-        ),
+        decoration: BoxDecoration(color: ArtistColors.surfaceSoft, borderRadius: BorderRadius.circular(14), border: Border.all(color: ArtistColors.border)),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(Icons.add_a_photo_outlined, color: ArtistColors.primary, size: 25),
+          const SizedBox(height: 7),
+          Text(label, style: ArtistTextStyles.caption),
+          const SizedBox(height: 3),
+          Text('Add photo', style: ArtistTextStyles.caption),
+        ]),
       ),
     );
   }
@@ -484,40 +464,52 @@ class _AddProductState extends State<AddProduct> {
 
   // LIST PRODUCT BUTTON
   Widget _buildListProductButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: ElevatedButton.icon(
-        onPressed: () {
-          if (!_formKey.currentState!.validate()) {
-            return;
-          }
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Product listing will be connected in the next phase.',
-              ),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        },
-        icon: const Icon(Icons.add_business_outlined, size: 20),
-        label: const Text('List Product'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: ArtistColors.primary,
-          foregroundColor: ArtistColors.background,
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          textStyle: ArtistTextStyles.bodyMedium.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+    return ElevatedButton.icon(
+      onPressed: _isSubmitting ? null : _submitProduct,
+      icon: _isSubmitting ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.add_business_outlined, size: 20),
+      label: Text(_isSubmitting ? 'Saving product…' : 'List Product'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: ArtistColors.primary,
+        foregroundColor: ArtistColors.background,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: ArtistTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
       ),
     );
+  }
+
+  Future<void> _submitProduct() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_images.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least one product photo.')));
+      return;
+    }
+    if ((selectedListingType ?? 'Sell') == 'Donate') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('For donations, please use the Donate Item flow so pickup details can be recorded.')));
+      return;
+    }
+    setState(() => _isSubmitting = true);
+    try {
+      await EcoLoopApi.instance.post('/products', {
+        'title': titleController.text.trim(),
+        'description': descriptionController.text.trim(),
+        'categoryId': EcoLoopApi.categoryId(selectedCategory),
+        'listingType': 'b2c',
+        'condition': (selectedCondition ?? 'used').toLowerCase().replaceAll(' ', '_'),
+        'price': double.parse(priceController.text.trim()),
+        'quantity': int.parse(quantityController.text.trim()),
+        'status': 'published',
+        'imageBase64': await EcoImagePicker.payload(_images),
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your product has been listed successfully.')));
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   // PRODUCT TIPS

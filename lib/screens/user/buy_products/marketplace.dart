@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/ecoloop_api.dart';
+
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../widgets/user_more_menu.dart';
@@ -55,186 +57,42 @@ class _MarketplaceState extends State<Marketplace> {
 
   // DUMMY PRODUCTS
 
-  final List<Map<String, dynamic>> products = [
-    {
-      'id': 1,
-      'title': 'Wooden Table',
-      'price': 2500,
-      'condition': 'Used',
-      'category': 'Furniture',
-      'seller': 'Rahul',
-      'location': 'Ahmedabad, Gujarat',
-      'views': 126,
-      'wishlistCount': 14,
-      'availableQuantity': 1,
-      'description':
-          'A sturdy pre-owned wooden table in good usable condition. Perfect for study, work or creative projects.',
-      'image':
-          'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?auto=format&fit=crop&w=1200&q=85',
-        'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'id': 2,
-      'title': 'Wooden Chair',
-      'price': 1200,
-      'condition': 'Used',
-      'category': 'Furniture',
-      'seller': 'Amit',
-      'location': 'Vadodara, Gujarat',
-      'views': 89,
-      'wishlistCount': 9,
-      'availableQuantity': 2,
-      'description':
-          'Comfortable wooden chair available for reuse. Minor signs of use but structurally strong.',
-      'image':
-          'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'id': 3,
-      'title': 'Bottle Lamp',
-      'price': 899,
-      'condition': 'Upcycled',
-      'category': 'Decor',
-      'seller': 'Priya',
-      'location': 'Surat, Gujarat',
-      'views': 174,
-      'wishlistCount': 23,
-      'availableQuantity': 1,
-      'description':
-          'Creative decorative lamp made using reused glass bottles. A beautiful example of upcycling.',
-      'image':
-          'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'id': 4,
-      'title': 'Old Speaker',
-      'price': 1500,
-      'condition': 'Good',
-      'category': 'Electronics',
-      'seller': 'Karan',
-      'location': 'Ahmedabad, Gujarat',
-      'views': 102,
-      'wishlistCount': 11,
-      'availableQuantity': 1,
-      'description':
-          'Pre-owned speaker in working condition. Suitable for home entertainment or creative reuse.',
-      'image':
-          'https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'id': 5,
-      'title': 'Glass Decoration',
-      'price': 650,
-      'condition': 'Recycled',
-      'category': 'Decor',
-      'seller': 'Neha',
-      'location': 'Rajkot, Gujarat',
-      'views': 65,
-      'wishlistCount': 7,
-      'availableQuantity': 3,
-      'description':
-          'Beautiful decorative piece created from recycled glass material.',
-      'image':
-          'https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'id': 6,
-      'title': 'Wooden Cabinet',
-      'price': 2200,
-      'condition': 'Used',
-      'category': 'Furniture',
-      'seller': 'Vivek',
-      'location': 'Gandhinagar, Gujarat',
-      'views': 211,
-      'wishlistCount': 31,
-      'availableQuantity': 1,
-      'description':
-          'Large wooden cabinet available for reuse. Good for storage and home organization.',
-      'image':
-          'https://images.unsplash.com/photo-1595428774223-ef52624120d2?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1595428774223-ef52624120d2?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'id': 7,
-      'title': 'Craft Wood Pieces',
-      'price': 450,
-      'condition': 'Recycled',
-      'category': 'Materials',
-      'seller': 'EcoCraft',
-      'location': 'Ahmedabad, Gujarat',
-      'views': 93,
-      'wishlistCount': 12,
-      'availableQuantity': 8,
-      'description':
-          'Reusable wood pieces suitable for DIY projects, art, craft and furniture making.',
-      'image':
-          'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'id': 8,
-      'title': 'Denim Material Bundle',
-      'price': 700,
-      'condition': 'Used',
-      'category': 'Fashion',
-      'seller': 'Mira',
-      'location': 'Mumbai, Maharashtra',
-      'views': 77,
-      'wishlistCount': 8,
-      'availableQuantity': 5,
-      'description':
-          'Reusable denim fabric pieces for crafting, upcycling and DIY fashion projects.',
-      'image':
-          'https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'id': 9,
-      'title': 'Programming Books Bundle',
-      'price': 850,
-      'condition': 'Good',
-      'category': 'Books',
-      'seller': 'Arjun',
-      'location': 'Pune, Maharashtra',
-      'views': 118,
-      'wishlistCount': 16,
-      'availableQuantity': 4,
-      'description':
-          'Collection of useful programming and computer science books. Great for students and beginners.',
-      'image':
-          'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-  ];
+  final List<Map<String, dynamic>> products = [];
+
+  bool _loadingProducts = true;
+  String? _loadError;
+
+  Future<void> _loadProducts() async {
+    try {
+      final data = await EcoLoopApi.instance.get('/products');
+      final rows = (data is List ? data : <dynamic>[]).whereType<Map>().map((raw) {
+        final p = Map<String, dynamic>.from(raw);
+        final images = (p['imageUrls'] is List) ? List<dynamic>.from(p['imageUrls']) : <dynamic>[];
+        final category = (p['categoryName'] ?? p['category'] ?? 'Other').toString();
+        final seller = (p['sellerName'] ?? 'EcoLoop seller').toString();
+        final location = [p['city'], p['state']].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
+        return <String, dynamic>{
+          ...p, 'id': p['productId'], 'category': category, 'seller': seller,
+          'location': location.isEmpty ? 'Location not provided' : location,
+          'image': images.isNotEmpty ? images.first.toString() : '', 'images': images,
+          'price': p['price'] ?? 0, 'condition': p['condition'] ?? 'Not specified',
+          'availableQuantity': p['availableQuantity'] ?? 0,
+        };
+      }).toList();
+      if (!mounted) return;
+      setState(() { products..clear()..addAll(rows); _loadingProducts = false; _loadError = null; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _loadingProducts = false; _loadError = e.toString(); });
+    }
+  }
 
   // INIT
 
   @override
   void initState() {
     super.initState();
+    _loadProducts();
 
     searchQuery = widget.initialSearch ?? '';
 
@@ -628,6 +486,9 @@ class _MarketplaceState extends State<Marketplace> {
   Widget _buildProductGrid() {
     final items = filteredProducts;
 
+    if (_loadingProducts) {
+      return const Center(child: CircularProgressIndicator());
+    }
     if (items.isEmpty) {
       return _buildEmptyState();
     }
@@ -687,12 +548,12 @@ class _MarketplaceState extends State<Marketplace> {
 
             const SizedBox(height: 17),
 
-            Text('No products found', style: AppTextStyles.title),
+            Text(_loadError == null ? 'No products found' : 'Products could not be loaded', style: AppTextStyles.title),
 
             const SizedBox(height: 6),
 
             Text(
-              'Try another search, category or filter.',
+              _loadError == null ? 'No live listings match your filters yet.' : 'Check your internet connection and Apps Script deployment, then retry.',
               textAlign: TextAlign.center,
               style: AppTextStyles.body,
             ),
@@ -700,8 +561,8 @@ class _MarketplaceState extends State<Marketplace> {
             const SizedBox(height: 16),
 
             OutlinedButton(
-              onPressed: _resetFilters,
-              child: const Text('Clear Filters'),
+              onPressed: _loadError != null ? _loadProducts : _resetFilters,
+              child: Text(_loadError != null ? 'Retry' : 'Clear Filters'),
             ),
           ],
         ),

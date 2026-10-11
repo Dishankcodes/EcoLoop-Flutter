@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/cart_popup.dart';
 import '../../../widgets/user_more_menu.dart';
@@ -22,8 +23,58 @@ import 'notifications.dart';
 import 'rewards.dart';
 import 'settings.dart';
 
-class Profile extends StatelessWidget {
+class Profile extends StatefulWidget {
   const Profile({super.key});
+
+  @override
+  State<Profile> createState() => _ProfileState();
+}
+
+class _ProfileState extends State<Profile> {
+  Map<String, dynamic>? _account;
+  bool _loadingProfile = true;
+  String? _profileError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final result = await EcoLoopApi.instance.get('/auth/me');
+      if (!mounted) return;
+      setState(() {
+        _account = result is Map
+            ? Map<String, dynamic>.from(result)
+            : <String, dynamic>{};
+        _loadingProfile = false;
+        _profileError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingProfile = false;
+        _profileError = error.toString();
+      });
+    }
+  }
+
+  String get _displayName {
+    final account = _account ?? const <String, dynamic>{};
+    final artistName = (account['userName'] ?? '').toString().trim();
+    if (artistName.isNotEmpty) return artistName;
+    final first = (account['firstName'] ?? '').toString().trim();
+    final last = (account['lastName'] ?? '').toString().trim();
+    final full = '$first $last'.trim();
+    return full.isNotEmpty ? full : 'Your profile';
+  }
+
+  String get _email => (_account?['email'] ?? '').toString();
+
+  String get _photoUrl =>
+      (_account?['profilePhotoUrl'] ?? '').toString().trim();
 
   @override
   Widget build(BuildContext context) {
@@ -94,26 +145,50 @@ class Profile extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Container(
-            width: 88,
-            height: 88,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.light,
-              border: Border.all(color: AppColors.accent, width: 2),
-            ),
-            child: const Icon(
-              Icons.person_rounded,
-              size: 46,
-              color: AppColors.primary,
-            ),
+          Stack(
+            children: [
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.light,
+                  border: Border.all(color: AppColors.accent, width: 2),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: _loadingProfile
+                    ? const Center(
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : (_photoUrl.isNotEmpty
+                          ? Image.network(
+                              _photoUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person_rounded,
+                                size: 46,
+                                color: AppColors.primary,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.person_rounded,
+                              size: 46,
+                              color: AppColors.primary,
+                            )),
+              ),
+            ],
           ),
 
           const SizedBox(height: 13),
 
-          const Text(
-            'Dishank Prajapati',
-            style: TextStyle(
+          Text(
+            _loadingProfile ? 'Loading profile…' : _displayName,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
@@ -122,7 +197,19 @@ class Profile extends StatelessWidget {
 
           const SizedBox(height: 4),
 
-          Text('user@ecoloop.com', style: AppTextStyles.caption),
+          Text(
+            _loadingProfile ? '' : _email,
+            style: AppTextStyles.caption,
+            textAlign: TextAlign.center,
+          ),
+          if (_profileError != null) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _loadProfile,
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Retry loading profile'),
+            ),
+          ],
 
           const SizedBox(height: 5),
 
@@ -156,7 +243,7 @@ class Profile extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const EditProfile()),
-                );
+                ).then((_) => _loadProfile());
               },
               icon: const Icon(Icons.edit_outlined, size: 17),
               label: const Text(

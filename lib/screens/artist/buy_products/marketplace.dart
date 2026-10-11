@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/ecoloop_api.dart';
+
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../widgets/artist_more_menu.dart';
@@ -45,229 +47,33 @@ class _MarketplaceState extends State<Marketplace> {
     'Recycled',
   ];
 
-  final List<Map<String, dynamic>> products = [
-    {
-      'productId': 1,
-      'sellerId': 101,
-      'sellerType': 'artist',
-      'title': 'Wooden Table',
-      'price': 2500,
-      'condition': 'Used',
-      'categoryId': 1,
-      'category': 'Furniture',
-      'listingType': 'c2c',
-      'seller': 'Rahul',
-      'location': 'Ahmedabad, Gujarat',
-      'views': 126,
-      'wishlistCount': 14,
-      'salesCount': 8,
-      'quantity': 1,
-      'availableQuantity': 1,
-      'status': 'published',
-      'description':
-          'A sturdy pre-owned wooden table in good usable condition. Perfect for study, work or creative projects.',
-      'imageUrls': [
-        'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?auto=format&fit=crop&w=1200&q=85',
-        'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 2,
-      'sellerId': 102,
-      'sellerType': 'artist',
-      'title': 'Wooden Chair',
-      'price': 1200,
-      'condition': 'Used',
-      'categoryId': 1,
-      'category': 'Furniture',
-      'listingType': 'c2c',
-      'seller': 'Amit',
-      'location': 'Vadodara, Gujarat',
-      'views': 89,
-      'wishlistCount': 9,
-      'salesCount': 5,
-      'quantity': 2,
-      'availableQuantity': 2,
-      'status': 'published',
-      'description':
-          'Comfortable wooden chair available for reuse. Minor signs of use but structurally strong.',
-      'imageUrls': [
-        'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 3,
-      'sellerId': 103,
-      'sellerType': 'artist',
-      'title': 'Bottle Lamp',
-      'price': 899,
-      'condition': 'Upcycled',
-      'categoryId': 2,
-      'category': 'Decor',
-      'listingType': 'b2c',
-      'seller': 'Priya',
-      'location': 'Surat, Gujarat',
-      'views': 174,
-      'wishlistCount': 23,
-      'salesCount': 12,
-      'quantity': 1,
-      'availableQuantity': 1,
-      'status': 'published',
-      'description':
-          'Creative decorative lamp made using reused glass bottles. A beautiful example of upcycling.',
-      'imageUrls': [
-        'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 4,
-      'sellerId': 104,
-      'sellerType': 'artist',
-      'title': 'Old Speaker',
-      'price': 1500,
-      'condition': 'Good',
-      'categoryId': 3,
-      'category': 'Electronics',
-      'listingType': 'c2c',
-      'seller': 'Karan',
-      'location': 'Ahmedabad, Gujarat',
-      'views': 102,
-      'wishlistCount': 11,
-      'salesCount': 4,
-      'quantity': 1,
-      'availableQuantity': 1,
-      'status': 'published',
-      'description':
-          'Pre-owned speaker in working condition. Suitable for home entertainment or creative reuse.',
-      'imageUrls': [
-        'https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 5,
-      'sellerId': 105,
-      'sellerType': 'artist',
-      'title': 'Glass Decoration',
-      'price': 650,
-      'condition': 'Recycled',
-      'categoryId': 2,
-      'category': 'Decor',
-      'listingType': 'b2c',
-      'seller': 'Neha',
-      'location': 'Rajkot, Gujarat',
-      'views': 65,
-      'wishlistCount': 7,
-      'salesCount': 3,
-      'quantity': 3,
-      'availableQuantity': 3,
-      'status': 'published',
-      'description':
-          'Beautiful decorative piece created from recycled glass material.',
-      'imageUrls': [
-        'https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 6,
-      'sellerId': 106,
-      'sellerType': 'artist',
-      'title': 'Wooden Cabinet',
-      'price': 2200,
-      'condition': 'Used',
-      'categoryId': 1,
-      'category': 'Furniture',
-      'listingType': 'c2c',
-      'seller': 'Vivek',
-      'location': 'Gandhinagar, Gujarat',
-      'views': 211,
-      'wishlistCount': 31,
-      'salesCount': 17,
-      'quantity': 1,
-      'availableQuantity': 1,
-      'status': 'published',
-      'description':
-          'Large wooden cabinet available for reuse. Good for storage and home organization.',
-      'imageUrls': [
-        'https://images.unsplash.com/photo-1595428774223-ef52624120d2?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 7,
-      'sellerId': 107,
-      'sellerType': 'artist',
-      'title': 'Craft Wood Pieces',
-      'price': 450,
-      'condition': 'Recycled',
-      'categoryId': 4,
-      'category': 'Materials',
-      'listingType': 'b2c',
-      'seller': 'EcoCraft',
-      'location': 'Ahmedabad, Gujarat',
-      'views': 93,
-      'wishlistCount': 12,
-      'salesCount': 19,
-      'quantity': 8,
-      'availableQuantity': 8,
-      'status': 'published',
-      'description':
-          'Reusable wood pieces suitable for DIY projects, art, craft and furniture making.',
-      'imageUrls': [
-        'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 8,
-      'sellerId': 108,
-      'sellerType': 'artist',
-      'title': 'Denim Material Bundle',
-      'price': 700,
-      'condition': 'Used',
-      'categoryId': 5,
-      'category': 'Fashion',
-      'listingType': 'c2c',
-      'seller': 'Mira',
-      'location': 'Mumbai, Maharashtra',
-      'views': 77,
-      'wishlistCount': 8,
-      'salesCount': 6,
-      'quantity': 5,
-      'availableQuantity': 5,
-      'status': 'published',
-      'description':
-          'Reusable denim fabric pieces for crafting, upcycling and DIY fashion projects.',
-      'imageUrls': [
-        'https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 9,
-      'sellerId': 109,
-      'sellerType': 'artist',
-      'title': 'Programming Books Bundle',
-      'price': 850,
-      'condition': 'Good',
-      'categoryId': 6,
-      'category': 'Books',
-      'listingType': 'c2c',
-      'seller': 'Arjun',
-      'location': 'Pune, Maharashtra',
-      'views': 118,
-      'wishlistCount': 16,
-      'salesCount': 7,
-      'quantity': 4,
-      'availableQuantity': 4,
-      'status': 'published',
-      'description':
-          'Collection of useful programming and computer science books. Great for students and beginners.',
-      'imageUrls': [
-        'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-  ];
+  final List<Map<String, dynamic>> products = [];
+
+  bool _loadingProducts = true;
+  String? _loadError;
+
+  Future<void> _loadProducts() async {
+    try {
+      final data = await EcoLoopApi.instance.get('/products');
+      final rows = (data is List ? data : <dynamic>[]).whereType<Map>().map((raw) {
+        final p = Map<String, dynamic>.from(raw);
+        final images = (p['imageUrls'] is List) ? List<dynamic>.from(p['imageUrls']) : <dynamic>[];
+        final category = (p['categoryName'] ?? p['category'] ?? 'Other').toString();
+        final location = [p['city'], p['state']].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
+        return <String, dynamic>{...p, 'category': category, 'seller': (p['sellerName'] ?? 'EcoLoop seller').toString(), 'location': location.isEmpty ? 'Location not provided' : location, 'imageUrls': images, 'image': images.isNotEmpty ? images.first.toString() : '', 'availableQuantity': p['availableQuantity'] ?? 0};
+      }).toList();
+      if (!mounted) return;
+      setState(() { products..clear()..addAll(rows); _loadingProducts = false; _loadError = null; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _loadingProducts = false; _loadError = e.toString(); });
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _loadProducts();
     searchQuery = widget.initialSearch ?? '';
     _searchController.text = searchQuery;
 
@@ -609,6 +415,7 @@ class _MarketplaceState extends State<Marketplace> {
   Widget _buildProductGrid() {
     final items = filteredProducts;
 
+    if (_loadingProducts) return const Center(child: CircularProgressIndicator());
     if (items.isEmpty) {
       return _buildEmptyState();
     }

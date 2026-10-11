@@ -17,24 +17,12 @@ class EditProfile extends StatefulWidget {
 
 class _EditProfileState extends State<EditProfile> {
   // Input controllers with initial default values
-  final TextEditingController _nameController = TextEditingController(
-    text: 'Creative Studio',
-  );
-  final TextEditingController _emailController = TextEditingController(
-    text: 'artist@ecoloop.com',
-  );
-  final TextEditingController _phoneController = TextEditingController(
-    text: '+91 98765 43210',
-  );
-  final TextEditingController _bioController = TextEditingController(
-    text: 'Turning reusable materials into beautiful, meaningful creations.',
-  );
-  final TextEditingController _skillsController = TextEditingController(
-    text: 'Upcycling, Woodwork, Home Decor',
-  );
-  final TextEditingController _experienceController = TextEditingController(
-    text: '3 years',
-  );
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _bioController = TextEditingController();
+  final TextEditingController _skillsController = TextEditingController();
+  final TextEditingController _experienceController = TextEditingController();
 
   // Initial location fallback names and model references
   String? _initialStateName = 'Gujarat';

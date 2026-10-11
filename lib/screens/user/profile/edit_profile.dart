@@ -11,6 +11,7 @@ import '../../../app_theme/user/app_text_styles.dart';
 import '../../../models/location/city_model.dart';
 import '../../../models/location/state_model.dart';
 import '../../../services/image_picker_service.dart';
+import '../../../services/ecoloop_api.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/app_message.dart';
 
@@ -22,28 +23,18 @@ class EditProfile extends StatefulWidget {
 }
 
 class _EditProfileState extends State<EditProfile> {
-  final TextEditingController _nameController = TextEditingController(
-    text: 'Dishank Prajapati',
-  );
-
-  final TextEditingController _emailController = TextEditingController(
-    text: 'dishank@example.com',
-  );
-
-  final TextEditingController _phoneController = TextEditingController(
-    text: '+91 98765 43210',
-  );
-
-  final TextEditingController _bioController = TextEditingController(
-    text: 'EcoLoop user who believes unused things deserve a new life.',
-  );
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _bioController = TextEditingController();
 
   Uint8List? _profilePhotoBytes;
   String _profilePhotoUrl = '';
   bool _isUploadingPhoto = false;
 
-  String? _initialStateName = 'Gujarat';
-  String? _initialCityName = 'Ahmedabad';
+  String? _initialStateName;
+  String? _initialCityName;
+  bool _profileLoaded = false;
 
   StateModel? _selectedState;
   CityModel? _selectedCity;
@@ -79,8 +70,7 @@ class _EditProfileState extends State<EditProfile> {
     super.initState();
 
     _profilePhotoUrl = Prefs.getString('profilePhotoUrl').trim();
-
-    _loadStates();
+    _loadProfileFromBackend();
   }
 
   @override
@@ -163,6 +153,30 @@ class _EditProfileState extends State<EditProfile> {
     return 'Something went wrong. Please try again.';
   }
 
+  Future<void> _loadProfileFromBackend() async {
+    try {
+      final dynamic account = await EcoLoopApi.instance.get('/auth/me');
+      if (!mounted || account is! Map) return;
+      final data = Map<String, dynamic>.from(account);
+      final firstName = (data['firstName'] ?? data['userName'] ?? '').toString();
+      final lastName = (data['lastName'] ?? '').toString();
+      _nameController.text = ('$firstName $lastName').trim();
+      _emailController.text = (data['email'] ?? '').toString();
+      _phoneController.text = (data['phone'] ?? '').toString();
+      _bioController.text = (data['bio'] ?? '').toString();
+      _profilePhotoUrl = (data['profilePhotoUrl'] ?? '').toString();
+      _initialStateName = (data['state'] ?? '').toString();
+      _initialCityName = (data['city'] ?? '').toString();
+      await Prefs.setString('profilePhotoUrl', _profilePhotoUrl);
+      if (mounted) setState(() => _profileLoaded = true);
+    } catch (error) {
+      if (mounted) {
+        _showMessage(title: 'Unable to load profile', message: _getReadableError(error), type: AppMessageType.error);
+      }
+    }
+    if (mounted) await _loadStates();
+  }
+
   Future<void> _loadStates() async {
     if (!mounted) return;
 
@@ -188,7 +202,7 @@ class _EditProfileState extends State<EditProfile> {
                 (state) => state.stateName.trim().toLowerCase() == targetState,
               );
             } catch (_) {
-              _selectedState = _states.first;
+              _selectedState = null;
             }
           }
         });
@@ -1447,6 +1461,7 @@ class _EditProfileState extends State<EditProfile> {
       await Prefs.setString('userName', name);
 
       await Prefs.setString('userEmail', email);
+      await Prefs.setString('profilePhotoUrl', _profilePhotoUrl);
 
       if (!mounted) return;
 

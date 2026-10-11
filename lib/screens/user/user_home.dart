@@ -1,3 +1,4 @@
+import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
 import '../../app_theme/user/app_colors.dart';
@@ -35,96 +36,56 @@ class _UserHomeState extends State<UserHome> {
 
   // RECOMMENDED PRODUCTS
 
-  final List<Map<String, dynamic>> _products = [
-    {
-      'id': 1,
-      'title': 'Reclaimed Wood Table',
-      'price': 2500,
-      'seller': 'Rahul',
-      'condition': 'Used',
-      'category': 'Furniture',
-      'location': 'Ahmedabad, Gujarat',
-      'views': 182,
-      'wishlistCount': 21,
-      'availableQuantity': 1,
-      'description':
-          'Beautiful reclaimed wooden table in good usable condition. '
-          'Perfect for study rooms, workspaces or creative projects.',
-      'image':
-          'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc'
-          '?auto=format&fit=crop&w=1000&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc'
-            '?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'id': 2,
-      'title': 'Recycled Bottle Lamp',
-      'price': 899,
-      'seller': 'Creative Studio',
-      'condition': 'Upcycled',
-      'category': 'Decor',
-      'location': 'Vadodara, Gujarat',
-      'views': 126,
-      'wishlistCount': 18,
-      'availableQuantity': 2,
-      'description':
-          'Creative decorative lamp made from recycled glass bottles. '
-          'A great addition to an eco-friendly home.',
-      'image':
-          'https://images.unsplash.com/photo-1507473885765-e6ed057f782c'
-          '?auto=format&fit=crop&w=1000&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1507473885765-e6ed057f782c'
-            '?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'id': 3,
-      'title': 'Wooden Pallet Sofa',
-      'price': 4200,
-      'seller': 'Eco Artist',
-      'condition': 'Upcycled',
-      'category': 'Furniture',
-      'location': 'Surat, Gujarat',
-      'views': 241,
-      'wishlistCount': 32,
-      'availableQuantity': 1,
-      'description':
-          'Handcrafted sofa made using reclaimed wooden pallets. '
-          'Strong, unique and ideal for sustainable interiors.',
-      'image':
-          'https://images.unsplash.com/photo-1555041469-a586c61ea9bc'
-          '?auto=format&fit=crop&w=1000&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1555041469-a586c61ea9bc'
-            '?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'id': 4,
-      'title': 'Recycled Glass Decor',
-      'price': 650,
-      'seller': 'Priya',
-      'condition': 'Recycled',
-      'category': 'Decor',
-      'location': 'Ahmedabad, Gujarat',
-      'views': 97,
-      'wishlistCount': 13,
-      'availableQuantity': 4,
-      'description':
-          'Handmade decorative piece created from recycled glass. '
-          'Perfect for shelves, tables and creative spaces.',
-      'image':
-          'https://images.unsplash.com/photo-1577083552431-6e5fd01988b5'
-          '?auto=format&fit=crop&w=1000&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1577083552431-6e5fd01988b5'
-            '?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-  ];
+  final List<Map<String, dynamic>> _products = [];
+
+  bool _loadingProducts = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    try {
+      final data = await EcoLoopApi.instance.get('/products');
+      final rows = (data is List ? data : <dynamic>[]).whereType<Map>().map((
+        raw,
+      ) {
+        final p = Map<String, dynamic>.from(raw);
+        final images = (p['imageUrls'] is List)
+            ? List<dynamic>.from(p['imageUrls'])
+            : <dynamic>[];
+        final location = [
+          p['city'],
+          p['state'],
+        ].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
+        return <String, dynamic>{
+          ...p,
+          'id': p['productId'],
+          'seller': p['sellerName'] ?? 'EcoLoop seller',
+          'category': p['categoryName'] ?? 'Other',
+          'location': location.isEmpty ? 'Location not provided' : location,
+          'image': images.isNotEmpty ? images.first.toString() : '',
+          'images': images,
+          'price': p['price'] ?? 0,
+          'condition': p['condition'] ?? 'Not specified',
+        };
+      }).toList();
+      if (!mounted) return;
+      setState(() {
+        _products
+          ..clear()
+          ..addAll(rows);
+        _loadingProducts = false;
+      });
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          _loadingProducts = false;
+        });
+    }
+  }
 
   // DISPOSE
 
@@ -676,6 +637,35 @@ class _UserHomeState extends State<UserHome> {
   // RECOMMENDED PRODUCTS
 
   Widget _buildProducts() {
+    if (_loadingProducts)
+      return const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    if (_products.isEmpty)
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.inventory_2_outlined,
+                size: 36,
+                color: AppColors.primary,
+              ),
+              const SizedBox(height: 8),
+              Text('No listings available yet', style: AppTextStyles.title),
+              const SizedBox(height: 4),
+              Text(
+                'New items from the marketplace will appear here.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.caption,
+              ),
+            ],
+          ),
+        ),
+      );
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
