@@ -643,17 +643,17 @@ class _MarketplaceState extends State<Marketplace> {
   Widget build(BuildContext context) {
     final products = _filteredProducts;
     final width = MediaQuery.sizeOf(context).width;
-    final columns = width >= 1000
-        ? 4
-        : width >= 650
-        ? 3
-        : 2;
+    final columns = width >= 1100 ? 4 : width >= 700 ? 3 : 2;
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
+        titleSpacing: 20,
         title: const Text(
           'Marketplace',
-          style: TextStyle(fontWeight: FontWeight.w800),
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -.4),
         ),
         actions: [
           IconButton(
@@ -670,7 +670,7 @@ class _MarketplaceState extends State<Marketplace> {
               child: const Icon(Icons.favorite_border_rounded),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
         ],
       ),
       body: RefreshIndicator(
@@ -681,56 +681,22 @@ class _MarketplaceState extends State<Marketplace> {
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: _primary.withValues(alpha: .09),
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Give good things\na second life.',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w900,
-                                        height: 1.12,
-                                      ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Discover pre-loved finds and upcycled creations.',
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Icon(Icons.eco_rounded, size: 54, color: _primary),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     TextField(
                       controller: _searchController,
-                      onChanged: (v) => setState(() => _query = v),
+                      onChanged: (value) => setState(() => _query = value),
                       textInputAction: TextInputAction.search,
                       decoration: InputDecoration(
-                        hintText: 'Search products, categories, sellers…',
+                        hintText: 'Search items, categories, sellers',
+                        hintStyle: TextStyle(color: muted, fontSize: 14),
                         prefixIcon: const Icon(Icons.search_rounded),
                         suffixIcon: _query.isEmpty
                             ? null
                             : IconButton(
+                                tooltip: 'Clear search',
                                 icon: const Icon(Icons.close_rounded),
                                 onPressed: () {
                                   _searchController.clear();
@@ -739,26 +705,48 @@ class _MarketplaceState extends State<Marketplace> {
                               ),
                         filled: true,
                         fillColor: _surface,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 15,
+                        ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide(
+                            color: theme.dividerColor.withValues(alpha: .35),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide(
+                            color: theme.dividerColor.withValues(alpha: .35),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide(color: _primary, width: 1.4),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 20),
                     Row(
                       children: [
                         Expanded(
                           child: Text(
-                            'Browse categories',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w800),
+                            'Categories',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -.2,
+                            ),
                           ),
                         ),
                         TextButton.icon(
                           onPressed: _openFilters,
                           icon: const Icon(Icons.tune_rounded, size: 18),
-                          label: const Text('Filter'),
+                          label: const Text('Filter & sort'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: _primary,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                          ),
                         ),
                       ],
                     ),
@@ -770,65 +758,55 @@ class _MarketplaceState extends State<Marketplace> {
                         children: <Widget>[
                           _categoryChip('All'),
                           ..._categories
-                              .map(
-                                (category) =>
-                                    (category['name'] ??
-                                            category['title'] ??
-                                            '')
-                                        .toString()
-                                        .trim(),
-                              )
+                              .map((category) =>
+                                  (category['name'] ?? category['title'] ?? '')
+                                      .toString()
+                                      .trim())
                               .where((name) => name.isNotEmpty)
                               .toSet()
                               .map(_categoryChip),
                           ..._products
                               .map(_categoryName)
-                              .where(
-                                (name) => name.isNotEmpty && name != 'Other',
-                              )
+                              .where((name) => name.isNotEmpty && name != 'Other')
                               .toSet()
-                              .where(
-                                (name) => !_categories.any(
-                                  (category) =>
-                                      (category['name'] ??
-                                              category['title'] ??
-                                              '')
-                                          .toString()
-                                          .toLowerCase() ==
-                                      name.toLowerCase(),
-                                ),
-                              )
+                              .where((name) => !_categories.any((category) =>
+                                  (category['name'] ?? category['title'] ?? '')
+                                      .toString()
+                                      .toLowerCase() ==
+                                  name.toLowerCase()))
                               .map(_categoryChip),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 22),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Expanded(
                           child: Text(
                             _query.isEmpty ? 'Explore items' : 'Search results',
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w900),
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -.5,
+                            ),
                           ),
                         ),
                         Text(
-                          '${products.length} items',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
+                          '${products.length} ${products.length == 1 ? 'item' : 'items'}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: muted,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
                     if (_filtersApplied ||
                         _selectedCondition != 'Any condition' ||
                         _sortBy != 'Newest') ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Wrap(
-                        spacing: 6,
+                        spacing: 7,
+                        runSpacing: 6,
                         children: [
                           if (_selectedCondition != 'Any condition')
                             InputChip(
@@ -857,7 +835,7 @@ class _MarketplaceState extends State<Marketplace> {
                         ],
                       ),
                     ],
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                   ],
                 ),
               ),
@@ -876,7 +854,7 @@ class _MarketplaceState extends State<Marketplace> {
                   _error!,
                   action: TextButton.icon(
                     onPressed: () => _loadMarketplace(refresh: true),
-                    icon: const Icon(Icons.refresh),
+                    icon: const Icon(Icons.refresh_rounded),
                     label: const Text('Try again'),
                   ),
                 ),
@@ -892,8 +870,7 @@ class _MarketplaceState extends State<Marketplace> {
                   _products.isEmpty
                       ? 'Published listings from EcoLoop users and ReMakers will appear here.'
                       : 'Try another search or clear your filters.',
-                  action:
-                      _query.isNotEmpty ||
+                  action: _query.isNotEmpty ||
                           _filtersApplied ||
                           _selectedCondition != 'Any condition' ||
                           _selectedCategory != 'All'
@@ -906,13 +883,13 @@ class _MarketplaceState extends State<Marketplace> {
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                 sliver: SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
                     crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: width < 400 ? .61 : .66,
+                    mainAxisSpacing: 14,
+                    childAspectRatio: width < 380 ? .62 : width < 700 ? .66 : .70,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) => _productCard(products[index]),
@@ -928,10 +905,15 @@ class _MarketplaceState extends State<Marketplace> {
                 ),
               ),
             if (!_hasMore && products.isNotEmpty)
-              const SliverToBoxAdapter(
+              SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.only(bottom: 24),
-                  child: Center(child: Text('You’re all caught up.')),
+                  padding: const EdgeInsets.only(bottom: 24, top: 4),
+                  child: Center(
+                    child: Text(
+                      'You’re all caught up',
+                      style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -949,10 +931,18 @@ class _MarketplaceState extends State<Marketplace> {
         selected: selected,
         onSelected: (_) => setState(() => _selectedCategory = name),
         showCheckmark: false,
-        selectedColor: _primary.withValues(alpha: .15),
-        side: BorderSide(
-          color: selected ? _primary : Theme.of(context).dividerColor,
+        labelStyle: TextStyle(
+          color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          fontSize: 13,
         ),
+        selectedColor: _primary,
+        backgroundColor: _surface,
+        side: BorderSide(
+          color: selected ? _primary : Theme.of(context).dividerColor.withValues(alpha: .5),
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
       ),
     );
   }
@@ -963,179 +953,181 @@ class _MarketplaceState extends State<Marketplace> {
     final saved = _wishlistIds.contains(id);
     final price = _number(product['price']);
     final seller =
-        (product['sellerName'] ?? product['seller'] ?? 'EcoLoop member')
-            .toString();
+        (product['sellerName'] ?? product['seller'] ?? 'EcoLoop member').toString();
     final city = (product['sellerCity'] ?? product['city'] ?? '').toString();
     final state = (product['sellerState'] ?? product['state'] ?? '').toString();
     final location = [city, state].where((e) => e.trim().isNotEmpty).join(', ');
     final condition = (product['condition'] ?? 'Pre-loved').toString();
+
     return Material(
       color: _surface,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _openProduct(product),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (images.isNotEmpty)
-                    Image.network(
-                      images.first,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _imageFallback(),
-                    )
-                  else
-                    _imageFallback(),
-                  Positioned(
-                    left: 8,
-                    top: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: .58),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        condition,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 7,
-                    top: 7,
-                    child: Material(
-                      color: _surface.withValues(alpha: .95),
-                      shape: const CircleBorder(),
-                      child: IconButton(
-                        visualDensity: VisualDensity.compact,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 36,
-                          height: 36,
-                        ),
-                        padding: EdgeInsets.zero,
-                        tooltip: saved
-                            ? 'Remove from wishlist'
-                            : 'Add to wishlist',
-                        onPressed: () => _toggleWishlist(product),
-                        icon: Icon(
-                          saved
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          color: saved ? Colors.redAccent : _onSurface,
-                          size: 19,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Theme.of(context).dividerColor.withValues(alpha: .35),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _categoryName(product).toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: _primary,
-                      fontSize: 9,
-                      letterSpacing: .8,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _title(product),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      height: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    '₹${price.toStringAsFixed(price % 1 == 0 ? 0 : 2)}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: _primary,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  InkWell(
-                    onTap: () => _openSellerProfile(product),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _isArtistSeller(product)
-                                ? Icons.palette_outlined
-                                : Icons.person_outline_rounded,
-                            size: 13,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 11,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (images.isNotEmpty)
+                      Image.network(
+                        images.first,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => _imageFallback(),
+                      )
+                    else
+                      _imageFallback(),
+                    Positioned(
+                      left: 9,
+                      top: 9,
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 125),
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: .94),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: Text(
+                          condition,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
                             color: _primary,
-                          ),
-                          const SizedBox(width: 3),
-                          Expanded(
-                            child: Text(
-                              seller,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    fontSize: 10,
-                                    color: _primary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                          ),
-                          const Icon(Icons.open_in_new_rounded, size: 11),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (location.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined, size: 12),
-                        const SizedBox(width: 3),
-                        Expanded(
-                          child: Text(
-                            location,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(
-                              context,
-                            ).textTheme.bodySmall?.copyWith(fontSize: 10),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                      ],
+                      ),
+                    ),
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Material(
+                        color: Colors.white.withValues(alpha: .96),
+                        shape: const CircleBorder(),
+                        child: IconButton(
+                          visualDensity: VisualDensity.compact,
+                          constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+                          padding: EdgeInsets.zero,
+                          tooltip: saved ? 'Remove from wishlist' : 'Add to wishlist',
+                          onPressed: () => _toggleWishlist(product),
+                          icon: Icon(
+                            saved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                            color: saved ? Colors.redAccent : _primary,
+                            size: 19,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+              Expanded(
+                flex: 10,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _categoryName(product).toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _primary,
+                          fontSize: 9,
+                          letterSpacing: 1,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        _title(product),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '₹${price.toStringAsFixed(price % 1 == 0 ? 0 : 2)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: _primary,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -.3,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      InkWell(
+                        onTap: () => _openSellerProfile(product),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _isArtistSeller(product)
+                                  ? Icons.palette_outlined
+                                  : Icons.person_outline_rounded,
+                              size: 13,
+                              color: _primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                seller,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  fontSize: 10,
+                                  color: _primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right_rounded, size: 15),
+                          ],
+                        ),
+                      ),
+                      if (location.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Icon(Icons.location_on_outlined, size: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                location,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  fontSize: 10,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
