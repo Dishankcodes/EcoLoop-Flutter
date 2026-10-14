@@ -11,8 +11,7 @@ class UserHelpSupportScreen extends StatefulWidget {
   const UserHelpSupportScreen({super.key});
 
   @override
-  State<UserHelpSupportScreen> createState() =>
-      _UserHelpSupportScreenState();
+  State<UserHelpSupportScreen> createState() => _UserHelpSupportScreenState();
 }
 
 class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
@@ -36,32 +35,32 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
     {
       'question': 'How do I buy a product?',
       'answer':
-      'Browse products from the marketplace, open the product you like, check its details and add it to your cart. Continue to checkout and complete your payment.',
+          'Browse products from the marketplace, open the product you like, check its details and add it to your cart. Continue to checkout and complete your payment.',
     },
     {
       'question': 'How can I track my order?',
       'answer':
-      'Open the Orders section from your profile or navigation menu. Select an order to view its current status and tracking information.',
+          'Open the Orders section from your profile or navigation menu. Select an order to view its current status and tracking information.',
     },
     {
       'question': 'How do I add a product to wishlist?',
       'answer':
-      'Open any product and tap the heart icon. The product will be saved in your Wishlist so you can easily find it later.',
+          'Open any product and tap the heart icon. The product will be saved in your Wishlist so you can easily find it later.',
     },
     {
       'question': 'How can I become an artist?',
       'answer':
-      'Use the selling/artist option available in your account and complete the required artist information and verification steps.',
+          'Use the selling/artist option available in your account and complete the required artist information and verification steps.',
     },
     {
       'question': 'Can I review a product?',
       'answer':
-      'After purchasing a product, you can provide your feedback and rating from the relevant order or product section.',
+          'After purchasing a product, you can provide your feedback and rating from the relevant order or product section.',
     },
     {
       'question': 'What should I do if I have a problem with my order?',
       'answer':
-      'Open your order details and check the available support options. You can also contact support for assistance.',
+          'Open your order details and check the available support options. You can also contact support for assistance.',
     },
   ];
 
@@ -97,17 +96,13 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
       // ============================================================
       // APP BAR
       // ============================================================
-
       appBar: AppBar(
         backgroundColor: background,
         elevation: 0,
 
         leading: IconButton(
           onPressed: () => _toast('Back clicked'),
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: Color(0xFF1E1E2D),
-          ),
+          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1E1E2D)),
         ),
 
         title: const Text(
@@ -125,7 +120,6 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
       // ============================================================
       // BODY
       // ============================================================
-
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -133,11 +127,9 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               // ======================================================
               // HEADER CARD
               // ======================================================
-
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -203,7 +195,6 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
               // ======================================================
               // QUICK HELP
               // ======================================================
-
               _sectionTitle('Quick Help'),
 
               const SizedBox(height: 12),
@@ -215,7 +206,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                       Icons.shopping_bag_outlined,
                       'Orders',
                       'Track your orders',
-                          () => _toast('Orders Support'),
+                      () => _toast('Orders Support'),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -224,7 +215,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                       Icons.favorite_border_rounded,
                       'Wishlist',
                       'Manage saved items',
-                          () => _toast('Wishlist Support'),
+                      () => _toast('Wishlist Support'),
                     ),
                   ),
                 ],
@@ -239,7 +230,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                       Icons.payment_outlined,
                       'Payments',
                       'Payment assistance',
-                          () => _toast('Payment Support'),
+                      () => _toast('Payment Support'),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -248,7 +239,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                       Icons.person_outline_rounded,
                       'Account',
                       'Account assistance',
-                          () => _toast('Account Support'),
+                      () => _toast('Account Support'),
                     ),
                   ),
                 ],
@@ -259,7 +250,6 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
               // ======================================================
               // HOW IT WORKS
               // ======================================================
-
               _sectionTitle('How EcoLoop Works'),
 
               const SizedBox(height: 12),
@@ -269,7 +259,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                 icon: Icons.search_rounded,
                 title: 'Explore Products',
                 description:
-                'Browse handmade, upcycled and sustainable products available on EcoLoop.',
+                    'Browse handmade, upcycled and sustainable products available on EcoLoop.',
               ),
 
               _howItWorksStep(
@@ -277,7 +267,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                 icon: Icons.favorite_border_rounded,
                 title: 'Save or Add to Cart',
                 description:
-                'Save products to your wishlist or add the products you want to purchase to your cart.',
+                    'Save products to your wishlist or add the products you want to purchase to your cart.',
               ),
 
               _howItWorksStep(
@@ -285,7 +275,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                 icon: Icons.shopping_cart_outlined,
                 title: 'Place Your Order',
                 description:
-                'Review your selected products, provide the required details and complete checkout.',
+                    'Review your selected products, provide the required details and complete checkout.',
               ),
 
               _howItWorksStep(
@@ -293,7 +283,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                 icon: Icons.local_shipping_outlined,
                 title: 'Track Delivery',
                 description:
-                'View your order status and follow the delivery progress from the Orders section.',
+                    'View your order status and follow the delivery progress from the Orders section.',
               ),
 
               _howItWorksStep(
@@ -301,7 +291,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                 icon: Icons.star_outline_rounded,
                 title: 'Share Your Review',
                 description:
-                'After receiving your product, share your experience by giving a rating and review.',
+                    'After receiving your product, share your experience by giving a rating and review.',
               ),
 
               const SizedBox(height: 20),
@@ -309,24 +299,17 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
               // ======================================================
               // FAQ
               // ======================================================
-
               _sectionTitle('Frequently Asked Questions'),
 
               const SizedBox(height: 10),
 
-              ...faqs.map(
-                    (faq) => _faqCard(
-                  faq['question']!,
-                  faq['answer']!,
-                ),
-              ),
+              ...faqs.map((faq) => _faqCard(faq['question']!, faq['answer']!)),
 
               const SizedBox(height: 18),
 
               // ======================================================
               // CONTACT SUPPORT
               // ======================================================
-
               _sectionTitle('Need More Help?'),
 
               const SizedBox(height: 12),
@@ -337,18 +320,15 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                 decoration: BoxDecoration(
                   color: cardColor,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: borderColor,
-                  ),
+                  border: Border.all(color: borderColor),
                 ),
                 child: Column(
                   children: [
-
                     _supportOption(
                       Icons.chat_bubble_outline_rounded,
                       'Chat with Support',
                       'Get help with your issue',
-                          () => _toast('Opening Support Chat'),
+                      () => _toast('Opening Support Chat'),
                     ),
 
                     const Divider(height: 22),
@@ -357,7 +337,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                       Icons.email_outlined,
                       'Email Support',
                       'Send us your question',
-                          () => _toast('Opening Email Support'),
+                      () => _toast('Opening Email Support'),
                     ),
 
                     const Divider(height: 22),
@@ -366,7 +346,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                       Icons.report_problem_outlined,
                       'Report a Problem',
                       'Tell us what went wrong',
-                          () => _toast('Report Problem'),
+                      () => _toast('Report Problem'),
                     ),
                   ],
                 ),
@@ -377,7 +357,6 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
               // ======================================================
               // SUPPORT NOTE
               // ======================================================
-
               Container(
                 padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(
@@ -387,11 +366,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.info_outline_rounded,
-                      color: primary,
-                      size: 21,
-                    ),
+                    Icon(Icons.info_outline_rounded, color: primary, size: 21),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -435,11 +410,11 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
   // ================================================================
 
   Widget _quickHelpCard(
-      IconData icon,
-      String title,
-      String subtitle,
-      VoidCallback onTap,
-      ) {
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(17),
@@ -448,9 +423,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(17),
-          border: Border.all(
-            color: borderColor,
-          ),
+          border: Border.all(color: borderColor),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,11 +435,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
                 color: softPurple,
                 borderRadius: BorderRadius.circular(13),
               ),
-              child: Icon(
-                icon,
-                color: primary,
-                size: 22,
-              ),
+              child: Icon(icon, color: primary, size: 22),
             ),
 
             const SizedBox(height: 11),
@@ -484,10 +453,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
 
             Text(
               subtitle,
-              style: const TextStyle(
-                color: Color(0xFF7E8CA0),
-                fontSize: 9.5,
-              ),
+              style: const TextStyle(color: Color(0xFF7E8CA0), fontSize: 9.5),
             ),
           ],
         ),
@@ -511,14 +477,11 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: borderColor,
-        ),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           Container(
             width: 42,
             height: 42,
@@ -526,11 +489,7 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
               color: softPurple,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              color: primary,
-              size: 21,
-            ),
+            child: Icon(icon, color: primary, size: 21),
           ),
 
           const SizedBox(width: 12),
@@ -585,29 +544,17 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
   // FAQ
   // ================================================================
 
-  Widget _faqCard(
-      String question,
-      String answer,
-      ) {
+  Widget _faqCard(String question, String answer) {
     return Container(
       margin: const EdgeInsets.only(bottom: 9),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: borderColor,
-        ),
+        border: Border.all(color: borderColor),
       ),
       child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(
-          horizontal: 15,
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(
-          15,
-          0,
-          15,
-          15,
-        ),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 15),
+        childrenPadding: const EdgeInsets.fromLTRB(15, 0, 15, 15),
         iconColor: primary,
         collapsedIconColor: mutedColor,
         title: Text(
@@ -640,17 +587,16 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
   // ================================================================
 
   Widget _supportOption(
-      IconData icon,
-      String title,
-      String subtitle,
-      VoidCallback onTap,
-      ) {
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Row(
         children: [
-
           Container(
             width: 42,
             height: 42,
@@ -658,19 +604,14 @@ class _UserHelpSupportScreenState extends State<UserHelpSupportScreen> {
               color: softPurple,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              color: primary,
-              size: 21,
-            ),
+            child: Icon(icon, color: primary, size: 21),
           ),
 
           const SizedBox(width: 12),
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,

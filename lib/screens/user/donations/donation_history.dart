@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
@@ -43,8 +42,8 @@ class _DonationHistoryState extends State<DonationHistory> {
       final categoryRows = categoryResponse is List
           ? categoryResponse
           : categoryResponse is Map && categoryResponse['categories'] is List
-              ? categoryResponse['categories'] as List
-              : <dynamic>[];
+          ? categoryResponse['categories'] as List
+          : <dynamic>[];
       final categoryNames = <String, String>{};
       for (final row in categoryRows.whereType<Map>()) {
         if (row['categoryId'] != null && row['name'] != null) {
@@ -60,12 +59,19 @@ class _DonationHistoryState extends State<DonationHistory> {
       } else if (response is Map && response['data'] is List) {
         rows = response['data'] as List;
       } else {
-        throw Exception('The server returned an unexpected donations response.');
+        throw Exception(
+          'The server returned an unexpected donations response.',
+        );
       }
 
       final parsed = rows
           .whereType<Map>()
-          .map((row) => _normalizeDonation(Map<String, dynamic>.from(row), categoryNames))
+          .map(
+            (row) => _normalizeDonation(
+              Map<String, dynamic>.from(row),
+              categoryNames,
+            ),
+          )
           .toList();
 
       if (!mounted) return;
@@ -83,7 +89,10 @@ class _DonationHistoryState extends State<DonationHistory> {
     }
   }
 
-  Map<String, dynamic> _normalizeDonation(Map<String, dynamic> raw, [Map<String, String> categoryNames = const {}]) {
+  Map<String, dynamic> _normalizeDonation(
+    Map<String, dynamic> raw, [
+    Map<String, String> categoryNames = const {},
+  ]) {
     final images = raw['imageUrls'];
     String image = '';
     if (images is List && images.isNotEmpty) {
@@ -96,10 +105,19 @@ class _DonationHistoryState extends State<DonationHistory> {
     return {
       ...raw,
       'id': raw['donationId']?.toString() ?? raw['id']?.toString() ?? '',
-      'item': raw['title']?.toString() ?? raw['item']?.toString() ?? 'Donated Item',
-      'category': raw['category']?.toString() ?? raw['categoryName']?.toString() ?? categoryNames[raw['categoryId']?.toString()] ?? (raw['categoryId'] == null ? 'Category unavailable' : 'Category ${raw['categoryId']}'),
+      'item':
+          raw['title']?.toString() ?? raw['item']?.toString() ?? 'Donated Item',
+      'category':
+          raw['category']?.toString() ??
+          raw['categoryName']?.toString() ??
+          categoryNames[raw['categoryId']?.toString()] ??
+          (raw['categoryId'] == null
+              ? 'Category unavailable'
+              : 'Category ${raw['categoryId']}'),
       'condition': _prettyCondition(raw['condition']?.toString() ?? 'used'),
-      'date': _displayDate(createdAt.isNotEmpty ? createdAt : raw['date']?.toString()),
+      'date': _displayDate(
+        createdAt.isNotEmpty ? createdAt : raw['date']?.toString(),
+      ),
       'status': _prettyStatus(raw['status']?.toString() ?? 'pending'),
       'pickupDate': raw['pickupDate']?.toString() ?? '',
       'location': [
@@ -108,9 +126,13 @@ class _DonationHistoryState extends State<DonationHistory> {
       ].where((part) => part != null && part.trim().isNotEmpty).join(', '),
       'address': raw['address']?.toString() ?? '',
       'image': image,
-      'rewardStatus': raw['rewardStatus']?.toString() ?? _rewardStatusFor(raw['status']?.toString() ?? 'pending'),
+      'rewardStatus':
+          raw['rewardStatus']?.toString() ??
+          _rewardStatusFor(raw['status']?.toString() ?? 'pending'),
       'rewardPoints': raw['rewardPoints'] ?? 0,
-      'rewardCredited': raw['rewardCredited'] == true || '${raw['rewardCredited']}'.toLowerCase() == 'true',
+      'rewardCredited':
+          raw['rewardCredited'] == true ||
+          '${raw['rewardCredited']}'.toLowerCase() == 'true',
     };
   }
 
@@ -169,8 +191,18 @@ class _DonationHistoryState extends State<DonationHistory> {
     final parsed = DateTime.tryParse(datePart);
     if (parsed == null) return raw;
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${parsed.day} ${months[parsed.month - 1]} ${parsed.year}';
   }
@@ -180,22 +212,30 @@ class _DonationHistoryState extends State<DonationHistory> {
     if (_selectedFilter == 'Active') {
       return _donations.where((d) {
         final s = d['status'].toString().toLowerCase();
-        return s == 'pending' || s == 'pickup scheduled' || s == 'pickup requested';
+        return s == 'pending' ||
+            s == 'pickup scheduled' ||
+            s == 'pickup requested';
       }).toList();
     }
     if (_selectedFilter == 'Completed') {
       return _donations.where((d) {
         final s = d['status'].toString().toLowerCase();
-        return s == 'completed' || s == 'collected' || s == 'accepted' || s == 'approved';
+        return s == 'completed' ||
+            s == 'collected' ||
+            s == 'accepted' ||
+            s == 'approved';
       }).toList();
     }
     return _donations;
   }
 
   int get _completedCount => _donations.where((d) {
-        final s = d['status'].toString().toLowerCase();
-        return s == 'completed' || s == 'collected' || s == 'accepted' || s == 'approved';
-      }).length;
+    final s = d['status'].toString().toLowerCase();
+    return s == 'completed' ||
+        s == 'collected' ||
+        s == 'accepted' ||
+        s == 'approved';
+  }).length;
 
   @override
   Widget build(BuildContext context) {
@@ -230,19 +270,19 @@ class _DonationHistoryState extends State<DonationHistory> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? _buildErrorState()
-                    : _filteredDonations.isEmpty
-                        ? _buildEmptyState()
-                        : RefreshIndicator(
-                            onRefresh: _loadDonations,
-                            child: ListView.builder(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 25),
-                              itemCount: _filteredDonations.length,
-                              itemBuilder: (context, index) =>
-                                  _buildDonationCard(_filteredDonations[index]),
-                            ),
-                          ),
+                ? _buildErrorState()
+                : _filteredDonations.isEmpty
+                ? _buildEmptyState()
+                : RefreshIndicator(
+                    onRefresh: _loadDonations,
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 25),
+                      itemCount: _filteredDonations.length,
+                      itemBuilder: (context, index) =>
+                          _buildDonationCard(_filteredDonations[index]),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -260,11 +300,37 @@ class _DonationHistoryState extends State<DonationHistory> {
       ),
       child: Row(
         children: [
-          Expanded(child: _summaryItem(Icons.volunteer_activism_outlined, 'Donated', '${_donations.length}')),
-          Container(height: 42, width: 1, color: Colors.white.withOpacity(0.25)),
-          Expanded(child: _summaryItem(Icons.check_circle_outline, 'Completed', '$_completedCount')),
-          Container(height: 42, width: 1, color: Colors.white.withOpacity(0.25)),
-          Expanded(child: _summaryItem(Icons.eco_outlined, 'Impact', _donations.isEmpty ? '—' : 'Active')),
+          Expanded(
+            child: _summaryItem(
+              Icons.volunteer_activism_outlined,
+              'Donated',
+              '${_donations.length}',
+            ),
+          ),
+          Container(
+            height: 42,
+            width: 1,
+            color: Colors.white.withOpacity(0.25),
+          ),
+          Expanded(
+            child: _summaryItem(
+              Icons.check_circle_outline,
+              'Completed',
+              '$_completedCount',
+            ),
+          ),
+          Container(
+            height: 42,
+            width: 1,
+            color: Colors.white.withOpacity(0.25),
+          ),
+          Expanded(
+            child: _summaryItem(
+              Icons.eco_outlined,
+              'Impact',
+              _donations.isEmpty ? '—' : 'Active',
+            ),
+          ),
         ],
       ),
     );
@@ -275,9 +341,19 @@ class _DonationHistoryState extends State<DonationHistory> {
       children: [
         Icon(icon, size: 20, color: Colors.white),
         const SizedBox(height: 6),
-        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(title, style: TextStyle(fontSize: 9, color: Colors.white.withOpacity(0.8))),
+        Text(
+          title,
+          style: TextStyle(fontSize: 9, color: Colors.white.withOpacity(0.8)),
+        ),
       ],
     );
   }
@@ -306,7 +382,9 @@ class _DonationHistoryState extends State<DonationHistory> {
               color: selected ? Colors.white : AppColors.textSecondary,
             ),
             side: BorderSide(
-              color: selected ? AppColors.primary : AppColors.accent.withOpacity(0.6),
+              color: selected
+                  ? AppColors.primary
+                  : AppColors.accent.withOpacity(0.6),
             ),
           );
         },
@@ -322,7 +400,9 @@ class _DonationHistoryState extends State<DonationHistory> {
       onTap: () async {
         await Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => DonationDetails(donation: donation)),
+          MaterialPageRoute(
+            builder: (_) => DonationDetails(donation: donation),
+          ),
         );
         if (mounted) _loadDonations();
       },
@@ -368,13 +448,20 @@ class _DonationHistoryState extends State<DonationHistory> {
                           ),
                         ),
                       ),
-                      const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.textSecondary),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 12,
+                        color: AppColors.textSecondary,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 5),
                   Text(
                     '${donation['category']} • ${donation['condition']}',
-                    style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 7),
                   _buildStatusBadge(status),
@@ -392,7 +479,10 @@ class _DonationHistoryState extends State<DonationHistory> {
                   const SizedBox(height: 5),
                   Text(
                     '${donation['date']} · ID ${donation['id']}',
-                    style: const TextStyle(fontSize: 9.5, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                      fontSize: 9.5,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -404,11 +494,14 @@ class _DonationHistoryState extends State<DonationHistory> {
   }
 
   Widget _imagePlaceholder() => Container(
-        height: 82,
-        width: 82,
-        color: AppColors.light,
-        child: const Icon(Icons.volunteer_activism_outlined, color: AppColors.primary),
-      );
+    height: 82,
+    width: 82,
+    color: AppColors.light,
+    child: const Icon(
+      Icons.volunteer_activism_outlined,
+      color: AppColors.primary,
+    ),
+  );
 
   Widget _buildStatusBadge(String status) {
     final active = status == 'Pickup Scheduled' || status == 'Pending';
@@ -422,7 +515,9 @@ class _DonationHistoryState extends State<DonationHistory> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            active ? Icons.schedule_rounded : Icons.check_circle_outline_rounded,
+            active
+                ? Icons.schedule_rounded
+                : Icons.check_circle_outline_rounded,
             size: 12,
             color: active ? Colors.orange.shade700 : AppColors.success,
           ),
@@ -447,9 +542,16 @@ class _DonationHistoryState extends State<DonationHistory> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.cloud_off_outlined, size: 48, color: AppColors.textSecondary),
+            const Icon(
+              Icons.cloud_off_outlined,
+              size: 48,
+              color: AppColors.textSecondary,
+            ),
             const SizedBox(height: 12),
-            const Text('Could not load donation history', style: TextStyle(fontWeight: FontWeight.w700)),
+            const Text(
+              'Could not load donation history',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 8),
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -474,19 +576,34 @@ class _DonationHistoryState extends State<DonationHistory> {
             Container(
               height: 88,
               width: 88,
-              decoration: const BoxDecoration(color: AppColors.light, shape: BoxShape.circle),
-              child: const Icon(Icons.volunteer_activism_outlined, size: 42, color: AppColors.primary),
+              decoration: const BoxDecoration(
+                color: AppColors.light,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.volunteer_activism_outlined,
+                size: 42,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 18),
             const Text(
               'No donations found',
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
               'Your submitted donations and pickup updates from EcoLoop will appear here.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.5,
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -494,4 +611,3 @@ class _DonationHistoryState extends State<DonationHistory> {
     );
   }
 }
-

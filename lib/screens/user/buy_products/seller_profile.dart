@@ -120,7 +120,11 @@ class _SellerProfileState extends State<SellerProfile> {
   }
 
   Future<void> _loadSellerReviews() async {
-    final id = _id(widget.seller['userId'] ?? widget.seller['id'] ?? widget.seller['sellerId']);
+    final id = _id(
+      widget.seller['userId'] ??
+          widget.seller['id'] ??
+          widget.seller['sellerId'],
+    );
     if (id.isEmpty) return;
     if (mounted) setState(() => _loadingReviews = true);
     try {
@@ -135,11 +139,20 @@ class _SellerProfileState extends State<SellerProfile> {
   }
 
   Future<void> _loadSellerReviewEligibility() async {
-    final id = _id(widget.seller['userId'] ?? widget.seller['id'] ?? widget.seller['sellerId']);
+    final id = _id(
+      widget.seller['userId'] ??
+          widget.seller['id'] ??
+          widget.seller['sellerId'],
+    );
     if (id.isEmpty) return;
     try {
       final data = await _api.get('/sellers/user/$id/review-eligibility');
-      if (mounted) setState(() => _reviewEligibility = data is Map ? Map<String, dynamic>.from(data) : null);
+      if (mounted)
+        setState(
+          () => _reviewEligibility = data is Map
+              ? Map<String, dynamic>.from(data)
+              : null,
+        );
     } catch (_) {
       if (mounted) setState(() => _reviewEligibility = {'eligible': false});
     }
@@ -148,10 +161,14 @@ class _SellerProfileState extends State<SellerProfile> {
   Future<void> _giveSellerReview() async {
     final eligibility = _reviewEligibility;
     if (eligibility?['eligible'] != true || eligibility?['orderId'] == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('You can review this seller after you purchase and receive an item from them.'),
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'You can review this seller after you purchase and receive an item from them.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
     final commentController = TextEditingController();
@@ -165,34 +182,65 @@ class _SellerProfileState extends State<SellerProfile> {
           content: Form(
             key: formKey,
             child: SingleChildScrollView(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Text('Only verified buyers can leave a seller review.'),
-                const SizedBox(height: 10),
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (i) => IconButton(
-                  onPressed: () => setDialogState(() => rating = i + 1),
-                  icon: Icon(i < rating ? Icons.star_rounded : Icons.star_outline_rounded, color: AppColors.primary, size: 30),
-                ))),
-                TextFormField(
-                  controller: commentController,
-                  minLines: 3,
-                  maxLines: 5,
-                  maxLength: 500,
-                  decoration: const InputDecoration(labelText: 'Your experience', border: OutlineInputBorder()),
-                  validator: (value) => (value ?? '').trim().length < 5 ? 'Write at least 5 characters.' : null,
-                ),
-                if (rating == 0) const Text('Select a star rating', style: TextStyle(color: Colors.red, fontSize: 12)),
-              ]),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Only verified buyers can leave a seller review.'),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      5,
+                      (i) => IconButton(
+                        onPressed: () => setDialogState(() => rating = i + 1),
+                        icon: Icon(
+                          i < rating
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          color: AppColors.primary,
+                          size: 30,
+                        ),
+                      ),
+                    ),
+                  ),
+                  TextFormField(
+                    controller: commentController,
+                    minLines: 3,
+                    maxLines: 5,
+                    maxLength: 500,
+                    decoration: const InputDecoration(
+                      labelText: 'Your experience',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) => (value ?? '').trim().length < 5
+                        ? 'Write at least 5 characters.'
+                        : null,
+                  ),
+                  if (rating == 0)
+                    const Text(
+                      'Select a star rating',
+                      style: TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                ],
+              ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () {
-                if (rating == 0 || !(formKey.currentState?.validate() ?? false)) {
+                if (rating == 0 ||
+                    !(formKey.currentState?.validate() ?? false)) {
                   setDialogState(() {});
                   return;
                 }
-                Navigator.pop(dialogContext, {'rating': rating, 'comment': commentController.text.trim()});
+                Navigator.pop(dialogContext, {
+                  'rating': rating,
+                  'comment': commentController.text.trim(),
+                });
               },
               child: const Text('Submit review'),
             ),
@@ -204,53 +252,150 @@ class _SellerProfileState extends State<SellerProfile> {
     if (result == null) return;
     try {
       await _api.post('/reviews/seller', {
-        'sellerId': int.tryParse(_id(widget.seller['userId'] ?? widget.seller['id'] ?? widget.seller['sellerId'])) ?? 0,
+        'sellerId':
+            int.tryParse(
+              _id(
+                widget.seller['userId'] ??
+                    widget.seller['id'] ??
+                    widget.seller['sellerId'],
+              ),
+            ) ??
+            0,
         'sellerType': 'user',
-        'orderId': int.tryParse(eligibility!['orderId'].toString()) ?? eligibility['orderId'],
+        'orderId':
+            int.tryParse(eligibility!['orderId'].toString()) ??
+            eligibility['orderId'],
         'rating': result['rating'],
         'comment': result['comment'],
       });
       await _loadSellerReviews();
       await _loadSellerReviewEligibility();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Seller review submitted.'), behavior: SnackBarBehavior.floating));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Seller review submitted.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not submit review: $e'), behavior: SnackBarBehavior.floating));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not submit review: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
     }
   }
 
   Widget _buildSellerReviews() {
-    final avg = _reviews.isEmpty ? 0.0 : _reviews.fold<double>(0, (sum, r) => sum + (num.tryParse((r['rating'] ?? 0).toString())?.toDouble() ?? 0)) / _reviews.length;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Expanded(child: Text('Seller reviews', style: AppTextStyles.title.copyWith(fontSize: 18))),
-        if (_reviews.isNotEmpty) Text('${avg.toStringAsFixed(1)} ★ (${_reviews.length})', style: AppTextStyles.caption),
-      ]),
-      const SizedBox(height: 10),
-      SizedBox(width: double.infinity, child: OutlinedButton.icon(
-        onPressed: _reviewEligibility?['eligible'] == true ? _giveSellerReview : null,
-        icon: const Icon(Icons.rate_review_outlined),
-        label: Text(_reviewEligibility?['eligible'] == true ? 'Give a review' : 'Give a review after purchase'),
-      )),
-      const SizedBox(height: 10),
-      if (_loadingReviews) const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
-      else if (_reviews.isEmpty) Text('No verified seller reviews yet.', style: AppTextStyles.caption)
-      else ..._reviews.take(5).map((r) => Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 9),
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.accent.withOpacity(.35))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(child: Text((r['reviewerName'] ?? r['userName'] ?? r['name'] ?? 'EcoLoop buyer').toString(), style: const TextStyle(fontWeight: FontWeight.w700))),
-            Text('★ ${r['rating'] ?? '—'}', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
-          ]),
-          const SizedBox(height: 5),
-          Text((r['comment'] ?? '').toString()),
-          const SizedBox(height: 4),
-          Text((r['createdAt'] ?? '').toString(), style: AppTextStyles.caption),
-        ]),
-      )),
-    ]);
+    final avg = _reviews.isEmpty
+        ? 0.0
+        : _reviews.fold<double>(
+                0,
+                (sum, r) =>
+                    sum +
+                    (num.tryParse((r['rating'] ?? 0).toString())?.toDouble() ??
+                        0),
+              ) /
+              _reviews.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Seller reviews',
+                style: AppTextStyles.title.copyWith(fontSize: 18),
+              ),
+            ),
+            if (_reviews.isNotEmpty)
+              Text(
+                '${avg.toStringAsFixed(1)} ★ (${_reviews.length})',
+                style: AppTextStyles.caption,
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _reviewEligibility?['eligible'] == true
+                ? _giveSellerReview
+                : null,
+            icon: const Icon(Icons.rate_review_outlined),
+            label: Text(
+              _reviewEligibility?['eligible'] == true
+                  ? 'Give a review'
+                  : 'Give a review after purchase',
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (_loadingReviews)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          )
+        else if (_reviews.isEmpty)
+          Text('No verified seller reviews yet.', style: AppTextStyles.caption)
+        else
+          ..._reviews
+              .take(5)
+              .map(
+                (r) => Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 9),
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppColors.accent.withOpacity(.35),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              (r['reviewerName'] ??
+                                      r['userName'] ??
+                                      r['name'] ??
+                                      'EcoLoop buyer')
+                                  .toString(),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '★ ${r['rating'] ?? '—'}',
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text((r['comment'] ?? '').toString()),
+                      const SizedBox(height: 4),
+                      Text(
+                        (r['createdAt'] ?? '').toString(),
+                        style: AppTextStyles.caption,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+      ],
+    );
   }
 
   @override

@@ -643,7 +643,11 @@ class _MarketplaceState extends State<Marketplace> {
   Widget build(BuildContext context) {
     final products = _filteredProducts;
     final width = MediaQuery.sizeOf(context).width;
-    final columns = width >= 1100 ? 4 : width >= 700 ? 3 : 2;
+    final columns = width >= 1100
+        ? 4
+        : width >= 700
+        ? 3
+        : 2;
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
 
@@ -758,22 +762,34 @@ class _MarketplaceState extends State<Marketplace> {
                         children: <Widget>[
                           _categoryChip('All'),
                           ..._categories
-                              .map((category) =>
-                                  (category['name'] ?? category['title'] ?? '')
-                                      .toString()
-                                      .trim())
+                              .map(
+                                (category) =>
+                                    (category['name'] ??
+                                            category['title'] ??
+                                            '')
+                                        .toString()
+                                        .trim(),
+                              )
                               .where((name) => name.isNotEmpty)
                               .toSet()
                               .map(_categoryChip),
                           ..._products
                               .map(_categoryName)
-                              .where((name) => name.isNotEmpty && name != 'Other')
+                              .where(
+                                (name) => name.isNotEmpty && name != 'Other',
+                              )
                               .toSet()
-                              .where((name) => !_categories.any((category) =>
-                                  (category['name'] ?? category['title'] ?? '')
-                                      .toString()
-                                      .toLowerCase() ==
-                                  name.toLowerCase()))
+                              .where(
+                                (name) => !_categories.any(
+                                  (category) =>
+                                      (category['name'] ??
+                                              category['title'] ??
+                                              '')
+                                          .toString()
+                                          .toLowerCase() ==
+                                      name.toLowerCase(),
+                                ),
+                              )
                               .map(_categoryChip),
                         ],
                       ),
@@ -870,7 +886,8 @@ class _MarketplaceState extends State<Marketplace> {
                   _products.isEmpty
                       ? 'Published listings from EcoLoop users and ReMakers will appear here.'
                       : 'Try another search or clear your filters.',
-                  action: _query.isNotEmpty ||
+                  action:
+                      _query.isNotEmpty ||
                           _filtersApplied ||
                           _selectedCondition != 'Any condition' ||
                           _selectedCategory != 'All'
@@ -889,7 +906,11 @@ class _MarketplaceState extends State<Marketplace> {
                     crossAxisCount: columns,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 14,
-                    childAspectRatio: width < 380 ? .62 : width < 700 ? .66 : .70,
+                    childAspectRatio: width < 380
+                        ? .62
+                        : width < 700
+                        ? .66
+                        : .70,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) => _productCard(products[index]),
@@ -932,14 +953,18 @@ class _MarketplaceState extends State<Marketplace> {
         onSelected: (_) => setState(() => _selectedCategory = name),
         showCheckmark: false,
         labelStyle: TextStyle(
-          color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+          color: selected
+              ? Colors.white
+              : Theme.of(context).colorScheme.onSurface,
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           fontSize: 13,
         ),
         selectedColor: _primary,
         backgroundColor: _surface,
         side: BorderSide(
-          color: selected ? _primary : Theme.of(context).dividerColor.withValues(alpha: .5),
+          color: selected
+              ? _primary
+              : Theme.of(context).dividerColor.withValues(alpha: .5),
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
@@ -953,7 +978,8 @@ class _MarketplaceState extends State<Marketplace> {
     final saved = _wishlistIds.contains(id);
     final price = _number(product['price']);
     final seller =
-        (product['sellerName'] ?? product['seller'] ?? 'EcoLoop member').toString();
+        (product['sellerName'] ?? product['seller'] ?? 'EcoLoop member')
+            .toString();
     final city = (product['sellerCity'] ?? product['city'] ?? '').toString();
     final state = (product['sellerState'] ?? product['state'] ?? '').toString();
     final location = [city, state].where((e) => e.trim().isNotEmpty).join(', ');
@@ -984,7 +1010,8 @@ class _MarketplaceState extends State<Marketplace> {
                       Image.network(
                         images.first,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => _imageFallback(),
+                        errorBuilder: (context, error, stackTrace) =>
+                            _imageFallback(),
                       )
                     else
                       _imageFallback(),
@@ -993,7 +1020,10 @@ class _MarketplaceState extends State<Marketplace> {
                       top: 9,
                       child: Container(
                         constraints: const BoxConstraints(maxWidth: 125),
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: .94),
                           borderRadius: BorderRadius.circular(30),
@@ -1018,12 +1048,19 @@ class _MarketplaceState extends State<Marketplace> {
                         shape: const CircleBorder(),
                         child: IconButton(
                           visualDensity: VisualDensity.compact,
-                          constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+                          constraints: const BoxConstraints.tightFor(
+                            width: 36,
+                            height: 36,
+                          ),
                           padding: EdgeInsets.zero,
-                          tooltip: saved ? 'Remove from wishlist' : 'Add to wishlist',
+                          tooltip: saved
+                              ? 'Remove from wishlist'
+                              : 'Add to wishlist',
                           onPressed: () => _toggleWishlist(product),
                           icon: Icon(
-                            saved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                            saved
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
                             color: saved ? Colors.redAccent : _primary,
                             size: 19,
                           ),
@@ -1066,11 +1103,12 @@ class _MarketplaceState extends State<Marketplace> {
                         '₹${price.toStringAsFixed(price % 1 == 0 ? 0 : 2)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: _primary,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -.3,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: _primary,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -.3,
+                            ),
                       ),
                       const SizedBox(height: 5),
                       InkWell(
@@ -1091,11 +1129,12 @@ class _MarketplaceState extends State<Marketplace> {
                                 seller,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontSize: 10,
-                                  color: _primary,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      fontSize: 10,
+                                      color: _primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                               ),
                             ),
                             const Icon(Icons.chevron_right_rounded, size: 15),
@@ -1106,17 +1145,26 @@ class _MarketplaceState extends State<Marketplace> {
                         const SizedBox(height: 3),
                         Row(
                           children: [
-                            Icon(Icons.location_on_outlined, size: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 12,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
                             const SizedBox(width: 3),
                             Expanded(
                               child: Text(
                                 location,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontSize: 10,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      fontSize: 10,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
                               ),
                             ),
                           ],

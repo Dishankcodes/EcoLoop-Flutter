@@ -1,4 +1,3 @@
-
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -576,7 +575,8 @@ class _EcoImpactState extends State<EcoImpact> {
         ),
         const SizedBox(height: 6),
         Text(
-          _loadError ?? 'Something went wrong while loading your environmental impact.',
+          _loadError ??
+              'Something went wrong while loading your environmental impact.',
           textAlign: TextAlign.center,
           style: AppTextStyles.body,
         ),
@@ -609,35 +609,44 @@ class _EcoImpactState extends State<EcoImpact> {
       ]);
       final response = results[0];
       if (response is! Map) {
-        throw Exception('The backend returned an unexpected Eco Impact response.');
+        throw Exception(
+          'The backend returned an unexpected Eco Impact response.',
+        );
       }
       final data = Map<String, dynamic>.from(response);
       final donationResponse = results[1];
       final donationRows = donationResponse is List
           ? donationResponse
           : donationResponse is Map && donationResponse['donations'] is List
-              ? donationResponse['donations'] as List
-              : <dynamic>[];
+          ? donationResponse['donations'] as List
+          : <dynamic>[];
       final acceptedDonationIds = <String>{};
       for (final row in donationRows.whereType<Map>()) {
         final status = (row['status'] ?? '').toString().toLowerCase();
-        if (status == 'accepted' || status == 'approved' || status == 'completed') {
+        if (status == 'accepted' ||
+            status == 'approved' ||
+            status == 'completed') {
           final id = (row['donationId'] ?? row['id'] ?? '').toString();
           if (id.isNotEmpty) acceptedDonationIds.add(id);
         }
       }
       final rewardResponse = results[2];
-      final transactions = rewardResponse is Map && rewardResponse['transactions'] is List
+      final transactions =
+          rewardResponse is Map && rewardResponse['transactions'] is List
           ? rewardResponse['transactions'] as List
           : rewardResponse is List
-              ? rewardResponse
-              : <dynamic>[];
+          ? rewardResponse
+          : <dynamic>[];
       var acceptedPoints = 0;
       for (final row in transactions.whereType<Map>()) {
         final points = _asInt(row['points']);
-        final referenceType = (row['referenceType'] ?? '').toString().toLowerCase();
+        final referenceType = (row['referenceType'] ?? '')
+            .toString()
+            .toLowerCase();
         final referenceId = (row['referenceId'] ?? '').toString();
-        if (referenceType == 'donation' && !acceptedDonationIds.contains(referenceId)) continue;
+        if (referenceType == 'donation' &&
+            !acceptedDonationIds.contains(referenceId))
+          continue;
         acceptedPoints += points;
       }
       final reused = _asInt(data['itemsReused']);
@@ -663,8 +672,11 @@ class _EcoImpactState extends State<EcoImpact> {
     }
   }
 
-  int _asInt(dynamic value) => value is num ? value.toInt() : int.tryParse(value?.toString() ?? '') ?? 0;
-  double _asDouble(dynamic value) => value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '') ?? 0;
+  int _asInt(dynamic value) =>
+      value is num ? value.toInt() : int.tryParse(value?.toString() ?? '') ?? 0;
+  double _asDouble(dynamic value) => value is num
+      ? value.toDouble()
+      : double.tryParse(value?.toString() ?? '') ?? 0;
 
   String _formatNumber(double value) {
     if (value == value.roundToDouble()) {
@@ -1069,4 +1081,3 @@ class _ImpactChartPainter extends CustomPainter {
         oldDelegate.textColor != textColor;
   }
 }
-

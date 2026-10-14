@@ -88,9 +88,8 @@ class ApiManager {
             debugPrint('==================================');
           }
 
-          
           // GOOGLE APPS SCRIPT 302 REDIRECT
-          
+
           if (response.statusCode == 302) {
             final location = response.headers.value('location');
 

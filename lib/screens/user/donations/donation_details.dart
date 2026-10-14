@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
@@ -43,7 +42,9 @@ class _DonationDetailsState extends State<DonationDetails> {
           raw['category']?.toString() ??
           raw['categoryName']?.toString() ??
           _categoryNames[raw['categoryId']?.toString()] ??
-          (raw['categoryId'] == null ? 'Category unavailable' : 'Category ${raw['categoryId']}'),
+          (raw['categoryId'] == null
+              ? 'Category unavailable'
+              : 'Category ${raw['categoryId']}'),
       'condition': _pretty(raw['condition']?.toString() ?? 'used'),
       'status': _prettyStatus(rawStatus),
       'image': image,
@@ -57,7 +58,9 @@ class _DonationDetailsState extends State<DonationDetails> {
       'pickupDate': raw['pickupDate']?.toString() ?? '',
       'rewardStatus': raw['rewardStatus']?.toString() ?? 'Pending acceptance',
       'rewardPoints': raw['rewardPoints'] ?? 0,
-      'rewardCredited': raw['rewardCredited'] == true || '${raw['rewardCredited']}'.toLowerCase() == 'true',
+      'rewardCredited':
+          raw['rewardCredited'] == true ||
+          '${raw['rewardCredited']}'.toLowerCase() == 'true',
     };
   }
 
@@ -124,8 +127,8 @@ class _DonationDetailsState extends State<DonationDetails> {
       final rows = response is List
           ? response
           : response is Map && response['categories'] is List
-              ? response['categories'] as List
-              : <dynamic>[];
+          ? response['categories'] as List
+          : <dynamic>[];
       final names = <String, String>{};
       for (final row in rows.whereType<Map>()) {
         if (row['categoryId'] != null && row['name'] != null) {
@@ -614,13 +617,14 @@ class _DonationDetailsState extends State<DonationDetails> {
 
   Widget _buildRewardSection() {
     final status = (_donation['status'] ?? '').toString().toLowerCase();
-    final accepted = status == 'accepted' || status == 'approved' || status == 'completed';
+    final accepted =
+        status == 'accepted' || status == 'approved' || status == 'completed';
     final rejected = status == 'rejected';
     final label = rejected
         ? 'Not eligible — donation rejected'
         : accepted
-            ? 'Donation accepted. Check Rewards for credited points.'
-            : 'Pending review — points are not shown as earned yet.';
+        ? 'Donation accepted. Check Rewards for credited points.'
+        : 'Pending review — points are not shown as earned yet.';
     return _section(
       child: Container(
         padding: const EdgeInsets.all(15),
@@ -634,9 +638,14 @@ class _DonationDetailsState extends State<DonationDetails> {
             Container(
               height: 48,
               width: 48,
-              decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                shape: BoxShape.circle,
+              ),
               child: Icon(
-                accepted ? Icons.card_giftcard_rounded : Icons.card_giftcard_outlined,
+                accepted
+                    ? Icons.card_giftcard_rounded
+                    : Icons.card_giftcard_outlined,
                 color: accepted ? AppColors.success : AppColors.primary,
                 size: 23,
               ),
@@ -646,13 +655,35 @@ class _DonationDetailsState extends State<DonationDetails> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('EcoLoop Reward', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  const Text(
+                    'EcoLoop Reward',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(label, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: rejected ? Colors.red : accepted ? AppColors.success : AppColors.textSecondary)),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: rejected
+                          ? Colors.red
+                          : accepted
+                          ? AppColors.success
+                          : AppColors.textSecondary,
+                    ),
+                  ),
                   const SizedBox(height: 3),
                   const Text(
                     'Donation decisions are updated by the EcoLoop team. Reward eligibility is based on the latest status recorded in your donation.',
-                    style: TextStyle(fontSize: 9.5, height: 1.35, color: AppColors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      height: 1.35,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -731,4 +762,3 @@ class _DonationDetailsState extends State<DonationDetails> {
     );
   }
 }
-

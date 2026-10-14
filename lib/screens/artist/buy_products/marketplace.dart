@@ -55,18 +55,43 @@ class _MarketplaceState extends State<Marketplace> {
   Future<void> _loadProducts() async {
     try {
       final data = await EcoLoopApi.instance.get('/products');
-      final rows = (data is List ? data : <dynamic>[]).whereType<Map>().map((raw) {
+      final rows = (data is List ? data : <dynamic>[]).whereType<Map>().map((
+        raw,
+      ) {
         final p = Map<String, dynamic>.from(raw);
-        final images = (p['imageUrls'] is List) ? List<dynamic>.from(p['imageUrls']) : <dynamic>[];
-        final category = (p['categoryName'] ?? p['category'] ?? 'Other').toString();
-        final location = [p['city'], p['state']].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
-        return <String, dynamic>{...p, 'category': category, 'seller': (p['sellerName'] ?? 'EcoLoop seller').toString(), 'location': location.isEmpty ? 'Location not provided' : location, 'imageUrls': images, 'image': images.isNotEmpty ? images.first.toString() : '', 'availableQuantity': p['availableQuantity'] ?? 0};
+        final images = (p['imageUrls'] is List)
+            ? List<dynamic>.from(p['imageUrls'])
+            : <dynamic>[];
+        final category = (p['categoryName'] ?? p['category'] ?? 'Other')
+            .toString();
+        final location = [
+          p['city'],
+          p['state'],
+        ].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
+        return <String, dynamic>{
+          ...p,
+          'category': category,
+          'seller': (p['sellerName'] ?? 'EcoLoop seller').toString(),
+          'location': location.isEmpty ? 'Location not provided' : location,
+          'imageUrls': images,
+          'image': images.isNotEmpty ? images.first.toString() : '',
+          'availableQuantity': p['availableQuantity'] ?? 0,
+        };
       }).toList();
       if (!mounted) return;
-      setState(() { products..clear()..addAll(rows); _loadingProducts = false; _loadError = null; });
+      setState(() {
+        products
+          ..clear()
+          ..addAll(rows);
+        _loadingProducts = false;
+        _loadError = null;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _loadingProducts = false; _loadError = e.toString(); });
+      setState(() {
+        _loadingProducts = false;
+        _loadError = e.toString();
+      });
     }
   }
 
@@ -415,7 +440,8 @@ class _MarketplaceState extends State<Marketplace> {
   Widget _buildProductGrid() {
     final items = filteredProducts;
 
-    if (_loadingProducts) return const Center(child: CircularProgressIndicator());
+    if (_loadingProducts)
+      return const Center(child: CircularProgressIndicator());
     if (items.isEmpty) {
       return _buildEmptyState();
     }

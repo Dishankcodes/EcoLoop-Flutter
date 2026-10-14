@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
@@ -196,7 +195,7 @@ class _RewardsState extends State<Rewards> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.16),
+            color: AppColors.primary.withValues(alpha: 0.16),
             blurRadius: 16,
             offset: const Offset(0, 7),
           ),
@@ -211,7 +210,7 @@ class _RewardsState extends State<Rewards> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.13),
+                  color: Colors.white.withValues(alpha: 0.13),
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: const Icon(
@@ -236,7 +235,7 @@ class _RewardsState extends State<Rewards> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.12),
+                  color: Colors.white.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Row(
@@ -295,7 +294,7 @@ class _RewardsState extends State<Rewards> {
                 ? 'Start earning Eco Points through sustainable actions.'
                 : 'Available Eco Points',
             style: AppTextStyles.caption.copyWith(
-              color: Colors.white.withOpacity(0.75),
+              color: Colors.white.withValues(alpha: 0.75),
             ),
           ),
         ],
@@ -342,7 +341,7 @@ class _RewardsState extends State<Rewards> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.accent.withOpacity(0.45)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.45)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -453,7 +452,7 @@ class _RewardsState extends State<Rewards> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.accent.withOpacity(0.40)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.40)),
       ),
       child: ListView.separated(
         shrinkWrap: true,
@@ -464,7 +463,7 @@ class _RewardsState extends State<Rewards> {
             padding: const EdgeInsets.only(left: 68),
             child: Divider(
               height: 1,
-              color: AppColors.accent.withOpacity(0.20),
+              color: AppColors.accent.withValues(alpha: 0.20),
             ),
           );
         },
@@ -529,7 +528,7 @@ class _RewardsState extends State<Rewards> {
                   item.date,
                   style: AppTextStyles.caption.copyWith(
                     fontSize: 10,
-                    color: AppColors.textSecondary.withOpacity(0.65),
+                    color: AppColors.textSecondary.withValues(alpha: 0.65),
                   ),
                 ),
               ],
@@ -557,7 +556,7 @@ class _RewardsState extends State<Rewards> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.accent.withOpacity(0.40)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.40)),
       ),
       child: Column(
         children: [
@@ -604,7 +603,7 @@ class _RewardsState extends State<Rewards> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.accent.withOpacity(0.40)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.40)),
       ),
       child: Column(
         children: [
@@ -645,7 +644,10 @@ class _RewardsState extends State<Rewards> {
   Widget _divider() {
     return Padding(
       padding: const EdgeInsets.only(left: 69),
-      child: Divider(height: 1, color: AppColors.accent.withOpacity(0.20)),
+      child: Divider(
+        height: 1,
+        color: AppColors.accent.withValues(alpha: 0.20),
+      ),
     );
   }
 
@@ -731,7 +733,7 @@ class _RewardsState extends State<Rewards> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
       ),
     );
   }
@@ -750,7 +752,7 @@ class _RewardsState extends State<Rewards> {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: AppColors.error.withOpacity(0.08),
+              color: AppColors.error.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(18),
             ),
             child: const Icon(
@@ -772,7 +774,8 @@ class _RewardsState extends State<Rewards> {
         const SizedBox(height: 6),
 
         Text(
-          _loadError ?? 'Something went wrong while loading your rewards. Please try again.',
+          _loadError ??
+              'Something went wrong while loading your rewards. Please try again.',
           textAlign: TextAlign.center,
           style: AppTextStyles.body,
         ),
@@ -793,11 +796,30 @@ class _RewardsState extends State<Rewards> {
     );
   }
 
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, item) => MapEntry(key.toString(), item));
+    }
+    return <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _asRows(dynamic value) {
+    if (value is List) {
+      return value
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+    }
+    return <Map<String, dynamic>>[];
+  }
+
   // Loads the current account's reward transactions from the Apps Script API.
   // Donation-related points are shown only after the matching donation has
   // been accepted/approved/completed in the Google Sheet.
   Future<void> _loadRewards() async {
     if (!mounted) return;
+
     setState(() {
       _isLoading = true;
       _hasError = false;
@@ -805,63 +827,141 @@ class _RewardsState extends State<Rewards> {
     });
 
     try {
-      final results = await Future.wait<dynamic>([
-        EcoLoopApi.instance.get('/rewards'),
-        EcoLoopApi.instance.get('/donations'),
-      ]);
-      final rewardResponse = results[0];
-      final donationResponse = results[1];
-      final voucherRows = rewardResponse is Map && rewardResponse['vouchers'] is List
-          ? (rewardResponse['vouchers'] as List).whereType<Map>().map((v) => Map<String, dynamic>.from(v)).toList()
-          : <Map<String, dynamic>>[];
-      final transactions = rewardResponse is Map && rewardResponse['transactions'] is List
-          ? rewardResponse['transactions'] as List
-          : rewardResponse is List
-              ? rewardResponse
-              : <dynamic>[];
-      final donations = donationResponse is List
+      // Rewards are the primary source for points and vouchers.
+      final rewardResponse = await EcoLoopApi.instance.get('/rewards');
+      final rewardRoot = _asMap(rewardResponse);
+      final rewardData = rewardRoot['data'] is Map
+          ? _asMap(rewardRoot['data'])
+          : rewardRoot;
+
+      final voucherRows = _asRows(
+        rewardData['vouchers'] ?? rewardRoot['vouchers'],
+      );
+
+      final dynamic transactionValue =
+          rewardData['transactions'] ??
+          rewardRoot['transactions'] ??
+          (rewardResponse is List ? rewardResponse : null);
+
+      final transactions = transactionValue is List
+          ? transactionValue
+          : <dynamic>[];
+
+      // Donation status is supplementary. If the endpoint is unavailable,
+      // the rewards API remains authoritative for already-credited rewards.
+      dynamic donationResponse;
+      try {
+        donationResponse = await EcoLoopApi.instance.get('/donations');
+      } catch (_) {
+        donationResponse = null;
+      }
+
+      final donationRoot = _asMap(donationResponse);
+      final donationData = donationRoot['data'] is Map
+          ? _asMap(donationRoot['data'])
+          : donationRoot;
+
+      final dynamic donationValue = donationResponse is List
           ? donationResponse
-          : donationResponse is Map && donationResponse['donations'] is List
-              ? donationResponse['donations'] as List
-              : <dynamic>[];
+          : donationData['donations'] ??
+                donationData['items'] ??
+                donationData['results'] ??
+                donationRoot['donations'] ??
+                donationRoot['items'];
+
+      final donations = donationValue is List ? donationValue : <dynamic>[];
+
       final donationStatuses = <String, String>{};
       for (final item in donations.whereType<Map>()) {
-        final id = (item['donationId'] ?? item['id'] ?? '').toString();
-        if (id.isNotEmpty) donationStatuses[id] = (item['status'] ?? '').toString().toLowerCase();
+        final donation = _asMap(item);
+        final id =
+            (donation['donationId'] ??
+                    donation['donation_id'] ??
+                    donation['id'] ??
+                    '')
+                .toString()
+                .trim();
+
+        if (id.isNotEmpty) {
+          donationStatuses[id] = (donation['status'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
+        }
       }
 
       final parsed = <RewardHistoryItem>[];
       var earned = 0;
       var used = 0;
-      var balance = 0;
+      var calculatedBalance = 0;
+
       for (final item in transactions.whereType<Map>()) {
-        final row = Map<String, dynamic>.from(item);
+        final row = _asMap(item);
         final points = int.tryParse((row['points'] ?? 0).toString()) ?? 0;
-        final referenceType = (row['referenceType'] ?? '').toString().toLowerCase();
-        final referenceId = (row['referenceId'] ?? '').toString();
+        final referenceType =
+            (row['referenceType'] ?? row['reference_type'] ?? '')
+                .toString()
+                .trim()
+                .toLowerCase();
+        final referenceId = (row['referenceId'] ?? row['reference_id'] ?? '')
+            .toString();
+        final reason = (row['reason'] ?? 'EcoLoop reward').toString();
+
         if (referenceType == 'donation') {
           final status = donationStatuses[referenceId] ?? '';
-          final accepted = status == 'accepted' || status == 'approved' || status == 'completed';
-          final credited = (row['reason'] ?? '').toString().startsWith('Accepted donation reward');
-          if (!accepted || !credited) continue;
+          final statusIsKnown = status.isNotEmpty;
+          final acceptedStatus =
+              status == 'accepted' ||
+              status == 'approved' ||
+              status == 'completed';
+          final creditedReason = reason.toLowerCase().startsWith(
+            'accepted donation reward',
+          );
+
+          // If a matching donation status is available, require acceptance.
+          // If the status is missing, trust the reward transaction already
+          // returned by /rewards, but still require the credited-reward reason.
+          if (!creditedReason || (statusIsKnown && !acceptedStatus)) {
+            continue;
+          }
         }
-        balance += points;
+
+        calculatedBalance += points;
         if (points >= 0) {
           earned += points;
         } else {
           used += points.abs();
         }
-        parsed.add(RewardHistoryItem(
-          title: (row['reason'] ?? 'EcoLoop reward').toString(),
-          description: referenceType.isEmpty ? 'EcoLoop activity' : '${_capitalize(referenceType)} reference #$referenceId',
-          points: points.abs(),
-          date: _formatRewardDate((row['createdAt'] ?? '').toString()),
-          type: points < 0 ? RewardHistoryType.used : RewardHistoryType.earned,
-        ));
+
+        parsed.add(
+          RewardHistoryItem(
+            title: reason,
+            description: referenceType.isEmpty
+                ? 'EcoLoop activity'
+                : referenceId.isEmpty
+                ? _capitalize(referenceType)
+                : '${_capitalize(referenceType)} reference #$referenceId',
+            points: points.abs(),
+            date: _formatRewardDate(
+              (row['createdAt'] ?? row['created_at'] ?? '').toString(),
+            ),
+            type: points < 0
+                ? RewardHistoryType.used
+                : RewardHistoryType.earned,
+          ),
+        );
       }
+
+      // The API response may provide the authoritative balance directly,
+      // e.g. {data: {totalPoints: 100, transactions: [...], vouchers: [...]}}.
+      final totalPointsValue =
+          rewardData['totalPoints'] ?? rewardRoot['totalPoints'];
+      final apiBalance = int.tryParse((totalPointsValue ?? '').toString());
+      final balance = apiBalance ?? calculatedBalance;
+
       if (!mounted) return;
       setState(() {
-        _ecoPoints = balance;
+        _ecoPoints = balance < 0 ? 0 : balance;
         _pointsEarned = earned;
         _pointsUsed = used;
         _history
@@ -880,14 +980,19 @@ class _RewardsState extends State<Rewards> {
     }
   }
 
-
   Widget _buildVouchers() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Redeem Eco Points', style: AppTextStyles.title.copyWith(fontSize: 17)),
+        Text(
+          'Redeem Eco Points',
+          style: AppTextStyles.title.copyWith(fontSize: 17),
+        ),
         const SizedBox(height: 5),
-        Text('Claim available vouchers using your current points balance.', style: AppTextStyles.caption),
+        Text(
+          'Claim available vouchers using your current points balance.',
+          style: AppTextStyles.caption,
+        ),
         const SizedBox(height: 10),
         if (_vouchers.isEmpty)
           Container(
@@ -896,7 +1001,9 @@ class _RewardsState extends State<Rewards> {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.accent.withOpacity(0.4)),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.4),
+              ),
             ),
             child: const Text('No active vouchers are available right now.'),
           )
@@ -913,35 +1020,68 @@ class _RewardsState extends State<Rewards> {
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.accent.withOpacity(0.4)),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.4),
+                ),
               ),
               child: Row(
                 children: [
                   Container(
                     width: 44,
                     height: 44,
-                    decoration: BoxDecoration(color: AppColors.light, borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.card_giftcard_rounded, color: AppColors.primary),
+                    decoration: BoxDecoration(
+                      color: AppColors.light,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.card_giftcard_rounded,
+                      color: AppColors.primary,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(title, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                        Text(
+                          title,
+                          style: AppTextStyles.body.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
                         if (description.isNotEmpty) ...[
                           const SizedBox(height: 3),
                           Text(description, style: AppTextStyles.caption),
                         ],
                         const SizedBox(height: 5),
-                        Text('$cost Eco Points', style: AppTextStyles.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
+                        Text(
+                          '$cost Eco Points',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: (!_claimingVoucher && affordable) ? () => _claimVoucher(id, title) : null,
-                    child: Text(affordable ? 'Claim' : 'Locked'),
+                  SizedBox(
+                    width: 78,
+                    child: ElevatedButton(
+                      onPressed: (!_claimingVoucher && affordable)
+                          ? () => _claimVoucher(id, title)
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(78, 42),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      child: Text(
+                        affordable ? 'Claim' : 'Locked',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -955,13 +1095,25 @@ class _RewardsState extends State<Rewards> {
     if (_claimingVoucher || voucherId.isEmpty) return;
     setState(() => _claimingVoucher = true);
     try {
-      final response = await EcoLoopApi.instance.post('/rewards/claim', {'voucherId': voucherId});
+      final response = await EcoLoopApi.instance.post('/rewards/claim', {
+        'voucherId': voucherId,
+      });
       if (!mounted) return;
-      final map = response is Map ? Map<String, dynamic>.from(response) : <String, dynamic>{};
-      final claim = map['claim'] is Map ? Map<String, dynamic>.from(map['claim'] as Map) : <String, dynamic>{};
+      final map = response is Map
+          ? Map<String, dynamic>.from(response)
+          : <String, dynamic>{};
+      final claim = map['claim'] is Map
+          ? Map<String, dynamic>.from(map['claim'] as Map)
+          : <String, dynamic>{};
       final code = (claim['claimCode'] ?? '').toString();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(code.isEmpty ? '$title claimed successfully.' : '$title claimed. Code: $code')),
+        SnackBar(
+          content: Text(
+            code.isEmpty
+                ? '$title claimed successfully.'
+                : '$title claimed. Code: $code',
+          ),
+        ),
       );
       await _loadRewards();
     } catch (e) {
@@ -975,14 +1127,26 @@ class _RewardsState extends State<Rewards> {
     }
   }
 
-  String _capitalize(String value) => value.isEmpty
-      ? value
-      : '${value[0].toUpperCase()}${value.substring(1)}';
+  String _capitalize(String value) =>
+      value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
 
   String _formatRewardDate(String raw) {
     final parsed = DateTime.tryParse(raw);
     if (parsed == null) return raw.isEmpty ? 'Date unavailable' : raw;
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${parsed.day} ${months[parsed.month - 1]} ${parsed.year}';
   }
 
@@ -1077,7 +1241,7 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: AppColors.accent.withOpacity(0.40)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.40)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1185,4 +1349,3 @@ class RewardHistoryItem {
     required this.type,
   });
 }
-

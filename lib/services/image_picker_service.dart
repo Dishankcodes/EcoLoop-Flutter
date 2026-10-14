@@ -95,7 +95,11 @@ class ImagePickerService {
     final String mimeType = _getMimeType(fileName);
     final String base64Image = base64Encode(bytes);
 
-    final String token = (Prefs.getString('userRole').toLowerCase() == 'artist' ? Prefs.getString('artistToken') : Prefs.getString('authToken')).trim();
+    final String token =
+        (Prefs.getString('userRole').toLowerCase() == 'artist'
+                ? Prefs.getString('artistToken')
+                : Prefs.getString('authToken'))
+            .trim();
 
     if (token.isEmpty) {
       throw const ImagePickerServiceException(
@@ -302,7 +306,11 @@ class ImagePickerService {
     String gender = '',
     String stateCode = '',
   }) async {
-    final String token = (Prefs.getString('userRole').toLowerCase() == 'artist' ? Prefs.getString('artistToken') : Prefs.getString('authToken')).trim();
+    final String token =
+        (Prefs.getString('userRole').toLowerCase() == 'artist'
+                ? Prefs.getString('artistToken')
+                : Prefs.getString('authToken'))
+            .trim();
 
     if (token.isEmpty) {
       throw const ImagePickerServiceException(

@@ -66,13 +66,31 @@ class _ProfileState extends State<Profile> {
   }
 
   List<Map<String, dynamic>> _countRows(dynamic value) {
-    if (value is List) return value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    if (value is List)
+      return value
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     if (value is Map) {
       final data = value['data'];
-      if (data is List) return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-      for (final key in ['orders', 'products', 'items', 'results', 'wishlist']) {
+      if (data is List)
+        return data
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      for (final key in [
+        'orders',
+        'products',
+        'items',
+        'results',
+        'wishlist',
+      ]) {
         final rows = value[key] ?? (data is Map ? data[key] : null);
-        if (rows is List) return rows.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        if (rows is List)
+          return rows
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
       }
     }
     return [];
@@ -92,7 +110,14 @@ class _ProfileState extends State<Profile> {
       final wishlist = _countRows(results[2]);
       setState(() {
         _orderCount = orders.length;
-        _listingCount = listings.where((p) => !['deleted', 'removed'].contains((p['status'] ?? '').toString().toLowerCase())).length;
+        _listingCount = listings
+            .where(
+              (p) => ![
+                'deleted',
+                'removed',
+              ].contains((p['status'] ?? '').toString().toLowerCase()),
+            )
+            .length;
         _wishlistCount = wishlist.length;
       });
     } catch (_) {
@@ -282,7 +307,10 @@ class _ProfileState extends State<Profile> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const EditProfile()),
-                ).then((_) { _loadProfile(); _loadProfileCounts(); });
+                ).then((_) {
+                  _loadProfile();
+                  _loadProfileCounts();
+                });
               },
               icon: const Icon(Icons.edit_outlined, size: 17),
               label: const Text(

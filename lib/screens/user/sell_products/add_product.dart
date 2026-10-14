@@ -21,7 +21,9 @@ class _AddProductState extends State<AddProduct> {
   final TextEditingController descriptionController = TextEditingController();
 
   final TextEditingController priceController = TextEditingController();
-  final TextEditingController quantityController = TextEditingController(text: '1');
+  final TextEditingController quantityController = TextEditingController(
+    text: '1',
+  );
   String _deliveryMethod = 'EcoLoop Delivery';
 
   List<SelectedEcoImage> _images = [];
@@ -219,7 +221,8 @@ class _AddProductState extends State<AddProduct> {
             const SizedBox(height: 10),
             _buildDeliveryOption(
               title: 'EcoLoop delivery',
-              subtitle: '₹45–₹60 for the first 500 g on local/short routes. Final charges depend on distance.',
+              subtitle:
+                  '₹45–₹60 for the first 500 g on local/short routes. Final charges depend on distance.',
               value: 'EcoLoop Delivery',
             ),
 
@@ -438,19 +441,26 @@ class _AddProductState extends State<AddProduct> {
           color: selected ? AppColors.light : AppColors.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.accent.withOpacity(0.35),
+            color: selected
+                ? AppColors.primary
+                : AppColors.accent.withOpacity(0.35),
           ),
         ),
         child: Row(
           children: [
-            Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                color: AppColors.primary),
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: AppColors.primary,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 4),
                   Text(subtitle, style: const TextStyle(fontSize: 12)),
                 ],

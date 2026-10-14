@@ -38,17 +38,19 @@ class _AddressListState extends State<AddressList> {
     _loadAddresses();
   }
 
-  Dio _dio() => Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 20),
-        sendTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
-        headers: const {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        validateStatus: (status) =>
-            status != null && status >= 200 && status < 400,
-      ));
+  Dio _dio() => Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 20),
+      sendTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 30),
+      headers: const {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      validateStatus: (status) =>
+          status != null && status >= 200 && status < 400,
+    ),
+  );
 
   Uri _uri(String path, [Map<String, String>? query]) =>
       Uri.parse(_baseUrl).replace(queryParameters: {'path': path, ...?query});
@@ -77,8 +79,11 @@ class _AddressListState extends State<AddressList> {
 
   Future<dynamic> _unwrapRedirect(Dio dio, Response<dynamic> response) async {
     final status = response.statusCode;
-    if (status == 301 || status == 302 || status == 303 ||
-        status == 307 || status == 308) {
+    if (status == 301 ||
+        status == 302 ||
+        status == 303 ||
+        status == 307 ||
+        status == 308) {
       final location = response.headers.value('location');
       if (location == null || location.isEmpty) {
         throw Exception('The API redirected without a response URL.');
@@ -185,11 +190,7 @@ class _AddressListState extends State<AddressList> {
     try {
       final response = await dio.post<dynamic>(
         _uri(path).toString(),
-        data: {
-          ...body,
-          'token': _token,
-          '_method': method,
-        },
+        data: {...body, 'token': _token, '_method': method},
         options: Options(followRedirects: false, maxRedirects: 0),
       );
       final raw = await _unwrapRedirect(dio, response);
@@ -210,9 +211,7 @@ class _AddressListState extends State<AddressList> {
   Future<void> _openAddressForm({AddressItem? address}) async {
     final result = await Navigator.push<dynamic>(
       context,
-      MaterialPageRoute(
-        builder: (_) => AddAddress(address: address?.toMap()),
-      ),
+      MaterialPageRoute(builder: (_) => AddAddress(address: address?.toMap())),
     );
     if (!mounted || result == null) return;
     // The AddAddress page saves to the backend before returning.
@@ -224,20 +223,14 @@ class _AddressListState extends State<AddressList> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Delete Address?',
-          style: AppTextStyles.title.copyWith(
-            color: AppColors.textPrimary,
-          ),
+          style: AppTextStyles.title.copyWith(color: AppColors.textPrimary),
         ),
         content: Text(
           'Are you sure you want to remove this saved address?',
-          style: AppTextStyles.body.copyWith(
-            color: AppColors.textSecondary,
-          ),
+          style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
@@ -262,8 +255,10 @@ class _AddressListState extends State<AddressList> {
 
     setState(() => _isMutating = true);
     try {
-      await _sendMutation('/addresses/${Uri.encodeComponent(address.id)}',
-          method: 'DELETE');
+      await _sendMutation(
+        '/addresses/${Uri.encodeComponent(address.id)}',
+        method: 'DELETE',
+      );
       if (!mounted) return;
       _showMessage('Address deleted.');
       await _loadAddresses();
@@ -296,11 +291,13 @@ class _AddressListState extends State<AddressList> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: error ? AppColors.error : AppColors.success,
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: error ? AppColors.error : AppColors.success,
+        ),
+      );
   }
 
   @override
@@ -313,9 +310,7 @@ class _AddressListState extends State<AddressList> {
         foregroundColor: AppColors.textPrimary,
         title: Text(
           'My Addresses',
-          style: AppTextStyles.title.copyWith(
-            color: AppColors.textPrimary,
-          ),
+          style: AppTextStyles.title.copyWith(color: AppColors.textPrimary),
         ),
         actions: [
           IconButton(
@@ -325,9 +320,7 @@ class _AddressListState extends State<AddressList> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: _buildBody(),
-      ),
+      body: SafeArea(child: _buildBody()),
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
@@ -497,27 +490,28 @@ class AddressItem {
       state: read('state'),
       pincode: read('pincode'),
       type: read('type').isEmpty ? 'Home' : read('type'),
-      isDefault: defaultValue == true ||
+      isDefault:
+          defaultValue == true ||
           defaultValue?.toString().toLowerCase() == 'true' ||
           defaultValue?.toString() == '1',
     );
   }
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'addressId': id,
-        'name': name,
-        'phone': phone,
-        'house': house,
-        'street': street,
-        'area': area,
-        'landmark': landmark,
-        'city': city,
-        'state': state,
-        'pincode': pincode,
-        'type': type,
-        'isDefault': isDefault,
-      };
+    'id': id,
+    'addressId': id,
+    'name': name,
+    'phone': phone,
+    'house': house,
+    'street': street,
+    'area': area,
+    'landmark': landmark,
+    'city': city,
+    'state': state,
+    'pincode': pincode,
+    'type': type,
+    'isDefault': isDefault,
+  };
 }
 
 class _AddressCard extends StatelessWidget {
@@ -778,9 +772,7 @@ class _EmptyAddressState extends StatelessWidget {
             Text(
               'No saved addresses',
               textAlign: TextAlign.center,
-              style: AppTextStyles.title.copyWith(
-                color: AppColors.textPrimary,
-              ),
+              style: AppTextStyles.title.copyWith(color: AppColors.textPrimary),
             ),
             const SizedBox(height: 8),
             Text(

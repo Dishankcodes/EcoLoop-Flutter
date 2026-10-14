@@ -5,10 +5,7 @@ import '../app_theme/user/app_colors.dart';
 class AppBackButton extends StatelessWidget {
   final VoidCallback? onPressed;
 
-  const AppBackButton({
-    super.key,
-    this.onPressed,
-  });
+  const AppBackButton({super.key, this.onPressed});
 
   @override
   Widget build(BuildContext context) {

@@ -17,7 +17,6 @@ class UserMoreMenu extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       onSelected: (value) {
         switch (value) {
-
           case 'notification':
             Navigator.push(
               context,
@@ -48,7 +47,6 @@ class UserMoreMenu extends StatelessWidget {
         }
       },
       itemBuilder: (context) => const [
-
         PopupMenuItem<String>(
           value: 'notification',
           child: Row(
