@@ -1,15 +1,180 @@
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
+import '../../../services/ecoloop_api.dart';
 
-class DonationDetails extends StatelessWidget {
+class DonationDetails extends StatefulWidget {
   final Map<String, dynamic> donation;
 
   const DonationDetails({super.key, required this.donation});
 
   @override
+  State<DonationDetails> createState() => _DonationDetailsState();
+}
+
+class _DonationDetailsState extends State<DonationDetails> {
+  late Map<String, dynamic> _donation;
+  bool _loading = false;
+  bool _requestingPickup = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _donation = _normalize(widget.donation);
+    _refreshDetails();
+  }
+
+  Map<String, dynamic> _normalize(Map<String, dynamic> raw) {
+    final dynamic images = raw['imageUrls'];
+    String image = raw['image']?.toString() ?? '';
+    if (images is List && images.isNotEmpty) image = images.first.toString();
+
+    final rawStatus = (raw['status'] ?? 'pending').toString();
+    return {
+      ...raw,
+      'id': raw['donationId']?.toString() ?? raw['id']?.toString() ?? '',
+      'item':
+          raw['title']?.toString() ?? raw['item']?.toString() ?? 'Donated Item',
+      'category':
+          raw['category']?.toString() ??
+          raw['categoryName']?.toString() ??
+          'Other',
+      'condition': _pretty(raw['condition']?.toString() ?? 'used'),
+      'status': _prettyStatus(rawStatus),
+      'image': image,
+      'date': _displayDate(raw['createdAt']?.toString() ?? ''),
+      'location': [
+        raw['city']?.toString(),
+        raw['state']?.toString(),
+      ].where((part) => part != null && part.trim().isNotEmpty).join(', '),
+      'address': raw['address']?.toString() ?? '',
+      'description': raw['description']?.toString() ?? '',
+      'pickupDate': raw['pickupDate']?.toString() ?? '',
+      'rewardStatus': raw['rewardStatus']?.toString() ?? 'Under Review',
+    };
+  }
+
+  String _pretty(String value) => value
+      .replaceAll('_', ' ')
+      .split(' ')
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
+
+  String _prettyStatus(String value) {
+    switch (value.toLowerCase()) {
+      case 'pending':
+      case 'submitted':
+        return 'Pending';
+      case 'pickup_requested':
+      case 'requested':
+        return 'Pickup Requested';
+      case 'pickup scheduled':
+        return 'Pickup Scheduled';
+      case 'picked_up':
+      case 'collected':
+        return 'Collected';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return _pretty(value);
+    }
+  }
+
+  String _displayDate(String raw) {
+    if (raw.trim().isEmpty) return 'Recently';
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${parsed.day} ${months[parsed.month - 1]} ${parsed.year}';
+  }
+
+  Future<void> _refreshDetails() async {
+    final id = (_donation['id'] ?? '').toString();
+    if (id.isEmpty || int.tryParse(id) == null) return;
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final response = await EcoLoopApi.instance.get('/donations/$id');
+      Map<String, dynamic>? raw;
+      if (response is Map) {
+        if (response['donation'] is Map) {
+          raw = Map<String, dynamic>.from(response['donation'] as Map);
+        } else if (response['data'] is Map) {
+          raw = Map<String, dynamic>.from(response['data'] as Map);
+        } else {
+          raw = Map<String, dynamic>.from(response);
+        }
+      }
+      if (raw != null && mounted) {
+        setState(() => _donation = _normalize(raw!));
+      }
+    } catch (e) {
+      // Keep the data passed from history visible if refreshing is unavailable.
+      if (mounted)
+        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _requestPickup() async {
+    final id = (_donation['id'] ?? '').toString();
+    if (id.isEmpty || int.tryParse(id) == null) {
+      _message('This donation has no valid ID.');
+      return;
+    }
+
+    setState(() => _requestingPickup = true);
+    try {
+      await EcoLoopApi.instance.post('/donations/$id/pickup-request', {});
+      if (!mounted) return;
+      _message('Pickup request submitted successfully.');
+      await _refreshDetails();
+    } catch (e) {
+      if (mounted) {
+        _message(e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _requestingPickup = false);
+    }
+  }
+
+  void _message(String value) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(value), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  bool get _pickupCanBeRequested {
+    final status = (_donation['status'] ?? '').toString().toLowerCase();
+    return status == 'pending';
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final status = donation['status']?.toString() ?? 'Pending';
+    final status = (_donation['status'] ?? 'Pending').toString();
+    final image = (_donation['image'] ?? '').toString();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -17,26 +182,66 @@ class DonationDetails extends StatelessWidget {
         backgroundColor: AppColors.surface,
         elevation: 0,
         foregroundColor: AppColors.textPrimary,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
         title: const Text(
           'Donation Details',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _loading ? null : _refreshDetails,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 30),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: RefreshIndicator(
+        onRefresh: _refreshDetails,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 30),
           children: [
-            _buildItemHeader(),
+            _buildItemHeader(image),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  'Showing saved details. Refresh error: $_error',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
             _buildStatusSection(status),
             _buildPickupSection(),
             _buildDonationInformation(),
             _buildRewardSection(),
+            if (_pickupCanBeRequested)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                child: SizedBox(
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _requestingPickup ? null : _requestPickup,
+                    icon: _requestingPickup
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.local_shipping_outlined),
+                    label: Text(
+                      _requestingPickup
+                          ? 'Requesting pickup...'
+                          : 'Request Free Pickup',
+                    ),
+                  ),
+                ),
+              ),
             _buildEcoLoopMessage(),
           ],
         ),
@@ -44,68 +249,60 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  // ITEM HEADER
-
-  Widget _buildItemHeader() {
+  Widget _buildItemHeader(String image) {
     return Container(
       color: AppColors.surface,
       padding: const EdgeInsets.all(16),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(15),
-            child: Image.network(
-              donation['image'].toString(),
-              height: 105,
-              width: 105,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) {
-                return Container(
-                  height: 105,
-                  width: 105,
-                  color: AppColors.light,
-                  child: const Icon(
-                    Icons.volunteer_activism_outlined,
-                    size: 35,
-                    color: AppColors.primary,
-                  ),
-                );
-              },
-            ),
+            child: image.startsWith('http')
+                ? Image.network(
+                    image,
+                    height: 105,
+                    width: 105,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                  )
+                : _imagePlaceholder(),
           ),
-
           const SizedBox(width: 15),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  donation['item']?.toString() ?? 'Donated Item',
+                  _donation['item'].toString(),
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
                 ),
-
                 const SizedBox(height: 7),
-
                 Text(
-                  '${donation['category']} • ${donation['condition']}',
+                  '${_donation['category']} • ${_donation['condition']}',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
                   ),
                 ),
-
                 const SizedBox(height: 9),
-
                 Text(
-                  'Donation ID: ${donation['id']}',
+                  'Donation ID: ${_donation['id']}',
                   style: const TextStyle(
-                    fontSize: 9.5,
+                    fontSize: 10,
                     fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Submitted: ${_donation['date']}',
+                  style: const TextStyle(
+                    fontSize: 10,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -117,11 +314,26 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  // STATUS
+  Widget _imagePlaceholder() => Container(
+    height: 105,
+    width: 105,
+    color: AppColors.light,
+    child: const Icon(
+      Icons.volunteer_activism_outlined,
+      size: 35,
+      color: AppColors.primary,
+    ),
+  );
 
   Widget _buildStatusSection(String status) {
-    final isScheduled = status == 'Pickup Scheduled';
-    final isCompleted = status == 'Completed' || status == 'Collected';
+    final lower = status.toLowerCase();
+    final submitted = true;
+    final pickupActive =
+        lower == 'pickup requested' ||
+        lower == 'pickup scheduled' ||
+        lower == 'collected' ||
+        lower == 'completed';
+    final completed = lower == 'completed' || lower == 'collected';
 
     return _section(
       child: Column(
@@ -135,38 +347,32 @@ class DonationDetails extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-
           const SizedBox(height: 16),
-
           _timelineStep(
             icon: Icons.volunteer_activism_outlined,
             title: 'Donation submitted',
-            subtitle: donation['date']?.toString() ?? 'Recently',
-            completed: true,
+            subtitle: _donation['date'].toString(),
+            completed: submitted,
             active: false,
           ),
-
           _timelineLine(),
-
           _timelineStep(
             icon: Icons.local_shipping_outlined,
-            title: 'Pickup scheduled',
-            subtitle:
-                donation['pickupDate']?.toString() ??
-                'Pickup date will be confirmed',
-            completed: isCompleted,
-            active: isScheduled,
+            title: 'Pickup requested',
+            subtitle: pickupActive
+                ? status
+                : 'Request pickup when you are ready',
+            completed: completed,
+            active: pickupActive && !completed,
           ),
-
           _timelineLine(),
-
           _timelineStep(
             icon: Icons.check_circle_outline_rounded,
             title: 'Donation completed',
-            subtitle: isCompleted
+            subtitle: completed
                 ? 'Item successfully collected'
                 : 'Waiting for pickup',
-            completed: isCompleted,
+            completed: completed,
             active: false,
           ),
         ],
@@ -199,9 +405,7 @@ class DonationDetails extends StatelessWidget {
                 : AppColors.textSecondary,
           ),
         ),
-
         const SizedBox(width: 12),
-
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,18 +437,21 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  Widget _timelineLine() {
-    return Container(
-      margin: const EdgeInsets.only(left: 18, top: 3, bottom: 3),
-      height: 25,
-      width: 2,
-      color: AppColors.accent,
-    );
-  }
-
-  // PICKUP
+  Widget _timelineLine() => Container(
+    margin: const EdgeInsets.only(left: 18, top: 3, bottom: 3),
+    height: 25,
+    width: 2,
+    color: AppColors.accent,
+  );
 
   Widget _buildPickupSection() {
+    final addressParts = [
+      _donation['address']?.toString(),
+      _donation['city']?.toString(),
+      _donation['state']?.toString(),
+    ].where((part) => part != null && part.trim().isNotEmpty).toList();
+    final location = addressParts.join(', ');
+
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,29 +464,24 @@ class DonationDetails extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-
           const SizedBox(height: 15),
-
           _infoRow(
             Icons.calendar_today_outlined,
             'Pickup Date',
-            donation['pickupDate']?.toString() ?? 'Not scheduled',
+            (_donation['pickupDate']?.toString().isNotEmpty ?? false)
+                ? _donation['pickupDate'].toString()
+                : 'Not scheduled',
           ),
-
           _infoRow(
             Icons.location_on_outlined,
             'Pickup Location',
-            donation['location']?.toString() ?? 'Ahmedabad, Gujarat',
+            location.isEmpty ? 'Address not available' : location,
           ),
-
           _infoRow(
             Icons.local_shipping_outlined,
             'Pickup',
             'Free EcoLoop Pickup',
           ),
-
-          const SizedBox(height: 5),
-
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -297,8 +499,7 @@ class DonationDetails extends StatelessWidget {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Our pickup partner will contact you before '
-                    'arriving at the pickup location.',
+                    'Pickup timing is confirmed by the EcoLoop team. Please keep the item ready after your pickup request is accepted.',
                     style: TextStyle(
                       fontSize: 10.5,
                       height: 1.4,
@@ -314,9 +515,8 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  // DONATION INFORMATION
-
   Widget _buildDonationInformation() {
+    final description = (_donation['description'] ?? '').toString();
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -329,43 +529,57 @@ class DonationDetails extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-
           const SizedBox(height: 16),
-
           _infoRow(
             Icons.category_outlined,
             'Category',
-            donation['category']?.toString() ?? 'Other',
+            (_donation['category'] ?? 'Other').toString(),
           ),
-
           _infoRow(
             Icons.check_circle_outline,
             'Condition',
-            donation['condition']?.toString() ?? 'Good',
+            (_donation['condition'] ?? 'Used').toString(),
           ),
-
           _infoRow(
             Icons.calendar_today_outlined,
             'Submitted',
-            donation['date']?.toString() ?? 'Recently',
+            (_donation['date'] ?? 'Recently').toString(),
           ),
-
           _infoRow(
             Icons.tag_outlined,
             'Donation ID',
-            donation['id']?.toString() ?? 'DN0000',
+            (_donation['id'] ?? '—').toString(),
           ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            const Text(
+              'Description',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              description,
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.45,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  // REWARD
-
   Widget _buildRewardSection() {
-    final reward = donation['rewardStatus']?.toString() ?? 'Under Review';
-
-    final earned = reward == 'Reward Earned' || reward == 'Gift Received';
+    final reward = (_donation['rewardStatus'] ?? 'Under Review').toString();
+    final earned =
+        reward.toLowerCase().contains('earned') ||
+        reward.toLowerCase().contains('received');
 
     return _section(
       child: Container(
@@ -392,9 +606,7 @@ class DonationDetails extends StatelessWidget {
                 size: 23,
               ),
             ),
-
             const SizedBox(width: 12),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,9 +619,7 @@ class DonationDetails extends StatelessWidget {
                       color: AppColors.textPrimary,
                     ),
                   ),
-
                   const SizedBox(height: 4),
-
                   Text(
                     reward,
                     style: TextStyle(
@@ -420,14 +630,12 @@ class DonationDetails extends StatelessWidget {
                           : AppColors.textSecondary,
                     ),
                   ),
-
                   const SizedBox(height: 3),
-
                   const Text(
-                    'Reward eligibility and gifts will be '
-                    'handled by EcoLoop.',
+                    'Reward points are recorded by the backend when the donation is created. Any additional gift eligibility is subject to review.',
                     style: TextStyle(
                       fontSize: 9.5,
+                      height: 1.35,
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -440,21 +648,17 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  // ECOLOOP MESSAGE
-
   Widget _buildEcoLoopMessage() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 15),
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(20, 8, 20, 15),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.eco_outlined, size: 19, color: AppColors.success),
-          const SizedBox(width: 8),
-          const Expanded(
+          Icon(Icons.eco_outlined, size: 19, color: AppColors.success),
+          SizedBox(width: 8),
+          Expanded(
             child: Text(
-              'Thank you for giving your unused item another life. '
-              'Every donation helps reduce waste and supports a '
-              'more circular community. 🌱',
+              'Thank you for giving your unused item another life. Every donation helps reduce waste and supports a more circular community.',
               style: TextStyle(
                 fontSize: 11,
                 height: 1.5,
@@ -467,28 +671,26 @@ class DonationDetails extends StatelessWidget {
     );
   }
 
-  // INFO ROW
-
   Widget _infoRow(IconData icon, String title, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 18, color: AppColors.primary),
-
           const SizedBox(width: 10),
-
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 11.5,
-              color: AppColors.textSecondary,
+          SizedBox(
+            width: 105,
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 11.5,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
-
-          const Spacer(),
-
-          Flexible(
+          const SizedBox(width: 8),
+          Expanded(
             child: Text(
               value,
               textAlign: TextAlign.right,
@@ -503,8 +705,6 @@ class DonationDetails extends StatelessWidget {
       ),
     );
   }
-
-  // SECTION
 
   Widget _section({required Widget child}) {
     return Container(
