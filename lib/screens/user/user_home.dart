@@ -1,7 +1,6 @@
 import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
-import '../../app_theme/user/app_colors.dart';
 import '../../app_theme/user/app_text_styles.dart';
 import '../../widgets/user_more_menu.dart';
 import 'buy_products/marketplace.dart';
@@ -17,714 +16,1213 @@ class UserHome extends StatefulWidget {
 }
 
 class _UserHomeState extends State<UserHome> {
-  // SEARCH
-
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
+  List<Map<String, dynamic>> _products = [];
+  List<Map<String, dynamic>> _categories = [];
+  Map<String, dynamic> _profile = {};
+  Map<String, dynamic> _impact = {};
+  Map<String, dynamic> _rewards = {};
+
+  bool _loading = true;
+  bool _refreshing = false;
+  bool _productsError = false;
+  bool _categoriesError = false;
+  String? _errorMessage;
   String _searchQuery = '';
 
-  // CATEGORIES
-
-  final List<Map<String, dynamic>> _categories = [
-    {'title': 'Furniture', 'icon': Icons.chair_outlined},
-    {'title': 'Decor', 'icon': Icons.home_work_outlined},
-    {'title': 'Electronics', 'icon': Icons.devices_other_outlined},
-    {'title': 'Materials', 'icon': Icons.layers_outlined},
-    {'title': 'Fashion', 'icon': Icons.checkroom_outlined},
-    {'title': 'Books', 'icon': Icons.menu_book_outlined},
-  ];
-
-  // RECOMMENDED PRODUCTS
-
-  final List<Map<String, dynamic>> _products = [];
-
-  bool _loadingProducts = true;
+  static const Color _deepGreen = Color(0xFF183D2C);
+  static const Color _forest = Color(0xFF2A4D3A);
+  static const Color _sage = Color(0xFFDCE8DC);
+  static const Color _cream = Color(0xFFF7F5EE);
+  static const Color _muted = Color(0xFF748078);
 
   @override
   void initState() {
     super.initState();
-    _loadProducts();
+    _loadDashboard();
   }
-
-  Future<void> _loadProducts() async {
-    try {
-      final data = await EcoLoopApi.instance.get('/products');
-      final rows = (data is List ? data : <dynamic>[]).whereType<Map>().map((
-        raw,
-      ) {
-        final p = Map<String, dynamic>.from(raw);
-        final images = (p['imageUrls'] is List)
-            ? List<dynamic>.from(p['imageUrls'])
-            : <dynamic>[];
-        final location = [
-          p['city'],
-          p['state'],
-        ].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
-        return <String, dynamic>{
-          ...p,
-          'id': p['productId'],
-          'seller': p['sellerName'] ?? 'EcoLoop seller',
-          'category': p['categoryName'] ?? 'Other',
-          'location': location.isEmpty ? 'Location not provided' : location,
-          'image': images.isNotEmpty ? images.first.toString() : '',
-          'images': images,
-          'price': p['price'] ?? 0,
-          'condition': p['condition'] ?? 'Not specified',
-        };
-      }).toList();
-      if (!mounted) return;
-      setState(() {
-        _products
-          ..clear()
-          ..addAll(rows);
-        _loadingProducts = false;
-      });
-    } catch (_) {
-      if (mounted)
-        setState(() {
-          _loadingProducts = false;
-        });
-    }
-  }
-
-  // DISPOSE
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  // BUILD
+  Future<void> _loadDashboard({bool refresh = false}) async {
+    if (refresh) {
+      setState(() => _refreshing = true);
+    } else {
+      setState(() => _loading = true);
+    }
+
+    final results = await Future.wait<dynamic>([
+      _safeGet('/auth/me'),
+      _safeGet('/categories'),
+      _safeGet('/products'),
+      _safeGet('/eco-impact'),
+      _safeGet('/rewards'),
+    ]);
+
+    if (!mounted) return;
+
+    final profileResult = results[0];
+    final categoryResult = results[1];
+    final productResult = results[2];
+    final impactResult = results[3];
+    final rewardResult = results[4];
+
+    setState(() {
+      if (profileResult != null && profileResult is Map) {
+        _profile = Map<String, dynamic>.from(profileResult);
+      }
+
+      if (categoryResult is List) {
+        _categories = categoryResult
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .where(
+              (e) =>
+                  (e['status'] ?? 'active').toString().toLowerCase() ==
+                  'active',
+            )
+            .toList();
+        _categoriesError = false;
+      } else if (categoryResult == null) {
+        _categoriesError = true;
+      }
+
+      if (productResult is List) {
+        _products = productResult
+            .whereType<Map>()
+            .map(_normalizeProduct)
+            .where(
+              (p) =>
+                  (p['status'] ?? 'published').toString().toLowerCase() ==
+                  'published',
+            )
+            .where(
+              (p) =>
+                  (p['availableQuantity'] == null ||
+                  _number(p['availableQuantity']) > 0),
+            )
+            .toList();
+        _productsError = false;
+      } else if (productResult == null) {
+        _productsError = true;
+      }
+
+      if (impactResult is Map) {
+        _impact = Map<String, dynamic>.from(impactResult);
+      }
+      if (rewardResult is Map) {
+        _rewards = Map<String, dynamic>.from(rewardResult);
+      }
+
+      _errorMessage = _productsError && _categoriesError
+          ? 'We could not load marketplace data. Check your connection and try again.'
+          : null;
+      _loading = false;
+      _refreshing = false;
+    });
+  }
+
+  Future<dynamic> _safeGet(String path) async {
+    try {
+      return await EcoLoopApi.instance.get(path);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Map<String, dynamic> _normalizeProduct(Map raw) {
+    final product = Map<String, dynamic>.from(raw);
+    final rawImages = product['imageUrls'];
+    final images = rawImages is List
+        ? rawImages
+              .map((e) => e.toString())
+              .where((e) => e.trim().isNotEmpty)
+              .toList()
+        : <String>[];
+    final city = (product['sellerCity'] ?? product['city'] ?? '')
+        .toString()
+        .trim();
+    final state = (product['sellerState'] ?? product['state'] ?? '')
+        .toString()
+        .trim();
+    final location = [city, state].where((e) => e.isNotEmpty).join(', ');
+    return {
+      ...product,
+      'id': product['productId'] ?? product['id'],
+      'seller': product['sellerName'] ?? 'EcoLoop Member',
+      'category':
+          product['categoryName'] ?? _categoryName(product['categoryId']),
+      'location': location,
+      'image': images.isNotEmpty ? images.first : '',
+      'images': images,
+      'price': product['price'] ?? 0,
+      'condition': product['condition'] ?? 'Not specified',
+      'availableQuantity': product['availableQuantity'] ?? product['quantity'],
+    };
+  }
+
+  String _categoryName(dynamic id) {
+    for (final category in _categories) {
+      if (category['categoryId'].toString() == id.toString()) {
+        return (category['name'] ?? 'Category').toString();
+      }
+    }
+    return 'Marketplace';
+  }
+
+  int _number(dynamic value) {
+    if (value is num) return value.round();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  double _decimal(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  String get _firstName {
+    final first = (_profile['firstName'] ?? '').toString().trim();
+    if (first.isNotEmpty) return first;
+    final full = (_profile['name'] ?? _profile['userName'] ?? '')
+        .toString()
+        .trim();
+    if (full.isNotEmpty) return full.split(RegExp(r'\s+')).first;
+    return 'there';
+  }
+
+  String get _profileImage =>
+      (_profile['profilePhotoUrl'] ?? '').toString().trim();
+
+  int get _ecoPoints {
+    final fromRewards = _rewards['totalPoints'];
+    if (fromRewards != null) return _number(fromRewards);
+    return _number(_impact['ecoPoints']);
+  }
+
+  List<Map<String, dynamic>> get _visibleProducts {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return _products.take(8).toList();
+    return _products
+        .where((product) {
+          return [
+            'title',
+            'description',
+            'category',
+            'condition',
+            'seller',
+          ].any(
+            (key) =>
+                (product[key] ?? '').toString().toLowerCase().contains(query),
+          );
+        })
+        .take(8)
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.background,
-      child: SafeArea(
-        child: Stack(
-          children: [
-            CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                // HEADER
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                  sliver: SliverToBoxAdapter(child: _buildHeader()),
-                ),
+    return Scaffold(
+      backgroundColor: _cream,
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: _forest,
+          onRefresh: () => _loadDashboard(refresh: true),
+          child: CustomScrollView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            slivers: [
+              SliverToBoxAdapter(child: _buildTopBar()),
+              SliverToBoxAdapter(child: _buildWelcomeHero()),
+              SliverToBoxAdapter(child: _buildSearch()),
+              SliverToBoxAdapter(child: _buildQuickActions()),
+              SliverToBoxAdapter(child: _buildImpactStrip()),
+              SliverToBoxAdapter(child: _buildCategoriesSection()),
+              SliverToBoxAdapter(child: _buildMarketplaceHeading()),
+              SliverToBoxAdapter(child: _buildProductSection()),
+              SliverToBoxAdapter(child: _buildCircularCallout()),
+              const SliverToBoxAdapter(child: SizedBox(height: 30)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-                // GREETING
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
-                  sliver: SliverToBoxAdapter(child: _buildGreeting()),
-                ),
-
-                // SEARCH
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                  sliver: SliverToBoxAdapter(child: _buildSearchBar()),
-                ),
-
-                // QUICK ACTIONS
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                  sliver: SliverToBoxAdapter(child: _buildQuickActions()),
-                ),
-
-                // EXPLORE CATEGORIES HEADER
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
-                  sliver: SliverToBoxAdapter(
-                    child: _buildSectionHeader(
-                      'Explore Categories',
-                      onTap: () {
-                        _openMarketplace();
-                      },
-                    ),
-                  ),
-                ),
-
-                // CATEGORIES
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  sliver: SliverToBoxAdapter(child: _buildCategories()),
-                ),
-
-                // SELL BANNER
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
-                  sliver: SliverToBoxAdapter(child: _buildSellBanner()),
-                ),
-
-                // DONATE BANNER
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  sliver: SliverToBoxAdapter(child: _buildDonateBanner()),
-                ),
-
-                // RECOMMENDED HEADER
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 27, 20, 0),
-                  sliver: SliverToBoxAdapter(
-                    child: _buildSectionHeader(
-                      'Recommended For You',
-                      onTap: () {
-                        _openMarketplace();
-                      },
-                    ),
-                  ),
-                ),
-
-                // RECOMMENDED PRODUCTS
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 95),
-                  sliver: SliverToBoxAdapter(child: _buildProducts()),
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 16, 4),
+      child: Row(
+        children: [
+          Container(
+            width: 45,
+            height: 45,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [_deepGreen, _forest],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: [
+                BoxShadow(
+                  color: _deepGreen.withOpacity(.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
+            child: const Icon(Icons.eco_rounded, color: Colors.white, size: 27),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'EcoLoop',
+                  style: AppTextStyles.title.copyWith(
+                    fontSize: 20,
+                    color: _deepGreen,
+                    letterSpacing: -.5,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                const Text(
+                  'A better life for every item',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: _muted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _sage),
+            ),
+            child: IconButton(
+              tooltip: 'Refresh dashboard',
+              onPressed: () => _loadDashboard(refresh: true),
+              icon: const Icon(Icons.refresh_rounded, color: _forest, size: 20),
+            ),
+          ),
+          const SizedBox(width: 5),
+          const UserMoreMenu(),
+        ],
+      ),
+    );
+  }
 
-            // FLOATING CART BAR
+  Widget _buildWelcomeHero() {
+    final greeting = DateTime.now().hour < 12
+        ? 'Good morning'
+        : DateTime.now().hour < 17
+        ? 'Good afternoon'
+        : 'Good evening';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 17, 18, 0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(21, 22, 18, 20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [_deepGreen, Color(0xFF315D42), _forest],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(27),
+          boxShadow: [
+            BoxShadow(
+              color: _deepGreen.withOpacity(.17),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -22,
+              top: -27,
+              child: Container(
+                width: 145,
+                height: 145,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(.08),
+                    width: 25,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 9,
+              bottom: -35,
+              child: Icon(
+                Icons.eco_rounded,
+                size: 118,
+                color: Colors.white.withOpacity(.055),
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(.12),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(.12),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.spa_outlined,
+                            color: Color(0xFFD8E9C8),
+                            size: 13,
+                          ),
+                          SizedBox(width: 5),
+                          Text(
+                            'LIVE SUSTAINABLY',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              letterSpacing: 1.05,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    if (_profileImage.isNotEmpty)
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.white24,
+                        backgroundImage: NetworkImage(_profileImage),
+                      )
+                    else
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.white.withOpacity(.14),
+                        child: Text(
+                          _firstName == 'there'
+                              ? 'E'
+                              : _firstName[0].toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 21),
+                Text(
+                  '$greeting,',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(.78),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _firstName == 'there'
+                      ? 'Welcome to EcoLoop'
+                      : '$_firstName 👋',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -.8,
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 270),
+                  child: Text(
+                    'Discover pre-loved finds and give useful things a second life.',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(.78),
+                      fontSize: 12,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 19),
+                Row(
+                  children: [
+                    _heroAction(
+                      'Explore items',
+                      Icons.arrow_forward_rounded,
+                      () => _openMarketplace(),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(.10),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(.15),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.stars_rounded,
+                            size: 16,
+                            color: Color(0xFFE8D99D),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '$_ecoPoints pts',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  // HEADER
-
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        // ECOLOOP LOGO
-        Container(
-          width: 43,
-          height: 43,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(13),
-          ),
-          child: const Center(
-            child: Text(
-              'E',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
+  Widget _heroAction(String label, IconData icon, VoidCallback onTap) {
+    return Material(
+      color: const Color(0xFFE5EEDC),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: _deepGreen,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
+              const SizedBox(width: 7),
+              Icon(icon, size: 15, color: _deepGreen),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearch() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 19, 20, 0),
+      child: Container(
+        height: 54,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: const Color(0xFFE2E8DE)),
+          boxShadow: [
+            BoxShadow(
+              color: _deepGreen.withOpacity(.035),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: _searchController,
+          onChanged: (value) => setState(() => _searchQuery = value),
+          onSubmitted: (value) => _openMarketplace(
+            search: value.trim().isEmpty ? null : value.trim(),
+          ),
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              color: _forest,
+              size: 23,
+            ),
+            hintText: 'Search furniture, decor, books...',
+            hintStyle: const TextStyle(color: Color(0xFF9AA39B), fontSize: 12),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: _muted,
+                      size: 19,
+                    ),
+                  )
+                : IconButton(
+                    onPressed: () => _openMarketplace(
+                      search: _searchController.text.trim().isEmpty
+                          ? null
+                          : _searchController.text.trim(),
+                    ),
+                    icon: const Icon(
+                      Icons.tune_rounded,
+                      color: _forest,
+                      size: 20,
+                    ),
+                  ),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(vertical: 17),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: _actionTile(
+              icon: Icons.add_box_rounded,
+              title: 'Sell an item',
+              subtitle: 'List something useful',
+              tint: const Color(0xFFE4EDE0),
+              onTap: _openAddProduct,
             ),
           ),
-        ),
-
-        const SizedBox(width: 10),
-
-        // ECOLOOP NAME
-        Text('EcoLoop', style: AppTextStyles.title.copyWith(fontSize: 19)),
-
-        const Spacer(),
-
-        // MORE MENU
-        const UserMoreMenu(),
-      ],
-    );
-  }
-
-  // GREETING
-
-  Widget _buildGreeting() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Hello there 👋',
-          style: AppTextStyles.heading.copyWith(fontSize: 24),
-        ),
-
-        const SizedBox(height: 5),
-
-        Text('Give unused things a new life.', style: AppTextStyles.body),
-      ],
-    );
-  }
-
-  // SEARCH BAR
-
-  Widget _buildSearchBar() {
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.55)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.025),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+          const SizedBox(width: 11),
+          Expanded(
+            child: _actionTile(
+              icon: Icons.volunteer_activism_rounded,
+              title: 'Donate',
+              subtitle: 'Pass it forward',
+              tint: const Color(0xFFF2E8D9),
+              onTap: _openDonate,
+            ),
           ),
         ],
       ),
-      child: TextField(
-        controller: _searchController,
-        textInputAction: TextInputAction.search,
+    );
+  }
 
-        // SEARCH SUBMIT
-        onSubmitted: (value) {
-          final query = value.trim();
-
-          _openMarketplace(search: query.isEmpty ? null : query);
-        },
-
-        // LIVE TEXT
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-          });
-        },
-
-        decoration: InputDecoration(
-          hintText: 'Search products, materials...',
-          hintStyle: AppTextStyles.hint,
-
-          // SEARCH ICON
-          prefixIcon: const Icon(
-            Icons.search_rounded,
-            color: AppColors.primary,
+  Widget _actionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color tint,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE8ECE5)),
           ),
-
-          // CLEAR / OPEN MARKETPLACE
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  tooltip: 'Clear search',
-                  onPressed: () {
-                    _searchController.clear();
-
-                    setState(() {
-                      _searchQuery = '';
-                    });
-                  },
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    size: 19,
-                    color: AppColors.textSecondary,
-                  ),
-                )
-              : IconButton(
-                  tooltip: 'Search marketplace',
-                  onPressed: () {
-                    final query = _searchController.text.trim();
-
-                    _openMarketplace(search: query.isEmpty ? null : query);
-                  },
-                  icon: const Icon(
-                    Icons.arrow_forward_rounded,
-                    color: AppColors.primary,
-                  ),
-                ),
-
-          border: InputBorder.none,
-
-          contentPadding: const EdgeInsets.symmetric(vertical: 15),
-        ),
-      ),
-    );
-  }
-
-  // QUICK ACTIONS
-
-  Widget _buildQuickActions() {
-    return Row(
-      children: [
-        // SELL
-        Expanded(
-          child: _QuickAction(
-            icon: Icons.add_box_outlined,
-            title: 'Sell Item',
-            subtitle: 'List unused items',
-            onTap: _openAddProduct,
-          ),
-        ),
-
-        const SizedBox(width: 12),
-
-        // DONATE
-        Expanded(
-          child: _QuickAction(
-            icon: Icons.volunteer_activism_outlined,
-            title: 'Donate',
-            subtitle: 'Give items away',
-            onTap: _openDonate,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // SECTION HEADER
-
-  Widget _buildSectionHeader(String title, {VoidCallback? onTap}) {
-    return Row(
-      children: [
-        Text(title, style: AppTextStyles.title.copyWith(fontSize: 17)),
-
-        const Spacer(),
-
-        if (onTap != null)
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-              child: Row(
-                children: [
-                  Text(
-                    'See all',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  const SizedBox(width: 3),
-
-                  const Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 14,
-                    color: AppColors.primary,
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // CATEGORIES
-
-  Widget _buildCategories() {
-    return SizedBox(
-      height: 105,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: _categories.length,
-        separatorBuilder: (_, __) {
-          return const SizedBox(width: 10);
-        },
-        itemBuilder: (context, index) {
-          final category = _categories[index];
-
-          final String title = category['title'] as String;
-
-          final IconData icon = category['icon'] as IconData;
-
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              _openMarketplace(category: title);
-            },
-            child: Container(
-              width: 88,
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(
-                  color: AppColors.accent.withValues(alpha: 0.55),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.018),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // CATEGORY ICON
-                  Container(
-                    width: 43,
-                    height: 43,
-                    decoration: BoxDecoration(
-                      color: AppColors.light,
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                    child: Icon(icon, size: 23, color: AppColors.primary),
-                  ),
-
-                  const SizedBox(height: 7),
-
-                  // CATEGORY NAME
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // SELL BANNER
-
-  Widget _buildSellBanner() {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: _openAddProduct,
-      child: Container(
-        padding: const EdgeInsets.all(17),
-        decoration: BoxDecoration(
-          color: AppColors.light,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.accent),
-        ),
-        child: Row(
-          children: [
-            // ICON
-            Container(
-              width: 49,
-              height: 49,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(
-                Icons.recycling_rounded,
-                color: AppColors.primary,
-                size: 28,
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            // TEXT
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Have something unused?',
-                    style: AppTextStyles.body.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  const SizedBox(height: 3),
-
-                  Text(
-                    'Sell it and give it a new life.',
-                    style: AppTextStyles.caption,
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(width: 8),
-
-            // SELL BUTTON
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Sell',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-
-                  SizedBox(width: 3),
-
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 13,
-                    color: AppColors.primary,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // DONATE BANNER
-
-  Widget _buildDonateBanner() {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: _openDonate,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.accent.withValues(alpha: 0.55)),
-        ),
-        child: Row(
-          children: [
-            // ICON
-            Container(
-              width: 47,
-              height: 47,
-              decoration: BoxDecoration(
-                color: AppColors.light,
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: const Icon(
-                Icons.volunteer_activism_outlined,
-                color: AppColors.primary,
-                size: 25,
-              ),
-            ),
-
-            const SizedBox(width: 11),
-
-            // TEXT
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Want to give instead?',
-                    style: AppTextStyles.body.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  const SizedBox(height: 3),
-
-                  Text(
-                    'Donate unused items to the community.',
-                    style: AppTextStyles.caption,
-                  ),
-                ],
-              ),
-            ),
-
-            // ARROW
-            const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: AppColors.primary,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // RECOMMENDED PRODUCTS
-
-  Widget _buildProducts() {
-    if (_loadingProducts)
-      return const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    if (_products.isEmpty)
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 28),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
             children: [
-              const Icon(
-                Icons.inventory_2_outlined,
-                size: 36,
-                color: AppColors.primary,
+              Container(
+                width: 43,
+                height: 43,
+                decoration: BoxDecoration(
+                  color: tint,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: _forest, size: 22),
               ),
-              const SizedBox(height: 8),
-              Text('No listings available yet', style: AppTextStyles.title),
-              const SizedBox(height: 4),
-              Text(
-                'New items from the marketplace will appear here.',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.caption,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: _deepGreen,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        color: _muted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-      );
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _products.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 14,
-        childAspectRatio: 0.68,
       ),
-      itemBuilder: (context, index) {
-        final product = _products[index];
-
-        return _HomeProductCard(
-          product: product,
-          onTap: () {
-            _openProduct(product);
-          },
-        );
-      },
     );
   }
 
-  // OPEN MARKETPLACE
-
-  void _openMarketplace({String? search, String? category}) {
-    final cleanSearch = search?.trim().isEmpty == true ? null : search?.trim();
-
-    final cleanCategory = category?.trim().isEmpty == true
-        ? null
-        : category?.trim();
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => Marketplace(
-          initialSearch: cleanSearch,
-          initialCategory: cleanCategory,
+  Widget _buildImpactStrip() {
+    final reused = _number(_impact['itemsReused']);
+    final donated = _number(_impact['itemsDonated']);
+    final co2 = _decimal(_impact['co2Saved']);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(15, 15, 15, 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF0E6),
+          borderRadius: BorderRadius.circular(19),
+          border: Border.all(color: const Color(0xFFDCE6D8)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.energy_savings_leaf_rounded,
+                  size: 18,
+                  color: _forest,
+                ),
+                const SizedBox(width: 7),
+                const Expanded(
+                  child: Text(
+                    'Your positive impact',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _deepGreen,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Text(
+                  'FROM YOUR ACTIVITY',
+                  style: TextStyle(
+                    fontSize: 8,
+                    letterSpacing: .7,
+                    color: _forest.withOpacity(.72),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 13),
+            Row(
+              children: [
+                Expanded(
+                  child: _impactMetric(
+                    Icons.recycling_rounded,
+                    '$reused',
+                    'Items reused',
+                  ),
+                ),
+                _verticalDivider(),
+                Expanded(
+                  child: _impactMetric(
+                    Icons.volunteer_activism_rounded,
+                    '$donated',
+                    'Donated',
+                  ),
+                ),
+                _verticalDivider(),
+                Expanded(
+                  child: _impactMetric(
+                    Icons.cloud_done_rounded,
+                    '${co2.toStringAsFixed(co2.truncateToDouble() == co2 ? 0 : 1)} kg',
+                    'CO₂ saved',
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // OPEN ADD PRODUCT
-
-  void _openAddProduct() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const AddProduct()));
+  Widget _impactMetric(IconData icon, String value, String label) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 17, color: _forest),
+        const SizedBox(height: 7),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 17,
+            color: _deepGreen,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.4,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 9,
+            color: _muted,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
   }
 
-  // OPEN DONATE
+  Widget _verticalDivider() => Container(
+    height: 49,
+    width: 1,
+    margin: const EdgeInsets.symmetric(horizontal: 9),
+    color: const Color(0xFFD4DFD0),
+  );
 
-  void _openDonate() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const DonateItem()));
+  Widget _buildCategoriesSection() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 26),
+      child: Column(
+        children: [
+          _sectionHeader(
+            'Explore categories',
+            'Find your next useful thing',
+            onSeeAll: _openMarketplace,
+          ),
+          const SizedBox(height: 13),
+          if (_loading && _categories.isEmpty)
+            const SizedBox(
+              height: 86,
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: _forest,
+                ),
+              ),
+            )
+          else if (_categoriesError && _categories.isEmpty)
+            _inlineRetry(
+              'Categories could not be loaded.',
+              () => _loadDashboard(refresh: true),
+            )
+          else if (_categories.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              child: Text(
+                'Categories will appear here when they are available.',
+                style: TextStyle(color: _muted, fontSize: 12),
+              ),
+            )
+          else
+            SizedBox(
+              height: 105,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: _categories.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (context, index) {
+                  final category = _categories[index];
+                  final name = (category['name'] ?? 'Category').toString();
+                  final icon = _iconForCategory(name);
+                  return Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(17),
+                    child: InkWell(
+                      onTap: () => _openMarketplace(category: name),
+                      borderRadius: BorderRadius.circular(17),
+                      child: Container(
+                        width: 91,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(17),
+                          border: Border.all(color: const Color(0xFFE6EBE2)),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 45,
+                              height: 43,
+                              decoration: BoxDecoration(
+                                color: _sage.withOpacity(.7),
+                                borderRadius: BorderRadius.circular(13),
+                              ),
+                              child: Icon(icon, color: _forest, size: 23),
+                            ),
+                            const SizedBox(height: 7),
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: _deepGreen,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
-  // OPEN PRODUCT DETAILS
+  IconData _iconForCategory(String value) {
+    final name = value.toLowerCase();
+    if (name.contains('furniture')) return Icons.chair_alt_rounded;
+    if (name.contains('decor')) return Icons.weekend_rounded;
+    if (name.contains('electronic')) return Icons.devices_other_rounded;
+    if (name.contains('material')) return Icons.layers_rounded;
+    if (name.contains('fashion') || name.contains('cloth'))
+      return Icons.checkroom_rounded;
+    if (name.contains('book')) return Icons.menu_book_rounded;
+    if (name.contains('kitchen')) return Icons.kitchen_rounded;
+    if (name.contains('toy')) return Icons.toys_rounded;
+    return Icons.category_rounded;
+  }
+
+  Widget _buildMarketplaceHeading() => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+    child: _sectionHeader(
+      _searchQuery.trim().isEmpty ? 'Fresh finds for you' : 'Matching items',
+      _searchQuery.trim().isEmpty
+          ? 'Recently listed on EcoLoop'
+          : 'From available listings',
+      onSeeAll: () => _openMarketplace(
+        search: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+      ),
+    ),
+  );
+
+  Widget _sectionHeader(
+    String title,
+    String subtitle, {
+    VoidCallback? onSeeAll,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.title.copyWith(
+                    fontSize: 18,
+                    color: _deepGreen,
+                    letterSpacing: -.35,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: _muted, fontSize: 10.5),
+                ),
+              ],
+            ),
+          ),
+          if (onSeeAll != null)
+            InkWell(
+              onTap: onSeeAll,
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+                child: Row(
+                  children: [
+                    Text(
+                      'See all',
+                      style: TextStyle(
+                        color: _forest,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(width: 3),
+                    Icon(Icons.arrow_forward_rounded, size: 14, color: _forest),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductSection() {
+    if (_loading && _products.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(30),
+        child: Center(
+          child: CircularProgressIndicator(color: _forest, strokeWidth: 2),
+        ),
+      );
+    }
+    if (_productsError && _products.isEmpty) {
+      return _inlineRetry(
+        'We could not load listings from the marketplace.',
+        () => _loadDashboard(refresh: true),
+      );
+    }
+    final products = _visibleProducts;
+    if (products.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE7ECE4)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  color: _sage,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.inventory_2_outlined,
+                  color: _forest,
+                  size: 27,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _searchQuery.isEmpty
+                    ? 'Your next find is on its way'
+                    : 'No items match your search',
+                style: const TextStyle(
+                  color: _deepGreen,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                _searchQuery.isEmpty
+                    ? 'There are no available listings right now. Check back soon.'
+                    : 'Try another name or browse all marketplace items.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: _muted,
+                  fontSize: 11,
+                  height: 1.5,
+                ),
+              ),
+              if (_searchQuery.isNotEmpty)
+                TextButton(
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                  child: const Text('Clear search'),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: products.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 13,
+          childAspectRatio: .64,
+        ),
+        itemBuilder: (context, index) => _ProductCard(
+          product: products[index],
+          onTap: () => _openProduct(products[index]),
+        ),
+      ),
+    );
+  }
+
+  Widget _inlineRetry(String message, VoidCallback onRetry) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE6EBE2)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.cloud_off_rounded, color: _muted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: _muted,
+                  fontSize: 11,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCircularCallout() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0E9DA),
+          borderRadius: BorderRadius.circular(21),
+          border: Border.all(color: const Color(0xFFE9DFC9)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 47,
+              height: 47,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(.8),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: const Icon(
+                Icons.recycling_rounded,
+                color: _forest,
+                size: 25,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Make room for a little good.',
+                    style: TextStyle(
+                      color: _deepGreen,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Sell what you no longer need, or donate it to someone who does.',
+                    style: TextStyle(
+                      color: _deepGreen.withOpacity(.72),
+                      fontSize: 10.5,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            IconButton(
+              onPressed: _openDonate,
+              tooltip: 'Donate an item',
+              icon: const Icon(Icons.arrow_forward_rounded, color: _forest),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openMarketplace({String? search, String? category}) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            Marketplace(initialSearch: search, initialCategory: category),
+      ),
+    );
+  }
+
+  void _openAddProduct() => Navigator.of(
+    context,
+  ).push(MaterialPageRoute(builder: (_) => const AddProduct()));
+
+  void _openDonate() => Navigator.of(
+    context,
+  ).push(MaterialPageRoute(builder: (_) => const DonateItem()));
 
   void _openProduct(Map<String, dynamic> product) {
     Navigator.of(
@@ -733,276 +1231,183 @@ class _UserHomeState extends State<UserHome> {
   }
 }
 
-// QUICK ACTION
-
-class _QuickAction extends StatelessWidget {
-  const _QuickAction({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: AppColors.accent.withValues(alpha: 0.45)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.018),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // ICON
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.light,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(icon, color: AppColors.primary, size: 21),
-            ),
-
-            const SizedBox(width: 9),
-
-            // TEXT
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.body.copyWith(
-                      color: AppColors.textPrimary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  const SizedBox(height: 2),
-
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.caption.copyWith(fontSize: 8.5),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// HOME PRODUCT CARD
-
-class _HomeProductCard extends StatelessWidget {
-  const _HomeProductCard({required this.product, required this.onTap});
+class _ProductCard extends StatelessWidget {
+  const _ProductCard({required this.product, required this.onTap});
 
   final Map<String, dynamic> product;
   final VoidCallback onTap;
 
+  static const Color _deepGreen = Color(0xFF183D2C);
+  static const Color _forest = Color(0xFF2A4D3A);
+  static const Color _muted = Color(0xFF748078);
+
   @override
   Widget build(BuildContext context) {
-    final int price = (product['price'] as num).toInt();
+    final priceValue = product['price'];
+    final price = priceValue is num
+        ? priceValue
+        : num.tryParse(priceValue?.toString() ?? '') ?? 0;
+    final image = (product['image'] ?? '').toString().trim();
+    final title = (product['title'] ?? 'Untitled item').toString();
+    final category = (product['category'] ?? 'Marketplace').toString();
+    final condition = (product['condition'] ?? 'Not specified').toString();
+    final seller = (product['seller'] ?? 'EcoLoop Member').toString();
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: AppColors.accent.withValues(alpha: 0.42)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.035),
-              blurRadius: 9,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // IMAGE
-            Expanded(
-              child: Stack(
-                children: [
-                  // PRODUCT IMAGE
-                  Positioned.fill(
-                    child: Image.network(
-                      product['image'].toString(),
-                      fit: BoxFit.cover,
-
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) {
-                          return child;
-                        }
-
-                        return Container(
-                          color: AppColors.light,
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        );
-                      },
-
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: AppColors.light,
-                          child: const Center(
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 35,
-                              color: AppColors.secondary,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // CONDITION
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      child: Text(
-                        product['condition'].toString(),
-                        style: const TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // CATEGORY
-                  Positioned(
-                    bottom: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.55),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        product['category'].toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(19),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(19),
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(19),
+            border: Border.all(color: const Color(0xFFE5EAE2)),
+            boxShadow: [
+              BoxShadow(
+                color: _deepGreen.withOpacity(.035),
+                blurRadius: 12,
+                offset: const Offset(0, 5),
               ),
-            ),
-
-            // PRODUCT DETAILS
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // TITLE
-                  Text(
-                    product['title'].toString(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.body.copyWith(
-                      color: AppColors.textPrimary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  const SizedBox(height: 3),
-
-                  // PRICE
-                  Text(
-                    '₹$price',
-                    style: AppTextStyles.title.copyWith(fontSize: 16),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  // SELLER
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.person_outline_rounded,
-                        size: 11,
-                        color: AppColors.textSecondary,
-                      ),
-
-                      const SizedBox(width: 3),
-
-                      Expanded(
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (image.isNotEmpty)
+                      Image.network(
+                        image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                      )
+                    else
+                      _imagePlaceholder(),
+                    Positioned(
+                      top: 9,
+                      left: 9,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(.94),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         child: Text(
-                          product['seller'].toString(),
+                          condition,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.caption.copyWith(fontSize: 9),
+                          style: const TextStyle(
+                            color: _forest,
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
-
-                      const SizedBox(width: 3),
-
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 12,
-                        color: AppColors.primary,
+                    ),
+                    Positioned(
+                      bottom: 9,
+                      left: 9,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _deepGreen.withOpacity(.82),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          category,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(11, 10, 11, 11),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _deepGreen,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      '₹${price.toStringAsFixed(price.truncateToDouble() == price ? 0 : 2)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _forest,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -.4,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.person_outline_rounded,
+                          size: 13,
+                          color: _muted,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            seller,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: _muted,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_outward_rounded,
+                          size: 13,
+                          color: _forest,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  Widget _imagePlaceholder() => Container(
+    color: const Color(0xFFEAF0E6),
+    child: const Center(
+      child: Icon(Icons.image_outlined, color: _forest, size: 34),
+    ),
+  );
 }

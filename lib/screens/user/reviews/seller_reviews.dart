@@ -119,7 +119,7 @@ class _SellerReviewsState extends State<SellerReviews> {
     body: RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
         children: [
           Container(
             padding: const EdgeInsets.all(16),
@@ -176,43 +176,63 @@ class _SellerReviewsState extends State<SellerReviews> {
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 18),
           RatingSummary(
             rating: _average,
             totalReviews: _reviews.length,
             ratingCounts: _counts,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           if (widget.orderId != null &&
               widget.orderId!.isNotEmpty &&
               widget.sellerId.isNotEmpty)
-            OutlinedButton.icon(
-              onPressed: () async {
-                final result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => WriteSellerReview(
-                      sellerName: widget.sellerName,
-                      sellerImage: widget.sellerImage,
-                      sellerId: widget.sellerId,
-                      sellerType: widget.sellerType,
-                      orderId: widget.orderId!,
-                    ),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 14,
+                    horizontal: 16,
                   ),
-                );
-                if (result == true) _load();
-              },
-              icon: const Icon(Icons.rate_review_outlined),
-              label: const Text('Write a seller review'),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () async {
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => WriteSellerReview(
+                        sellerName: widget.sellerName,
+                        sellerImage: widget.sellerImage,
+                        sellerId: widget.sellerId,
+                        sellerType: widget.sellerType,
+                        orderId: widget.orderId!,
+                      ),
+                    ),
+                  );
+                  if (result == true) _load();
+                },
+                icon: const Icon(Icons.rate_review_outlined),
+                label: const Text('Write a seller review'),
+              ),
             ),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
                 child: DropdownButtonFormField<int>(
                   initialValue: _ratingFilter,
+                  isExpanded: true,
+                  iconSize: 20,
                   decoration: const InputDecoration(
                     labelText: 'Rating',
                     border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    isDense: true,
                   ),
                   items: [
                     const DropdownMenuItem(
@@ -227,23 +247,30 @@ class _SellerReviewsState extends State<SellerReviews> {
                   },
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: DropdownButtonFormField<String>(
                   initialValue: _sort,
+                  isExpanded: true,
+                  iconSize: 20,
                   decoration: const InputDecoration(
-                    labelText: 'Sort',
+                    labelText: 'Sort by',
                     border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    isDense: true,
                   ),
                   items: const [
                     DropdownMenuItem(value: 'Newest', child: Text('Newest')),
                     DropdownMenuItem(
                       value: 'Highest rated',
-                      child: Text('Highest rated'),
+                      child: Text('Highest', overflow: TextOverflow.ellipsis),
                     ),
                     DropdownMenuItem(
                       value: 'Lowest rated',
-                      child: Text('Lowest rated'),
+                      child: Text('Lowest', overflow: TextOverflow.ellipsis),
                     ),
                   ],
                   onChanged: (v) {
@@ -253,7 +280,7 @@ class _SellerReviewsState extends State<SellerReviews> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           if (_loading)
             const Center(
               child: Padding(
@@ -268,8 +295,8 @@ class _SellerReviewsState extends State<SellerReviews> {
           else
             ..._visible.map(
               (r) => Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(14),
@@ -294,16 +321,21 @@ class _SellerReviewsState extends State<SellerReviews> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 6),
                     Text(
-                      '${r['createdAt'] ?? ''}',
+                      _formatDate(r['createdAt']),
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text('${r['comment'] ?? ''}'),
+                    const SizedBox(height: 10),
+                    Text(
+                      '${r['comment'] ?? ''}'.trim().isEmpty
+                          ? 'No written comment.'
+                          : '${r['comment']}'.trim(),
+                      style: const TextStyle(height: 1.4),
+                    ),
                   ],
                 ),
               ),
@@ -312,6 +344,31 @@ class _SellerReviewsState extends State<SellerReviews> {
       ),
     ),
   );
+
+  String _formatDate(dynamic value) {
+    final raw = '${value ?? ''}'.trim();
+    if (raw.isEmpty) return 'Date unavailable';
+
+    final date = DateTime.tryParse(raw);
+    if (date == null) return raw;
+
+    final local = date.toLocal();
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${local.day} ${months[local.month - 1]} ${local.year}';
+  }
 
   Widget _empty(String text, {Future<void> Function()? retry}) => Padding(
     padding: const EdgeInsets.all(24),

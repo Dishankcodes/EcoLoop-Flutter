@@ -906,11 +906,14 @@ class _MarketplaceState extends State<Marketplace> {
                     crossAxisCount: columns,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 14,
+                    // Give the details section enough vertical room on compact phones.
+                    // The previous ratios caused the product-card Column to
+                    // overflow by 12 px on the user's device.
                     childAspectRatio: width < 380
-                        ? .62
+                        ? .50
                         : width < 700
-                        ? .66
-                        : .70,
+                        ? .56
+                        : .66,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) => _productCard(products[index]),
@@ -1073,7 +1076,7 @@ class _MarketplaceState extends State<Marketplace> {
               Expanded(
                 flex: 10,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
+                  padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1088,7 +1091,7 @@ class _MarketplaceState extends State<Marketplace> {
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 4),
                       Text(
                         _title(product),
                         maxLines: 2,
@@ -1110,7 +1113,7 @@ class _MarketplaceState extends State<Marketplace> {
                               letterSpacing: -.3,
                             ),
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 3),
                       InkWell(
                         onTap: () => _openSellerProfile(product),
                         borderRadius: BorderRadius.circular(6),

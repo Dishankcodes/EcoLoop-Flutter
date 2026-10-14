@@ -21,6 +21,7 @@ import 'eco_impact.dart';
 import 'edit_profile.dart';
 import 'notifications.dart';
 import 'rewards.dart';
+import 'sellers_earning.dart';
 import 'settings.dart';
 
 class Profile extends StatefulWidget {
@@ -536,7 +537,10 @@ class _ProfileState extends State<Profile> {
             color: AppColors.textSecondary,
           ),
           onTap: () {
-            _showComingSoon(context, 'Selling Earnings');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SellersEarning()),
+            );
           },
         ),
       ],
