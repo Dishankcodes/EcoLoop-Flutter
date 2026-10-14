@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
@@ -28,6 +29,10 @@ class _ProductDetailsState extends State<ProductDetails> {
   int _quantity = 1;
   bool _isWishlisted = false;
   bool _wishlistBusy = false;
+  bool _reviewsLoading = false;
+  bool _reviewEligibilityLoading = false;
+  List<Map<String, dynamic>> _liveReviews = [];
+  Map<String, dynamic>? _reviewEligibility;
   final EcoLoopApi _api = EcoLoopApi.instance;
 
   @override
@@ -39,6 +44,8 @@ class _ProductDetailsState extends State<ProductDetails> {
         widget.product['isWishlisted'] == true ||
         widget.product['wishlisted'] == true;
     _syncWishlistState();
+    _loadLiveReviews();
+    _loadReviewEligibility();
   }
 
   @override
@@ -111,6 +118,12 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   double get rating {
+    if (_liveReviews.isNotEmpty) {
+      return _liveReviews
+              .map((r) => _number(r['rating']))
+              .fold<double>(0, (a, b) => a + b) /
+          _liveReviews.length;
+    }
     final value = widget.product['rating'];
     if (value is num) {
       return value.toDouble();
@@ -119,6 +132,9 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   int get reviewCount {
+    if (_liveReviews.isNotEmpty) {
+      return _liveReviews.length;
+    }
     final value =
         widget.product['reviewCount'] ?? widget.product['reviews'] ?? 0;
     if (value is num) {
@@ -127,45 +143,123 @@ class _ProductDetailsState extends State<ProductDetails> {
     return int.tryParse(value.toString()) ?? 0;
   }
 
+  double _number(dynamic value) => value is num
+      ? value.toDouble()
+      : double.tryParse((value ?? '').toString()) ?? 0;
+
+  List<Map<String, dynamic>> _toRows(dynamic value) {
+    if (value is List)
+      return value
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    if (value is Map) {
+      final data = value['data'];
+      if (data is List)
+        return data
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      for (final key in ['reviews', 'items', 'results']) {
+        final rows = value[key] ?? (data is Map ? data[key] : null);
+        if (rows is List)
+          return rows
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+      }
+    }
+    return [];
+  }
+
+  Future<void> _loadLiveReviews() async {
+    final id = _currentProductId;
+    if (id.isEmpty) {
+      return;
+    }
+    if (mounted) setState(() => _reviewsLoading = true);
+    try {
+      final data = await _api.get('/products/$id/reviews');
+      if (mounted) setState(() => _liveReviews = _toRows(data));
+    } catch (_) {
+      if (mounted) setState(() => _liveReviews = []);
+    } finally {
+      if (mounted) setState(() => _reviewsLoading = false);
+    }
+  }
+
+  Future<void> _loadReviewEligibility() async {
+    final id = _currentProductId;
+    if (id.isEmpty) {
+      return;
+    }
+    if (mounted) setState(() => _reviewEligibilityLoading = true);
+    try {
+      final data = await _api.get('/products/$id/review-eligibility');
+      if (mounted)
+        setState(
+          () => _reviewEligibility = data is Map
+              ? Map<String, dynamic>.from(data)
+              : null,
+        );
+    } catch (_) {
+      if (mounted) setState(() => _reviewEligibility = {'eligible': false});
+    } finally {
+      if (mounted) setState(() => _reviewEligibilityLoading = false);
+    }
+  }
+
+  String _reviewDate(dynamic value) {
+    if (value == null || value.toString().trim().isEmpty)
+      return 'Date unavailable';
+    final parsed = DateTime.tryParse(value.toString());
+    if (parsed == null) {
+      return value.toString();
+    }
+    final local = parsed.isUtc ? parsed.toLocal() : parsed;
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${local.day} ${months[local.month - 1]} ${local.year}';
+  }
+
   List<String> get images {
     dynamic productImages =
         widget.product['images'] ?? widget.product['imageUrls'];
     if (productImages is String && productImages.trim().isNotEmpty) {
       try {
         final decoded = jsonDecode(productImages);
-        if (decoded is List) {
-          productImages = decoded;
-        } else {
-          productImages = <dynamic>[productImages];
-        }
+        if (decoded is List) productImages = decoded;
       } catch (_) {
-        productImages = productImages.split(RegExp(r',(?=https?://)'));
+        productImages = productImages.split(RegExp(r'[,\n]'));
       }
     }
     if (productImages is List && productImages.isNotEmpty) {
-      final result = <String>[];
-      for (final item in productImages) {
-        final rawUrl = item.toString().trim();
-        final driveId = RegExp(r'(?:/file/d/|[?&]id=)([A-Za-z0-9_-]+)')
-            .firstMatch(rawUrl)?.group(1);
-        final url = driveId != null && rawUrl.contains('drive.google.com')
-            ? 'https://drive.google.com/uc?export=view&id=$driveId'
-            : rawUrl;
-        if ((url.startsWith('http://') || url.startsWith('https://')) &&
-            !result.contains(url)) {
-          result.add(url);
-        }
-      }
-      return result;
+      return productImages
+          .map((image) => image.toString().trim())
+          .where(
+            (image) =>
+                image.startsWith('http://') || image.startsWith('https://'),
+          )
+          .toSet()
+          .toList();
     }
-    final singleImage =
-        (widget.product['image'] ?? widget.product['imageUrl'])?.toString().trim();
-    if (singleImage != null && singleImage.startsWith('http')) {
-      final driveId = RegExp(r'(?:/file/d/|[?&]id=)([A-Za-z0-9_-]+)')
-          .firstMatch(singleImage)?.group(1);
-      return [driveId != null && singleImage.contains('drive.google.com')
-          ? 'https://drive.google.com/uc?export=view&id=$driveId'
-          : singleImage];
+    final singleImage = (widget.product['image'] ?? widget.product['imageUrl'])
+        .toString()
+        .trim();
+    if (singleImage.startsWith('http')) {
+      return [singleImage];
     }
     return const <String>[];
   }
@@ -270,7 +364,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                       images[index],
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) {
+                      errorBuilder: (context, error, stackTrace) {
                         return Container(
                           color: AppColors.light,
                           child: const Center(
@@ -283,7 +377,9 @@ class _ProductDetailsState extends State<ProductDetails> {
                         );
                       },
                       loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
+                        if (progress == null) {
+                          return child;
+                        }
                         return Container(
                           color: AppColors.light,
                           child: const Center(
@@ -301,7 +397,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   top: 16,
                   right: 16,
                   child: Material(
-                    color: Colors.white.withOpacity(0.95),
+                    color: Colors.white.withValues(alpha: 0.95),
                     shape: const CircleBorder(),
                     elevation: 1,
                     child: InkWell(
@@ -331,7 +427,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.55),
+                      color: Colors.black.withValues(alpha: 0.55),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -481,9 +577,9 @@ class _ProductDetailsState extends State<ProductDetails> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.18)),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Row(
         children: [
@@ -569,7 +665,9 @@ class _ProductDetailsState extends State<ProductDetails> {
               decoration: BoxDecoration(
                 color: AppColors.background,
                 borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: AppColors.accent.withOpacity(0.45)),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.45),
+                ),
               ),
               child: Row(
                 children: [
@@ -651,7 +749,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
-              color: AppColors.light.withOpacity(0.55),
+              color: AppColors.light.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(11),
             ),
             child: const Row(
@@ -754,7 +852,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
-              color: AppColors.light.withOpacity(0.65),
+              color: AppColors.light.withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(11),
             ),
             child: const Row(
@@ -877,32 +975,61 @@ class _ProductDetailsState extends State<ProductDetails> {
           const SizedBox(height: 8),
           _buildRatingSummary(),
           const SizedBox(height: 16),
-          _buildReviewCard(
-            name: 'Priya S.',
-            rating: 5,
-            date: '2 weeks ago',
-            review:
-                'Great quality! Exactly as shown. Very sturdy and easy to assemble.',
-            imageCount: 2,
-          ),
-          const SizedBox(height: 10),
-          _buildReviewCard(
-            name: 'Amit K.',
-            rating: 4,
-            date: '1 month ago',
-            review:
-                'Good product for the price. Minor scratches but overall great.',
-            imageCount: 1,
-          ),
+          if (_reviewsLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
+              ),
+            )
+          else if (_liveReviews.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No verified reviews yet. Be the first eligible buyer to review this item.',
+                style: AppTextStyles.caption,
+              ),
+            )
+          else
+            ..._liveReviews
+                .take(3)
+                .map(
+                  (review) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _buildReviewCard(
+                      name:
+                          (review['reviewerName'] ??
+                                  review['userName'] ??
+                                  review['name'] ??
+                                  'EcoLoop buyer')
+                              .toString(),
+                      rating: _number(
+                        review['rating'],
+                      ).round().clamp(1, 5).toInt(),
+                      date: _reviewDate(review['createdAt']),
+                      review: (review['comment'] ?? review['review'] ?? '')
+                          .toString(),
+                      imageCount: 0,
+                    ),
+                  ),
+                ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             height: 43,
             child: OutlinedButton.icon(
-              onPressed: _writeReview,
+              onPressed: _reviewEligibilityLoading ? null : _writeReview,
               icon: const Icon(Icons.rate_review_outlined, size: 17),
-              label: const Text(
-                'Write a Review',
+              label: Text(
+                _reviewEligibilityLoading
+                    ? 'Checking purchase…'
+                    : ((_reviewEligibility != null &&
+                              _reviewEligibility!['eligible'] == true)
+                          ? 'Write a Review'
+                          : 'Review after purchase'),
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
               ),
             ),
@@ -919,7 +1046,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.accent.withOpacity(0.4)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
@@ -968,40 +1095,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  /// Helper bar widget rendering percentage distribution for individual star ratings.
-  Widget _ratingBar(int number, double percentage) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 15,
-            child: Text(
-              '$number',
-              style: const TextStyle(
-                fontSize: 9,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          const Icon(Icons.star_rounded, size: 11, color: Color(0xFFFFB300)),
-          const SizedBox(width: 5),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(
-                minHeight: 5,
-                value: percentage,
-                backgroundColor: AppColors.accent.withOpacity(0.3),
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Review item card showing reviewer details, score, text, and user media.
   Widget _buildReviewCard({
     required String name,
@@ -1015,7 +1108,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.accent.withOpacity(0.35)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1243,7 +1336,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.only(right: 20),
               itemCount: products.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 11),
+              separatorBuilder: (context, index) => const SizedBox(width: 11),
               itemBuilder: (context, index) {
                 return _buildSimilarProductCard(products[index]);
               },
@@ -1260,7 +1353,9 @@ class _ProductDetailsState extends State<ProductDetails> {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => ProductDetails(product: product)),
+          MaterialPageRoute(
+            builder: (context) => ProductDetails(product: product),
+          ),
         );
       },
       child: SizedBox(
@@ -1279,7 +1374,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     child: Image.network(
                       product['image'].toString(),
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) {
+                      errorBuilder: (context, error, stackTrace) {
                         return const Icon(
                           Icons.image_outlined,
                           color: AppColors.primary,
@@ -1295,7 +1390,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.94),
+                      color: Colors.white.withValues(alpha: 0.94),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -1349,7 +1444,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           color: AppColors.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.10),
+              color: Colors.black.withValues(alpha: 0.10),
               blurRadius: 15,
               offset: const Offset(0, -5),
             ),
@@ -1364,7 +1459,9 @@ class _ProductDetailsState extends State<ProductDetails> {
                 decoration: BoxDecoration(
                   color: AppColors.light,
                   borderRadius: BorderRadius.circular(13),
-                  border: Border.all(color: AppColors.accent.withOpacity(0.4)),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.4),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -1532,7 +1629,8 @@ class _ProductDetailsState extends State<ProductDetails> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => Checkout(product: widget.product, quantity: _quantity),
+        builder: (context) =>
+            Checkout(product: widget.product, quantity: _quantity),
       ),
     );
   }
@@ -1552,7 +1650,9 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   Future<void> _syncWishlistState() async {
     final id = _currentProductId;
-    if (id.isEmpty) return;
+    if (id.isEmpty) {
+      return;
+    }
     try {
       final response = await _api.get('/wishlist');
       final root = _asMap(response);
@@ -1594,7 +1694,9 @@ class _ProductDetailsState extends State<ProductDetails> {
       _showMessage('This item has no product ID and cannot be saved.');
       return;
     }
-    if (_wishlistBusy) return;
+    if (_wishlistBusy) {
+      return;
+    }
     final wasSaved = _isWishlisted;
     setState(() {
       _wishlistBusy = true;
@@ -1606,10 +1708,11 @@ class _ProductDetailsState extends State<ProductDetails> {
       } else {
         await _api.post('/wishlist', <String, dynamic>{'productId': id});
       }
-      if (mounted)
+      if (mounted) {
         _showMessage(
           wasSaved ? 'Removed from your wishlist.' : 'Added to your wishlist.',
         );
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isWishlisted = wasSaved);
@@ -1626,16 +1729,14 @@ class _ProductDetailsState extends State<ProductDetails> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ArtistProfile(
+          builder: (context) => ArtistProfile(
             artist: {
               'artistId':
                   widget.product['sellerId'] ?? widget.product['artistId'],
               'name': seller,
               'location': location,
-              'rating': '4.8',
-              'reviews': '42',
-              'followers': '127',
-              'products': '127',
+              'rating': widget.product['rating'] ?? 0,
+              'reviews': widget.product['reviewCount'] ?? 0,
             },
           ),
         ),
@@ -1646,16 +1747,13 @@ class _ProductDetailsState extends State<ProductDetails> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => SellerProfile(
+        builder: (context) => SellerProfile(
           seller: {
             'userId': widget.product['sellerId'] ?? widget.product['userId'],
             'name': seller,
             'location': location,
-            'rating': '4.8',
-            'reviews': '42',
-            'listings': '127',
-            'sold': '42',
-            'positive': '98%',
+            'rating': widget.product['rating'] ?? 0,
+            'reviews': widget.product['reviewCount'] ?? 0,
           },
         ),
       ),
@@ -1667,17 +1765,42 @@ class _ProductDetailsState extends State<ProductDetails> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ProductReviews(product: widget.product),
+        builder: (context) => ProductReviews(
+          product: widget.product,
+          orderId:
+              _reviewEligibility != null &&
+                  _reviewEligibility!['eligible'] == true
+              ? _reviewEligibility!['orderId']?.toString()
+              : null,
+        ),
       ),
     );
   }
 
   /// Opens form interface for submitting a new review.
-  void _writeReview() {
-    Navigator.push(
+  Future<void> _writeReview() async {
+    final eligible =
+        _reviewEligibility != null && _reviewEligibility!['eligible'] == true;
+    final orderId = _reviewEligibility == null
+        ? null
+        : _reviewEligibility!['orderId'];
+    if (!eligible || orderId == null) {
+      _showMessage(
+        'You must purchase and receive this product before leaving a review.',
+      );
+      return;
+    }
+    final submitted = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => WriteReview(product: widget.product)),
+      MaterialPageRoute(
+        builder: (context) =>
+            WriteReview(product: widget.product, orderId: orderId.toString()),
+      ),
     );
+    if (submitted == true) {
+      await _loadLiveReviews();
+      await _loadReviewEligibility();
+    }
   }
 
   /// Triggers product sharing option placeholder.

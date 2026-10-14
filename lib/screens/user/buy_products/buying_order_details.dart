@@ -31,6 +31,7 @@ class BuyingOrderDetails extends StatelessWidget {
 
     final id = _value(order['orderId']);
     final status = _value(order['status'], 'pending').replaceAll('_', ' ');
+
     final paymentStatus = _value(
       order['paymentStatus'],
       'pending',

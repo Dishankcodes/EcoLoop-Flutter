@@ -1,6 +1,8 @@
+
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
+import '../../../services/ecoloop_api.dart';
 import 'donation_details.dart';
 
 class DonationHistory extends StatefulWidget {
@@ -12,85 +14,188 @@ class DonationHistory extends StatefulWidget {
 
 class _DonationHistoryState extends State<DonationHistory> {
   String _selectedFilter = 'All';
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _donations = [];
+  Map<String, String> _categoryNames = {};
 
-  final List<Map<String, dynamic>> _donations = [
-    {
-      'id': 'DN1024',
-      'item': 'Wooden Study Table',
-      'category': 'Furniture',
-      'condition': 'Good',
-      'date': '28 Aug 2026',
-      'status': 'Pickup Scheduled',
-      'statusColor': 'orange',
-      'pickupDate': '30 Aug 2026',
-      'location': 'Ahmedabad, Gujarat',
-      'image':
-          'https://images.unsplash.com/photo-1518455027359-f3f8164ba6b0?auto=format&fit=crop&w=700&q=80',
-      'rewardStatus': 'Eligible',
-    },
-    {
-      'id': 'DN1018',
-      'item': 'Old Books Bundle',
-      'category': 'Books',
-      'condition': 'Good',
-      'date': '18 Aug 2026',
-      'status': 'Collected',
-      'statusColor': 'green',
-      'pickupDate': '20 Aug 2026',
-      'location': 'Vadodara, Gujarat',
-      'image':
-          'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=700&q=80',
-      'rewardStatus': 'Reward Earned',
-    },
-    {
-      'id': 'DN1007',
-      'item': 'Glass Decoration Set',
-      'category': 'Decor',
-      'condition': 'Good',
-      'date': '05 Aug 2026',
-      'status': 'Completed',
-      'statusColor': 'green',
-      'pickupDate': '07 Aug 2026',
-      'location': 'Surat, Gujarat',
-      'image':
-          'https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&w=700&q=80',
-      'rewardStatus': 'Gift Received',
-    },
-    {
-      'id': 'DN0992',
-      'item': 'Old Bluetooth Speaker',
-      'category': 'Electronics',
-      'condition': 'Used',
-      'date': '27 Jul 2026',
-      'status': 'Completed',
-      'statusColor': 'green',
-      'pickupDate': '29 Jul 2026',
-      'location': 'Ahmedabad, Gujarat',
-      'image':
-          'https://images.unsplash.com/photo-1589003077984-894e133dabab?auto=format&fit=crop&w=700&q=80',
-      'rewardStatus': 'Not Eligible',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadDonations();
+  }
 
-  List<Map<String, dynamic>> get _filteredDonations {
-    if (_selectedFilter == 'All') {
-      return _donations;
+  Future<void> _loadDonations() async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
     }
 
-    return _donations.where((donation) {
-      final status = donation['status'].toString();
+    try {
+      final results = await Future.wait<dynamic>([
+        EcoLoopApi.instance.get('/donations'),
+        EcoLoopApi.instance.get('/categories'),
+      ]);
+      final response = results[0];
+      final categoryResponse = results[1];
+      final categoryRows = categoryResponse is List
+          ? categoryResponse
+          : categoryResponse is Map && categoryResponse['categories'] is List
+              ? categoryResponse['categories'] as List
+              : <dynamic>[];
+      final categoryNames = <String, String>{};
+      for (final row in categoryRows.whereType<Map>()) {
+        if (row['categoryId'] != null && row['name'] != null) {
+          categoryNames[row['categoryId'].toString()] = row['name'].toString();
+        }
+      }
+      final List<dynamic> rows;
 
-      if (_selectedFilter == 'Active') {
-        return status == 'Pickup Scheduled';
+      if (response is List) {
+        rows = response;
+      } else if (response is Map && response['donations'] is List) {
+        rows = response['donations'] as List;
+      } else if (response is Map && response['data'] is List) {
+        rows = response['data'] as List;
+      } else {
+        throw Exception('The server returned an unexpected donations response.');
       }
 
-      if (_selectedFilter == 'Completed') {
-        return status == 'Completed' || status == 'Collected';
-      }
+      final parsed = rows
+          .whereType<Map>()
+          .map((row) => _normalizeDonation(Map<String, dynamic>.from(row), categoryNames))
+          .toList();
 
-      return true;
-    }).toList();
+      if (!mounted) return;
+      setState(() {
+        _donations = parsed;
+        _categoryNames = categoryNames;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
+    }
   }
+
+  Map<String, dynamic> _normalizeDonation(Map<String, dynamic> raw, [Map<String, String> categoryNames = const {}]) {
+    final images = raw['imageUrls'];
+    String image = '';
+    if (images is List && images.isNotEmpty) {
+      image = images.first.toString();
+    } else if (raw['image'] != null) {
+      image = raw['image'].toString();
+    }
+
+    final createdAt = raw['createdAt']?.toString() ?? '';
+    return {
+      ...raw,
+      'id': raw['donationId']?.toString() ?? raw['id']?.toString() ?? '',
+      'item': raw['title']?.toString() ?? raw['item']?.toString() ?? 'Donated Item',
+      'category': raw['category']?.toString() ?? raw['categoryName']?.toString() ?? categoryNames[raw['categoryId']?.toString()] ?? (raw['categoryId'] == null ? 'Category unavailable' : 'Category ${raw['categoryId']}'),
+      'condition': _prettyCondition(raw['condition']?.toString() ?? 'used'),
+      'date': _displayDate(createdAt.isNotEmpty ? createdAt : raw['date']?.toString()),
+      'status': _prettyStatus(raw['status']?.toString() ?? 'pending'),
+      'pickupDate': raw['pickupDate']?.toString() ?? '',
+      'location': [
+        raw['city']?.toString(),
+        raw['state']?.toString(),
+      ].where((part) => part != null && part.trim().isNotEmpty).join(', '),
+      'address': raw['address']?.toString() ?? '',
+      'image': image,
+      'rewardStatus': raw['rewardStatus']?.toString() ?? _rewardStatusFor(raw['status']?.toString() ?? 'pending'),
+      'rewardPoints': raw['rewardPoints'] ?? 0,
+      'rewardCredited': raw['rewardCredited'] == true || '${raw['rewardCredited']}'.toLowerCase() == 'true',
+    };
+  }
+
+  String _rewardStatusFor(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+      case 'approved':
+      case 'completed':
+        return 'Accepted — check Rewards for credited points';
+      case 'rejected':
+        return 'Not eligible';
+      default:
+        return 'Pending acceptance';
+    }
+  }
+
+  String _prettyCondition(String value) {
+    return value
+        .replaceAll('_', ' ')
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+  }
+
+  String _prettyStatus(String value) {
+    switch (value.toLowerCase()) {
+      case 'pending':
+      case 'submitted':
+        return 'Pending';
+      case 'pickup_requested':
+      case 'requested':
+      case 'pickup scheduled':
+        return 'Pickup Scheduled';
+      case 'picked_up':
+      case 'collected':
+        return 'Collected';
+      case 'accepted':
+      case 'approved':
+        return 'Accepted';
+      case 'rejected':
+        return 'Rejected';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return _prettyCondition(value);
+    }
+  }
+
+  String _displayDate(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return 'Date unavailable';
+    final text = raw.trim();
+    final datePart = text.length >= 10 ? text.substring(0, 10) : text;
+    final parsed = DateTime.tryParse(datePart);
+    if (parsed == null) return raw;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${parsed.day} ${months[parsed.month - 1]} ${parsed.year}';
+  }
+
+  List<Map<String, dynamic>> get _filteredDonations {
+    if (_selectedFilter == 'All') return _donations;
+    if (_selectedFilter == 'Active') {
+      return _donations.where((d) {
+        final s = d['status'].toString().toLowerCase();
+        return s == 'pending' || s == 'pickup scheduled' || s == 'pickup requested';
+      }).toList();
+    }
+    if (_selectedFilter == 'Completed') {
+      return _donations.where((d) {
+        final s = d['status'].toString().toLowerCase();
+        return s == 'completed' || s == 'collected' || s == 'accepted' || s == 'approved';
+      }).toList();
+    }
+    return _donations;
+  }
+
+  int get _completedCount => _donations.where((d) {
+        final s = d['status'].toString().toLowerCase();
+        return s == 'completed' || s == 'collected' || s == 'accepted' || s == 'approved';
+      }).length;
 
   @override
   Widget build(BuildContext context) {
@@ -109,28 +214,40 @@ class _DonationHistoryState extends State<DonationHistory> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Refresh donations',
+            onPressed: _loadDonations,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
       ),
       body: Column(
         children: [
           _buildHeaderSummary(),
           _buildFilters(),
           Expanded(
-            child: _filteredDonations.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 25),
-                    itemCount: _filteredDonations.length,
-                    itemBuilder: (context, index) {
-                      return _buildDonationCard(_filteredDonations[index]);
-                    },
-                  ),
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? _buildErrorState()
+                    : _filteredDonations.isEmpty
+                        ? _buildEmptyState()
+                        : RefreshIndicator(
+                            onRefresh: _loadDonations,
+                            child: ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 25),
+                              itemCount: _filteredDonations.length,
+                              itemBuilder: (context, index) =>
+                                  _buildDonationCard(_filteredDonations[index]),
+                            ),
+                          ),
           ),
         ],
       ),
     );
   }
-
-  // SUMMARY
 
   Widget _buildHeaderSummary() {
     return Container(
@@ -143,27 +260,11 @@ class _DonationHistoryState extends State<DonationHistory> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: _summaryItem(
-              Icons.volunteer_activism_outlined,
-              'Donated',
-              '${_donations.length}',
-            ),
-          ),
-          Container(
-            height: 42,
-            width: 1,
-            color: Colors.white.withOpacity(0.25),
-          ),
-          Expanded(child: _summaryItem(Icons.eco_outlined, 'Impact', 'High')),
-          Container(
-            height: 42,
-            width: 1,
-            color: Colors.white.withOpacity(0.25),
-          ),
-          Expanded(
-            child: _summaryItem(Icons.card_giftcard_outlined, 'Rewards', '2'),
-          ),
+          Expanded(child: _summaryItem(Icons.volunteer_activism_outlined, 'Donated', '${_donations.length}')),
+          Container(height: 42, width: 1, color: Colors.white.withOpacity(0.25)),
+          Expanded(child: _summaryItem(Icons.check_circle_outline, 'Completed', '$_completedCount')),
+          Container(height: 42, width: 1, color: Colors.white.withOpacity(0.25)),
+          Expanded(child: _summaryItem(Icons.eco_outlined, 'Impact', _donations.isEmpty ? '—' : 'Active')),
         ],
       ),
     );
@@ -174,28 +275,15 @@ class _DonationHistoryState extends State<DonationHistory> {
       children: [
         Icon(icon, size: 20, color: Colors.white),
         const SizedBox(height: 6),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-          ),
-        ),
+        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
         const SizedBox(height: 2),
-        Text(
-          title,
-          style: TextStyle(fontSize: 9, color: Colors.white.withOpacity(0.8)),
-        ),
+        Text(title, style: TextStyle(fontSize: 9, color: Colors.white.withOpacity(0.8))),
       ],
     );
   }
 
-  // FILTERS
-
   Widget _buildFilters() {
     const filters = ['All', 'Active', 'Completed'];
-
     return SizedBox(
       height: 48,
       child: ListView.separated(
@@ -206,15 +294,10 @@ class _DonationHistoryState extends State<DonationHistory> {
         itemBuilder: (context, index) {
           final filter = filters[index];
           final selected = _selectedFilter == filter;
-
           return ChoiceChip(
             label: Text(filter),
             selected: selected,
-            onSelected: (_) {
-              setState(() {
-                _selectedFilter = filter;
-              });
-            },
+            onSelected: (_) => setState(() => _selectedFilter = filter),
             selectedColor: AppColors.primary,
             backgroundColor: AppColors.surface,
             labelStyle: TextStyle(
@@ -223,9 +306,7 @@ class _DonationHistoryState extends State<DonationHistory> {
               color: selected ? Colors.white : AppColors.textSecondary,
             ),
             side: BorderSide(
-              color: selected
-                  ? AppColors.primary
-                  : AppColors.accent.withOpacity(0.6),
+              color: selected ? AppColors.primary : AppColors.accent.withOpacity(0.6),
             ),
           );
         },
@@ -233,19 +314,17 @@ class _DonationHistoryState extends State<DonationHistory> {
     );
   }
 
-  // DONATION CARD
-
   Widget _buildDonationCard(Map<String, dynamic> donation) {
     final status = donation['status'].toString();
+    final image = donation['image'].toString();
 
     return InkWell(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        await Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => DonationDetails(donation: donation),
-          ),
+          MaterialPageRoute(builder: (_) => DonationDetails(donation: donation)),
         );
+        if (mounted) _loadDonations();
       },
       borderRadius: BorderRadius.circular(17),
       child: Container(
@@ -260,27 +339,17 @@ class _DonationHistoryState extends State<DonationHistory> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(13),
-              child: Image.network(
-                donation['image'].toString(),
-                height: 82,
-                width: 82,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) {
-                  return Container(
-                    height: 82,
-                    width: 82,
-                    color: AppColors.light,
-                    child: const Icon(
-                      Icons.volunteer_activism_outlined,
-                      color: AppColors.primary,
-                    ),
-                  );
-                },
-              ),
+              child: image.startsWith('http')
+                  ? Image.network(
+                      image,
+                      height: 82,
+                      width: 82,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                    )
+                  : _imagePlaceholder(),
             ),
-
             const SizedBox(width: 13),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -299,36 +368,31 @@ class _DonationHistoryState extends State<DonationHistory> {
                           ),
                         ),
                       ),
-                      const Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 12,
-                        color: AppColors.textSecondary,
-                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.textSecondary),
                     ],
                   ),
-
                   const SizedBox(height: 5),
-
                   Text(
                     '${donation['category']} • ${donation['condition']}',
+                    style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 7),
+                  _buildStatusBadge(status),
+                  const SizedBox(height: 5),
+                  Text(
+                    'Reward: ${donation['rewardStatus'] ?? 'Pending acceptance'}'
+                    '${(int.tryParse('${donation['rewardPoints'] ?? 0}') ?? 0) > 0 ? ' • ${donation['rewardPoints']} points' : ''}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 10,
                       color: AppColors.textSecondary,
                     ),
                   ),
-
-                  const SizedBox(height: 7),
-
-                  _buildStatusBadge(status),
-
-                  const SizedBox(height: 6),
-
+                  const SizedBox(height: 5),
                   Text(
-                    donation['date'].toString(),
-                    style: const TextStyle(
-                      fontSize: 9.5,
-                      color: AppColors.textSecondary,
-                    ),
+                    '${donation['date']} · ID ${donation['id']}',
+                    style: const TextStyle(fontSize: 9.5, color: AppColors.textSecondary),
                   ),
                 ],
               ),
@@ -339,11 +403,15 @@ class _DonationHistoryState extends State<DonationHistory> {
     );
   }
 
-  // STATUS
+  Widget _imagePlaceholder() => Container(
+        height: 82,
+        width: 82,
+        color: AppColors.light,
+        child: const Icon(Icons.volunteer_activism_outlined, color: AppColors.primary),
+      );
 
   Widget _buildStatusBadge(String status) {
-    final bool active = status == 'Pickup Scheduled';
-
+    final active = status == 'Pickup Scheduled' || status == 'Pending';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
@@ -354,9 +422,7 @@ class _DonationHistoryState extends State<DonationHistory> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            active
-                ? Icons.schedule_rounded
-                : Icons.check_circle_outline_rounded,
+            active ? Icons.schedule_rounded : Icons.check_circle_outline_rounded,
             size: 12,
             color: active ? Colors.orange.shade700 : AppColors.success,
           ),
@@ -374,7 +440,29 @@ class _DonationHistoryState extends State<DonationHistory> {
     );
   }
 
-  // EMPTY
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off_outlined, size: 48, color: AppColors.textSecondary),
+            const SizedBox(height: 12),
+            const Text('Could not load donation history', style: TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text(_error!, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadDonations,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildEmptyState() {
     return Center(
@@ -386,39 +474,19 @@ class _DonationHistoryState extends State<DonationHistory> {
             Container(
               height: 88,
               width: 88,
-              decoration: const BoxDecoration(
-                color: AppColors.light,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.volunteer_activism_outlined,
-                size: 42,
-                color: AppColors.primary,
-              ),
+              decoration: const BoxDecoration(color: AppColors.light, shape: BoxShape.circle),
+              child: const Icon(Icons.volunteer_activism_outlined, size: 42, color: AppColors.primary),
             ),
-
             const SizedBox(height: 18),
-
             const Text(
               'No donations found',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
             ),
-
             const SizedBox(height: 8),
-
             const Text(
-              'Your donated items and pickup history\n'
-              'will appear here.',
+              'Your submitted donations and pickup updates from EcoLoop will appear here.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.5,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -426,3 +494,4 @@ class _DonationHistoryState extends State<DonationHistory> {
     );
   }
 }
+

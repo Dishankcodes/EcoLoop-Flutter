@@ -830,6 +830,13 @@ class _SellerProfileState extends State<SellerProfile> {
       context,
       MaterialPageRoute(
         builder: (_) => SellerReviews(
+          sellerId:
+              (widget.seller['userId'] ??
+                      widget.seller['id'] ??
+                      widget.seller['sellerId'] ??
+                      '')
+                  .toString(),
+          sellerType: sellerType,
           sellerName: sellerName,
           sellerImage: sellerImage,
           sellerLocation: location,

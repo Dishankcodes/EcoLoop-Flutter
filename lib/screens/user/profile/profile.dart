@@ -34,11 +34,15 @@ class _ProfileState extends State<Profile> {
   Map<String, dynamic>? _account;
   bool _loadingProfile = true;
   String? _profileError;
+  int _orderCount = 0;
+  int _listingCount = 0;
+  int _wishlistCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _loadProfileCounts();
   }
 
   Future<void> _loadProfile() async {
@@ -58,6 +62,41 @@ class _ProfileState extends State<Profile> {
         _loadingProfile = false;
         _profileError = error.toString();
       });
+    }
+  }
+
+  List<Map<String, dynamic>> _countRows(dynamic value) {
+    if (value is List) return value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    if (value is Map) {
+      final data = value['data'];
+      if (data is List) return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      for (final key in ['orders', 'products', 'items', 'results', 'wishlist']) {
+        final rows = value[key] ?? (data is Map ? data[key] : null);
+        if (rows is List) return rows.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      }
+    }
+    return [];
+  }
+
+  Future<void> _loadProfileCounts() async {
+    final api = EcoLoopApi.instance;
+    try {
+      final results = await Future.wait([
+        api.get('/orders'),
+        api.get('/my/products'),
+        api.get('/wishlist'),
+      ]);
+      if (!mounted) return;
+      final orders = _countRows(results[0]);
+      final listings = _countRows(results[1]);
+      final wishlist = _countRows(results[2]);
+      setState(() {
+        _orderCount = orders.length;
+        _listingCount = listings.where((p) => !['deleted', 'removed'].contains((p['status'] ?? '').toString().toLowerCase())).length;
+        _wishlistCount = wishlist.length;
+      });
+    } catch (_) {
+      // Keep last known counts; retry when the profile is reopened/refreshed.
     }
   }
 
@@ -243,7 +282,7 @@ class _ProfileState extends State<Profile> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const EditProfile()),
-                ).then((_) => _loadProfile());
+                ).then((_) { _loadProfile(); _loadProfileCounts(); });
               },
               icon: const Icon(Icons.edit_outlined, size: 17),
               label: const Text(
@@ -273,7 +312,7 @@ class _ProfileState extends State<Profile> {
         Expanded(
           child: _QuickStatCard(
             icon: Icons.shopping_bag_outlined,
-            value: '0',
+            value: _orderCount.toString(),
             label: 'Orders',
             onTap: () {
               Navigator.push(
@@ -289,7 +328,7 @@ class _ProfileState extends State<Profile> {
         Expanded(
           child: _QuickStatCard(
             icon: Icons.inventory_2_outlined,
-            value: '0',
+            value: _listingCount.toString(),
             label: 'Listings',
             onTap: () {
               Navigator.push(
@@ -305,7 +344,7 @@ class _ProfileState extends State<Profile> {
         Expanded(
           child: _QuickStatCard(
             icon: Icons.favorite_border_rounded,
-            value: '0',
+            value: _wishlistCount.toString(),
             label: 'Wishlist',
             onTap: () {
               Navigator.push(

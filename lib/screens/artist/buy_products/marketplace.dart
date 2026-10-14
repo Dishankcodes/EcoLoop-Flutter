@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import '../../../services/ecoloop_api.dart';
@@ -59,26 +57,10 @@ class _MarketplaceState extends State<Marketplace> {
       final data = await EcoLoopApi.instance.get('/products');
       final rows = (data is List ? data : <dynamic>[]).whereType<Map>().map((raw) {
         final p = Map<String, dynamic>.from(raw);
-        dynamic rawImages = p['imageUrls'] ?? p['images'] ?? p['imageUrl'] ?? p['image'];
-        if (rawImages is String && rawImages.trim().isNotEmpty) {
-          try {
-            final decoded = jsonDecode(rawImages);
-            rawImages = decoded is List ? decoded : <dynamic>[rawImages];
-          } catch (_) {
-            rawImages = rawImages.split(RegExp(r',(?=https?://)'));
-          }
-        }
-        final images = rawImages is List ? List<dynamic>.from(rawImages) : <dynamic>[];
-        final normalizedImages = images.map((value) {
-          final url = value.toString().trim();
-          final id = RegExp(r'(?:/file/d/|[?&]id=)([A-Za-z0-9_-]+)').firstMatch(url)?.group(1);
-          return id != null && url.contains('drive.google.com')
-              ? 'https://drive.google.com/uc?export=view&id=$id'
-              : url;
-        }).where((url) => url.startsWith('https://') || url.startsWith('http://')).toList();
+        final images = (p['imageUrls'] is List) ? List<dynamic>.from(p['imageUrls']) : <dynamic>[];
         final category = (p['categoryName'] ?? p['category'] ?? 'Other').toString();
         final location = [p['city'], p['state']].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
-        return <String, dynamic>{...p, 'category': category, 'seller': (p['sellerName'] ?? 'EcoLoop seller').toString(), 'location': location.isEmpty ? 'Location not provided' : location, 'imageUrls': normalizedImages, 'image': normalizedImages.isNotEmpty ? normalizedImages.first.toString() : '', 'availableQuantity': p['availableQuantity'] ?? 0};
+        return <String, dynamic>{...p, 'category': category, 'seller': (p['sellerName'] ?? 'EcoLoop seller').toString(), 'location': location.isEmpty ? 'Location not provided' : location, 'imageUrls': images, 'image': images.isNotEmpty ? images.first.toString() : '', 'availableQuantity': p['availableQuantity'] ?? 0};
       }).toList();
       if (!mounted) return;
       setState(() { products..clear()..addAll(rows); _loadingProducts = false; _loadError = null; });

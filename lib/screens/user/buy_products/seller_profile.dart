@@ -21,6 +21,9 @@ class _SellerProfileState extends State<SellerProfile> {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _listings = [];
+  List<Map<String, dynamic>> _reviews = [];
+  Map<String, dynamic>? _reviewEligibility;
+  bool _loadingReviews = false;
 
   Map<String, dynamic> _map(dynamic v) {
     if (v is Map<String, dynamic>) return v;
@@ -32,7 +35,7 @@ class _SellerProfileState extends State<SellerProfile> {
     if (v is List) return v.map(_map).where((e) => e.isNotEmpty).toList();
     final m = _map(v);
     final data = _map(m['data']);
-    for (final k in ['products', 'items', 'results']) {
+    for (final k in ['products', 'items', 'results', 'reviews']) {
       final x = m[k] ?? data[k];
       if (x is List) return x.map(_map).where((e) => e.isNotEmpty).toList();
     }
@@ -116,10 +119,146 @@ class _SellerProfileState extends State<SellerProfile> {
     }
   }
 
+  Future<void> _loadSellerReviews() async {
+    final id = _id(widget.seller['userId'] ?? widget.seller['id'] ?? widget.seller['sellerId']);
+    if (id.isEmpty) return;
+    if (mounted) setState(() => _loadingReviews = true);
+    try {
+      final data = await _api.get('/sellers/user/$id/reviews');
+      final rows = _rows(data);
+      if (mounted) setState(() => _reviews = rows);
+    } catch (_) {
+      if (mounted) setState(() => _reviews = []);
+    } finally {
+      if (mounted) setState(() => _loadingReviews = false);
+    }
+  }
+
+  Future<void> _loadSellerReviewEligibility() async {
+    final id = _id(widget.seller['userId'] ?? widget.seller['id'] ?? widget.seller['sellerId']);
+    if (id.isEmpty) return;
+    try {
+      final data = await _api.get('/sellers/user/$id/review-eligibility');
+      if (mounted) setState(() => _reviewEligibility = data is Map ? Map<String, dynamic>.from(data) : null);
+    } catch (_) {
+      if (mounted) setState(() => _reviewEligibility = {'eligible': false});
+    }
+  }
+
+  Future<void> _giveSellerReview() async {
+    final eligibility = _reviewEligibility;
+    if (eligibility?['eligible'] != true || eligibility?['orderId'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('You can review this seller after you purchase and receive an item from them.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    final commentController = TextEditingController();
+    int rating = 0;
+    final formKey = GlobalKey<FormState>();
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Review this seller'),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Text('Only verified buyers can leave a seller review.'),
+                const SizedBox(height: 10),
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (i) => IconButton(
+                  onPressed: () => setDialogState(() => rating = i + 1),
+                  icon: Icon(i < rating ? Icons.star_rounded : Icons.star_outline_rounded, color: AppColors.primary, size: 30),
+                ))),
+                TextFormField(
+                  controller: commentController,
+                  minLines: 3,
+                  maxLines: 5,
+                  maxLength: 500,
+                  decoration: const InputDecoration(labelText: 'Your experience', border: OutlineInputBorder()),
+                  validator: (value) => (value ?? '').trim().length < 5 ? 'Write at least 5 characters.' : null,
+                ),
+                if (rating == 0) const Text('Select a star rating', style: TextStyle(color: Colors.red, fontSize: 12)),
+              ]),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                if (rating == 0 || !(formKey.currentState?.validate() ?? false)) {
+                  setDialogState(() {});
+                  return;
+                }
+                Navigator.pop(dialogContext, {'rating': rating, 'comment': commentController.text.trim()});
+              },
+              child: const Text('Submit review'),
+            ),
+          ],
+        ),
+      ),
+    );
+    commentController.dispose();
+    if (result == null) return;
+    try {
+      await _api.post('/reviews/seller', {
+        'sellerId': int.tryParse(_id(widget.seller['userId'] ?? widget.seller['id'] ?? widget.seller['sellerId'])) ?? 0,
+        'sellerType': 'user',
+        'orderId': int.tryParse(eligibility!['orderId'].toString()) ?? eligibility['orderId'],
+        'rating': result['rating'],
+        'comment': result['comment'],
+      });
+      await _loadSellerReviews();
+      await _loadSellerReviewEligibility();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Seller review submitted.'), behavior: SnackBarBehavior.floating));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not submit review: $e'), behavior: SnackBarBehavior.floating));
+    }
+  }
+
+  Widget _buildSellerReviews() {
+    final avg = _reviews.isEmpty ? 0.0 : _reviews.fold<double>(0, (sum, r) => sum + (num.tryParse((r['rating'] ?? 0).toString())?.toDouble() ?? 0)) / _reviews.length;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(child: Text('Seller reviews', style: AppTextStyles.title.copyWith(fontSize: 18))),
+        if (_reviews.isNotEmpty) Text('${avg.toStringAsFixed(1)} ★ (${_reviews.length})', style: AppTextStyles.caption),
+      ]),
+      const SizedBox(height: 10),
+      SizedBox(width: double.infinity, child: OutlinedButton.icon(
+        onPressed: _reviewEligibility?['eligible'] == true ? _giveSellerReview : null,
+        icon: const Icon(Icons.rate_review_outlined),
+        label: Text(_reviewEligibility?['eligible'] == true ? 'Give a review' : 'Give a review after purchase'),
+      )),
+      const SizedBox(height: 10),
+      if (_loadingReviews) const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
+      else if (_reviews.isEmpty) Text('No verified seller reviews yet.', style: AppTextStyles.caption)
+      else ..._reviews.take(5).map((r) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 9),
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.accent.withOpacity(.35))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: Text((r['reviewerName'] ?? r['userName'] ?? r['name'] ?? 'EcoLoop buyer').toString(), style: const TextStyle(fontWeight: FontWeight.w700))),
+            Text('★ ${r['rating'] ?? '—'}', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+          ]),
+          const SizedBox(height: 5),
+          Text((r['comment'] ?? '').toString()),
+          const SizedBox(height: 4),
+          Text((r['createdAt'] ?? '').toString(), style: AppTextStyles.caption),
+        ]),
+      )),
+    ]);
+  }
+
   @override
   void initState() {
     super.initState();
     _loadListings();
+    _loadSellerReviews();
+    _loadSellerReviewEligibility();
   }
 
   @override
@@ -210,6 +349,8 @@ class _SellerProfileState extends State<SellerProfile> {
                 ],
               ),
             ),
+            const SizedBox(height: 22),
+            _buildSellerReviews(),
             const SizedBox(height: 22),
             Text(
               'Published listings',

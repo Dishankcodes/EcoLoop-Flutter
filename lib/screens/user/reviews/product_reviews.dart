@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
+
 import '../../../app_theme/user/app_colors.dart';
 import '../../../services/ecoloop_api.dart';
 import 'rating_summary.dart';
 import 'write_review.dart';
 
+/// Displays reviews loaded from the EcoLoop backend for a product.
 class ProductReviews extends StatefulWidget {
   final Map<String, dynamic> product;
-  /// Required for submitting a review; must be the delivered order containing this product.
+
+  /// The delivered order containing this product, when the current user is eligible to review.
   final String? orderId;
+
   const ProductReviews({super.key, required this.product, this.orderId});
+
   @override
   State<ProductReviews> createState() => _ProductReviewsState();
 }
@@ -16,122 +21,395 @@ class ProductReviews extends StatefulWidget {
 class _ProductReviewsState extends State<ProductReviews> {
   bool _loading = true;
   String? _error;
-  List<Map<String, dynamic>> _reviews = [];
+  List<Map<String, dynamic>> _reviews = <Map<String, dynamic>>[];
   String _filter = 'All';
   String _sort = 'Newest';
 
-  int _int(dynamic v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
-  double _double(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
-  String get _id => '${widget.product['productId'] ?? widget.product['id'] ?? ''}';
-  String get _title => '${widget.product['title'] ?? widget.product['name'] ?? 'Product'}';
-  String get _image {
-    final images = widget.product['imageUrls'] ?? widget.product['images'];
-    if (images is List && images.isNotEmpty) return '${images.first}';
-    return '${widget.product['imageUrl'] ?? widget.product['image'] ?? ''}';
+  final EcoLoopApi _api = EcoLoopApi.instance;
+
+  int _int(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse((value ?? '').toString()) ?? 0;
   }
-  double get _average => _reviews.isEmpty ? 0 : _reviews.fold<double>(0, (sum, r) => sum + _double(r['rating'])) / _reviews.length;
-  Map<int, int> get _counts => {for (var n = 1; n <= 5; n++) n: _reviews.where((r) => _int(r['rating']) == n).length};
+
+  double _double(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse((value ?? '').toString()) ?? 0.0;
+  }
+
+  String get _id =>
+      (widget.product['productId'] ??
+              widget.product['product_id'] ??
+              widget.product['id'] ??
+              '')
+          .toString()
+          .trim();
+
+  String get _title =>
+      (widget.product['title'] ?? widget.product['name'] ?? 'Product')
+          .toString();
+
+  String get _image {
+    final dynamic images =
+        widget.product['imageUrls'] ?? widget.product['images'];
+    if (images is List && images.isNotEmpty) {
+      final first = images.first.toString().trim();
+      if (first.isNotEmpty) return first;
+    }
+    return (widget.product['imageUrl'] ?? widget.product['image'] ?? '')
+        .toString()
+        .trim();
+  }
+
+  double get _average {
+    if (_reviews.isEmpty) return 0.0;
+    final total = _reviews.fold<double>(
+      0.0,
+      (sum, review) => sum + _double(review['rating']),
+    );
+    return total / _reviews.length;
+  }
+
+  Map<int, int> get _counts => <int, int>{
+    for (var star = 1; star <= 5; star++)
+      star: _reviews.where((review) => _int(review['rating']) == star).length,
+  };
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
     try {
-      if (_id.isEmpty) throw Exception('This product has no valid product ID.');
-      final data = await EcoLoopApi.instance.get('/products/$_id/reviews');
-      final rows = data is List ? data : (data is Map && data['reviews'] is List ? data['reviews'] as List : <dynamic>[]);
+      if (_id.isEmpty) {
+        throw Exception('This product has no valid product ID.');
+      }
+
+      final dynamic response = await _api.get('/products/$_id/reviews');
+      dynamic rows;
+
+      if (response is List) {
+        rows = response;
+      } else if (response is Map) {
+        final data = response['data'];
+        if (response['reviews'] is List) {
+          rows = response['reviews'];
+        } else if (data is List) {
+          rows = data;
+        } else if (data is Map && data['reviews'] is List) {
+          rows = data['reviews'];
+        } else if (response['items'] is List) {
+          rows = response['items'];
+        } else if (response['results'] is List) {
+          rows = response['results'];
+        }
+      }
+
+      final parsedReviews = rows is List
+          ? rows
+                .whereType<Map>()
+                .map((row) => Map<String, dynamic>.from(row))
+                .toList()
+          : <Map<String, dynamic>>[];
+
       if (!mounted) return;
-      setState(() { _reviews = rows.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); _loading = false; });
-    } catch (e) {
+      setState(() {
+        _reviews = parsedReviews;
+        _loading = false;
+      });
+    } catch (error) {
       if (!mounted) return;
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
     }
   }
 
-  List<Map<String, dynamic>> get _visible {
+  List<Map<String, dynamic>> get _visibleReviews {
     var rows = List<Map<String, dynamic>>.from(_reviews);
-    if (_filter != 'All') {
-      if (_filter == 'With Photos') {
-        rows = rows.where((r) => (r['photos'] is List && (r['photos'] as List).isNotEmpty)).toList();
-      } else {
-        final star = int.tryParse(_filter[0]) ?? 0;
-        rows = rows.where((r) => _int(r['rating']) == star).toList();
-      }
+
+    if (_filter == 'With Photos') {
+      rows = rows.where((review) {
+        final photos = review['photos'] ?? review['images'];
+        return photos is List && photos.isNotEmpty;
+      }).toList();
+    } else if (_filter != 'All') {
+      final star = int.tryParse(_filter.split(' ').first) ?? 0;
+      rows = rows.where((review) => _int(review['rating']) == star).toList();
     }
-    rows.sort((a,b) {
-      final ad = DateTime.tryParse('${a['createdAt'] ?? ''}') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bd = DateTime.tryParse('${b['createdAt'] ?? ''}') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      if (_sort == 'Highest Rating') return _int(b['rating']).compareTo(_int(a['rating']));
-      if (_sort == 'Lowest Rating') return _int(a['rating']).compareTo(_int(b['rating']));
-      return bd.compareTo(ad);
+
+    rows.sort((a, b) {
+      if (_sort == 'Highest Rating') {
+        return _int(b['rating']).compareTo(_int(a['rating']));
+      }
+      if (_sort == 'Lowest Rating') {
+        return _int(a['rating']).compareTo(_int(b['rating']));
+      }
+
+      final dateA =
+          DateTime.tryParse(
+            (a['createdAt'] ?? a['created_at'] ?? '').toString(),
+          ) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final dateB =
+          DateTime.tryParse(
+            (b['createdAt'] ?? b['created_at'] ?? '').toString(),
+          ) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return dateB.compareTo(dateA);
     });
+
     return rows;
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
-    appBar: AppBar(title: const Text('Product Reviews'), backgroundColor: AppColors.surface, foregroundColor: AppColors.textPrimary, elevation: 0),
-    body: RefreshIndicator(onRefresh: _load, child: ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      children: [
-        _productCard(),
-        const SizedBox(height: 14),
-        RatingSummary(rating: _average, totalReviews: _reviews.length, ratingCounts: _counts),
-        const SizedBox(height: 14),
-        SizedBox(width: double.infinity, child: OutlinedButton.icon(
-          onPressed: widget.orderId == null || widget.orderId!.isEmpty ? null : () async {
-            final result = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => WriteReview(product: widget.product, orderId: widget.orderId!)));
-            if (result == true) _load();
-          },
-          icon: const Icon(Icons.rate_review_outlined), label: const Text('Write a review'),
-        )),
-        const SizedBox(height: 12),
-        Wrap(spacing: 8, children: ['All','5 Star','4 Star','3 Star','2 Star','1 Star'].map((f) => ChoiceChip(label: Text(f), selected: _filter == f, onSelected: (_) => setState(() => _filter = f))).toList()),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: _sort,
-          decoration: const InputDecoration(labelText: 'Sort reviews', border: OutlineInputBorder()),
-          items: const [DropdownMenuItem(value:'Newest',child:Text('Newest')),DropdownMenuItem(value:'Highest Rating',child:Text('Highest Rating')),DropdownMenuItem(value:'Lowest Rating',child:Text('Lowest Rating'))],
-          onChanged: (v) { if (v != null) setState(() => _sort = v); },
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Product Reviews'),
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+      ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
+            _productCard(),
+            const SizedBox(height: 14),
+            RatingSummary(
+              rating: _average,
+              totalReviews: _reviews.length,
+              ratingCounts: _counts,
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: widget.orderId == null || widget.orderId!.isEmpty
+                    ? null
+                    : _openWriteReview,
+                icon: const Icon(Icons.rate_review_outlined),
+                label: const Text('Write a review'),
+              ),
+            ),
+            if (widget.orderId == null || widget.orderId!.isEmpty) ...[
+              const SizedBox(height: 4),
+              const Text(
+                'A review can be submitted only for an eligible purchase.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children:
+                  <String>[
+                    'All',
+                    '5 Star',
+                    '4 Star',
+                    '3 Star',
+                    '2 Star',
+                    '1 Star',
+                    'With Photos',
+                  ].map((filter) {
+                    return ChoiceChip(
+                      label: Text(filter),
+                      selected: _filter == filter,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _filter = filter);
+                      },
+                    );
+                  }).toList(),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _sort,
+              decoration: const InputDecoration(
+                labelText: 'Sort reviews',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'Newest', child: Text('Newest')),
+                DropdownMenuItem(
+                  value: 'Highest Rating',
+                  child: Text('Highest Rating'),
+                ),
+                DropdownMenuItem(
+                  value: 'Lowest Rating',
+                  child: Text('Lowest Rating'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null) setState(() => _sort = value);
+              },
+            ),
+            const SizedBox(height: 12),
+            if (_loading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(28),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (_error != null)
+              _message(_error!, action: _load)
+            else if (_visibleReviews.isEmpty)
+              _message('No reviews have been submitted for this product yet.')
+            else
+              ..._visibleReviews.map(_reviewCard),
+          ],
         ),
-        const SizedBox(height: 12),
-        if (_loading) const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()))
-        else if (_error != null) _message(_error!, action: _load)
-        else if (_visible.isEmpty) _message('No reviews have been submitted for this product yet.')
-        else ..._visible.map(_reviewCard),
-      ],
-    )),
-  );
+      ),
+    );
+  }
 
-  Widget _productCard() => Container(
-    padding: const EdgeInsets.all(13),
-    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
-    child: Row(children: [
-      ClipRRect(borderRadius: BorderRadius.circular(10), child: SizedBox(width: 68, height: 68, child: _image.isEmpty
-        ? const ColoredBox(color: AppColors.light, child: Icon(Icons.image_outlined))
-        : Image.network(_image, fit: BoxFit.cover, errorBuilder: (_,__,___) => const ColoredBox(color: AppColors.light, child: Icon(Icons.image_not_supported_outlined))))),
-      const SizedBox(width: 12),
-      Expanded(child: Text(_title, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-    ]),
-  );
+  Future<void> _openWriteReview() async {
+    final orderId = widget.orderId;
+    if (orderId == null || orderId.trim().isEmpty) return;
 
-  Widget _reviewCard(Map<String,dynamic> r) => Container(
-    margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(15)),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [Expanded(child: Text('${r['reviewerName'] ?? r['name'] ?? 'EcoLoop user'}', style: const TextStyle(fontWeight: FontWeight.w700))), Text('${_int(r['rating'])} ★', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700))]),
-      const SizedBox(height: 5),
-      Text('${r['createdAt'] ?? ''}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-      const SizedBox(height: 8),
-      Text('${r['comment'] ?? ''}'),
-    ]),
-  );
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(
+        builder: (_) => WriteReview(product: widget.product, orderId: orderId),
+      ),
+    );
 
-  Widget _message(String text, {Future<void> Function()? action}) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 28),
-    child: Column(children: [const Icon(Icons.rate_review_outlined, size: 34, color: AppColors.textSecondary), const SizedBox(height: 8), Text(text, textAlign: TextAlign.center), if (action != null) TextButton(onPressed: action, child: const Text('Try again'))]),
-  );
+    if (result == true && mounted) {
+      await _load();
+    }
+  }
+
+  Widget _productCard() {
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: SizedBox(
+              width: 68,
+              height: 68,
+              child: _image.isEmpty
+                  ? const ColoredBox(
+                      color: AppColors.light,
+                      child: Icon(Icons.image_outlined),
+                    )
+                  : Image.network(
+                      _image,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const ColoredBox(
+                            color: AppColors.light,
+                            child: Icon(Icons.image_not_supported_outlined),
+                          ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reviewCard(Map<String, dynamic> review) {
+    final rating = _int(review['rating']).clamp(0, 5);
+    final reviewerName =
+        (review['reviewerName'] ??
+                review['userName'] ??
+                review['name'] ??
+                'EcoLoop user')
+            .toString();
+    final date = (review['createdAt'] ?? review['created_at'] ?? '').toString();
+    final comment = (review['comment'] ?? review['review'] ?? '').toString();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  reviewerName,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              Text(
+                '$rating ★',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(
+            date,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          if (comment.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(comment),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _message(String message, {Future<void> Function()? action}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 28),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.rate_review_outlined,
+            size: 34,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(height: 8),
+          Text(message, textAlign: TextAlign.center),
+          if (action != null)
+            TextButton(onPressed: action, child: const Text('Try again')),
+        ],
+      ),
+    );
+  }
 }

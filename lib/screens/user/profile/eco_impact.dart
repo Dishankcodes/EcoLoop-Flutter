@@ -1,9 +1,11 @@
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 
 class EcoImpact extends StatefulWidget {
   const EcoImpact({super.key});
@@ -16,21 +18,20 @@ class _EcoImpactState extends State<EcoImpact> {
   bool _isLoading = false;
   bool _hasError = false;
 
-  // Note: Temporary values for testing UI before Google Apps Script integration.
-  int _itemsReused = 24;
-  int _itemsDonated = 8;
-  double _co2Saved = 42.6;
-  double _wasteDiverted = 18.4;
-  int _ecoPoints = 1250;
+  int _itemsReused = 0;
+  int _itemsDonated = 0;
+  double _co2Saved = 0;
+  double _wasteDiverted = 0;
+  int _ecoPoints = 0;
+  String? _loadError;
+  // The existing API returns aggregate totals only, not month-by-month history.
+  final List<_ImpactMonth> _monthlyImpact = [];
 
-  final List<_ImpactMonth> _monthlyImpact = const [
-    _ImpactMonth(label: 'Apr', value: 3),
-    _ImpactMonth(label: 'May', value: 5),
-    _ImpactMonth(label: 'Jun', value: 7),
-    _ImpactMonth(label: 'Jul', value: 8),
-    _ImpactMonth(label: 'Aug', value: 11),
-    _ImpactMonth(label: 'Sep', value: 14),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadImpact();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -341,26 +342,29 @@ class _EcoImpactState extends State<EcoImpact> {
             ],
           ),
           const SizedBox(height: 18),
-          SizedBox(
-            height: 190,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: _ImpactChartPainter(
-                data: _monthlyImpact,
-                primaryColor: AppColors.primary,
-                secondaryColor: AppColors.secondary,
-                gridColor: AppColors.accent.withOpacity(0.24),
-                textColor: AppColors.textSecondary,
+          if (_monthlyImpact.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
+              child: Text(
+                'Monthly history is not provided by the current backend. Your totals above are loaded from your EcoLoop account.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.caption.copyWith(height: 1.45),
+              ),
+            )
+          else
+            SizedBox(
+              height: 190,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _ImpactChartPainter(
+                  data: _monthlyImpact,
+                  primaryColor: AppColors.primary,
+                  secondaryColor: AppColors.secondary,
+                  gridColor: AppColors.accent.withOpacity(0.24),
+                  textColor: AppColors.textSecondary,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 5),
-          Center(
-            child: Text(
-              'Monthly activity',
-              style: AppTextStyles.caption.copyWith(fontSize: 10),
-            ),
-          ),
         ],
       ),
     );
@@ -572,7 +576,7 @@ class _EcoImpactState extends State<EcoImpact> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Something went wrong while loading your environmental impact.',
+          _loadError ?? 'Something went wrong while loading your environmental impact.',
           textAlign: TextAlign.center,
           style: AppTextStyles.body,
         ),
@@ -590,21 +594,77 @@ class _EcoImpactState extends State<EcoImpact> {
     );
   }
 
-  // Note: Backend endpoint integration will be hooked up using the API manager when ready.
   Future<void> _loadImpact() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _hasError = false;
+      _loadError = null;
     });
-
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-
-    if (!mounted) return;
-
-    setState(() {
-      _isLoading = false;
-    });
+    try {
+      final results = await Future.wait<dynamic>([
+        EcoLoopApi.instance.get('/eco-impact'),
+        EcoLoopApi.instance.get('/donations'),
+        EcoLoopApi.instance.get('/rewards'),
+      ]);
+      final response = results[0];
+      if (response is! Map) {
+        throw Exception('The backend returned an unexpected Eco Impact response.');
+      }
+      final data = Map<String, dynamic>.from(response);
+      final donationResponse = results[1];
+      final donationRows = donationResponse is List
+          ? donationResponse
+          : donationResponse is Map && donationResponse['donations'] is List
+              ? donationResponse['donations'] as List
+              : <dynamic>[];
+      final acceptedDonationIds = <String>{};
+      for (final row in donationRows.whereType<Map>()) {
+        final status = (row['status'] ?? '').toString().toLowerCase();
+        if (status == 'accepted' || status == 'approved' || status == 'completed') {
+          final id = (row['donationId'] ?? row['id'] ?? '').toString();
+          if (id.isNotEmpty) acceptedDonationIds.add(id);
+        }
+      }
+      final rewardResponse = results[2];
+      final transactions = rewardResponse is Map && rewardResponse['transactions'] is List
+          ? rewardResponse['transactions'] as List
+          : rewardResponse is List
+              ? rewardResponse
+              : <dynamic>[];
+      var acceptedPoints = 0;
+      for (final row in transactions.whereType<Map>()) {
+        final points = _asInt(row['points']);
+        final referenceType = (row['referenceType'] ?? '').toString().toLowerCase();
+        final referenceId = (row['referenceId'] ?? '').toString();
+        if (referenceType == 'donation' && !acceptedDonationIds.contains(referenceId)) continue;
+        acceptedPoints += points;
+      }
+      final reused = _asInt(data['itemsReused']);
+      final donated = acceptedDonationIds.length;
+      if (!mounted) return;
+      setState(() {
+        _itemsReused = reused;
+        _itemsDonated = donated;
+        // Keep the current Code.gs impact formula, but count only donations
+        // accepted in the sheet for the user-facing impact figures.
+        _co2Saved = (reused * 2.5) + (donated * 3.0);
+        _wasteDiverted = (reused * 1.5) + (donated * 2.0);
+        _ecoPoints = acceptedPoints;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _hasError = true;
+        _loadError = e.toString().replaceFirst('Exception: ', '');
+        _isLoading = false;
+      });
+    }
   }
+
+  int _asInt(dynamic value) => value is num ? value.toInt() : int.tryParse(value?.toString() ?? '') ?? 0;
+  double _asDouble(dynamic value) => value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '') ?? 0;
 
   String _formatNumber(double value) {
     if (value == value.roundToDouble()) {
@@ -1009,3 +1069,4 @@ class _ImpactChartPainter extends CustomPainter {
         oldDelegate.textColor != textColor;
   }
 }
+
