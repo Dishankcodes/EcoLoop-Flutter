@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../../services/ecoloop_api.dart';
@@ -263,36 +265,51 @@ class _MarketplaceState extends State<Marketplace> {
     return 'Other';
   }
 
+  String _displayImageUrl(dynamic value) {
+    var url = (value ?? '').toString().trim();
+    if (url.isEmpty) return '';
+
+    // Google Drive's /file/d/<id>/view URL is an HTML preview page,
+    // not an image response. Convert it to a direct image URL.
+    final driveId = RegExp(r'(?:/file/d/|[?&]id=)([A-Za-z0-9_-]+)')
+        .firstMatch(url)
+        ?.group(1);
+    if (driveId != null && (url.contains('drive.google.com') || url.contains('docs.google.com'))) {
+      return 'https://drive.google.com/uc?export=view&id=$driveId';
+    }
+    return url;
+  }
+
   List<String> _images(Map<String, dynamic> product) {
-    final raw =
-        product['imageUrls'] ??
-        product['images'] ??
-        product['imageUrl'] ??
-        product['image'];
-    if (raw is List) {
-      return raw
-          .map((e) => e.toString().trim())
-          .where((e) => e.startsWith('http'))
-          .toList();
-    }
-    if (raw is String && raw.trim().isNotEmpty) {
-      // Some existing rows store image URLs as JSON or comma-separated text.
+    dynamic raw = product['imageUrls'] ?? product['images'] ??
+        product['imageUrl'] ?? product['image'];
+
+    if (raw is String) {
       final text = raw.trim();
-      if (text.startsWith('[') && text.endsWith(']')) {
-        return text
-            .substring(1, text.length - 1)
-            .split(',')
-            .map((e) => e.trim().replaceAll('"', '').replaceAll("'", ''))
-            .where((e) => e.startsWith('http'))
-            .toList();
+      if (text.isEmpty) return <String>[];
+      try {
+        final decoded = jsonDecode(text);
+        if (decoded is List) {
+          raw = decoded;
+        } else {
+          raw = <dynamic>[text];
+        }
+      } catch (_) {
+        // Support old rows that contain comma-separated URLs.
+        raw = text.split(RegExp(r',(?=https?://)'));
       }
-      return text
-          .split(',')
-          .map((e) => e.trim())
-          .where((e) => e.startsWith('http'))
-          .toList();
     }
-    return <String>[];
+
+    final values = raw is List ? raw : <dynamic>[if (raw != null) raw];
+    final result = <String>[];
+    for (final value in values) {
+      final url = _displayImageUrl(value);
+      if ((url.startsWith('https://') || url.startsWith('http://')) &&
+          !result.contains(url)) {
+        result.add(url);
+      }
+    }
+    return result;
   }
 
   List<Map<String, dynamic>> get _filteredProducts {

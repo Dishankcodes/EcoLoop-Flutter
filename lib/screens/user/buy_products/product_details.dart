@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
@@ -123,24 +124,49 @@ class _ProductDetailsState extends State<ProductDetails> {
     if (value is num) {
       return value.toInt();
     }
-    return int.tryParse(value.toString()) ?? 42;
+    return int.tryParse(value.toString()) ?? 0;
   }
 
   List<String> get images {
-    final productImages =
+    dynamic productImages =
         widget.product['images'] ?? widget.product['imageUrls'];
+    if (productImages is String && productImages.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(productImages);
+        if (decoded is List) {
+          productImages = decoded;
+        } else {
+          productImages = <dynamic>[productImages];
+        }
+      } catch (_) {
+        productImages = productImages.split(RegExp(r',(?=https?://)'));
+      }
+    }
     if (productImages is List && productImages.isNotEmpty) {
-      return productImages
-          .map((image) => image.toString())
-          .where((image) => image.isNotEmpty)
-          .toList();
+      final result = <String>[];
+      for (final item in productImages) {
+        final rawUrl = item.toString().trim();
+        final driveId = RegExp(r'(?:/file/d/|[?&]id=)([A-Za-z0-9_-]+)')
+            .firstMatch(rawUrl)?.group(1);
+        final url = driveId != null && rawUrl.contains('drive.google.com')
+            ? 'https://drive.google.com/uc?export=view&id=$driveId'
+            : rawUrl;
+        if ((url.startsWith('http://') || url.startsWith('https://')) &&
+            !result.contains(url)) {
+          result.add(url);
+        }
+      }
+      return result;
     }
-
-    final singleImage = widget.product['image']?.toString();
-    if (singleImage != null && singleImage.isNotEmpty) {
-      return [singleImage];
+    final singleImage =
+        (widget.product['image'] ?? widget.product['imageUrl'])?.toString().trim();
+    if (singleImage != null && singleImage.startsWith('http')) {
+      final driveId = RegExp(r'(?:/file/d/|[?&]id=)([A-Za-z0-9_-]+)')
+          .firstMatch(singleImage)?.group(1);
+      return [driveId != null && singleImage.contains('drive.google.com')
+          ? 'https://drive.google.com/uc?export=view&id=$driveId'
+          : singleImage];
     }
-
     return const <String>[];
   }
 

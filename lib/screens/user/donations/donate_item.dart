@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../../app_theme/user/app_colors.dart';
-import '../../../app_theme/user/app_text_styles.dart';
 import '../../../services/eco_image_picker.dart';
 import '../../../services/ecoloop_api.dart';
+
+import '../../../app_theme/user/app_colors.dart';
+import '../../../app_theme/user/app_text_styles.dart';
 
 /// Screen allowing users to list unused items for free donation and pickup.
 class DonateItem extends StatefulWidget {
@@ -149,9 +150,7 @@ class _DonateItemState extends State<DonateItem> {
               label: 'Full Address',
               hint: 'House / street / area',
               icon: Icons.location_on_outlined,
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Please enter pickup address'
-                  : null,
+              validator: (value) => value == null || value.trim().isEmpty ? 'Please enter pickup address' : null,
             ),
             const SizedBox(height: 14),
             _buildTextField(
@@ -159,9 +158,7 @@ class _DonateItemState extends State<DonateItem> {
               label: 'City',
               hint: 'Enter your city',
               icon: Icons.location_city_outlined,
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Please enter city'
-                  : null,
+              validator: (value) => value == null || value.trim().isEmpty ? 'Please enter city' : null,
             ),
             const SizedBox(height: 14),
             _buildTextField(
@@ -169,9 +166,7 @@ class _DonateItemState extends State<DonateItem> {
               label: 'State',
               hint: 'Enter your state',
               icon: Icons.map_outlined,
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Please enter state'
-                  : null,
+              validator: (value) => value == null || value.trim().isEmpty ? 'Please enter state' : null,
             ),
             const SizedBox(height: 24),
             _buildDonateButton(),
@@ -407,13 +402,7 @@ class _DonateItemState extends State<DonateItem> {
   Widget _buildDonateButton() {
     return ElevatedButton.icon(
       onPressed: _isSubmitting ? null : _submitDonation,
-      icon: _isSubmitting
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.volunteer_activism_outlined),
+      icon: _isSubmitting ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.volunteer_activism_outlined),
       label: Text(_isSubmitting ? 'Submitting donation…' : 'Donate Item'),
     );
   }
@@ -421,9 +410,7 @@ class _DonateItemState extends State<DonateItem> {
   Future<void> _submitDonation() async {
     if (!_formKey.currentState!.validate()) return;
     if (_images.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one item photo.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least one item photo.')));
       return;
     }
     setState(() => _isSubmitting = true);
@@ -432,25 +419,18 @@ class _DonateItemState extends State<DonateItem> {
         'title': titleController.text.trim(),
         'description': descriptionController.text.trim(),
         'categoryId': EcoLoopApi.categoryId(selectedCategory),
-        'condition': (selectedCondition ?? 'used').toLowerCase().replaceAll(
-          ' ',
-          '_',
-        ),
+        'condition': (selectedCondition ?? 'used').toLowerCase().replaceAll(' ', '_'),
         'address': addressController.text.trim(),
         'city': cityController.text.trim(),
         'state': stateController.text.trim(),
         'imageBase64': await EcoImagePicker.payload(_images),
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Donation saved successfully.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Donation saved successfully.')));
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

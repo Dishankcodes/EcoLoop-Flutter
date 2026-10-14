@@ -21,6 +21,8 @@ class _AddProductState extends State<AddProduct> {
   final TextEditingController descriptionController = TextEditingController();
 
   final TextEditingController priceController = TextEditingController();
+  final TextEditingController quantityController = TextEditingController(text: '1');
+  String _deliveryMethod = 'EcoLoop Delivery';
 
   List<SelectedEcoImage> _images = [];
   bool _isSubmitting = false;
@@ -82,6 +84,7 @@ class _AddProductState extends State<AddProduct> {
     titleController.dispose();
     descriptionController.dispose();
     priceController.dispose();
+    quantityController.dispose();
     super.dispose();
   }
 
@@ -186,6 +189,38 @@ class _AddProductState extends State<AddProduct> {
                 }
                 return null;
               },
+            ),
+
+            const SizedBox(height: 14),
+
+            _buildTextField(
+              controller: quantityController,
+              label: 'Available Quantity',
+              hint: 'Enter quantity in numbers',
+              icon: Icons.numbers_rounded,
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                final quantity = int.tryParse((value ?? '').trim());
+                if (quantity == null || quantity < 1) {
+                  return 'Enter a quantity of at least 1';
+                }
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 18),
+            _buildSectionTitle('Delivery Option'),
+            const SizedBox(height: 10),
+            _buildDeliveryOption(
+              title: 'Manage delivery yourself',
+              subtitle: 'Coordinate delivery directly with the buyer.',
+              value: 'Self Delivery',
+            ),
+            const SizedBox(height: 10),
+            _buildDeliveryOption(
+              title: 'EcoLoop delivery',
+              subtitle: '₹45–₹60 for the first 500 g on local/short routes. Final charges depend on distance.',
+              value: 'EcoLoop Delivery',
             ),
 
             const SizedBox(height: 14),
@@ -388,6 +423,45 @@ class _AddProductState extends State<AddProduct> {
   // SELL BUTTON
   // ==========================================================
 
+  Widget _buildDeliveryOption({
+    required String title,
+    required String subtitle,
+    required String value,
+  }) {
+    final selected = _deliveryMethod == value;
+    return InkWell(
+      onTap: () => setState(() => _deliveryMethod = value),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.light : AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.accent.withOpacity(0.35),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: AppColors.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: const TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSellButton() {
     return ElevatedButton.icon(
       onPressed: _isSubmitting ? null : _submitProduct,
@@ -432,7 +506,8 @@ class _AddProductState extends State<AddProduct> {
           '_',
         ),
         'price': double.parse(priceController.text.trim()),
-        'quantity': 1,
+        'quantity': int.parse(quantityController.text.trim()),
+        'deliveryMethod': _deliveryMethod,
         'status': 'published',
         'imageBase64': await EcoImagePicker.payload(_images),
       });
