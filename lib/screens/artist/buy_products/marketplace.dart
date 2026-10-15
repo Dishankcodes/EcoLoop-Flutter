@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../services/ecoloop_api.dart';
-
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import '../../../widgets/artist_more_menu.dart';
 import 'product_details.dart';
 
@@ -23,74 +22,217 @@ class _MarketplaceState extends State<Marketplace> {
   String searchQuery = '';
   String selectedCondition = 'All';
   String selectedSort = 'Newest First';
-  RangeValues priceRange = const RangeValues(0, 10000);
+  RangeValues priceRange = const RangeValues(0, 1000);
 
   final TextEditingController _searchController = TextEditingController();
 
-  final List<String> categories = [
-    'All',
-    'Furniture',
-    'Decor',
-    'Electronics',
-    'Materials',
-    'Fashion',
-    'Books',
-  ];
-
-  final List<String> conditions = [
-    'All',
-    'New',
-    'Like New',
-    'Good',
-    'Used',
-    'Upcycled',
-    'Recycled',
-  ];
-
+  /// Categories and conditions are populated from real backend data.
+  List<String> categories = <String>['All'];
+  List<String> conditions = <String>['All'];
   final List<Map<String, dynamic>> products = [];
 
   bool _loadingProducts = true;
   String? _loadError;
+  double _priceCeiling = 1000;
+
+  double _toDouble(dynamic value, {double fallback = 0}) {
+    if (value is num) return value.toDouble();
+    return double.tryParse((value ?? '').toString().trim()) ?? fallback;
+  }
+
+  int _toInt(dynamic value, {int fallback = 0}) {
+    if (value is num) return value.toInt();
+    return int.tryParse((value ?? '').toString().trim()) ?? fallback;
+  }
+
+  String _cleanString(dynamic value, {String fallback = ''}) {
+    final result = (value ?? '').toString().trim();
+    return result.isEmpty ? fallback : result;
+  }
 
   Future<void> _loadProducts() async {
+    if (mounted) {
+      setState(() {
+        _loadingProducts = true;
+        _loadError = null;
+      });
+    }
+
     try {
-      final data = await EcoLoopApi.instance.get('/products');
-      final rows = (data is List ? data : <dynamic>[]).whereType<Map>().map((
-        raw,
-      ) {
-        final p = Map<String, dynamic>.from(raw);
-        final images = (p['imageUrls'] is List)
-            ? List<dynamic>.from(p['imageUrls'])
-            : <dynamic>[];
-        final category = (p['categoryName'] ?? p['category'] ?? 'Other')
-            .toString();
-        final location = [
-          p['city'],
-          p['state'],
-        ].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
-        return <String, dynamic>{
-          ...p,
-          'category': category,
-          'seller': (p['sellerName'] ?? 'EcoLoop seller').toString(),
-          'location': location.isEmpty ? 'Location not provided' : location,
-          'imageUrls': images,
-          'image': images.isNotEmpty ? images.first.toString() : '',
-          'availableQuantity': p['availableQuantity'] ?? 0,
-        };
-      }).toList();
+      // Product and category data both come from the existing Apps Script API.
+      final rawProducts = await EcoLoopApi.instance.get('/products');
+
+      // Category lookup is supported by the current Code.gs. If that endpoint
+      // is temporarily unavailable, still show products rather than failing
+      // the entire marketplace screen.
+      dynamic rawCategories = <dynamic>[];
+      try {
+        rawCategories = await EcoLoopApi.instance.get('/categories');
+      } catch (_) {
+        rawCategories = <dynamic>[];
+      }
+
+      final categoryRows = (rawCategories is List ? rawCategories : <dynamic>[])
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+
+      final categoryMap = <String, String>{};
+      for (final category in categoryRows) {
+        final id = _cleanString(category['categoryId'] ?? category['id']);
+        final name = _cleanString(category['name'] ?? category['categoryName']);
+        final status = _cleanString(
+          category['status'],
+          fallback: 'active',
+        ).toLowerCase();
+        if (name.isNotEmpty && (status.isEmpty || status == 'active')) {
+          if (id.isNotEmpty) categoryMap[id] = name;
+        }
+      }
+
+      final rows = (rawProducts is List ? rawProducts : <dynamic>[])
+          .whereType<Map>()
+          .map((raw) {
+            final product = Map<String, dynamic>.from(raw);
+            final rawImages = product['imageUrls'];
+            final images = rawImages is List
+                ? rawImages
+                      .map((image) => image.toString().trim())
+                      .where((image) => image.isNotEmpty)
+                      .toList()
+                : <String>[];
+
+            final categoryId = _cleanString(product['categoryId']);
+            final category = _cleanString(
+              product['categoryName'] ?? product['category'],
+              fallback:
+                  categoryMap[categoryId] ??
+                  (categoryId.isNotEmpty ? 'Category $categoryId' : 'Other'),
+            );
+            final location =
+                [
+                      product['sellerCity'] ?? product['city'],
+                      product['sellerState'] ?? product['state'],
+                    ]
+                    .map((value) => _cleanString(value))
+                    .where((value) => value.isNotEmpty)
+                    .join(', ');
+
+            return <String, dynamic>{
+              ...product,
+              'productId': product['productId'] ?? product['id'],
+              'category': category,
+              'seller': _cleanString(
+                product['sellerName'],
+                fallback: 'EcoLoop Member',
+              ),
+              'location': location,
+              'imageUrls': images,
+              'image': images.isNotEmpty ? images.first : '',
+              'price': _toDouble(product['price']),
+              'views': _toInt(product['views']),
+              'wishlistCount': _toInt(
+                product['wishlistCount'] ?? product['likes'],
+              ),
+              'availableQuantity': _toInt(
+                product['availableQuantity'] ?? product['quantity'],
+              ),
+              'condition': _cleanString(
+                product['condition'],
+                fallback: 'Not specified',
+              ),
+              'listingType': _cleanString(
+                product['listingType'],
+                fallback: 'c2c',
+              ),
+              'status': _cleanString(product['status']).toLowerCase(),
+              'title': _cleanString(
+                product['title'],
+                fallback: 'Untitled item',
+              ),
+              'description': _cleanString(product['description']),
+            };
+          })
+          .where((product) => product['status'] == 'published')
+          .toList();
+
+      rows.sort((a, b) {
+        final dateA = DateTime.tryParse(_cleanString(a['createdAt']));
+        final dateB = DateTime.tryParse(_cleanString(b['createdAt']));
+        if (dateA == null && dateB == null) return 0;
+        if (dateA == null) return 1;
+        if (dateB == null) return -1;
+        return dateB.compareTo(dateA);
+      });
+
+      final dynamicConditions =
+          rows
+              .map((product) => _cleanString(product['condition']))
+              .where(
+                (condition) =>
+                    condition.isNotEmpty && condition != 'Not specified',
+              )
+              .toSet()
+              .toList()
+            ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+      final dynamicCategories = categoryMap.values.toSet().toList()
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+      // Include categories returned by products too, for older records whose
+      // category is no longer in the active category list.
+      for (final product in rows) {
+        final category = _cleanString(product['category']);
+        if (category.isNotEmpty &&
+            category != 'Other' &&
+            !dynamicCategories.contains(category)) {
+          dynamicCategories.add(category);
+        }
+      }
+
+      final maximumPrice = rows.fold<double>(0, (maximum, product) {
+        final price = _toDouble(product['price']);
+        return price > maximum ? price : maximum;
+      });
+      final ceiling = maximumPrice > 0 ? maximumPrice : 1000.0;
+
       if (!mounted) return;
       setState(() {
         products
           ..clear()
           ..addAll(rows);
+        categories = <String>['All', ...dynamicCategories];
+        conditions = <String>['All', ...dynamicConditions];
+        _priceCeiling = ceiling;
+
+        if (!categories.contains(selectedCategory)) {
+          selectedCategory = 'All';
+        }
+        if (!conditions.contains(selectedCondition)) {
+          selectedCondition = 'All';
+        }
+        priceRange = RangeValues(0, _priceCeiling);
         _loadingProducts = false;
         _loadError = null;
+
+        if (widget.initialCategory != null &&
+            categories.any(
+              (category) =>
+                  category.toLowerCase() ==
+                  widget.initialCategory!.trim().toLowerCase(),
+            )) {
+          selectedCategory = categories.firstWhere(
+            (category) =>
+                category.toLowerCase() ==
+                widget.initialCategory!.trim().toLowerCase(),
+          );
+        }
       });
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _loadingProducts = false;
-        _loadError = e.toString();
+        _loadError = error.toString();
       });
     }
   }
@@ -116,59 +258,74 @@ class _MarketplaceState extends State<Marketplace> {
 
   /// Filters products based on selected category, search term, condition, price, and status.
   List<Map<String, dynamic>> get filteredProducts {
-    List<Map<String, dynamic>> result = List<Map<String, dynamic>>.from(
-      products,
-    );
-
-    result = result
-        .where(
-          (product) =>
-              product['status'].toString().toLowerCase() == 'published',
-        )
-        .toList();
+    var result = List<Map<String, dynamic>>.from(products);
 
     if (selectedCategory != 'All') {
       result = result
-          .where((product) => product['category'] == selectedCategory)
+          .where(
+            (product) =>
+                _cleanString(product['category']).toLowerCase() ==
+                selectedCategory.toLowerCase(),
+          )
           .toList();
     }
 
-    if (searchQuery.trim().isNotEmpty) {
-      final query = searchQuery.toLowerCase().trim();
+    final query = searchQuery.trim().toLowerCase();
+    if (query.isNotEmpty) {
       result = result.where((product) {
-        final title = product['title'].toString().toLowerCase();
-        final category = product['category'].toString().toLowerCase();
-        final seller = product['seller'].toString().toLowerCase();
-        final description = product['description'].toString().toLowerCase();
-        final location = product['location'].toString().toLowerCase();
-
-        return title.contains(query) ||
-            category.contains(query) ||
-            seller.contains(query) ||
-            description.contains(query) ||
-            location.contains(query);
+        final searchableFields = [
+          product['title'],
+          product['category'],
+          product['seller'],
+          product['description'],
+          product['location'],
+        ];
+        return searchableFields.any(
+          (value) => _cleanString(value).toLowerCase().contains(query),
+        );
       }).toList();
     }
 
     if (selectedCondition != 'All') {
       result = result
-          .where((product) => product['condition'] == selectedCondition)
+          .where(
+            (product) =>
+                _cleanString(product['condition']).toLowerCase() ==
+                selectedCondition.toLowerCase(),
+          )
           .toList();
     }
 
     result = result.where((product) {
-      final price = (product['price'] as num).toDouble();
+      final price = _toDouble(product['price']);
       return price >= priceRange.start && price <= priceRange.end;
     }).toList();
 
-    if (selectedSort == 'Price: Low to High') {
-      result.sort((a, b) => (a['price'] as num).compareTo(b['price'] as num));
-    } else if (selectedSort == 'Price: High to Low') {
-      result.sort((a, b) => (b['price'] as num).compareTo(a['price'] as num));
-    } else if (selectedSort == 'Popular') {
-      result.sort((a, b) => (b['views'] as num).compareTo(a['views'] as num));
+    switch (selectedSort) {
+      case 'Price: Low to High':
+        result.sort(
+          (a, b) => _toDouble(a['price']).compareTo(_toDouble(b['price'])),
+        );
+        break;
+      case 'Price: High to Low':
+        result.sort(
+          (a, b) => _toDouble(b['price']).compareTo(_toDouble(a['price'])),
+        );
+        break;
+      case 'Popular':
+        result.sort((a, b) => _toInt(b['views']).compareTo(_toInt(a['views'])));
+        break;
+      case 'Newest First':
+      default:
+        result.sort((a, b) {
+          final dateA = DateTime.tryParse(_cleanString(a['createdAt']));
+          final dateB = DateTime.tryParse(_cleanString(b['createdAt']));
+          if (dateA == null && dateB == null) return 0;
+          if (dateA == null) return 1;
+          if (dateB == null) return -1;
+          return dateB.compareTo(dateA);
+        });
     }
-
     return result;
   }
 
@@ -183,7 +340,13 @@ class _MarketplaceState extends State<Marketplace> {
             _buildSearchBar(),
             _buildCategories(),
             _buildFilterRow(),
-            Expanded(child: _buildProductGrid()),
+            Expanded(
+              child: RefreshIndicator(
+                color: ArtistColors.primary,
+                onRefresh: _loadProducts,
+                child: _buildProductGrid(),
+              ),
+            ),
           ],
         ),
       ),
@@ -440,10 +603,52 @@ class _MarketplaceState extends State<Marketplace> {
   Widget _buildProductGrid() {
     final items = filteredProducts;
 
-    if (_loadingProducts)
+    if (_loadingProducts) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_loadError != null) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(28),
+        children: [
+          const SizedBox(height: 90),
+          const Icon(
+            Icons.cloud_off_outlined,
+            size: 48,
+            color: ArtistColors.primary,
+          ),
+          const SizedBox(height: 14),
+          Center(
+            child: Text(
+              'Could not load marketplace',
+              style: ArtistTextStyles.title,
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _loadError!,
+            textAlign: TextAlign.center,
+            style: ArtistTextStyles.caption,
+          ),
+          const SizedBox(height: 18),
+          Center(
+            child: OutlinedButton.icon(
+              onPressed: _loadProducts,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try Again'),
+            ),
+          ),
+        ],
+      );
+    }
+
     if (items.isEmpty) {
-      return _buildEmptyState();
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [SizedBox(height: 360, child: _buildEmptyState())],
+      );
     }
 
     return GridView.builder(
@@ -591,7 +796,7 @@ class _MarketplaceState extends State<Marketplace> {
                               setSheetState(() {
                                 temporaryCategory = 'All';
                                 temporaryCondition = 'All';
-                                temporaryPrice = const RangeValues(0, 10000);
+                                temporaryPrice = RangeValues(0, _priceCeiling);
                               });
                             },
                             child: Text(
@@ -678,7 +883,7 @@ class _MarketplaceState extends State<Marketplace> {
                       RangeSlider(
                         values: temporaryPrice,
                         min: 0,
-                        max: 10000,
+                        max: _priceCeiling,
                         divisions: 20,
                         activeColor: ArtistColors.primary,
                         inactiveColor: ArtistColors.border,
@@ -828,7 +1033,7 @@ class _MarketplaceState extends State<Marketplace> {
       selectedCategory = 'All';
       selectedCondition = 'All';
       selectedSort = 'Newest First';
-      priceRange = const RangeValues(0, 10000);
+      priceRange = RangeValues(0, _priceCeiling);
     });
   }
 
@@ -861,9 +1066,17 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int price = (product['price'] as num).toInt();
-    final List<dynamic> imageUrls = product['imageUrls'] as List<dynamic>;
-    final String image = imageUrls.isNotEmpty ? imageUrls.first.toString() : '';
+    final double priceValue = product['price'] is num
+        ? (product['price'] as num).toDouble()
+        : double.tryParse('${product['price']}') ?? 0;
+    final String price = priceValue == priceValue.roundToDouble()
+        ? priceValue.toStringAsFixed(0)
+        : priceValue.toStringAsFixed(2);
+    final rawImages = product['imageUrls'];
+    final List<dynamic> imageUrls = rawImages is List ? rawImages : <dynamic>[];
+    final String image = imageUrls.isNotEmpty
+        ? imageUrls.first.toString().trim()
+        : '';
 
     return GestureDetector(
       onTap: onTap,
@@ -996,7 +1209,7 @@ class _ProductCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '₹${price.toStringAsFixed(0)}',
+                    '₹$price',
                     style: ArtistTextStyles.title.copyWith(
                       fontSize: 17,
                       color: ArtistColors.primary,

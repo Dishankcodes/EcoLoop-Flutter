@@ -1,3 +1,4 @@
+import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
@@ -38,12 +39,21 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   String get quantity => widget.order['quantity']?.toString() ?? '1';
 
-  String get payment => widget.order['payment']?.toString() ?? widget.order['paymentStatus']?.toString() ?? 'Payment status unavailable';
+  String get payment =>
+      widget.order['payment']?.toString() ??
+      widget.order['paymentStatus']?.toString() ??
+      'Payment status unavailable';
 
   bool get isPaymentPending {
     final value = (widget.order['paymentStatus'] ?? widget.order['payment'])
-        ?.toString().trim().toLowerCase().replaceAll('_', ' ');
-    return value == 'pending' || value == 'unpaid' || value == 'failed' || value == 'payment pending';
+        ?.toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('_', ' ');
+    return value == 'pending' ||
+        value == 'unpaid' ||
+        value == 'failed' ||
+        value == 'payment pending';
   }
 
   String get deliveryMethod =>
@@ -57,7 +67,195 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   bool get isCancelled => _status == 'Cancelled';
 
-  bool get isDelivered => _status == 'Delivered';
+  bool get isDelivered => _status.toLowerCase() == 'delivered';
+
+  String get _normalizedOrderStatus =>
+      _status.trim().toLowerCase().replaceAll('_', ' ');
+
+  bool get _paymentPaid {
+    final value =
+        (widget.order['paymentStatus'] ?? widget.order['payment'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replaceAll('_', ' ');
+    return const {
+      'paid',
+      'completed',
+      'success',
+      'successful',
+      'captured',
+      'cod paid',
+    }.contains(value);
+  }
+
+  bool get _canReview =>
+      (_normalizedOrderStatus == 'delivered' ||
+          _normalizedOrderStatus == 'confirmed') &&
+      _paymentPaid;
+
+  int _safeId(dynamic value) =>
+      value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+
+  Widget _buildReviewActions() {
+    final productId = _safeId(widget.order['productId']);
+    final sellerId = _safeId(widget.order['sellerId']);
+    final sellerType = (widget.order['sellerType'] ?? 'user')
+        .toString()
+        .toLowerCase();
+    final orderNumericId = _safeId(widget.order['orderId']);
+    return _section(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle('Share Your Experience', Icons.rate_review_outlined),
+          const SizedBox(height: 6),
+          const Text(
+            'Your payment is marked as paid. Tell others about the product and your seller.',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: productId > 0 && orderNumericId > 0
+                  ? () => _writeReview(
+                      title: 'Review product',
+                      endpoint: '/reviews/product',
+                      payloadIds: {
+                        'productId': productId,
+                        'orderId': orderNumericId,
+                      },
+                    )
+                  : null,
+              icon: const Icon(Icons.inventory_2_outlined),
+              label: const Text('Write Product Review'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                minimumSize: const Size.fromHeight(46),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: sellerId > 0 && orderNumericId > 0
+                  ? () => _writeReview(
+                      title: 'Review seller',
+                      endpoint: '/reviews/seller',
+                      payloadIds: {
+                        'sellerId': sellerId,
+                        'sellerType': sellerType,
+                        'orderId': orderNumericId,
+                      },
+                    )
+                  : null,
+              icon: const Icon(Icons.storefront_outlined),
+              label: const Text('Write Seller Review'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(46),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _writeReview({
+    required String title,
+    required String endpoint,
+    required Map<String, dynamic> payloadIds,
+  }) async {
+    final commentController = TextEditingController();
+    int rating = 5;
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(title),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Your rating'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 4,
+                  children: List.generate(5, (index) {
+                    final star = index + 1;
+                    return IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => setDialogState(() => rating = star),
+                      icon: Icon(
+                        star <= rating
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
+                        color: Colors.orange,
+                      ),
+                    );
+                  }),
+                ),
+                TextField(
+                  controller: commentController,
+                  minLines: 3,
+                  maxLines: 5,
+                  maxLength: 500,
+                  decoration: const InputDecoration(
+                    hintText: 'Share your experience (at least 5 characters)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (commentController.text.trim().length < 5) return;
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (submitted != true || !mounted) {
+      commentController.dispose();
+      return;
+    }
+    try {
+      final payload = <String, dynamic>{
+        ...payloadIds,
+        'rating': rating,
+        'comment': commentController.text.trim(),
+      };
+      await EcoLoopApi.instance.post(endpoint, payload);
+      if (mounted) {
+        _showMessage('Review submitted successfully.');
+      }
+    } catch (error) {
+      if (mounted) {
+        _showMessage('Could not submit review: $error');
+      }
+    } finally {
+      commentController.dispose();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +271,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             if (!isCancelled) _buildStatusSection(),
             _buildProductSection(),
             _buildSellerSection(),
+            if (_canReview) _buildReviewActions(),
             _buildDeliverySection(),
             _buildPaymentSection(),
             if (isPaymentPending) _buildPendingPaymentCard(),
@@ -930,29 +1129,70 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFFFFD580)),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Row(children: [Icon(Icons.info_outline_rounded, color: Color(0xFF946200)), SizedBox(width: 8), Expanded(child: Text('Payment is pending', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF795500))))]),
-        const SizedBox(height: 7),
-        const Text('This order has not been marked as paid. Complete payment only after a payment gateway is connected.', style: TextStyle(height: 1.4, color: AppColors.textSecondary)),
-        const SizedBox(height: 12),
-        SizedBox(width: double.infinity, child: ElevatedButton.icon(
-          onPressed: _showPaymentNotReady,
-          icon: const Icon(Icons.payment_rounded),
-          label: const Text('Complete Payment'),
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, minimumSize: const Size.fromHeight(50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
-        )),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: Color(0xFF946200)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Payment is pending',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF795500),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          const Text(
+            'This order has not been marked as paid. Complete payment only after a payment gateway is connected.',
+            style: TextStyle(height: 1.4, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _showPaymentNotReady,
+              icon: const Icon(Icons.payment_rounded),
+              label: const Text('Complete Payment'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(13),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   void _showPaymentNotReady() {
-    showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
-      backgroundColor: AppColors.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Online payment is not connected'),
-      content: const Text('Your order is pending payment, but the current backend has no order-specific payment initiation or payment verification endpoint. The existing payment page places a new Cash on Delivery order, so opening it here could create a duplicate order. No payment has been taken and this order will remain pending until a real gateway flow is integrated.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Got it'))],
-    ));
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Online payment is not connected'),
+        content: const Text(
+          'Your order is pending payment, but the current backend has no order-specific payment initiation or payment verification endpoint. The existing payment page places a new Cash on Delivery order, so opening it here could create a duplicate order. No payment has been taken and this order will remain pending until a real gateway flow is integrated.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Persistent bottom action bar providing order cancellation or live tracking.
@@ -975,16 +1215,30 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: isPaymentPending ? _showPaymentNotReady : (isDelivered ? _buyAgain : _cancelOrder),
+                onPressed: isPaymentPending
+                    ? _showPaymentNotReady
+                    : (isDelivered ? _buyAgain : _cancelOrder),
                 icon: Icon(
-                  isPaymentPending ? Icons.payment_rounded : (isDelivered ? Icons.refresh_rounded : Icons.cancel_outlined),
+                  isPaymentPending
+                      ? Icons.payment_rounded
+                      : (isDelivered
+                            ? Icons.refresh_rounded
+                            : Icons.cancel_outlined),
                   size: 17,
                 ),
-                label: Text(isPaymentPending ? 'Complete Payment' : (isDelivered ? 'Buy Again' : 'Cancel Order')),
+                label: Text(
+                  isPaymentPending
+                      ? 'Complete Payment'
+                      : (isDelivered ? 'Buy Again' : 'Cancel Order'),
+                ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: isPaymentPending ? AppColors.primary : (isDelivered ? AppColors.primary : AppColors.error),
+                  foregroundColor: isPaymentPending
+                      ? AppColors.primary
+                      : (isDelivered ? AppColors.primary : AppColors.error),
                   side: BorderSide(
-                    color: isPaymentPending ? AppColors.primary : (isDelivered ? AppColors.primary : AppColors.error),
+                    color: isPaymentPending
+                        ? AppColors.primary
+                        : (isDelivered ? AppColors.primary : AppColors.error),
                   ),
                   minimumSize: const Size(0, 48),
                   shape: RoundedRectangleBorder(

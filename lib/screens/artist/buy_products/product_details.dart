@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:share_plus/share_plus.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import '../../../widgets/cart_popup.dart';
 import '../../artist/profile/artist_profile.dart';
 import '../../artist/reviews/product_reviews.dart';
@@ -9,6 +12,7 @@ import '../../artist/reviews/write_review.dart';
 import 'checkout.dart';
 import 'seller_profile.dart';
 
+/// Screen displaying full item details, image gallery, seller info, reviews, and purchasing options.
 class ProductDetails extends StatefulWidget {
   final Map<String, dynamic> product;
 
@@ -20,23 +24,78 @@ class ProductDetails extends StatefulWidget {
 
 class _ProductDetailsState extends State<ProductDetails> {
   late PageController _imageController;
+  late Map<String, dynamic> _product;
+  bool _detailsLoading = false;
+  String? _detailsError;
 
   int _currentImage = 0;
   int _quantity = 1;
-
   bool _isWishlisted = false;
-
-  // LIFECYCLE
+  bool _wishlistBusy = false;
+  bool _reviewsLoading = false;
+  bool _eligibilityLoading = false;
+  bool _canReview = false;
+  String? _eligibleOrderId;
+  List<Map<String, dynamic>> _liveReviews = [];
+  List<Map<String, dynamic>> _relatedProducts = <Map<String, dynamic>>[];
+  bool _relatedLoading = false;
+  final EcoLoopApi _api = EcoLoopApi.instance;
 
   @override
   void initState() {
     super.initState();
-
     _imageController = PageController();
-
+    _product = Map<String, dynamic>.from(widget.product);
     _isWishlisted =
-        widget.product['isWishlisted'] == true ||
-        widget.product['wishlisted'] == true;
+        _product['isWishlisted'] == true || _product['wishlisted'] == true;
+    _loadProductDetails();
+    _syncWishlistState();
+    _loadReviews();
+    _checkReviewEligibility();
+    _loadRelatedProducts();
+  }
+
+  /// Refreshes the selected listing from the backend so artist/user edits and
+  /// availability changes are reflected in the details page.
+  Future<void> _loadProductDetails() async {
+    final id =
+        (_product['productId'] ??
+                _product['product_id'] ??
+                _product['id'] ??
+                '')
+            .toString()
+            .trim();
+    if (id.isEmpty) return;
+    if (mounted) {
+      setState(() {
+        _detailsLoading = true;
+        _detailsError = null;
+      });
+    }
+    try {
+      final response = await _api.get('/products/$id');
+      final root = _asMap(response);
+      final nested = _asMap(root['data']);
+      final fetched = nested.isNotEmpty ? nested : root;
+      if (fetched.isNotEmpty && mounted) {
+        setState(() {
+          _product = <String, dynamic>{..._product, ...fetched};
+          final rawImages = _product['imageUrls'] ?? _product['images'];
+          if (rawImages is List && rawImages.isNotEmpty) {
+            _product['images'] = rawImages
+                .map((item) => item.toString())
+                .where((item) => item.isNotEmpty)
+                .toList();
+            _product['image'] ??= _product['images'].first;
+          }
+        });
+      }
+    } catch (e) {
+      // Keep the marketplace-provided product visible if refresh is unavailable.
+      if (mounted) setState(() => _detailsError = e.toString());
+    } finally {
+      if (mounted) setState(() => _detailsLoading = false);
+    }
   }
 
   @override
@@ -45,273 +104,138 @@ class _ProductDetailsState extends State<ProductDetails> {
     super.dispose();
   }
 
-  // PRODUCT GETTERS
-
-  String get productId =>
-      widget.product['productId']?.toString() ??
-      widget.product['id']?.toString() ??
-      'product_${title.hashCode}';
-
-  String get title =>
-      widget.product['title']?.toString() ?? 'Handcrafted Wooden Study Table';
+  String get title => _product['title']?.toString() ?? 'Product';
 
   int get priceValue {
-    final value = widget.product['price'];
-
+    final value = _product['price'];
     if (value is num) {
       return value.toInt();
     }
-
-    return _extractNumericPrice(value?.toString() ?? '2500');
+    return _extractNumericPrice(value?.toString() ?? '0');
   }
 
   String get price => '₹${_formatPrice(priceValue)}';
 
-  String get condition => widget.product['condition']?.toString() ?? 'Good';
+  String get condition =>
+      (_product['condition'] ?? '').toString().trim().isEmpty
+      ? 'Not specified'
+      : _product['condition'].toString();
 
-  String get category => widget.product['category']?.toString() ?? 'Furniture';
+  String get category =>
+      (_product['category'] ?? _product['categoryName'] ?? '')
+          .toString()
+          .trim()
+          .isEmpty
+      ? 'Uncategorized'
+      : (_product['category'] ?? _product['categoryName']).toString();
 
-  String get seller =>
-      widget.product['seller']?.toString() ??
-      widget.product['sellerName']?.toString() ??
-      'Creative Studio';
+  String get seller {
+    final value = (_product['sellerName'] ?? _product['seller'] ?? '')
+        .toString()
+        .trim();
+    return value.isEmpty ? 'Seller' : value;
+  }
 
-  String get location =>
-      widget.product['location']?.toString() ?? 'Ahmedabad, Gujarat';
+  double get sellerRating {
+    final value = _product['sellerRating'] ?? _product['rating'];
+    if (value is num) return value.toDouble();
+    return double.tryParse((value ?? '').toString()) ?? 0.0;
+  }
+
+  int get sellerListings {
+    final value = _product['sellerListings'] ?? _product['listings'];
+    if (value is num) return value.toInt();
+    return int.tryParse((value ?? '').toString()) ?? 0;
+  }
+
+  String get _sellerLocation =>
+      location.isEmpty ? 'Location not provided' : location;
+
+  String get location => [
+    _product['sellerCity'] ?? _product['city'],
+    _product['sellerState'] ?? _product['state'],
+  ].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
+
+  /// Seller account type used for profile navigation.
+  ///
+  /// Backend will provide this as `sellerType`:
+  /// - `user`    -> SellerProfile
+  /// - `artist`  -> ArtistProfile
+  ///
+  /// The legacy fallbacks are kept only so older/local product maps do not
+  /// break while the backend integration is still being implemented.
+  String get sellerType {
+    final type =
+        _product['sellerType'] ??
+        _product['sellerRole'] ??
+        _product['seller_role'] ??
+        _product['role'] ??
+        'user';
+
+    return type.toString().trim().toLowerCase();
+  }
+
+  bool get isArtistSeller =>
+      sellerType == 'artist' ||
+      sellerType == 'remaker' ||
+      sellerType == 're_maker' ||
+      sellerType == 're-maker';
 
   String get description =>
-      widget.product['description']?.toString() ??
-      'A well-maintained pre-owned product. '
-          'Perfect for students, home offices and creative workspaces. '
-          'The product is sturdy, useful and ready for its next owner.';
+      (_product['description'] ?? '').toString().trim().isEmpty
+      ? 'No description provided by the seller.'
+      : _product['description'].toString();
 
   int get availableQuantity {
-    final value = widget.product['availableQuantity'];
-
+    final value = _product['availableQuantity'];
     if (value is num) {
       return value.toInt();
     }
-
-    return int.tryParse(value?.toString() ?? '') ?? 5;
+    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   double get rating {
-    final value = widget.product['rating'];
-
+    if (_liveReviews.isNotEmpty) {
+      final values = _liveReviews
+          .map((r) => _intValue(r['rating']))
+          .where((v) => v >= 1 && v <= 5)
+          .toList();
+      if (values.isNotEmpty) {
+        return values.reduce((a, b) => a + b) / values.length;
+      }
+    }
+    final value = _product['rating'];
     if (value is num) {
       return value.toDouble();
     }
-
-    return double.tryParse(value?.toString() ?? '') ?? 4.7;
+    return double.tryParse(value?.toString() ?? '') ?? 0.0;
   }
 
   int get reviewCount {
-    final value =
-        widget.product['reviewCount'] ?? widget.product['reviews'] ?? 42;
-
+    if (_liveReviews.isNotEmpty) return _liveReviews.length;
+    final value = _product['reviewCount'] ?? _product['reviews'] ?? 0;
     if (value is num) {
       return value.toInt();
     }
-
-    return int.tryParse(value.toString()) ?? 42;
+    return int.tryParse(value.toString()) ?? 0;
   }
-
-  int get views {
-    final value = widget.product['views'];
-
-    if (value is num) {
-      return value.toInt();
-    }
-
-    return int.tryParse(value?.toString() ?? '') ?? 12;
-  }
-
-  int get wishlistCount {
-    final value = widget.product['wishlistCount'];
-
-    if (value is num) {
-      return value.toInt();
-    }
-
-    return int.tryParse(value?.toString() ?? '') ?? 4;
-  }
-
-  String get listedDate =>
-      widget.product['date']?.toString() ??
-      widget.product['createdAt']?.toString() ??
-      '28 Aug 2026';
-
-  // SELLER ROLE
-
-  /// Canonical seller account type.
-  ///
-  /// Backend will provide `sellerType` as either:
-  /// - `user`
-  /// - `artist`
-  ///
-  /// Temporary fallbacks are kept so the current UI continues to work
-  /// before the backend is connected.
-  String get sellerType {
-    final rawType =
-        widget.product['sellerType'] ??
-        widget.product['seller_type'] ??
-        widget.product['sellerRole'] ??
-        widget.product['seller_role'] ??
-        widget.product['role'] ??
-        'user';
-
-    return rawType.toString().trim().toLowerCase();
-  }
-
-  /// Backward-compatible alias for existing local UI/cart data.
-  String get sellerRole => sellerType;
-
-  bool get isArtistSeller {
-    return sellerRole == 'artist' ||
-        sellerRole == 'remaker' ||
-        sellerRole == 're_maker' ||
-        sellerRole == 're-maker';
-  }
-
-  bool get isUserSeller {
-    return !isArtistSeller;
-  }
-
-  // SELLER PROFILE DATA
-
-  Map<String, dynamic> get sellerProfileData {
-    final existingSellerData = widget.product['sellerData'];
-
-    if (existingSellerData is Map) {
-      return Map<String, dynamic>.from(existingSellerData);
-    }
-
-    final data = <String, dynamic>{
-      'name': seller,
-      'location': location,
-
-      // Seller identity
-      'sellerType': sellerType,
-      'role': isArtistSeller ? 'artist' : 'user',
-      'sellerId':
-          widget.product['sellerId'] ??
-          widget.product['artistId'] ??
-          widget.product['userId'],
-
-      // Common profile data
-      'image':
-          widget.product['sellerImage'] ??
-          widget.product['seller_image'] ??
-          widget.product['sellerProfileImage'] ??
-          widget.product['seller_profile_image'],
-
-      'rating':
-          widget.product['sellerRating'] ?? widget.product['rating'] ?? '4.8',
-
-      'reviews':
-          widget.product['sellerReviews'] ?? widget.product['reviews'] ?? '42',
-
-      'listings':
-          widget.product['sellerListings'] ??
-          widget.product['listings'] ??
-          '127',
-
-      'sold': widget.product['sellerSold'] ?? widget.product['sold'] ?? '42',
-
-      'positive':
-          widget.product['sellerPositive'] ??
-          widget.product['positive'] ??
-          '98%',
-    };
-
-    // ARTIST-SPECIFIC DATA
-
-    if (isArtistSeller) {
-      data.addAll({
-        'username':
-            widget.product['sellerUsername'] ??
-            widget.product['seller_username'] ??
-            '@remaker',
-
-        'bio':
-            widget.product['sellerBio'] ??
-            widget.product['seller_bio'] ??
-            'Creative ReMaker creating sustainable and meaningful products from reusable materials.',
-
-        'specialty':
-            widget.product['sellerSpecialty'] ??
-            widget.product['seller_specialty'] ??
-            category,
-
-        'followers':
-            widget.product['sellerFollowers'] ??
-            widget.product['seller_followers'] ??
-            '0',
-
-        'works':
-            widget.product['sellerWorks'] ??
-            widget.product['seller_works'] ??
-            '0',
-
-        'verified':
-            widget.product['sellerVerified'] ??
-            widget.product['seller_verified'] ??
-            true,
-
-        'certified':
-            widget.product['sellerCertified'] ??
-            widget.product['seller_certified'] ??
-            true,
-      });
-    }
-
-    return data;
-  }
-
-  // IMAGES
 
   List<String> get images {
-    final productImages = widget.product['images'];
-
+    final productImages = _product['images'] ?? _product['imageUrls'];
     if (productImages is List && productImages.isNotEmpty) {
-      final result = productImages
+      return productImages
           .map((image) => image.toString())
           .where((image) => image.isNotEmpty)
           .toList();
-
-      if (result.isNotEmpty) {
-        return result;
-      }
     }
 
-    final imageUrls = widget.product['imageUrls'];
-
-    if (imageUrls is List && imageUrls.isNotEmpty) {
-      final result = imageUrls
-          .map((image) => image.toString())
-          .where((image) => image.isNotEmpty)
-          .toList();
-
-      if (result.isNotEmpty) {
-        return result;
-      }
-    }
-
-    final singleImage = widget.product['image']?.toString();
-
+    final singleImage = _product['image']?.toString();
     if (singleImage != null && singleImage.isNotEmpty) {
       return [singleImage];
     }
 
-    return [
-      'https://images.unsplash.com/photo-1518455027359-f3f8164ba6b0?auto=format&fit=crop&w=1200&q=85',
-      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=85',
-      'https://images.unsplash.com/photo-1541558869434-2840d308329a?auto=format&fit=crop&w=1200&q=85',
-      'https://images.unsplash.com/photo-1593642532400-2682810df593?auto=format&fit=crop&w=1200&q=85',
-    ];
+    return const <String>[];
   }
-
-  // BUILD
 
   @override
   Widget build(BuildContext context) {
@@ -326,6 +250,21 @@ class _ProductDetailsState extends State<ProductDetails> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (_detailsLoading)
+                  const LinearProgressIndicator(
+                    minHeight: 2,
+                    color: ArtistColors.primary,
+                  ),
+                if (_detailsError != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Text(
+                      'Showing saved listing data because the latest refresh failed.',
+                      style: ArtistTextStyles.caption.copyWith(
+                        color: ArtistColors.textSecondary,
+                      ),
+                    ),
+                  ),
                 _buildImageGallery(),
                 _buildProductHeader(),
                 _buildSellerSection(),
@@ -346,8 +285,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // APP BAR
-
+  /// AppBar with product screen title, share action, and overflow options.
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: ArtistColors.surface,
@@ -359,12 +297,9 @@ class _ProductDetailsState extends State<ProductDetails> {
         onPressed: () => Navigator.pop(context),
         icon: const Icon(Icons.arrow_back_rounded),
       ),
-      title: Text(
+      title: const Text(
         'Product Details',
-        style: ArtistTextStyles.title.copyWith(
-          fontSize: 17,
-          fontWeight: FontWeight.w700,
-        ),
+        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
       ),
       centerTitle: true,
       actions: [
@@ -382,8 +317,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // IMAGE GALLERY
-
+  /// Interactive product image slider with pagination indicator and wishlist toggle.
   Widget _buildImageGallery() {
     return Container(
       color: ArtistColors.surface,
@@ -395,20 +329,32 @@ class _ProductDetailsState extends State<ProductDetails> {
               children: [
                 PageView.builder(
                   controller: _imageController,
-                  itemCount: images.length,
+                  itemCount: images.isEmpty ? 1 : images.length,
                   onPageChanged: (index) {
                     setState(() {
                       _currentImage = index;
                     });
                   },
                   itemBuilder: (context, index) {
+                    if (images.isEmpty) {
+                      return Container(
+                        color: ArtistColors.light,
+                        child: const Center(
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            size: 60,
+                            color: ArtistColors.primary,
+                          ),
+                        ),
+                      );
+                    }
                     return Image.network(
                       images[index],
                       width: double.infinity,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) {
                         return Container(
-                          color: ArtistColors.surfaceSoft,
+                          color: ArtistColors.light,
                           child: const Center(
                             child: Icon(
                               Icons.image_outlined,
@@ -419,12 +365,9 @@ class _ProductDetailsState extends State<ProductDetails> {
                         );
                       },
                       loadingBuilder: (context, child, progress) {
-                        if (progress == null) {
-                          return child;
-                        }
-
+                        if (progress == null) return child;
                         return Container(
-                          color: ArtistColors.surfaceSoft,
+                          color: ArtistColors.light,
                           child: const Center(
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
@@ -474,9 +417,12 @@ class _ProductDetailsState extends State<ProductDetails> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      '${_currentImage + 1}/${images.length}',
-                      style: ArtistTextStyles.small.copyWith(
+                      images.isEmpty
+                          ? 'No image'
+                          : '${_currentImage + 1}/${images.length}',
+                      style: const TextStyle(
                         color: Colors.white,
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -492,7 +438,6 @@ class _ProductDetailsState extends State<ProductDetails> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(images.length, (index) {
                   final selected = index == _currentImage;
-
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     margin: const EdgeInsets.symmetric(horizontal: 3),
@@ -513,8 +458,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // PRODUCT HEADER
-
+  /// Top section containing title, price, tags, and stock banner.
   Widget _buildProductHeader() {
     return _section(
       child: Column(
@@ -530,7 +474,12 @@ class _ProductDetailsState extends State<ProductDetails> {
           const SizedBox(height: 14),
           Text(
             title,
-            style: ArtistTextStyles.heading.copyWith(fontSize: 24, height: 1.2),
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: ArtistColors.textPrimary,
+              height: 1.2,
+            ),
           ),
           const SizedBox(height: 9),
           Row(
@@ -538,19 +487,22 @@ class _ProductDetailsState extends State<ProductDetails> {
             children: [
               Text(
                 price,
-                style: ArtistTextStyles.heading.copyWith(
+                style: const TextStyle(
                   fontSize: 25,
+                  fontWeight: FontWeight.w800,
                   color: ArtistColors.primary,
                 ),
               ),
               const SizedBox(width: 9),
-              Text(
-                'Negotiable',
-                style: ArtistTextStyles.small.copyWith(
-                  color: ArtistColors.success,
-                  fontWeight: FontWeight.w600,
+              if (_product['negotiable'] == true)
+                const Text(
+                  'Negotiable',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: ArtistColors.success,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -564,7 +516,11 @@ class _ProductDetailsState extends State<ProductDetails> {
               const SizedBox(width: 4),
               Text(
                 rating.toStringAsFixed(1),
-                style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 12),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: ArtistColors.textPrimary,
+                ),
               ),
               const SizedBox(width: 4),
               Text('($reviewCount reviews)', style: ArtistTextStyles.caption),
@@ -575,7 +531,10 @@ class _ProductDetailsState extends State<ProductDetails> {
                 color: ArtistColors.textSecondary,
               ),
               const SizedBox(width: 4),
-              Text('$views views', style: ArtistTextStyles.caption),
+              Text(
+                '${_product['views'] ?? 0} views',
+                style: ArtistTextStyles.caption,
+              ),
               const SizedBox(width: 16),
               const Icon(
                 Icons.favorite_border_rounded,
@@ -583,7 +542,10 @@ class _ProductDetailsState extends State<ProductDetails> {
                 color: ArtistColors.textSecondary,
               ),
               const SizedBox(width: 4),
-              Text('$wishlistCount saved', style: ArtistTextStyles.caption),
+              Text(
+                '${_product['wishlistCount'] ?? 0} saved',
+                style: ArtistTextStyles.caption,
+              ),
             ],
           ),
           const SizedBox(height: 13),
@@ -593,16 +555,13 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Banner indicating remaining stock availability.
   Widget _buildAvailabilityBanner() {
     final available = availableQuantity;
-
     final Color color = available <= 2
         ? ArtistColors.error
         : ArtistColors.success;
-
-    final String message = available <= 0
-        ? 'Currently unavailable'
-        : available <= 2
+    final String message = available <= 2
         ? 'Only $available left'
         : '$available items available';
 
@@ -625,9 +584,10 @@ class _ProductDetailsState extends State<ProductDetails> {
           const SizedBox(width: 7),
           Text(
             message,
-            style: ArtistTextStyles.small.copyWith(
-              color: color,
+            style: TextStyle(
+              fontSize: 11,
               fontWeight: FontWeight.w600,
+              color: color,
             ),
           ),
         ],
@@ -635,11 +595,12 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Tag chip helper for rendering category and condition labels.
   Widget _buildTag(String text, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
-        color: ArtistColors.light.withOpacity(0.65),
+        color: ArtistColors.light,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -649,9 +610,10 @@ class _ProductDetailsState extends State<ProductDetails> {
           const SizedBox(width: 5),
           Text(
             text,
-            style: ArtistTextStyles.small.copyWith(
-              color: ArtistColors.primary,
+            style: const TextStyle(
+              fontSize: 10,
               fontWeight: FontWeight.w600,
+              color: ArtistColors.primary,
             ),
           ),
         ],
@@ -659,91 +621,85 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // SELLER SECTION
-
+  /// Seller summary card with rating, listings count, and profile navigation link.
   Widget _buildSellerSection() {
-    final artistSeller = isArtistSeller;
-
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(
-                artistSeller ? 'ReMaker' : 'Seller',
-                style: ArtistTextStyles.title.copyWith(fontSize: 17),
+              const Text(
+                'Seller',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: ArtistColors.textPrimary,
+                ),
               ),
               const Spacer(),
               TextButton(
                 onPressed: _openSellerProfile,
-                child: Text(
+                child: const Text(
                   'View Profile',
-                  style: ArtistTextStyles.bodyMedium.copyWith(
-                    fontSize: 11,
-                    color: ArtistColors.primary,
-                  ),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 9),
-
-          // Entire seller card is tappable.
-          Material(
-            color: Colors.transparent,
+          InkWell(
+            onTap: _openSellerProfile,
             borderRadius: BorderRadius.circular(15),
-            child: InkWell(
-              onTap: _openSellerProfile,
-              borderRadius: BorderRadius.circular(15),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: ArtistColors.background,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: ArtistColors.border),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: ArtistColors.background,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: ArtistColors.border.withOpacity(0.45),
                 ),
-                child: Row(
-                  children: [
-                    _buildSellerAvatar(),
-
-                    const SizedBox(width: 12),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  seller,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: ArtistTextStyles.bodyMedium.copyWith(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: const BoxDecoration(
+                      color: ArtistColors.light,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.person_rounded,
+                      color: ArtistColors.primary,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                seller,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: ArtistColors.textPrimary,
                                 ),
                               ),
-                              const SizedBox(width: 5),
-
-                              Icon(
-                                artistSeller
-                                    ? Icons.verified_rounded
-                                    : Icons.verified_rounded,
-                                size: 16,
-                                color: artistSeller
-                                    ? ArtistColors.primary
-                                    : ArtistColors.success,
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 4),
-
-                          Row(
-                            children: [
+                            ),
+                            const SizedBox(width: 5),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            if (sellerRating > 0) ...[
                               const Icon(
                                 Icons.star_rounded,
                                 size: 14,
@@ -751,63 +707,59 @@ class _ProductDetailsState extends State<ProductDetails> {
                               ),
                               const SizedBox(width: 3),
                               Text(
-                                '4.8',
-                                style: ArtistTextStyles.bodyMedium.copyWith(
+                                sellerRating.toStringAsFixed(1),
+                                style: const TextStyle(
                                   fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: ArtistColors.textPrimary,
                                 ),
                               ),
                               const SizedBox(width: 7),
-                              Text(
-                                artistSeller ? 'ReMaker' : '127 listings',
-                                style: ArtistTextStyles.caption,
-                              ),
                             ],
-                          ),
-
-                          const SizedBox(height: 3),
-
-                          Text(
-                            artistSeller
-                                ? 'Verified EcoLoop ReMaker'
-                                : 'EcoLoop member',
-                            style: ArtistTextStyles.caption,
-                          ),
-                        ],
-                      ),
+                            Text(
+                              '$sellerListings listings',
+                              style: ArtistTextStyles.caption,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          isArtistSeller ? 'EcoLoop ReMaker' : 'EcoLoop seller',
+                          style: ArtistTextStyles.caption,
+                        ),
+                      ],
                     ),
-
-                    const Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 14,
-                      color: ArtistColors.textSecondary,
-                    ),
-                  ],
-                ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: ArtistColors.textSecondary,
+                  ),
+                ],
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
-              color: ArtistColors.light.withOpacity(0.45),
+              color: ArtistColors.light.withOpacity(0.55),
               borderRadius: BorderRadius.circular(11),
             ),
-            child: Row(
+            child: const Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.shield_outlined,
                   size: 18,
                   color: ArtistColors.primary,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Keep conversations and payments inside EcoLoop for a safer transaction.',
-                    style: ArtistTextStyles.small.copyWith(
+                    style: TextStyle(
                       fontSize: 10.5,
+                      color: ArtistColors.textSecondary,
                       height: 1.4,
                     ),
                   ),
@@ -820,80 +772,13 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // SELLER AVATAR
-
-  Widget _buildSellerAvatar() {
-    final image = sellerProfileData['image']?.toString() ?? '';
-
-    if (image.isNotEmpty) {
-      return ClipOval(
-        child: Image.network(
-          image,
-          width: 52,
-          height: 52,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
-            return _sellerAvatarFallback();
-          },
-        ),
-      );
-    }
-
-    return _sellerAvatarFallback();
-  }
-
-  Widget _sellerAvatarFallback() {
-    final initial = seller.isNotEmpty
-        ? seller.substring(0, 1).toUpperCase()
-        : 'S';
-
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: const BoxDecoration(
-        color: ArtistColors.light,
-        shape: BoxShape.circle,
-      ),
-      child: Center(
-        child: Text(
-          initial,
-          style: ArtistTextStyles.heading.copyWith(
-            color: ArtistColors.primary,
-            fontSize: 21,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ROLE-BASED PROFILE NAVIGATION
-
-  void _openSellerProfile() {
-    final profileData = sellerProfileData;
-
-    if (isArtistSeller) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ArtistProfile(artist: profileData)),
-      );
-      return;
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => SellerProfile(seller: profileData)),
-    );
-  }
-
-  // LOCATION
-
+  /// Item location detail row widget.
   Widget _buildLocationSection() {
     return _section(
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () {
-          _showMessage('Location details will be connected later.');
+          _showMessage(_sellerLocation);
         },
         child: Row(
           children: [
@@ -914,9 +799,13 @@ class _ProductDetailsState extends State<ProductDetails> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Item Location',
-                    style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 13),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: ArtistColors.textPrimary,
+                    ),
                   ),
                   const SizedBox(height: 3),
                   Text(location, style: ArtistTextStyles.caption),
@@ -934,41 +823,44 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // DESCRIPTION
-
+  /// Full text description and sustainability impact card.
   Widget _buildDescriptionSection() {
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'About this item',
-            style: ArtistTextStyles.title.copyWith(fontSize: 18),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: ArtistColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
             description,
-            style: ArtistTextStyles.body.copyWith(fontSize: 13, height: 1.6),
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.6,
+              color: ArtistColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
-              color: ArtistColors.light.withOpacity(0.55),
+              color: ArtistColors.light.withOpacity(0.65),
               borderRadius: BorderRadius.circular(11),
             ),
-            child: Row(
+            child: const Row(
               children: [
-                const Icon(
-                  Icons.eco_outlined,
-                  size: 18,
-                  color: ArtistColors.success,
-                ),
-                const SizedBox(width: 7),
+                Icon(Icons.eco_outlined, size: 18, color: ArtistColors.success),
+                SizedBox(width: 7),
                 Expanded(
                   child: Text(
                     'Buying pre-owned helps extend the life of useful products.',
-                    style: ArtistTextStyles.small.copyWith(
+                    style: TextStyle(
                       fontSize: 11,
                       color: ArtistColors.success,
                       fontWeight: FontWeight.w500,
@@ -983,16 +875,19 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ITEM INFORMATION
-
+  /// Key specifications list including category, condition, and listing date.
   Widget _buildItemInformation() {
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Item Information',
-            style: ArtistTextStyles.title.copyWith(fontSize: 18),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: ArtistColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 16),
           _infoRow(Icons.category_outlined, 'Category', category),
@@ -1002,7 +897,11 @@ class _ProductDetailsState extends State<ProductDetails> {
             'Availability',
             '$availableQuantity item${availableQuantity == 1 ? '' : 's'} available',
           ),
-          _infoRow(Icons.calendar_today_outlined, 'Listed', listedDate),
+          _infoRow(
+            Icons.calendar_today_outlined,
+            'Listed',
+            _displayReviewDate(_product['createdAt']),
+          ),
           _infoRow(
             Icons.local_shipping_outlined,
             'Delivery',
@@ -1013,6 +912,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Helper row widget for individual item specification items.
   Widget _infoRow(IconData icon, String title, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
@@ -1020,13 +920,23 @@ class _ProductDetailsState extends State<ProductDetails> {
         children: [
           Icon(icon, size: 19, color: ArtistColors.primary),
           const SizedBox(width: 10),
-          Text(title, style: ArtistTextStyles.caption),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              color: ArtistColors.textSecondary,
+            ),
+          ),
           const Spacer(),
           Flexible(
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 12),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: ArtistColors.textPrimary,
+              ),
             ),
           ),
         ],
@@ -1034,8 +944,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // REVIEWS
-
+  /// Reviews are loaded from the backend; no sample reviews are displayed.
   Widget _buildReviewsSection() {
     return _section(
       child: Column(
@@ -1043,78 +952,187 @@ class _ProductDetailsState extends State<ProductDetails> {
         children: [
           Row(
             children: [
-              Text(
+              const Text(
                 'Reviews',
-                style: ArtistTextStyles.title.copyWith(fontSize: 18),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: ArtistColors.textPrimary,
+                ),
               ),
               const Spacer(),
               TextButton(
                 onPressed: _openAllReviews,
-                child: Text(
-                  'See all',
-                  style: ArtistTextStyles.bodyMedium.copyWith(
-                    fontSize: 11,
-                    color: ArtistColors.primary,
-                  ),
-                ),
+                child: const Text('See all'),
               ),
             ],
           ),
           const SizedBox(height: 8),
           _buildRatingSummary(),
-          const SizedBox(height: 16),
-          _buildReviewCard(
-            name: 'Priya S.',
-            rating: 5,
-            date: '2 weeks ago',
-            review:
-                'Great quality! Exactly as shown. Very sturdy and easy to assemble.',
-            imageCount: 2,
-          ),
-          const SizedBox(height: 10),
-          _buildReviewCard(
-            name: 'Amit K.',
-            rating: 4,
-            date: '1 month ago',
-            review:
-                'Good product for the price. Minor scratches but overall great.',
-            imageCount: 1,
-          ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 43,
-            child: OutlinedButton.icon(
-              onPressed: _writeReview,
-              icon: const Icon(Icons.rate_review_outlined, size: 17),
-              label: Text(
-                'Write a Review',
-                style: ArtistTextStyles.bodyMedium.copyWith(
-                  fontSize: 12,
+          if (_reviewsLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
                   color: ArtistColors.primary,
                 ),
               ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: ArtistColors.primary,
-                side: const BorderSide(color: ArtistColors.primary),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            )
+          else if (_liveReviews.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Center(
+                child: Text(
+                  'No reviews for this product yet.',
+                  style: ArtistTextStyles.caption,
+                  textAlign: TextAlign.center,
                 ),
               ),
+            )
+          else
+            ..._liveReviews
+                .take(3)
+                .map(
+                  (review) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _buildReviewCard(
+                      name:
+                          (review['reviewerName'] ??
+                                  review['name'] ??
+                                  review['userName'] ??
+                                  'EcoLoop buyer')
+                              .toString(),
+                      rating: _intValue(review['rating']).clamp(1, 5),
+                      date: _displayReviewDate(
+                        review['createdAt'] ?? review['date'],
+                      ),
+                      review:
+                          (review['comment'] ??
+                                  review['review'] ??
+                                  review['text'] ??
+                                  '')
+                              .toString(),
+                      imageCount: 0,
+                    ),
+                  ),
+                ),
+          const SizedBox(height: 8),
+          if (_eligibilityLoading)
+            const LinearProgressIndicator(minHeight: 2)
+          else if (_canReview)
+            SizedBox(
+              width: double.infinity,
+              height: 43,
+              child: OutlinedButton.icon(
+                onPressed: _writeReview,
+                icon: const Icon(Icons.rate_review_outlined, size: 17),
+                label: const Text(
+                  'Write a Review',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ),
+            )
+          else
+            Text(
+              'Only buyers whose order for this product is marked Delivered can review it.',
+              style: ArtistTextStyles.caption.copyWith(
+                color: ArtistColors.textSecondary,
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 
+  Future<void> _loadReviews() async {
+    final id = _currentProductId;
+    if (id.isEmpty) return;
+    if (mounted) setState(() => _reviewsLoading = true);
+    try {
+      final response = await _api.get('/products/$id/reviews');
+      final root = _asMap(response);
+      final nested = _asMap(root['data']);
+      final dynamic rows = response is List
+          ? response
+          : (root['reviews'] ??
+                root['items'] ??
+                nested['reviews'] ??
+                nested['items'] ??
+                const []);
+      final parsed = rows is List
+          ? rows
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList()
+          : <Map<String, dynamic>>[];
+      if (!mounted) return;
+      setState(() => _liveReviews = parsed);
+    } catch (_) {
+      if (mounted) setState(() => _liveReviews = []);
+    } finally {
+      if (mounted) setState(() => _reviewsLoading = false);
+    }
+  }
+
+  Future<void> _checkReviewEligibility() async {
+    final productId = _currentProductId;
+    if (productId.isEmpty) return;
+    if (mounted) setState(() => _eligibilityLoading = true);
+    try {
+      final response = await _api.get(
+        '/products/$productId/review-eligibility',
+      );
+      final root = _asMap(response);
+      final data = _asMap(root['data']);
+      final result = data.isNotEmpty ? data : root;
+      final eligible =
+          result['eligible'] == true ||
+          result['canReview'] == true ||
+          result['can_review'] == true;
+      final orderId = (result['orderId'] ?? result['order_id'] ?? '')
+          .toString()
+          .trim();
+      if (!mounted) return;
+      setState(() {
+        _canReview = eligible && orderId.isNotEmpty;
+        _eligibleOrderId = orderId.isEmpty ? null : orderId;
+      });
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          _canReview = false;
+          _eligibleOrderId = null;
+        });
+    } finally {
+      if (mounted) setState(() => _eligibilityLoading = false);
+    }
+  }
+
+  int _intValue(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  String _displayReviewDate(dynamic value) {
+    if (value == null || value.toString().trim().isEmpty)
+      return 'Date unavailable';
+    final date = DateTime.tryParse(value.toString());
+    if (date == null) return value.toString();
+    final local = date.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/'
+        '${local.month.toString().padLeft(2, '0')}/${local.year}';
+  }
+
+  /// Summary bar showing average score and distribution chart for star ratings.
   Widget _buildRatingSummary() {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: ArtistColors.background,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: ArtistColors.border),
+        border: Border.all(color: ArtistColors.border.withOpacity(0.4)),
       ),
       child: Row(
         children: [
@@ -1122,7 +1140,11 @@ class _ProductDetailsState extends State<ProductDetails> {
             children: [
               Text(
                 rating.toStringAsFixed(1),
-                style: ArtistTextStyles.heading.copyWith(fontSize: 30),
+                style: const TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  color: ArtistColors.textPrimary,
+                ),
               ),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1144,11 +1166,13 @@ class _ProductDetailsState extends State<ProductDetails> {
           Expanded(
             child: Column(
               children: [
-                _ratingBar(5, 0.82),
-                _ratingBar(4, 0.12),
-                _ratingBar(3, 0.04),
-                _ratingBar(2, 0.01),
-                _ratingBar(1, 0.01),
+                const Text(
+                  'Ratings appear after verified reviews.',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: ArtistColors.textSecondary,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1157,6 +1181,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Helper bar widget rendering percentage distribution for individual star ratings.
   Widget _ratingBar(int number, double percentage) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -1166,7 +1191,10 @@ class _ProductDetailsState extends State<ProductDetails> {
             width: 15,
             child: Text(
               '$number',
-              style: ArtistTextStyles.small.copyWith(fontSize: 9),
+              style: const TextStyle(
+                fontSize: 9,
+                color: ArtistColors.textSecondary,
+              ),
             ),
           ),
           const Icon(Icons.star_rounded, size: 11, color: Color(0xFFFFB300)),
@@ -1177,7 +1205,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               child: LinearProgressIndicator(
                 minHeight: 5,
                 value: percentage,
-                backgroundColor: ArtistColors.border.withOpacity(0.35),
+                backgroundColor: ArtistColors.border.withOpacity(0.3),
                 color: ArtistColors.primary,
               ),
             ),
@@ -1187,6 +1215,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Review item card showing reviewer details, score, text, and user media.
   Widget _buildReviewCard({
     required String name,
     required int rating,
@@ -1199,7 +1228,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       decoration: BoxDecoration(
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: ArtistColors.border),
+        border: Border.all(color: ArtistColors.border.withOpacity(0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1226,7 +1255,11 @@ class _ProductDetailsState extends State<ProductDetails> {
                   children: [
                     Text(
                       name,
-                      style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 11),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: ArtistColors.textPrimary,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Row(
@@ -1258,7 +1291,11 @@ class _ProductDetailsState extends State<ProductDetails> {
           const SizedBox(height: 9),
           Text(
             review,
-            style: ArtistTextStyles.small.copyWith(fontSize: 11, height: 1.45),
+            style: const TextStyle(
+              fontSize: 11,
+              height: 1.45,
+              color: ArtistColors.textSecondary,
+            ),
           ),
           if (imageCount > 0) ...[
             const SizedBox(height: 9),
@@ -1286,16 +1323,19 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // ECOLOOP INFO
-
+  /// Informational section highlighting platform advantages and guarantees.
   Widget _buildEcoLoopInfo() {
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Why buy through EcoLoop?',
-            style: ArtistTextStyles.title.copyWith(fontSize: 18),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: ArtistColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 16),
           _benefitRow(
@@ -1323,6 +1363,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Benefit row item for platform highlights.
   Widget _benefitRow(IconData icon, String title, String subtitle) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 17),
@@ -1333,7 +1374,7 @@ class _ProductDetailsState extends State<ProductDetails> {
             height: 38,
             width: 38,
             decoration: BoxDecoration(
-              color: ArtistColors.light.withOpacity(0.55),
+              color: ArtistColors.light,
               borderRadius: BorderRadius.circular(11),
             ),
             child: Icon(icon, size: 19, color: ArtistColors.primary),
@@ -1345,14 +1386,19 @@ class _ProductDetailsState extends State<ProductDetails> {
               children: [
                 Text(
                   title,
-                  style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 13),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: ArtistColors.textPrimary,
+                  ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   subtitle,
-                  style: ArtistTextStyles.small.copyWith(
+                  style: const TextStyle(
                     fontSize: 11,
                     height: 1.4,
+                    color: ArtistColors.textSecondary,
                   ),
                 ),
               ],
@@ -1363,10 +1409,12 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // SIMILAR PRODUCTS
-
+  /// Horizontal scrolling carousel of related product recommendations.
   Widget _buildSimilarProducts() {
+    // Similar items should be loaded from GET /products by the marketplace
+    // screen. Do not display hard-coded sample listings here.
     final products = _similarProducts;
+    if (products.isEmpty && !_relatedLoading) return const SizedBox.shrink();
 
     return Container(
       color: ArtistColors.surface,
@@ -1378,46 +1426,52 @@ class _ProductDetailsState extends State<ProductDetails> {
             padding: const EdgeInsets.only(right: 20),
             child: Row(
               children: [
-                Expanded(
+                const Expanded(
                   child: Text(
                     'Similar Products',
-                    style: ArtistTextStyles.title.copyWith(fontSize: 18),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: ArtistColors.textPrimary,
+                    ),
                   ),
                 ),
                 TextButton(
-                  onPressed: () {
-                    _showMessage('More products will open later.');
-                  },
-                  child: Text(
+                  onPressed: _loadRelatedProducts,
+                  child: const Text(
                     'See All',
-                    style: ArtistTextStyles.bodyMedium.copyWith(
-                      fontSize: 11,
-                      color: ArtistColors.primary,
-                    ),
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 10),
-          SizedBox(
-            height: 190,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.only(right: 20),
-              itemCount: products.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 11),
-              itemBuilder: (context, index) {
-                return _buildSimilarProductCard(products[index]);
-              },
+          if (_relatedLoading)
+            const Padding(
+              padding: EdgeInsets.only(right: 20, bottom: 8),
+              child: LinearProgressIndicator(minHeight: 2),
             ),
-          ),
+          if (products.isNotEmpty)
+            SizedBox(
+              height: 190,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.only(right: 20),
+                itemCount: products.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 11),
+                itemBuilder: (context, index) {
+                  return _buildSimilarProductCard(products[index]);
+                },
+              ),
+            ),
         ],
       ),
     );
   }
 
+  /// Card item rendered inside the similar products carousel.
   Widget _buildSimilarProductCard(Map<String, dynamic> product) {
     return GestureDetector(
       onTap: () {
@@ -1440,14 +1494,19 @@ class _ProductDetailsState extends State<ProductDetails> {
                     height: 125,
                     color: ArtistColors.light,
                     child: Image.network(
-                      product['image'].toString(),
+                      (product['image'] ??
+                              product['imageUrl'] ??
+                              product['imageURL'] ??
+                              ((product['imageUrls'] is List &&
+                                      (product['imageUrls'] as List).isNotEmpty)
+                                  ? (product['imageUrls'] as List).first
+                                  : ''))
+                          .toString(),
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) {
-                        return const Center(
-                          child: Icon(
-                            Icons.image_outlined,
-                            color: ArtistColors.primary,
-                          ),
+                        return const Icon(
+                          Icons.image_outlined,
+                          color: ArtistColors.primary,
                         );
                       },
                     ),
@@ -1474,16 +1533,21 @@ class _ProductDetailsState extends State<ProductDetails> {
             ),
             const SizedBox(height: 7),
             Text(
-              product['title'].toString(),
+              (product['title'] ?? 'Product').toString(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 11),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: ArtistColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 3),
             Text(
-              '₹${_formatPrice(_extractNumericPrice(product['price'].toString()))}',
-              style: ArtistTextStyles.bodyMedium.copyWith(
+              '₹${_formatPrice(_extractNumericPrice((product['price'] ?? 0).toString()))}',
+              style: const TextStyle(
                 fontSize: 12,
+                fontWeight: FontWeight.w800,
                 color: ArtistColors.primary,
               ),
             ),
@@ -1493,65 +1557,70 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  List<Map<String, dynamic>> get _similarProducts {
-    return [
-      {
-        'id': 'similar_1',
-        'title': 'Laptop Table',
-        'price': 1800,
-        'condition': 'Good',
-        'category': category,
-        'seller': 'Amit K.',
-        'sellerType': 'user',
-        'location': 'Ahmedabad, Gujarat',
-        'availableQuantity': 3,
-        'image':
-            'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=600&q=80',
-      },
-      {
-        'id': 'similar_2',
-        'title': 'Bookshelf',
-        'price': 2200,
-        'condition': 'Used',
-        'category': category,
-        'seller': 'Neha P.',
-        'sellerType': 'user',
-        'location': 'Ahmedabad, Gujarat',
-        'availableQuantity': 2,
-        'image':
-            'https://images.unsplash.com/photo-1594620302200-9a762244a156?auto=format&fit=crop&w=600&q=80',
-      },
-      {
-        'id': 'similar_3',
-        'title': 'Upcycled Office Chair',
-        'price': 3500,
-        'condition': 'Good',
-        'category': category,
-        'seller': 'Vivek ReMaker',
-        'sellerType': 'artist',
-        'location': 'Gandhinagar, Gujarat',
-        'availableQuantity': 4,
-        'image':
-            'https://images.unsplash.com/photo-1580480055273-228ff5388ef8?auto=format&fit=crop&w=600&q=80',
-      },
-      {
-        'id': 'similar_4',
-        'title': 'Reclaimed Computer Desk',
-        'price': 2900,
-        'condition': 'Good',
-        'category': category,
-        'seller': 'Rahul ReMaker',
-        'sellerType': 'artist',
-        'location': 'Ahmedabad, Gujarat',
-        'availableQuantity': 2,
-        'image':
-            'https://images.unsplash.com/photo-1518455027359-f3f8164ba6b0?auto=format&fit=crop&w=600&q=80',
-      },
-    ];
+  /// Similar products are fetched from GET /products; no demo products are injected.
+  List<Map<String, dynamic>> get _similarProducts => _relatedProducts;
+
+  Future<void> _loadRelatedProducts() async {
+    final currentId = _currentProductId;
+    if (currentId.isEmpty) return;
+    if (mounted) setState(() => _relatedLoading = true);
+    try {
+      final categoryId =
+          (_product['categoryId'] ?? _product['category_id'] ?? '')
+              .toString()
+              .trim();
+      final response = await _api.get(
+        '/products',
+        query: <String, dynamic>{
+          if (categoryId.isNotEmpty) 'categoryId': categoryId,
+          'limit': 12,
+        },
+      );
+      final root = _asMap(response);
+      final nested = _asMap(root['data']);
+      final dynamic rows = response is List
+          ? response
+          : (root['products'] ??
+                root['items'] ??
+                nested['products'] ??
+                nested['items'] ??
+                const []);
+      final parsed = rows is List
+          ? rows
+                .whereType<Map>()
+                .map((row) => Map<String, dynamic>.from(row))
+                .where((row) {
+                  final id =
+                      (row['productId'] ?? row['product_id'] ?? row['id'] ?? '')
+                          .toString();
+                  final status = (row['status'] ?? 'published')
+                      .toString()
+                      .toLowerCase();
+                  return id.isNotEmpty &&
+                      id != currentId &&
+                      status != 'archived' &&
+                      status != 'deleted' &&
+                      status != 'sold' &&
+                      status != 'out_of_stock';
+                })
+                .take(8)
+                .toList()
+          : <Map<String, dynamic>>[];
+      for (final item in parsed) {
+        final rawImages = item['imageUrls'] ?? item['images'];
+        if (rawImages is List && rawImages.isNotEmpty) {
+          item['image'] ??= rawImages.first.toString();
+        }
+      }
+      if (mounted) setState(() => _relatedProducts = parsed);
+    } catch (_) {
+      if (mounted) setState(() => _relatedProducts = <Map<String, dynamic>>[]);
+    } finally {
+      if (mounted) setState(() => _relatedLoading = false);
+    }
   }
 
-  // BOTTOM BAR
-
+  /// Persistent bottom purchase bar for quantity selection, cart addition, and instant checkout.
   Widget _buildBottomBar() {
     return Positioned(
       left: 0,
@@ -1578,7 +1647,9 @@ class _ProductDetailsState extends State<ProductDetails> {
                 decoration: BoxDecoration(
                   color: ArtistColors.light,
                   borderRadius: BorderRadius.circular(13),
-                  border: Border.all(color: ArtistColors.border),
+                  border: Border.all(
+                    color: ArtistColors.border.withOpacity(0.4),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -1598,8 +1669,10 @@ class _ProductDetailsState extends State<ProductDetails> {
                       child: Text(
                         '$_quantity',
                         textAlign: TextAlign.center,
-                        style: ArtistTextStyles.bodyMedium.copyWith(
+                        style: const TextStyle(
                           fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: ArtistColors.textPrimary,
                         ),
                       ),
                     ),
@@ -1625,16 +1698,16 @@ class _ProductDetailsState extends State<ProductDetails> {
                       ),
                       padding: EdgeInsets.zero,
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.shopping_cart_outlined, size: 18),
-                        const SizedBox(width: 6),
+                        Icon(Icons.shopping_cart_outlined, size: 18),
+                        SizedBox(width: 6),
                         Text(
                           'Add to Cart',
-                          style: ArtistTextStyles.bodyMedium.copyWith(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: ArtistColors.primary,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
@@ -1660,16 +1733,16 @@ class _ProductDetailsState extends State<ProductDetails> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
+                        const Text(
                           'Buy Now',
-                          style: ArtistTextStyles.button.copyWith(fontSize: 13),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         Text(
                           '₹${_formatPrice(priceValue * _quantity)}',
-                          style: ArtistTextStyles.button.copyWith(
-                            fontSize: 10,
-                            height: 1.1,
-                          ),
+                          style: const TextStyle(fontSize: 10, height: 1.1),
                         ),
                       ],
                     ),
@@ -1683,8 +1756,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // QUANTITY
-
+  /// Increments quantity selection up to maximum available stock.
   void _increaseQuantity() {
     if (_quantity < availableQuantity) {
       setState(() {
@@ -1697,21 +1769,24 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
   }
 
-  // CART
-
+  /// Formats product data and presents the cart popup drawer.
   void _addToCart() {
+    if (_currentProductId.isEmpty) {
+      _showMessage('This product has no valid ID and cannot be added to cart.');
+      return;
+    }
     if (availableQuantity <= 0) {
       _showMessage('This product is currently unavailable.');
       return;
     }
 
-    final cartProduct = Map<String, dynamic>.from(widget.product);
+    final cartProduct = Map<String, dynamic>.from(_product);
 
     cartProduct['id'] =
-        widget.product['productId'] ?? widget.product['id'] ?? productId;
+        _product['productId'] ?? _product['product_id'] ?? _product['id'] ?? '';
 
     cartProduct['productId'] =
-        widget.product['productId'] ?? widget.product['id'] ?? productId;
+        _product['productId'] ?? _product['product_id'] ?? _product['id'] ?? '';
 
     cartProduct['title'] = title;
     cartProduct['price'] = priceValue;
@@ -1719,12 +1794,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     cartProduct['condition'] = condition;
     cartProduct['category'] = category;
     cartProduct['seller'] = seller;
-    cartProduct['sellerType'] = sellerType;
-    cartProduct['sellerRole'] = sellerType; // backward compatibility
-    cartProduct['sellerId'] =
-        widget.product['sellerId'] ??
-        widget.product['artistId'] ??
-        widget.product['userId'];
     cartProduct['location'] = location;
     cartProduct['availableQuantity'] = availableQuantity;
 
@@ -1735,13 +1804,15 @@ class _ProductDetailsState extends State<ProductDetails> {
     if (!cartProduct.containsKey('images')) {
       cartProduct['images'] = images;
     }
-
     CartPopup.addItem(context, item: cartProduct);
   }
 
-  // BUY NOW
-
+  /// Directs user immediately to the checkout flow with selected quantity.
   void _buyNow() {
+    if (_currentProductId.isEmpty) {
+      _showMessage('This product has no valid ID and cannot be purchased.');
+      return;
+    }
     if (availableQuantity <= 0) {
       _showMessage('This product is currently unavailable.');
       return;
@@ -1750,49 +1821,280 @@ class _ProductDetailsState extends State<ProductDetails> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => Checkout(product: widget.product, quantity: _quantity),
+        builder: (_) => Checkout(product: _product, quantity: _quantity),
       ),
     );
   }
 
-  // WISHLIST
+  String get _currentProductId =>
+      (_product['productId'] ?? _product['product_id'] ?? _product['id'] ?? '')
+          .toString()
+          .trim();
 
-  void _toggleWishlist() {
-    setState(() {
-      _isWishlisted = !_isWishlisted;
-    });
-
-    _showMessage(
-      _isWishlisted ? 'Added to your wishlist.' : 'Removed from your wishlist.',
-    );
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), v));
+    return <String, dynamic>{};
   }
 
-  // REVIEWS
+  Future<void> _syncWishlistState() async {
+    final id = _currentProductId;
+    if (id.isEmpty) return;
+    try {
+      final response = await _api.get('/wishlist');
+      final root = _asMap(response);
+      final data = _asMap(root['data']);
+      final rows = response is List
+          ? response
+          : (root['items'] ??
+                root['products'] ??
+                root['wishlist'] ??
+                data['items'] ??
+                data['products'] ??
+                data['wishlist'] ??
+                const []);
+      if (rows is! List) return;
+      final saved = rows.any((row) {
+        final item = _asMap(row);
+        final nested = _asMap(item['product']);
+        final productId =
+            (item['productId'] ??
+                    item['product_id'] ??
+                    item['id'] ??
+                    nested['productId'] ??
+                    nested['product_id'] ??
+                    nested['id'] ??
+                    '')
+                .toString();
+        return productId == id;
+      });
+      if (mounted) setState(() => _isWishlisted = saved);
+    } catch (_) {
+      // Keep the state passed from the marketplace if wishlist is temporarily unavailable.
+    }
+  }
 
-  void _openAllReviews() {
+  /// Saves/removes the product through the backend and rolls back on failure.
+  Future<void> _toggleWishlist() async {
+    final id = _currentProductId;
+    if (id.isEmpty) {
+      _showMessage('This item has no product ID and cannot be saved.');
+      return;
+    }
+    if (_wishlistBusy) return;
+    final wasSaved = _isWishlisted;
+    setState(() {
+      _wishlistBusy = true;
+      _isWishlisted = !wasSaved;
+    });
+    try {
+      if (wasSaved) {
+        await _api.delete('/wishlist/$id');
+      } else {
+        await _api.post('/wishlist', <String, dynamic>{'productId': id});
+      }
+      if (mounted)
+        _showMessage(
+          wasSaved ? 'Removed from your wishlist.' : 'Added to your wishlist.',
+        );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isWishlisted = wasSaved);
+        _showMessage('Wishlist update failed. Please sign in and try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _wishlistBusy = false);
+    }
+  }
+
+  /// Opens full profile page for the seller.
+  void _openSellerProfile() {
+    if (isArtistSeller) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ArtistProfile(
+            artist: {
+              'artistId': _product['sellerId'] ?? _product['artistId'],
+              'sellerType': 'artist',
+              'profileImage':
+                  _product['sellerImage'] ?? _product['artistImage'] ?? '',
+              'name': seller,
+              'location': location,
+              'rating': _product['sellerRating'] ?? _product['rating'] ?? 0,
+              'reviews':
+                  _product['sellerReviewCount'] ?? _product['reviewCount'] ?? 0,
+              'followers': _product['followerCount'] ?? 0,
+              'products': _product['sellerProductCount'] ?? 0,
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ProductReviews(product: widget.product),
+        builder: (_) => SellerProfile(
+          seller: {
+            'userId': _product['sellerId'] ?? _product['userId'],
+            'sellerType': 'user',
+            'profileImage': _product['sellerImage'] ?? '',
+            'name': seller,
+            'location': location,
+            'rating': _product['sellerRating'] ?? _product['rating'] ?? 0,
+            'reviews':
+                _product['sellerReviewCount'] ?? _product['reviewCount'] ?? 0,
+            'listings': _product['sellerProductCount'] ?? 0,
+            'sold': _product['salesCount'] ?? 0,
+            'positive': _product['positiveRating'] ?? 0,
+          },
+        ),
       ),
     );
   }
 
-  void _writeReview() {
+  /// Opens the complete list of reviews for this product.
+  void _openAllReviews() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => WriteReview(product: widget.product)),
+      MaterialPageRoute(builder: (_) => ProductReviews(product: _product)),
     );
   }
 
-  // SHARE
-
-  void _shareProduct() {
-    _showMessage('Product sharing will be connected later.');
+  /// Opens form interface for submitting a new review.
+  Future<void> _writeReview() async {
+    if (!_canReview || _eligibleOrderId == null) {
+      _showMessage('A delivered purchase is required before you can review.');
+      return;
+    }
+    final productForReview = <String, dynamic>{
+      ..._product,
+      'reviewOrderId': _eligibleOrderId,
+    };
+    final submitted = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => WriteReview(product: productForReview)),
+    );
+    if (submitted == true && mounted) {
+      await _loadReviews();
+      await _checkReviewEligibility();
+    }
   }
 
-  // MORE OPTIONS
+  /// Sharing is kept separate from backend mutations; this screen does not invent a public product URL.
+  /// Shares the real product details and, when available, its first valid
+  /// product image through the device's native share sheet.
+  ///
+  /// The app does not currently define a public deep link for product pages,
+  /// so this deliberately shares product details and the product ID rather
+  /// than inventing a URL.
+  Future<void> _shareProduct() async {
+    if (!mounted) return;
 
+    final String productName = title;
+    final String productPrice = price;
+    final String productCondition = condition;
+    final String productCategory = category;
+    final String productDescription = description;
+    final String productId = _currentProductId.trim();
+
+    final String shareText =
+        '''
+♻️ Check out this product on EcoLoop!
+
+$productName
+
+💰 Price: $productPrice
+📦 Condition: $productCondition
+🏷️ Category: $productCategory
+
+$productDescription
+
+${productId.isNotEmpty ? 'Product ID: $productId' : ''}
+
+Discover sustainable products with EcoLoop!
+'''
+            .trim();
+
+    try {
+      final String? imageUrl = images.cast<String?>().firstWhere((String? url) {
+        if (url == null || url.trim().isEmpty) return false;
+        final Uri? uri = Uri.tryParse(url.trim());
+        return uri != null &&
+            (uri.scheme == 'https' || uri.scheme == 'http') &&
+            uri.host.isNotEmpty;
+      }, orElse: () => null);
+
+      XFile? imageFile;
+      if (imageUrl != null) {
+        try {
+          final http.Response response = await http
+              .get(Uri.parse(imageUrl.trim()))
+              .timeout(const Duration(seconds: 15));
+
+          if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+            final Uri uri = Uri.parse(imageUrl.trim());
+            final String path = uri.path.toLowerCase();
+            final String extension = path.endsWith('.png')
+                ? 'png'
+                : path.endsWith('.webp')
+                ? 'webp'
+                : path.endsWith('.gif')
+                ? 'gif'
+                : 'jpg';
+            final String mimeType = extension == 'png'
+                ? 'image/png'
+                : extension == 'webp'
+                ? 'image/webp'
+                : extension == 'gif'
+                ? 'image/gif'
+                : 'image/jpeg';
+
+            imageFile = XFile.fromData(
+              response.bodyBytes,
+              mimeType: mimeType,
+              name: 'ecoloop_product.$extension',
+            );
+          }
+        } catch (_) {
+          // Sharing the text still works if the image cannot be downloaded.
+        }
+      }
+
+      if (!mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          text: shareText,
+          subject: 'Check out $productName on EcoLoop',
+          title: 'Share EcoLoop Product',
+          files: imageFile == null ? null : <XFile>[imageFile],
+          fileNameOverrides: imageFile == null
+              ? null
+              : <String>['ecoloop_product.${_sharedImageExtension()}'],
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Unable to share this product. Please try again.');
+    }
+  }
+
+  /// Chooses a safe filename extension for the shared product image.
+  String _sharedImageExtension() {
+    if (images.isEmpty) return 'jpg';
+
+    final Uri? uri = Uri.tryParse(images.first);
+    final String path = uri?.path.toLowerCase() ?? '';
+
+    if (path.endsWith('.png')) return 'png';
+    if (path.endsWith('.webp')) return 'webp';
+    if (path.endsWith('.gif')) return 'gif';
+    return 'jpg';
+  }
+
+  /// Displays bottom sheet with secondary actions.
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
@@ -1807,14 +2109,12 @@ class _ProductDetailsState extends State<ProductDetails> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Center(
-                  child: Container(
-                    width: 42,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: ArtistColors.border,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: ArtistColors.border,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 const SizedBox(height: 15),
@@ -1823,13 +2123,9 @@ class _ProductDetailsState extends State<ProductDetails> {
                     Icons.favorite_border_rounded,
                     color: ArtistColors.primary,
                   ),
-                  title: Text(
-                    'Add to Wishlist',
-                    style: ArtistTextStyles.bodyMedium,
-                  ),
+                  title: const Text('Add to Wishlist'),
                   onTap: () {
                     Navigator.pop(sheetContext);
-
                     if (!_isWishlisted) {
                       _toggleWishlist();
                     }
@@ -1840,10 +2136,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     Icons.share_outlined,
                     color: ArtistColors.primary,
                   ),
-                  title: Text(
-                    'Share Product',
-                    style: ArtistTextStyles.bodyMedium,
-                  ),
+                  title: const Text('Share Product'),
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _shareProduct();
@@ -1854,10 +2147,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     Icons.rate_review_outlined,
                     color: ArtistColors.primary,
                   ),
-                  title: Text(
-                    'View Reviews',
-                    style: ArtistTextStyles.bodyMedium,
-                  ),
+                  title: const Text('View Reviews'),
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _openAllReviews();
@@ -1868,11 +2158,9 @@ class _ProductDetailsState extends State<ProductDetails> {
                     Icons.flag_outlined,
                     color: ArtistColors.error,
                   ),
-                  title: Text(
+                  title: const Text(
                     'Report Listing',
-                    style: ArtistTextStyles.bodyMedium.copyWith(
-                      color: ArtistColors.error,
-                    ),
+                    style: TextStyle(color: ArtistColors.error),
                   ),
                   onTap: () {
                     Navigator.pop(sheetContext);
@@ -1887,28 +2175,27 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  // REPORT
-
+  /// Footer trigger button for reporting an issue with the product listing.
   Widget _buildReportSection() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 15, 20, 10),
       child: InkWell(
         onTap: _reportProduct,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
+              Icon(
                 Icons.flag_outlined,
                 size: 17,
                 color: ArtistColors.textSecondary,
               ),
-              const SizedBox(width: 7),
+              SizedBox(width: 7),
               Text(
                 'Report this listing',
-                style: ArtistTextStyles.small.copyWith(
+                style: TextStyle(
                   fontSize: 12,
                   color: ArtistColors.textSecondary,
                   fontWeight: FontWeight.w500,
@@ -1921,108 +2208,266 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Opens a report form and submits the report to the existing Apps Script API.
+  /// Code.gs handles POST /reports/product and stores the report in the Reports sheet.
   void _reportProduct() {
-    showModalBottomSheet(
+    final productId = int.tryParse(_currentProductId.trim());
+    if (productId == null || productId <= 0) {
+      _showMessage(
+        'This listing has an invalid product ID and cannot be reported.',
+      );
+      return;
+    }
+
+    const reasons = <Map<String, dynamic>>[
+      {'label': 'Misleading information', 'icon': Icons.info_outline_rounded},
+      {'label': 'Inappropriate content', 'icon': Icons.block_outlined},
+      {
+        'label': 'Suspicious or scam listing',
+        'icon': Icons.warning_amber_outlined,
+      },
+      {
+        'label': 'Counterfeit or prohibited item',
+        'icon': Icons.gpp_bad_outlined,
+      },
+      {'label': 'Other', 'icon': Icons.more_horiz_rounded},
+    ];
+
+    final detailsController = TextEditingController();
+    String selectedReason = reasons.first['label'] as String;
+    bool submitting = false;
+    String? formError;
+
+    showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: ArtistColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 25),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    height: 4,
-                    width: 42,
-                    decoration: BoxDecoration(
-                      color: ArtistColors.border,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> submitReport() async {
+              if (submitting) return;
+              if (selectedReason == 'Other' &&
+                  detailsController.text.trim().isEmpty) {
+                setSheetState(() {
+                  formError = 'Please describe the issue for an Other report.';
+                });
+                return;
+              }
+
+              setSheetState(() {
+                submitting = true;
+                formError = null;
+              });
+
+              try {
+                final response = await _api
+                    .post('/reports/product', <String, dynamic>{
+                      'productId': productId,
+                      'reason': selectedReason,
+                      'details': detailsController.text.trim(),
+                    });
+
+                if (!mounted) return;
+                Navigator.of(sheetContext).pop();
+                final result = _asMap(response);
+                final message = result['message']?.toString().trim();
+                _showMessage(
+                  message != null && message.isNotEmpty
+                      ? message
+                      : 'Report submitted for review.',
+                );
+              } catch (error) {
+                setSheetState(() {
+                  submitting = false;
+                  formError = error.toString().replaceFirst('Exception: ', '');
+                });
+              }
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  14,
+                  20,
+                  20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          height: 4,
+                          width: 42,
+                          decoration: BoxDecoration(
+                            color: ArtistColors.border,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Report Listing',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          color: ArtistColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Tell us why this listing should be reviewed. Your report will be sent to EcoLoop for moderation.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.45,
+                          color: ArtistColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      ...reasons.map((reason) {
+                        final label = reason['label'] as String;
+                        final icon = reason['icon'] as IconData;
+                        final selected = selectedReason == label;
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          leading: Icon(
+                            icon,
+                            color: selected
+                                ? ArtistColors.primary
+                                : ArtistColors.textSecondary,
+                          ),
+                          title: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: ArtistColors.textPrimary,
+                            ),
+                          ),
+                          trailing: Icon(
+                            selected
+                                ? Icons.radio_button_checked_rounded
+                                : Icons.radio_button_unchecked_rounded,
+                            color: selected
+                                ? ArtistColors.primary
+                                : ArtistColors.textSecondary,
+                          ),
+                          onTap: submitting
+                              ? null
+                              : () {
+                                  setSheetState(() {
+                                    selectedReason = label;
+                                    formError = null;
+                                  });
+                                },
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: detailsController,
+                        enabled: !submitting,
+                        minLines: 2,
+                        maxLines: 4,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: InputDecoration(
+                          labelText: selectedReason == 'Other'
+                              ? 'Describe the issue (required)'
+                              : 'Additional details (optional)',
+                          hintText:
+                              'Add details to help us review this listing',
+                          alignLabelWithHint: true,
+                          filled: true,
+                          fillColor: ArtistColors.background,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: ArtistColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: ArtistColors.border),
+                          ),
+                        ),
+                      ),
+                      if (formError != null) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          formError!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: ArtistColors.error,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: submitting ? null : submitReport,
+                          icon: submitting
+                              ? const SizedBox(
+                                  width: 17,
+                                  height: 17,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.flag_outlined, size: 18),
+                          label: Text(
+                            submitting
+                                ? 'Submitting report...'
+                                : 'Submit Report',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ArtistColors.primary,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: ArtistColors.primary
+                                .withOpacity(0.6),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  'Report Listing',
-                  style: ArtistTextStyles.title.copyWith(fontSize: 19),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Why are you reporting this listing?',
-                  style: ArtistTextStyles.caption,
-                ),
-                const SizedBox(height: 15),
-                _reportOption(
-                  'Misleading information',
-                  Icons.info_outline,
-                  sheetContext,
-                ),
-                _reportOption(
-                  'Inappropriate content',
-                  Icons.block_outlined,
-                  sheetContext,
-                ),
-                _reportOption(
-                  'Suspicious or scam listing',
-                  Icons.warning_amber_outlined,
-                  sheetContext,
-                ),
-                _reportOption('Other', Icons.more_horiz_rounded, sheetContext),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
-    );
+    ).whenComplete(detailsController.dispose);
   }
 
-  Widget _reportOption(String title, IconData icon, BuildContext sheetContext) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-      leading: Icon(icon, color: ArtistColors.textSecondary),
-      title: Text(
-        title,
-        style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 13),
-      ),
-      trailing: const Icon(
-        Icons.arrow_forward_ios_rounded,
-        size: 14,
-        color: ArtistColors.textSecondary,
-      ),
-      onTap: () {
-        Navigator.pop(sheetContext);
-        _showMessage('Report submitted for review.');
-      },
-    );
-  }
-
-  // PRICE HELPERS
-
+  /// Helper parsing formatted price strings into integer values.
   int _extractNumericPrice(String value) {
     final cleaned = value.replaceAll('₹', '').replaceAll(',', '').trim();
-
     return int.tryParse(cleaned) ?? 0;
   }
 
+  /// Helper formatting price integers with comma separators.
   String _formatPrice(int value) {
     final valueString = value.toString();
-
-    if (valueString.length <= 3) {
-      return valueString;
-    }
-
     final buffer = StringBuffer();
 
     for (int i = 0; i < valueString.length; i++) {
       final position = valueString.length - i;
-
       buffer.write(valueString[i]);
-
       if (position > 1 && position % 3 == 1) {
         buffer.write(',');
       }
@@ -2031,27 +2476,16 @@ class _ProductDetailsState extends State<ProductDetails> {
     return buffer.toString();
   }
 
-  // SNACKBAR
-
+  /// Displays floating snackbar message feedback.
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: ArtistTextStyles.bodyMedium.copyWith(
-              color: Colors.white,
-              fontSize: 12,
-            ),
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
   }
 
-  // SECTION WRAPPER
-
+  /// Card container block wrapper for primary detail sections.
   Widget _section({required Widget child}) {
     return Container(
       width: double.infinity,

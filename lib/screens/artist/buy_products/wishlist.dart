@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import '../buy_products/product_details.dart';
 
 class Wishlist extends StatefulWidget {
@@ -16,148 +17,132 @@ class _WishlistState extends State<Wishlist> {
 
   String searchQuery = '';
 
-  // DEMO WISHLIST PRODUCTS
+  // Wishlist items are loaded from the authenticated backend.
+  final List<Map<String, dynamic>> _wishlistItems = [];
+  bool _isLoading = true;
+  bool _hasLoadError = false;
+  String _loadError = '';
+  final Set<int> _removingProductIds = <int>{};
 
-  final List<Map<String, dynamic>> _wishlistItems = [
-    {
-      'productId': 'W001',
-      'title': 'Reclaimed Wood Study Table',
-      'price': 2500,
-      'condition': 'Good',
-      'seller': 'Green Crafts Studio',
-      'category': 'Furniture',
-      'location': 'Ahmedabad, Gujarat',
-      'views': 184,
-      'wishlistCount': 26,
-      'availableQuantity': 2,
-      'status': 'active',
-      'description':
-          'Beautiful reclaimed wooden study table created from reusable materials. '
-          'Perfect for studios, workspaces and creative corners.',
-      'image':
-          'https://images.unsplash.com/photo-1518455027359-f3f8164ba6b0'
-          '?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1518455027359-f3f8164ba6b0'
-            '?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 'W002',
-      'title': 'Upcycled Glass Vase',
-      'price': 850,
-      'condition': 'Like New',
-      'seller': 'ReCraft Studio',
-      'category': 'Home & Decor',
-      'location': 'Vadodara, Gujarat',
-      'views': 126,
-      'wishlistCount': 18,
-      'availableQuantity': 4,
-      'status': 'active',
-      'description':
-          'Decorative vase made using recycled glass materials. '
-          'A simple sustainable addition to a creative studio or home.',
-      'image':
-          'https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c'
-          '?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c'
-            '?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 'W003',
-      'title': 'Recycled Fabric Tote Bag',
-      'price': 550,
-      'condition': 'New',
-      'seller': 'Eco Handmade',
-      'category': 'Fashion',
-      'location': 'Surat, Gujarat',
-      'views': 221,
-      'wishlistCount': 31,
-      'availableQuantity': 8,
-      'status': 'active',
-      'description':
-          'Eco-friendly tote bag created using recycled fabric. '
-          'Lightweight, reusable and suitable for everyday use.',
-      'image':
-          'https://images.unsplash.com/photo-1590874103328-eac38a683ce7'
-          '?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1590874103328-eac38a683ce7'
-            '?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 'W004',
-      'title': 'Reclaimed Wood Wall Decor',
-      'price': 1200,
-      'condition': 'Upcycled',
-      'seller': 'ArtCycle Studio',
-      'category': 'Decor',
-      'location': 'Ahmedabad, Gujarat',
-      'views': 96,
-      'wishlistCount': 15,
-      'availableQuantity': 3,
-      'status': 'active',
-      'description':
-          'Handmade wall decoration created from reclaimed wooden pieces. '
-          'Designed for sustainable and creative interiors.',
-      'image':
-          'https://images.unsplash.com/photo-1549490349-8643362247b5'
-          '?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1549490349-8643362247b5'
-            '?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 'W005',
-      'title': 'Handmade Recycled Lamp',
-      'price': 1450,
-      'condition': 'Like New',
-      'seller': 'Creative Earth',
-      'category': 'Lighting',
-      'location': 'Rajkot, Gujarat',
-      'views': 143,
-      'wishlistCount': 23,
-      'availableQuantity': 5,
-      'status': 'active',
-      'description':
-          'Unique decorative lamp made from reused and recycled materials. '
-          'Ideal for sustainable interiors and creative workspaces.',
-      'image':
-          'https://images.unsplash.com/photo-1507473885765-e6ed057f782c'
-          '?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1507473885765-e6ed057f782c'
-            '?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-    {
-      'productId': 'W006',
-      'title': 'Recycled Storage Basket',
-      'price': 450,
-      'condition': 'Good',
-      'seller': 'Green Makers',
-      'category': 'Storage',
-      'location': 'Gandhinagar, Gujarat',
-      'views': 78,
-      'wishlistCount': 11,
-      'availableQuantity': 6,
-      'status': 'active',
-      'description':
-          'Reusable storage basket made from recycled materials. '
-          'Useful for organizing supplies, materials and everyday items.',
-      'image':
-          'https://images.unsplash.com/photo-1586023492125-27b2c045efd7'
-          '?auto=format&fit=crop&w=900&q=85',
-      'images': [
-        'https://images.unsplash.com/photo-1586023492125-27b2c045efd7'
-            '?auto=format&fit=crop&w=1200&q=85',
-      ],
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadWishlist();
+  }
+
+  int _toInt(dynamic value, [int fallback = 0]) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  double _toDouble(dynamic value, [double fallback = 0]) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  String _text(dynamic value, [String fallback = '']) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty || text.toLowerCase() == 'null' ? fallback : text;
+  }
+
+  Future<void> _loadWishlist() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _hasLoadError = false;
+        _loadError = '';
+      });
+    }
+    try {
+      final results = await Future.wait<dynamic>([
+        EcoLoopApi.instance.get('/wishlist'),
+        EcoLoopApi.instance.get('/categories'),
+      ]);
+      final rawWishlist = results[0];
+      final rawCategories = results[1];
+      final categories = <int, String>{};
+      if (rawCategories is List) {
+        for (final item in rawCategories) {
+          if (item is Map) {
+            categories[_toInt(item['categoryId'] ?? item['id'])] = _text(
+              item['name'] ?? item['categoryName'],
+              'Other',
+            );
+          }
+        }
+      }
+      final loaded = <Map<String, dynamic>>[];
+      if (rawWishlist is List) {
+        for (final entry in rawWishlist) {
+          if (entry is! Map) continue;
+          final product = Map<String, dynamic>.from(entry);
+          final id = _toInt(product['productId'] ?? product['id']);
+          if (id <= 0) continue;
+          final imageValues = product['imageUrls'] ?? product['images'];
+          final images = <String>[];
+          if (imageValues is List) {
+            for (final value in imageValues) {
+              final url = _text(value);
+              if (url.startsWith('http')) images.add(url);
+            }
+          } else {
+            final single = _text(product['imageUrl'] ?? product['image']);
+            if (single.startsWith('http')) images.add(single);
+          }
+          final city = _text(product['sellerCity'] ?? product['city']);
+          final state = _text(product['sellerState'] ?? product['state']);
+          final location = [
+            city,
+            state,
+          ].where((part) => part.isNotEmpty).toSet().join(', ');
+          final categoryId = _toInt(product['categoryId']);
+          product['productId'] = id;
+          product['price'] = _toDouble(product['price']);
+          product['quantity'] = _toInt(product['quantity']);
+          product['availableQuantity'] = _toInt(product['availableQuantity']);
+          product['views'] = _toInt(product['views']);
+          product['wishlistCount'] = _toInt(product['wishlistCount']);
+          product['title'] = _text(product['title'], 'Untitled product');
+          product['description'] = _text(product['description']);
+          product['condition'] = _text(product['condition'], 'Not specified');
+          product['seller'] = _text(
+            product['sellerName'] ?? product['seller'],
+            'EcoLoop seller',
+          );
+          product['category'] = _text(
+            product['categoryName'],
+            categories[categoryId] ?? 'Other',
+          );
+          product['location'] = location.isEmpty
+              ? 'Location not provided'
+              : location;
+          product['images'] = images;
+          product['image'] = images.isNotEmpty ? images.first : '';
+          loaded.add(product);
+        }
+      } else {
+        throw const EcoLoopApiException('Wishlist response was not a list.');
+      }
+      if (!mounted) return;
+      setState(() {
+        _wishlistItems
+          ..clear()
+          ..addAll(loaded);
+        _isLoading = false;
+        _hasLoadError = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _hasLoadError = true;
+        _loadError = error is EcoLoopApiException
+            ? error.message
+            : 'Could not load your wishlist. Please check your connection and try again.';
+      });
+    }
+  }
 
   // FILTERED ITEMS
 
@@ -245,7 +230,13 @@ class _WishlistState extends State<Wishlist> {
         ],
       ),
 
-      body: _wishlistItems.isEmpty
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: ArtistColors.primary),
+            )
+          : _hasLoadError
+          ? _buildLoadError()
+          : _wishlistItems.isEmpty
           ? _buildEmptyState()
           : Column(
               children: [
@@ -403,35 +394,41 @@ class _WishlistState extends State<Wishlist> {
   Widget _buildGrid() {
     final items = _filteredItems;
 
-    return GridView.builder(
-      physics: const BouncingScrollPhysics(),
+    return RefreshIndicator(
+      onRefresh: _loadWishlist,
+      color: ArtistColors.primary,
+      child: GridView.builder(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
 
-      padding: const EdgeInsets.fromLTRB(20, 5, 20, 30),
+        padding: const EdgeInsets.fromLTRB(20, 5, 20, 30),
 
-      itemCount: items.length,
+        itemCount: items.length,
 
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 14,
-        childAspectRatio: 0.61,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 14,
+          childAspectRatio: 0.61,
+        ),
+
+        itemBuilder: (context, index) {
+          final product = items[index];
+
+          return _WishlistProductCard(
+            product: product,
+
+            onTap: () {
+              _openProductDetails(product);
+            },
+
+            onRemove: () {
+              _removeProduct(product);
+            },
+          );
+        },
       ),
-
-      itemBuilder: (context, index) {
-        final product = items[index];
-
-        return _WishlistProductCard(
-          product: product,
-
-          onTap: () {
-            _openProductDetails(product);
-          },
-
-          onRemove: () {
-            _removeProduct(product);
-          },
-        );
-      },
     );
   }
 
@@ -444,51 +441,30 @@ class _WishlistState extends State<Wishlist> {
     );
   }
 
-  // REMOVE PRODUCT
-
-  void _removeProduct(Map<String, dynamic> product) {
-    final originalIndex = _wishlistItems.indexOf(product);
-
-    if (originalIndex == -1) return;
-
-    setState(() {
-      _wishlistItems.remove(product);
-    });
-
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            '${product['title']} removed from wishlist.',
-            style: const TextStyle(color: Colors.white, fontSize: 13),
-          ),
-
-          behavior: SnackBarBehavior.floating,
-
-          backgroundColor: ArtistColors.accent,
-
-          margin: const EdgeInsets.all(16),
-
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(11),
-          ),
-
-          action: SnackBarAction(
-            label: 'UNDO',
-            textColor: Colors.white,
-            onPressed: () {
-              setState(() {
-                final index = originalIndex <= _wishlistItems.length
-                    ? originalIndex
-                    : _wishlistItems.length;
-
-                _wishlistItems.insert(index, product);
-              });
-            },
-          ),
-        ),
+  // Remove from the server first; only update the UI after success.
+  Future<void> _removeProduct(Map<String, dynamic> product) async {
+    final id = _toInt(product['productId']);
+    if (id <= 0 || _removingProductIds.contains(id)) return;
+    setState(() => _removingProductIds.add(id));
+    try {
+      await EcoLoopApi.instance.delete('/wishlist/$id');
+      if (!mounted) return;
+      setState(() {
+        _wishlistItems.removeWhere((item) => _toInt(item['productId']) == id);
+        _removingProductIds.remove(id);
+      });
+      _showMessage(
+        '${_text(product['title'], 'Product')} removed from wishlist.',
       );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _removingProductIds.remove(id));
+      _showMessage(
+        error is EcoLoopApiException
+            ? error.message
+            : 'Could not remove this product. Please try again.',
+      );
+    }
   }
 
   // CLEAR WISHLIST
@@ -548,11 +524,7 @@ class _WishlistState extends State<Wishlist> {
               onPressed: () {
                 Navigator.pop(dialogContext);
 
-                setState(() {
-                  _wishlistItems.clear();
-                });
-
-                _showMessage('Wishlist cleared.');
+                _clearWishlist();
               },
 
               style: ElevatedButton.styleFrom(
@@ -573,6 +545,70 @@ class _WishlistState extends State<Wishlist> {
           ],
         );
       },
+    );
+  }
+
+  Future<void> _clearWishlist() async {
+    final ids = _wishlistItems
+        .map((item) => _toInt(item['productId']))
+        .where((id) => id > 0)
+        .toList();
+    try {
+      for (final id in ids) {
+        await EcoLoopApi.instance.delete('/wishlist/$id');
+      }
+      if (!mounted) return;
+      setState(() => _wishlistItems.clear());
+      _showMessage('Wishlist cleared.');
+    } catch (error) {
+      if (!mounted) return;
+      await _loadWishlist();
+      if (mounted) {
+        _showMessage(
+          error is EcoLoopApiException
+              ? error.message
+              : 'Some products could not be removed. Wishlist refreshed.',
+        );
+      }
+    }
+  }
+
+  Widget _buildLoadError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_outlined,
+              size: 48,
+              color: ArtistColors.textSecondary,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Could not load wishlist',
+              style: ArtistTextStyles.title.copyWith(fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _loadError,
+              textAlign: TextAlign.center,
+              style: ArtistTextStyles.body,
+            ),
+            const SizedBox(height: 18),
+            ElevatedButton.icon(
+              onPressed: _loadWishlist,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ArtistColors.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -755,7 +791,9 @@ class _WishlistProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int price = (product['price'] as num?)?.toInt() ?? 0;
+    final int price = product['price'] is num
+        ? (product['price'] as num).round()
+        : int.tryParse(product['price']?.toString() ?? '') ?? 0;
 
     final String image = product['image']?.toString() ?? '';
 

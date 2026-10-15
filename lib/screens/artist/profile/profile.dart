@@ -16,7 +16,6 @@ import '../my_products/selling_orders.dart';
 import '../reviews/review_history.dart';
 import 'aboutyou.dart';
 import 'address_list.dart';
-import 'certification.dart';
 import 'edit_profile.dart';
 import 'followers.dart';
 import 'notification.dart';
@@ -644,16 +643,6 @@ class _ProfileState extends State<Profile> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const Portfolio()),
-          ),
-        ),
-        const _ProfileDivider(),
-        _ProfileTile(
-          icon: Icons.verified_outlined,
-          title: 'Certification',
-          subtitle: 'View your artist certification',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const Certification()),
           ),
         ),
       ],

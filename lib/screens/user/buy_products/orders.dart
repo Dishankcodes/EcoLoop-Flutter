@@ -108,6 +108,29 @@ class _OrdersState extends State<Orders> {
         .join(' ');
   }
 
+  bool _reviewEligible(Map<String, dynamic> order) {
+    final status = (order['status'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('_', ' ');
+    final payment = (order['paymentStatus'] ?? order['payment'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('_', ' ');
+    final statusAllowed = status == 'delivered' || status == 'confirmed';
+    final paid = const {
+      'paid',
+      'completed',
+      'success',
+      'successful',
+      'captured',
+      'cod paid',
+    }.contains(payment);
+    return statusAllowed && paid;
+  }
+
   bool _paymentPending(Map<String, dynamic> order) {
     final String value = (order['paymentStatus'] ?? '')
         .toString()
@@ -408,6 +431,17 @@ class _OrdersState extends State<Orders> {
               ),
             ],
           ),
+          if (_reviewEligible(order)) ...<Widget>[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _openDetails(order),
+                icon: const Icon(Icons.rate_review_outlined),
+                label: const Text('Write Product & Seller Reviews'),
+              ),
+            ),
+          ],
           if (paymentPending) ...<Widget>[
             const SizedBox(height: 10),
             SizedBox(

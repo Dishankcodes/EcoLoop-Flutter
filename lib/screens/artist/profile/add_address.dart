@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 
 class AddAddress extends StatefulWidget {
   final Map<String, dynamic>? address;
@@ -41,17 +42,20 @@ class _AddAddressState extends State<AddAddress> {
     _phoneController = TextEditingController(
       text: address?['phone']?.toString() ?? '',
     );
+    final addressParts = _decodeAddressLine(
+      address?['addressLine']?.toString() ?? '',
+    );
     _houseController = TextEditingController(
-      text: address?['house']?.toString() ?? '',
+      text: address?['house']?.toString() ?? addressParts['house'] ?? '',
     );
     _streetController = TextEditingController(
-      text: address?['street']?.toString() ?? '',
+      text: address?['street']?.toString() ?? addressParts['street'] ?? '',
     );
     _areaController = TextEditingController(
       text: address?['area']?.toString() ?? '',
     );
     _landmarkController = TextEditingController(
-      text: address?['landmark']?.toString() ?? '',
+      text: address?['landmark']?.toString() ?? addressParts['landmark'] ?? '',
     );
     _cityController = TextEditingController(
       text: address?['city']?.toString() ?? '',
@@ -62,7 +66,7 @@ class _AddAddressState extends State<AddAddress> {
     _pincodeController = TextEditingController(
       text: address?['pincode']?.toString() ?? '',
     );
-    final savedType = address?['type']?.toString();
+    final savedType = (address?['type'] ?? address?['label'])?.toString();
     if (savedType == 'Studio' ||
         savedType == 'Workshop' ||
         savedType == 'Other') {
@@ -85,67 +89,125 @@ class _AddAddressState extends State<AddAddress> {
     super.dispose();
   }
 
-  // CURRENT LOCATION
+  // Location permission/geocoding is not part of the existing API contract.
+  // Do not pretend to fetch a location until a location provider is configured.
   Future<void> _useCurrentLocation() async {
     if (_isGettingLocation) return;
-    setState(() {
-      _isGettingLocation = true;
-    });
-    await Future.delayed(const Duration(milliseconds: 900));
+    setState(() => _isGettingLocation = true);
+    await Future<void>.delayed(const Duration(milliseconds: 150));
     if (!mounted) return;
-    setState(() {
-      _isGettingLocation = false;
-    });
+    setState(() => _isGettingLocation = false);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Current location will be connected later.'),
+        content: Text(
+          'Current-location autofill is not configured yet. Please enter the address manually.',
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  // SAVE ADDRESS
+  // SAVE ADDRESS THROUGH THE EXISTING /addresses API.
   Future<void> _saveAddress() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _isSaving) return;
+
     FocusScope.of(context).unfocus();
-    setState(() {
-      _isSaving = true;
-    });
-    await Future.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-    setState(() {
-      _isSaving = false;
-    });
-    final result = {
-      'id':
-          widget.address?['id'] ??
-          'address_${DateTime.now().millisecondsSinceEpoch}',
+    setState(() => _isSaving = true);
+
+    final addressLine = _encodeAddressLine(
+      house: _houseController.text.trim(),
+      street: _streetController.text.trim(),
+      landmark: _landmarkController.text.trim(),
+    );
+
+    final payload = <String, dynamic>{
+      'label': _addressType,
       'name': _nameController.text.trim(),
       'phone': _phoneController.text.trim(),
-      'house': _houseController.text.trim(),
-      'street': _streetController.text.trim(),
+      'addressLine': addressLine,
       'area': _areaController.text.trim(),
-      'landmark': _landmarkController.text.trim(),
       'city': _cityController.text.trim(),
       'state': _stateController.text.trim(),
       'pincode': _pincodeController.text.trim(),
-      'type': _addressType,
       'isDefault': _isDefault,
     };
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          widget.isEditing
-              ? 'Address updated successfully'
-              : 'Address saved successfully',
+
+    try {
+      final api = EcoLoopApi.instance;
+      final rawId = widget.address?['addressId'] ?? widget.address?['id'];
+      final id = int.tryParse(rawId?.toString() ?? '');
+
+      if (widget.isEditing) {
+        if (id == null || id <= 0) {
+          throw const EcoLoopApiException(
+            'This address has an invalid ID. Refresh the address list and try again.',
+          );
+        }
+        await api.put('/addresses/$id', payload);
+      } else {
+        await api.post('/addresses', payload);
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.isEditing
+                ? 'Address updated successfully'
+                : 'Address saved successfully',
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ArtistColors.success,
         ),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: ArtistColors.success,
-      ),
+      );
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is EcoLoopApiException
+          ? error.message
+          : 'Could not save address. Please check your connection and try again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ArtistColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  // Code.gs currently stores addressLine as one readable field. Keep the
+  // separate form fields recoverable without changing the existing API schema.
+  String _encodeAddressLine({
+    required String house,
+    required String street,
+    required String landmark,
+  }) {
+    final parts = <String>[];
+    if (house.isNotEmpty) parts.add('House: $house');
+    if (street.isNotEmpty) parts.add('Street: $street');
+    if (landmark.isNotEmpty) parts.add('Landmark: $landmark');
+    return parts.join(' • ');
+  }
+
+  Map<String, String> _decodeAddressLine(String value) {
+    final result = <String, String>{};
+    if (value.trim().isEmpty) return result;
+
+    // Parse the format written by this screen. Existing records created by
+    // other screens remain readable and are treated as the house/building line.
+    final labelled = RegExp(
+      r'(?:^| • )House: (.*?)(?= • (?:Street|Landmark): |$)|(?:^| • )Street: (.*?)(?= • (?:House|Landmark): |$)|(?:^| • )Landmark: (.*?)(?= • (?:House|Street): |$)',
     );
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (!mounted) return;
-    Navigator.pop(context, result);
+    for (final match in labelled.allMatches(value)) {
+      if (match.group(1) != null) result['house'] = match.group(1)!.trim();
+      if (match.group(2) != null) result['street'] = match.group(2)!.trim();
+      if (match.group(3) != null) result['landmark'] = match.group(3)!.trim();
+    }
+    if (result.isEmpty) result['house'] = value;
+    return result;
   }
 
   // VALIDATORS

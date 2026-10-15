@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import 'add_address.dart';
 
 class AddressList extends StatefulWidget {
@@ -12,56 +13,74 @@ class AddressList extends StatefulWidget {
 }
 
 class MyAddresses extends State<AddressList> {
-  // TEMPORARY UI DATA
-  final List<AddressItem> _addresses = [
-    AddressItem(
-      id: '1',
-      name: 'Creative Studio',
-      phone: '9876543210',
-      house: 'Studio 204, Green Heights',
-      street: 'Satellite Road',
-      area: 'Satellite',
-      landmark: 'Near Iscon Mall',
-      city: 'Ahmedabad',
-      state: 'Gujarat',
-      pincode: '380015',
-      type: 'Studio',
-      isDefault: true,
-    ),
-    AddressItem(
-      id: '2',
-      name: 'Creative Studio',
-      phone: '9876543210',
-      house: 'Workshop 302',
-      street: 'C G Road',
-      area: 'Navrangpura',
-      landmark: 'Near Commerce Six Road',
-      city: 'Ahmedabad',
-      state: 'Gujarat',
-      pincode: '380009',
-      type: 'Workshop',
-      isDefault: false,
-    ),
-  ];
+  final List<AddressItem> _addresses = [];
+  bool _isLoading = true;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddresses();
+  }
+
+  Future<void> _loadAddresses() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+
+    try {
+      final response = await EcoLoopApi.instance.get('/addresses');
+      if (response is! List) {
+        throw const EcoLoopApiException(
+          'The addresses API returned an unexpected response.',
+        );
+      }
+
+      final loaded = response
+          .whereType<Map>()
+          .map((row) => AddressItem.fromMap(Map<String, dynamic>.from(row)))
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _addresses
+          ..clear()
+          ..addAll(loaded);
+        _isLoading = false;
+        _loadError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = error is EcoLoopApiException
+            ? error.message
+            : 'Could not load saved addresses. Check your connection and try again.';
+      });
+    }
+  }
 
   // ADD ADDRESS
   Future<void> _addAddress() async {
-    final result = await Navigator.push(
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => const AddAddress()),
     );
     if (!mounted) return;
-    if (result == true) setState(() {});
+    if (result == true) await _loadAddresses();
   }
 
   // EDIT ADDRESS
   Future<void> _editAddress(AddressItem address) async {
-    final result = await Navigator.push(
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => AddAddress(address: address.toMap())),
     );
     if (!mounted) return;
-    if (result == true) setState(() {});
+    if (result == true) await _loadAddresses();
   }
 
   // DELETE ADDRESS
@@ -114,36 +133,62 @@ class MyAddresses extends State<AddressList> {
 
     if (shouldDelete != true) return;
 
-    setState(() {
-      _addresses.removeWhere((item) => item.id == address.id);
-    });
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Address deleted successfully'),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: ArtistColors.success,
-      ),
-    );
+    try {
+      await EcoLoopApi.instance.delete('/addresses/${address.id}');
+      if (!mounted) return;
+      setState(() => _addresses.removeWhere((item) => item.id == address.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Address deleted successfully'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ArtistColors.success,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is EcoLoopApiException
+          ? error.message
+          : 'Could not delete address. Please try again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ArtistColors.error,
+        ),
+      );
+    }
   }
 
-  // SET DEFAULT
-  void _setDefaultAddress(AddressItem address) {
-    setState(() {
-      for (final item in _addresses) {
-        item.isDefault = item.id == address.id;
-      }
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Default address updated'),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: ArtistColors.success,
-      ),
-    );
+  // SET DEFAULT USING THE EXISTING UPDATE ROUTE.
+  Future<void> _setDefaultAddress(AddressItem address) async {
+    try {
+      await EcoLoopApi.instance.put(
+        '/addresses/${address.id}',
+        <String, dynamic>{'isDefault': true},
+      );
+      if (!mounted) return;
+      await _loadAddresses();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Default address updated'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ArtistColors.success,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is EcoLoopApiException
+          ? error.message
+          : 'Could not update the default address. Please try again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ArtistColors.error,
+        ),
+      );
+    }
   }
 
   // BUILD
@@ -168,40 +213,82 @@ class MyAddresses extends State<AddressList> {
         ),
       ),
       body: SafeArea(
-        child: _addresses.isEmpty
-            ? _EmptyAddressState(onAddAddress: _addAddress)
-            : SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Saved addresses',
-                      style: ArtistTextStyles.title.copyWith(
-                        color: ArtistColors.textPrimary,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      'Manage your studio and workshop addresses for faster checkout.',
-                      style: ArtistTextStyles.caption.copyWith(
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: ArtistColors.primary),
+              )
+            : _loadError != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.cloud_off_rounded,
+                        size: 42,
                         color: ArtistColors.textSecondary,
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    ..._addresses.map(
-                      (address) => Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
-                        child: _AddressCard(
-                          address: address,
-                          onEdit: () => _editAddress(address),
-                          onDelete: () => _deleteAddress(address),
-                          onSetDefault: () => _setDefaultAddress(address),
+                      const SizedBox(height: 14),
+                      Text(
+                        _loadError!,
+                        textAlign: TextAlign.center,
+                        style: ArtistTextStyles.body.copyWith(
+                          color: ArtistColors.textSecondary,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _loadAddresses,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Retry'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ArtistColors.primary,
+                          foregroundColor: ArtistColors.background,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : _addresses.isEmpty
+            ? _EmptyAddressState(onAddAddress: _addAddress)
+            : RefreshIndicator(
+                color: ArtistColors.primary,
+                onRefresh: _loadAddresses,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Saved addresses',
+                        style: ArtistTextStyles.title.copyWith(
+                          color: ArtistColors.textPrimary,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        'Manage your studio and workshop addresses for faster checkout.',
+                        style: ArtistTextStyles.caption.copyWith(
+                          color: ArtistColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ..._addresses.map(
+                        (address) => Padding(
+                          padding: const EdgeInsets.only(bottom: 14),
+                          child: _AddressCard(
+                            address: address,
+                            onEdit: () => _editAddress(address),
+                            onDelete: () => _deleteAddress(address),
+                            onSetDefault: () => _setDefaultAddress(address),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
       ),
@@ -271,10 +358,32 @@ class AddressItem {
     required this.isDefault,
   });
 
-  // CONVERT TO MAP
+  factory AddressItem.fromMap(Map<String, dynamic> map) {
+    final line = (map['addressLine'] ?? '').toString();
+    final parts = _decodeStoredAddressLine(line);
+    return AddressItem(
+      id: (map['addressId'] ?? map['id'] ?? '').toString(),
+      name: (map['name'] ?? '').toString(),
+      phone: (map['phone'] ?? '').toString(),
+      house: (map['house'] ?? parts['house'] ?? line).toString(),
+      street: (map['street'] ?? parts['street'] ?? '').toString(),
+      area: (map['area'] ?? '').toString(),
+      landmark: (map['landmark'] ?? parts['landmark'] ?? '').toString(),
+      city: (map['city'] ?? '').toString(),
+      state: (map['state'] ?? '').toString(),
+      pincode: (map['pincode'] ?? '').toString(),
+      type: (map['label'] ?? map['type'] ?? 'Other').toString(),
+      isDefault:
+          map['isDefault'] == true ||
+          map['isDefault'].toString().toLowerCase() == 'true' ||
+          map['isDefault'].toString() == '1',
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'addressId': int.tryParse(id) ?? id,
       'name': name,
       'phone': phone,
       'house': house,
@@ -285,9 +394,28 @@ class AddressItem {
       'state': state,
       'pincode': pincode,
       'type': type,
+      'label': type,
       'isDefault': isDefault,
     };
   }
+}
+
+// The current Code.gs stores these parts in its existing addressLine field.
+// This keeps the saved line human-readable for checkout and editable here.
+Map<String, String> _decodeStoredAddressLine(String value) {
+  final result = <String, String>{};
+  if (value.trim().isEmpty) return result;
+  final labelled = RegExp(
+    r'(?:^| • )House: (.*?)(?= • (?:Street|Landmark): |$)|'
+    r'(?:^| • )Street: (.*?)(?= • (?:House|Landmark): |$)|'
+    r'(?:^| • )Landmark: (.*?)(?= • (?:House|Street): |$)',
+  );
+  for (final match in labelled.allMatches(value)) {
+    if (match.group(1) != null) result['house'] = match.group(1)!.trim();
+    if (match.group(2) != null) result['street'] = match.group(2)!.trim();
+    if (match.group(3) != null) result['landmark'] = match.group(3)!.trim();
+  }
+  return result;
 }
 
 // ADDRESS CARD
