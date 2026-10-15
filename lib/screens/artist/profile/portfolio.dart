@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import '../../../widgets/back_button.dart';
 
 class Portfolio extends StatefulWidget {
@@ -12,122 +13,83 @@ class Portfolio extends StatefulWidget {
 }
 
 class _PortfolioState extends State<Portfolio> {
-  // DEMO PORTFOLIO DATA
-
-  //
-  // These objects are intentionally kept in one place so that
-  // later they can be replaced directly with API data.
-  //
-  // Expected backend structure can eventually be:
-  //
-  // {
-  //   id,
-  //   title,
-  //   description,
-  //   category,
-  //   image,
-  //   images,
-  //   featured,
-  //   createdAt
-  // }
-
-  final List<Map<String, dynamic>> _portfolioItems = [
-    {
-      'id': 1,
-      'title': 'Reclaimed Wood Coffee Table',
-      'description':
-          'A handcrafted coffee table created from reclaimed wood, '
-          'designed to give discarded material a new purpose.',
-      'category': 'Furniture',
-      'image':
-          'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc'
-          '?auto=format&fit=crop&w=1200&q=85',
-      'featured': true,
-      'likes': 84,
-      'views': 312,
-    },
-    {
-      'id': 2,
-      'title': 'Upcycled Wall Decor',
-      'description':
-          'A decorative wall piece made using reclaimed materials '
-          'and hand-finished detailing.',
-      'category': 'Home Decor',
-      'image':
-          'https://images.unsplash.com/photo-1549490349-8643362247b5'
-          '?auto=format&fit=crop&w=1200&q=85',
-      'featured': true,
-      'likes': 61,
-      'views': 248,
-    },
-    {
-      'id': 3,
-      'title': 'Recycled Wooden Organizer',
-      'description':
-          'Functional desk storage made from leftover wood pieces '
-          'collected from previous projects.',
-      'category': 'Utility',
-      'image':
-          'https://images.unsplash.com/photo-1586023492125-27b2c045efd7'
-          '?auto=format&fit=crop&w=1200&q=85',
-      'featured': false,
-      'likes': 42,
-      'views': 176,
-    },
-    {
-      'id': 4,
-      'title': 'Handmade Decorative Shelf',
-      'description':
-          'A minimalist shelf crafted from reclaimed timber with '
-          'a natural finish.',
-      'category': 'Furniture',
-      'image':
-          'https://images.unsplash.com/photo-1594620302200-9a762244a156'
-          '?auto=format&fit=crop&w=1200&q=85',
-      'featured': false,
-      'likes': 37,
-      'views': 151,
-    },
-    {
-      'id': 5,
-      'title': 'Bottle Upcycling Project',
-      'description':
-          'Discarded glass bottles transformed into decorative '
-          'home accessories.',
-      'category': 'Upcycling',
-      'image':
-          'https://images.unsplash.com/photo-1603006905003-be475563bc59'
-          '?auto=format&fit=crop&w=1200&q=85',
-      'featured': false,
-      'likes': 29,
-      'views': 128,
-    },
-    {
-      'id': 6,
-      'title': 'Reclaimed Material Art',
-      'description':
-          'An experimental artwork created using a combination '
-          'of discarded and reclaimed materials.',
-      'category': 'Art',
-      'image':
-          'https://images.unsplash.com/photo-1547891654-e66ed7ebb968'
-          '?auto=format&fit=crop&w=1200&q=85',
-      'featured': false,
-      'likes': 51,
-      'views': 205,
-    },
-  ];
-
+  final EcoLoopApi _api = EcoLoopApi.instance;
+  final List<Map<String, dynamic>> _portfolioItems = [];
+  List<String> _categories = const ['All'];
   String _selectedCategory = 'All';
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
 
-  final List<String> _categories = const [
-    'All',
-    'Furniture',
-    'Home Decor',
-    'Utility',
-    'Upcycling',
-    'Art',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadPortfolio();
+  }
+
+  Future<void> _loadPortfolio({bool showLoader = true}) async {
+    if (showLoader && mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    try {
+      final response = await _api.get('/artist/portfolio');
+      final dynamic rawItems = response is List
+          ? response
+          : response is Map
+          ? (response['items'] ?? response['portfolio'] ?? [])
+          : [];
+      final items = <Map<String, dynamic>>[];
+      if (rawItems is List) {
+        for (final value in rawItems) {
+          if (value is Map) {
+            final item = Map<String, dynamic>.from(value);
+            final image = (item['imageUrl'] ?? item['image'] ?? '').toString();
+            items.add({
+              ...item,
+              'id': item['portfolioId'] ?? item['id'],
+              'image': image,
+              'category': (item['category'] ?? '').toString(),
+              'featured':
+                  item['featured'] == true ||
+                  item['featured'].toString().toLowerCase() == 'true',
+              'likes': _toInt(item['likes']),
+              'views': _toInt(item['views']),
+            });
+          }
+        }
+      }
+      if (!mounted) return;
+      final categoryNames =
+          items
+              .map((item) => item['category'].toString().trim())
+              .where((value) => value.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      setState(() {
+        _portfolioItems
+          ..clear()
+          ..addAll(items);
+        _categories = ['All', ...categoryNames];
+        if (!_categories.contains(_selectedCategory)) {
+          _selectedCategory = 'All';
+        }
+        _loading = false;
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  int _toInt(dynamic value) => int.tryParse(value?.toString() ?? '') ?? 0;
 
   // BUILD
 
@@ -184,6 +146,52 @@ class _PortfolioState extends State<Portfolio> {
               children: [
                 _buildPortfolioHeader(),
 
+                if (_loading) ...[
+                  const SizedBox(height: 20),
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(18),
+                      child: CircularProgressIndicator(
+                        color: ArtistColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+
+                if (_error != null && _portfolioItems.isEmpty) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: ArtistColors.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: ArtistColors.border),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_outlined,
+                          color: ArtistColors.error,
+                          size: 28,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: ArtistTextStyles.caption,
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed: () => _loadPortfolio(),
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 18),
 
                 _buildPortfolioStats(),
@@ -215,12 +223,12 @@ class _PortfolioState extends State<Portfolio> {
 
                 const SizedBox(height: 12),
 
-                if (filteredItems.isEmpty)
+                if (_loading && _portfolioItems.isEmpty)
+                  const SizedBox.shrink()
+                else if (filteredItems.isEmpty)
                   _buildEmptyState()
-                else
-                  _buildPortfolioGrid(
-                    regularItems.isEmpty ? filteredItems : regularItems,
-                  ),
+                else if (regularItems.isNotEmpty)
+                  _buildPortfolioGrid(regularItems),
               ],
             ),
           ),
@@ -342,12 +350,12 @@ class _PortfolioState extends State<Portfolio> {
   Widget _buildPortfolioStats() {
     final totalViews = _portfolioItems.fold<int>(
       0,
-      (sum, item) => sum + ((item['views'] ?? 0) as int),
+      (sum, item) => sum + _toInt(item['views']),
     );
 
     final totalLikes = _portfolioItems.fold<int>(
       0,
-      (sum, item) => sum + ((item['likes'] ?? 0) as int),
+      (sum, item) => sum + _toInt(item['likes']),
     );
 
     return Row(
@@ -737,7 +745,9 @@ class _PortfolioState extends State<Portfolio> {
           const SizedBox(height: 15),
 
           Text(
-            'No work in this category',
+            _error != null
+                ? 'Portfolio could not be loaded'
+                : 'No work in this category',
             style: ArtistTextStyles.title.copyWith(
               fontSize: 17,
               fontWeight: FontWeight.w700,
@@ -747,7 +757,8 @@ class _PortfolioState extends State<Portfolio> {
           const SizedBox(height: 6),
 
           Text(
-            'Try another category or add a new project to your portfolio.',
+            _error ??
+                'Try another category or add a new project to your portfolio.',
             textAlign: TextAlign.center,
             style: ArtistTextStyles.caption.copyWith(height: 1.45),
           ),
@@ -774,6 +785,19 @@ class _PortfolioState extends State<Portfolio> {
   // NETWORK IMAGE
 
   Widget _buildNetworkImage(String url, {double? width, double? height}) {
+    if (url.trim().isEmpty) {
+      return Container(
+        width: width,
+        height: height,
+        color: ArtistColors.light,
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.image_outlined,
+          color: ArtistColors.primary,
+          size: 32,
+        ),
+      );
+    }
     return Image.network(
       url,
       width: width,
@@ -837,78 +861,234 @@ class _PortfolioState extends State<Portfolio> {
   }
 
   // ADD
-
-  void _addPortfolioItem() {
-    _showComingSoon(
-      'Add Portfolio Work',
-      'The portfolio editor UI will be connected to the backend next.',
-    );
+  Future<void> _addPortfolioItem() async {
+    await _showPortfolioEditor();
   }
 
   // EDIT
-
-  void _editPortfolioItem(Map<String, dynamic> item) {
-    _showComingSoon(
-      'Edit Portfolio Work',
-      'Editing will be connected to the portfolio API next.',
-    );
+  Future<void> _editPortfolioItem(Map<String, dynamic> item) async {
+    await _showPortfolioEditor(item: item);
   }
 
-  // DELETE
-
-  void _deletePortfolioItem(Map<String, dynamic> item) {
-    showDialog(
+  Future<void> _showPortfolioEditor({Map<String, dynamic>? item}) async {
+    final formKey = GlobalKey<FormState>();
+    final titleController = TextEditingController(
+      text: item?['title']?.toString() ?? '',
+    );
+    final descriptionController = TextEditingController(
+      text: item?['description']?.toString() ?? '',
+    );
+    final categoryController = TextEditingController(
+      text: item?['category']?.toString() ?? '',
+    );
+    final imageController = TextEditingController(
+      text: (item?['imageUrl'] ?? item?['image'])?.toString() ?? '',
+    );
+    bool featured = item?['featured'] == true;
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) {
-        return AlertDialog(
-          backgroundColor: ArtistColors.surface,
-          title: Text(
-            'Delete Work?',
-            style: ArtistTextStyles.title.copyWith(fontSize: 18),
-          ),
-          content: Text(
-            'Are you sure you want to remove '
-            '"${item['title']}" from your portfolio?',
-            style: ArtistTextStyles.body,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: ArtistTextStyles.bodyMedium.copyWith(
-                  color: ArtistColors.textSecondary,
+      barrierDismissible: !_saving,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: ArtistColors.surface,
+              title: Text(
+                item == null ? 'Add Portfolio Work' : 'Edit Portfolio Work',
+                style: ArtistTextStyles.title.copyWith(fontSize: 19),
+              ),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: titleController,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          labelText: 'Project title *',
+                        ),
+                        validator: (value) =>
+                            (value == null || value.trim().isEmpty)
+                            ? 'Enter a project title'
+                            : null,
+                      ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: descriptionController,
+                        minLines: 2,
+                        maxLines: 4,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          labelText: 'Description *',
+                        ),
+                        validator: (value) =>
+                            (value == null || value.trim().isEmpty)
+                            ? 'Enter a description'
+                            : null,
+                      ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: categoryController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Category *',
+                        ),
+                        validator: (value) =>
+                            (value == null || value.trim().isEmpty)
+                            ? 'Enter a category'
+                            : null,
+                      ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: imageController,
+                        keyboardType: TextInputType.url,
+                        decoration: const InputDecoration(
+                          labelText: 'Image URL (optional)',
+                          hintText: 'https://...',
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: featured,
+                        activeColor: ArtistColors.primary,
+                        title: const Text('Feature this work'),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        onChanged: (value) => setDialogState(() {
+                          featured = value ?? false;
+                        }),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-
-                setState(() {
-                  _portfolioItems.removeWhere(
-                    (element) => element['id'] == item['id'],
-                  );
-                });
-
-                ScaffoldMessenger.of(context)
-                  ..clearSnackBars()
-                  ..showSnackBar(
-                    const SnackBar(content: Text('Portfolio work removed.')),
-                  );
-              },
-              child: Text(
-                'Delete',
-                style: ArtistTextStyles.bodyMedium.copyWith(
-                  color: ArtistColors.error,
-                  fontWeight: FontWeight.w600,
+              actions: [
+                TextButton(
+                  onPressed: _saving
+                      ? null
+                      : () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
                 ),
-              ),
-            ),
-          ],
+                ElevatedButton(
+                  onPressed: _saving
+                      ? null
+                      : () {
+                          if (!formKey.currentState!.validate()) return;
+                          Navigator.pop(dialogContext, {
+                            'title': titleController.text.trim(),
+                            'description': descriptionController.text.trim(),
+                            'category': categoryController.text.trim(),
+                            'imageUrl': imageController.text.trim(),
+                            'featured': featured,
+                          });
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ArtistColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text(item == null ? 'Add Work' : 'Save Changes'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
+
+    titleController.dispose();
+    descriptionController.dispose();
+    categoryController.dispose();
+    imageController.dispose();
+    if (result == null || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      if (item == null) {
+        await _api.post('/artist/portfolio', result);
+      } else {
+        final id = item['id'] ?? item['portfolioId'];
+        if (id == null) throw Exception('Portfolio item ID is missing.');
+        await _api.put('/artist/portfolio/$id', result);
+      }
+      await _loadPortfolio(showLoader: false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              item == null
+                  ? 'Portfolio work added.'
+                  : 'Portfolio work updated.',
+            ),
+          ),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  // DELETE
+  Future<void> _deletePortfolioItem(Map<String, dynamic> item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: ArtistColors.surface,
+        title: Text(
+          'Delete Work?',
+          style: ArtistTextStyles.title.copyWith(fontSize: 18),
+        ),
+        content: Text(
+          'Are you sure you want to remove "${item['title']}" from your portfolio?',
+          style: ArtistTextStyles.body,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              'Delete',
+              style: ArtistTextStyles.bodyMedium.copyWith(
+                color: ArtistColors.error,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final id = item['id'] ?? item['portfolioId'];
+    if (id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot delete this item: missing ID.')),
+      );
+      return;
+    }
+    try {
+      await _api.delete('/artist/portfolio/$id');
+      await _loadPortfolio(showLoader: false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Portfolio work deleted.')),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.toString())));
+    }
   }
 
   // ITEM OPTIONS
@@ -960,12 +1140,22 @@ class _PortfolioState extends State<Portfolio> {
                         ? 'Remove from Featured'
                         : 'Mark as Featured',
                   ),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(context);
-
-                    setState(() {
-                      item['featured'] = !(item['featured'] == true);
-                    });
+                    final id = item['id'] ?? item['portfolioId'];
+                    if (id == null) return;
+                    final nextFeatured = item['featured'] != true;
+                    try {
+                      await _api.put('/artist/portfolio/$id', {
+                        'featured': nextFeatured,
+                      });
+                      await _loadPortfolio(showLoader: false);
+                    } catch (error) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(error.toString())));
+                    }
                   },
                 ),
 
@@ -1087,99 +1277,14 @@ class _PortfolioState extends State<Portfolio> {
   }
 
   // REFRESH
-
   Future<void> _refreshPortfolio() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-
+    await _loadPortfolio(showLoader: false);
     if (!mounted) return;
-
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(const SnackBar(content: Text('Portfolio refreshed.')));
-  }
-
-  // COMING SOON
-
-  void _showComingSoon(String title, String message) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ArtistColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (_) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 25),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: ArtistColors.border,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-
-                const SizedBox(height: 22),
-
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: ArtistColors.light,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome_outlined,
-                    color: ArtistColors.primary,
-                    size: 28,
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                Text(
-                  title,
-                  style: ArtistTextStyles.title.copyWith(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: ArtistTextStyles.caption.copyWith(height: 1.45),
-                ),
-
-                const SizedBox(height: 18),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ArtistColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text('Okay'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    if (_error != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_error!)));
+    }
   }
 
   // FORMAT COUNT

@@ -4,7 +4,7 @@ import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
 import '../../../widgets/user_more_menu.dart';
-import '../../artist/profile/artist_profile.dart';
+import 'artist_profile.dart';
 import 'product_details.dart';
 import 'seller_profile.dart';
 import 'wishlist.dart';

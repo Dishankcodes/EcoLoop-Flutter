@@ -1,13 +1,17 @@
-import 'package:dio/dio.dart';
-import 'package:dropdown_search/dropdown_search.dart';
-import 'package:flutter/material.dart';
+import 'dart:typed_data';
 
-import '../../../api/api_manager.dart';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
-import '../../../models/location/city_model.dart';
-import '../../../models/location/state_model.dart';
+import '../../../services/ecoloop_api.dart';
+import '../../../services/image_picker_service.dart';
+import '../../../shared_preferences_util.dart';
 
+/// Edits the authenticated artist row in Google Sheets via PUT /profile.
+/// State and city options are loaded from the States and Cities sheets.
+/// Email is displayed from the backend and remains read-only.
 class EditProfile extends StatefulWidget {
   const EditProfile({super.key});
 
@@ -16,7 +20,9 @@ class EditProfile extends StatefulWidget {
 }
 
 class _EditProfileState extends State<EditProfile> {
-  // Input controllers with initial default values
+  final EcoLoopApi _api = EcoLoopApi.instance;
+  final _formKey = GlobalKey<FormState>();
+
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
@@ -24,32 +30,28 @@ class _EditProfileState extends State<EditProfile> {
   final TextEditingController _skillsController = TextEditingController();
   final TextEditingController _experienceController = TextEditingController();
 
-  // Initial location fallback names and model references
-  String? _initialStateName = 'Gujarat';
-  String? _initialCityName = 'Ahmedabad';
-  StateModel? _selectedState;
-  CityModel? _selectedCity;
+  bool _loading = true;
+  bool _saving = false;
+  bool _uploadingPhoto = false;
+  String? _loadError;
 
-  // Active state/city lists and loading flags
-  List<StateModel> _states = [];
-  List<CityModel> _cities = [];
-  bool _isLoadingStates = false;
-  bool _isLoadingCities = false;
-  bool _isSaving = false;
-
-  // In-memory cache and request deduplication map for location API responses
-  final Map<String, List<CityModel>> _citiesCache = {};
-  final Map<String, Future<List<CityModel>>> _cityLoadingFutures = {};
+  Map<String, dynamic> _profile = {};
+  List<Map<String, dynamic>> _states = [];
+  List<Map<String, dynamic>> _cities = [];
+  String? _selectedStateCode;
+  String? _selectedStateName;
+  String? _selectedCityName;
+  String _profilePhotoUrl = '';
+  Uint8List? _photoBytes;
 
   @override
   void initState() {
     super.initState();
-    _loadStates();
+    _loadInitialData();
   }
 
   @override
   void dispose() {
-    // Clean up input controllers when widget is unmounted
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -59,217 +61,306 @@ class _EditProfileState extends State<EditProfile> {
     super.dispose();
   }
 
-  // Parses API and connection errors into user-friendly error messages
-  String _getReadableError(Object error) {
-    if (error is DioException) {
-      if (error.type == DioExceptionType.connectionTimeout) {
-        return 'Connection timed out. Please check your internet connection.';
-      }
-      if (error.type == DioExceptionType.sendTimeout) {
-        return 'The request took too long to send. Please try again.';
-      }
-      if (error.type == DioExceptionType.receiveTimeout) {
-        return 'The server took too long to respond. Please try again.';
-      }
-      if (error.type == DioExceptionType.connectionError) {
-        return 'Unable to connect to the server. Please check your internet connection.';
-      }
-
-      final responseData = error.response?.data;
-      if (responseData is Map<String, dynamic>) {
-        final errorData = responseData['error'];
-        if (errorData is Map<String, dynamic>) {
-          final message = errorData['message'];
-          if (message != null && message.toString().isNotEmpty) {
-            return message.toString();
-          }
-        }
-        if (responseData['message'] != null) {
-          return responseData['message'].toString();
-        }
-      }
-      return 'Unable to process request. Please try again.';
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
     }
-    return 'Something went wrong. Please try again.';
+    return <String, dynamic>{};
   }
 
-  // Fetches available states from the API and auto-selects initial state
-  Future<void> _loadStates() async {
-    if (!mounted) return;
+  List<Map<String, dynamic>> _asList(dynamic value) {
+    if (value is List)
+      return value.map(_asMap).where((e) => e.isNotEmpty).toList();
+    final map = _asMap(value);
+    for (final key in ['states', 'cities', 'items', 'results', 'data']) {
+      final nested = map[key];
+      if (nested is List) {
+        return nested.map(_asMap).where((e) => e.isNotEmpty).toList();
+      }
+    }
+    return [];
+  }
 
+  String _text(dynamic value) => (value ?? '').toString().trim();
+
+  String _stateCode(Map<String, dynamic> state) =>
+      _text(state['stateCode'] ?? state['state_code']).toUpperCase();
+
+  String _stateName(Map<String, dynamic> state) =>
+      _text(state['stateName'] ?? state['state_name'] ?? state['name']);
+
+  String _cityName(Map<String, dynamic> city) =>
+      _text(city['cityName'] ?? city['city_name'] ?? city['name']);
+
+  Future<void> _loadInitialData() async {
+    if (!mounted) return;
     setState(() {
-      _isLoadingStates = true;
+      _loading = true;
+      _loadError = null;
     });
 
     try {
-      final response = await ApiManager().client.getStates('/locations/states');
+      final values = await Future.wait<dynamic>([
+        _api.get('/profile'),
+        _api.get('/locations/states'),
+      ]);
+      final profile = _asMap(values[0]);
+      final states = _asList(values[1]);
 
-      if (!mounted) return;
-
-      if (response.success == true && response.data != null) {
-        setState(() {
-          _states = response.data!;
-          _isLoadingStates = false;
-
-          if (_initialStateName != null && _states.isNotEmpty) {
-            try {
-              _selectedState = _states.firstWhere(
-                (state) =>
-                    state.stateName.toLowerCase() ==
-                    _initialStateName!.toLowerCase(),
-              );
-            } catch (_) {
-              _selectedState = _states.first;
-            }
-          }
-        });
-
-        if (_selectedState != null) {
-          await _loadCities(_selectedState!.stateCode);
-        }
-
-        _prefetchCitiesInBackground();
-      } else {
-        setState(() {
-          _isLoadingStates = false;
-        });
-
-        _showErrorMessage(
-          'Unable to load states',
-          response.error ?? 'Please try again.',
+      if (profile.isEmpty) {
+        throw const EcoLoopApiException(
+          'Your artist profile was not returned by the backend.',
         );
       }
-    } catch (e) {
-      if (!mounted) return;
 
-      setState(() {
-        _isLoadingStates = false;
-      });
+      _profile = profile;
+      _nameController.text = _text(profile['userName']);
+      _emailController.text = _text(profile['email']);
+      _phoneController.text = _text(profile['phone']);
+      _bioController.text = _text(profile['bio']);
+      _skillsController.text = _text(profile['skills']);
+      _experienceController.text = _text(profile['experience']);
+      _profilePhotoUrl = _text(profile['profilePhotoUrl']);
 
-      _showErrorMessage('Unable to load states', _getReadableError(e));
-    }
-  }
+      _states = states;
+      final currentStateCode = _text(profile['stateCode']).toUpperCase();
+      final currentStateName = _text(profile['state']);
+      Map<String, dynamic>? matchedState;
 
-  // Returns cached cities or initiates a new network fetch if uncached
-  Future<List<CityModel>> _fetchCitiesForState(String stateCode) {
-    if (_citiesCache.containsKey(stateCode)) {
-      return Future.value(_citiesCache[stateCode]!);
-    }
-
-    if (_cityLoadingFutures.containsKey(stateCode)) {
-      return _cityLoadingFutures[stateCode]!;
-    }
-
-    final future = _requestCities(stateCode);
-    _cityLoadingFutures[stateCode] = future;
-    return future;
-  }
-
-  // Executes the API call to retrieve cities for a given state code
-  Future<List<CityModel>> _requestCities(String stateCode) async {
-    try {
-      final response = await ApiManager().client.getCities(
-        '/locations/cities',
-        stateCode,
-      );
-
-      if (response.success == true && response.data != null) {
-        final cities = response.data!;
-        _citiesCache[stateCode] = cities;
-        return cities;
-      }
-      return [];
-    } catch (_) {
-      return [];
-    } finally {
-      _cityLoadingFutures.remove(stateCode);
-    }
-  }
-
-  // Prefetches city lists in parallel background batches for quick switching
-  Future<void> _prefetchCitiesInBackground() async {
-    if (_states.isEmpty) return;
-
-    const batchSize = 4;
-    for (int i = 0; i < _states.length; i += batchSize) {
-      if (!mounted) return;
-
-      final batch = _states.skip(i).take(batchSize);
-      await Future.wait(
-        batch.map((state) => _fetchCitiesForState(state.stateCode)),
-      );
-
-      if (mounted && _selectedState != null) {
-        final selectedCode = _selectedState!.stateCode;
-        if (_citiesCache.containsKey(selectedCode)) {
-          setState(() {
-            _cities = _citiesCache[selectedCode]!;
-            _isLoadingCities = false;
-          });
+      for (final state in _states) {
+        if ((_stateCode(state).isNotEmpty &&
+                _stateCode(state) == currentStateCode) ||
+            (_stateName(state).isNotEmpty &&
+                _stateName(state).toLowerCase() ==
+                    currentStateName.toLowerCase())) {
+          matchedState = state;
+          break;
         }
       }
+
+      if (matchedState != null) {
+        _selectedStateCode = _stateCode(matchedState);
+        _selectedStateName = _stateName(matchedState);
+        await _loadCities(
+          _selectedStateCode!,
+          selectCityName: _text(profile['city']),
+        );
+      } else {
+        // The saved text still came from the profile sheet, but it is not a
+        // valid dropdown selection until it matches an active location row.
+        _selectedStateCode = null;
+        _selectedStateName = null;
+        _selectedCityName = null;
+      }
+
+      if (!mounted) return;
+      setState(() => _loading = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = e.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
-  // Loads city options for a target state and resolves initial selection
-  Future<void> _loadCities(String stateCode) async {
-    if (!mounted) return;
-
-    final cachedCities = _citiesCache[stateCode];
-    if (cachedCities != null) {
+  Future<void> _loadCities(String stateCode, {String? selectCityName}) async {
+    try {
+      final result = await _api.get(
+        '/locations/cities',
+        query: {'stateCode': stateCode},
+      );
+      final cities = _asList(result);
+      if (!mounted) return;
       setState(() {
-        _cities = cachedCities;
-        _isLoadingCities = false;
-        _matchAndSetInitialCity();
+        _cities = cities;
+        final requestedCity = _text(selectCityName).toLowerCase();
+        final match = _cities.where(
+          (city) => _cityName(city).toLowerCase() == requestedCity,
+        );
+        if (requestedCity.isNotEmpty && match.isNotEmpty) {
+          _selectedCityName = _cityName(match.first);
+        } else if (selectCityName == null) {
+          _selectedCityName = null;
+        } else {
+          // Only allow cities currently returned by the Cities sheet.
+          _selectedCityName = null;
+        }
       });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _cities = []);
+      _showMessage(
+        'Unable to load cities. Please check the connection and try again.',
+        isError: true,
+      );
+    }
+  }
+
+  Future<void> _selectState(String? stateCode) async {
+    if (stateCode == null || stateCode.isEmpty) return;
+    final matches = _states.where((state) => _stateCode(state) == stateCode);
+    if (matches.isEmpty) return;
+    final state = matches.first;
+    setState(() {
+      _selectedStateCode = stateCode;
+      _selectedStateName = _stateName(state);
+      _selectedCityName = null;
+      _cities = [];
+    });
+    await _loadCities(stateCode);
+  }
+
+  Future<void> _changeProfilePhoto() async {
+    if (_uploadingPhoto) return;
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: ArtistColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: ArtistColors.border,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Update profile photo',
+                  style: ArtistTextStyles.title,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _PhotoOption(
+                icon: Icons.photo_library_outlined,
+                label: 'Choose from Gallery',
+                onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+              ),
+              const SizedBox(height: 9),
+              _PhotoOption(
+                icon: Icons.camera_alt_outlined,
+                label: 'Take a Photo',
+                onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source == null || !mounted) return;
+
+    setState(() => _uploadingPhoto = true);
+    try {
+      final result = await ImagePickerService.instance
+          .pickAndUploadProfilePhoto(source: source);
+      if (!mounted) return;
+      if (result == null) {
+        setState(() => _uploadingPhoto = false);
+        return;
+      }
+
+      await Prefs.setString('profilePhotoUrl', result.profilePhotoUrl);
+      setState(() {
+        _photoBytes = result.bytes;
+        _profilePhotoUrl = result.profilePhotoUrl;
+        _uploadingPhoto = false;
+      });
+      _showMessage('Profile photo uploaded successfully.');
+    } on ImagePickerServiceException catch (e) {
+      if (!mounted) return;
+      setState(() => _uploadingPhoto = false);
+      _showMessage(e.message, isError: true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _uploadingPhoto = false);
+      _showMessage(
+        'Could not upload profile photo. ${e.toString().replaceFirst('Exception: ', '')}',
+        isError: true,
+      );
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    FocusScope.of(context).unfocus();
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_selectedStateCode == null ||
+        _selectedStateName == null ||
+        _selectedStateName!.isEmpty) {
+      _showMessage('Please select a state.', isError: true);
+      return;
+    }
+    if (_selectedCityName == null || _selectedCityName!.trim().isEmpty) {
+      _showMessage('Please select a city.', isError: true);
       return;
     }
 
-    setState(() {
-      _cities = [];
-      _selectedCity = null;
-      _isLoadingCities = true;
-    });
-
+    setState(() => _saving = true);
     try {
-      final cities = await _fetchCitiesForState(stateCode);
-
-      if (!mounted) return;
-      if (_selectedState?.stateCode != stateCode) return;
-
-      if (cities.isNotEmpty) {
-        setState(() {
-          _cities = cities;
-          _isLoadingCities = false;
-          _matchAndSetInitialCity();
-        });
-      } else {
-        setState(() {
-          _cities = [];
-          _isLoadingCities = false;
-        });
-      }
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _isLoadingCities = false;
+      final response = await _api.put('/profile', {
+        'userName': _nameController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        'city': _selectedCityName!.trim(),
+        'state': _selectedStateName!.trim(),
+        'stateCode': _selectedStateCode!.trim().toUpperCase(),
+        'bio': _bioController.text.trim(),
+        'skills': _skillsController.text.trim(),
+        'experience': _experienceController.text.trim(),
       });
+
+      final updated = _asMap(response);
+      if (updated.isNotEmpty) {
+        _profile = updated;
+      }
+
+      await Prefs.setString('userName', _nameController.text.trim());
+      await Prefs.setString('userEmail', _emailController.text.trim());
+      if (_profilePhotoUrl.isNotEmpty) {
+        await Prefs.setString('profilePhotoUrl', _profilePhotoUrl);
+      }
+
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _showMessage('Artist profile updated successfully.');
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _showMessage(
+        'Could not save profile. ${e.toString().replaceFirst('Exception: ', '')}',
+        isError: true,
+      );
     }
   }
 
-  // Matches initial city name string against loaded city models
-  void _matchAndSetInitialCity() {
-    if (_initialCityName != null && _cities.isNotEmpty) {
-      try {
-        _selectedCity = _cities.firstWhere(
-          (city) =>
-              city.cityName.toLowerCase() == _initialCityName!.toLowerCase(),
-        );
-      } catch (_) {
-        _selectedCity = null;
-      }
-    }
+  void _showMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? ArtistColors.error : ArtistColors.primary,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
   }
 
   @override
@@ -292,14 +383,13 @@ class _EditProfileState extends State<EditProfile> {
           'Edit Profile',
           style: ArtistTextStyles.title.copyWith(fontSize: 20),
         ),
-        centerTitle: false,
         actions: [
           TextButton(
-            onPressed: _isSaving ? null : _saveProfile,
+            onPressed: _saving || _loading ? null : _saveProfile,
             child: Text(
               'Save',
               style: ArtistTextStyles.bodyMedium.copyWith(
-                color: _isSaving
+                color: _saving || _loading
                     ? ArtistColors.textMuted
                     : ArtistColors.primary,
                 fontWeight: FontWeight.w700,
@@ -310,87 +400,154 @@ class _EditProfileState extends State<EditProfile> {
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 35),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildProfilePhoto(),
-              const SizedBox(height: 30),
-              _buildSectionTitle(
-                'Personal Information',
-                Icons.person_outline_rounded,
+        child: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: ArtistColors.primary),
+              )
+            : _loadError != null
+            ? _LoadError(message: _loadError!, onRetry: _loadInitialData)
+            : Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 35),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildProfilePhoto(),
+                      const SizedBox(height: 30),
+                      _sectionTitle(
+                        'Personal Information',
+                        Icons.person_outline_rounded,
+                      ),
+                      const SizedBox(height: 14),
+                      _textField(
+                        controller: _nameController,
+                        label: 'Artist / Studio Name',
+                        hint: 'Enter your artist name',
+                        icon: Icons.person_outline_rounded,
+                        capitalization: TextCapitalization.words,
+                        validator: (value) => (value ?? '').trim().isEmpty
+                            ? 'Please enter your artist name.'
+                            : null,
+                      ),
+                      const SizedBox(height: 15),
+                      _emailField(),
+                      const SizedBox(height: 15),
+                      _textField(
+                        controller: _phoneController,
+                        label: 'Phone Number',
+                        hint: 'Enter your phone number',
+                        icon: Icons.phone_outlined,
+                        keyboardType: TextInputType.phone,
+                        validator: (value) {
+                          final phone = (value ?? '').trim();
+                          if (phone.isEmpty)
+                            return 'Please enter your phone number.';
+                          if (phone.length < 8)
+                            return 'Please enter a valid phone number.';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 30),
+                      _sectionTitle(
+                        'Artist Information',
+                        Icons.palette_outlined,
+                      ),
+                      const SizedBox(height: 14),
+                      _textField(
+                        controller: _bioController,
+                        label: 'Bio',
+                        hint: 'Tell people about yourself and your work',
+                        icon: Icons.edit_note_rounded,
+                        maxLines: 4,
+                        maxLength: 300,
+                        capitalization: TextCapitalization.sentences,
+                        validator: (value) => (value ?? '').trim().isEmpty
+                            ? 'Please enter a short bio.'
+                            : null,
+                      ),
+                      const SizedBox(height: 15),
+                      _textField(
+                        controller: _skillsController,
+                        label: 'Skills',
+                        hint: 'e.g. Painting, Upcycling, Woodwork',
+                        icon: Icons.auto_awesome_outlined,
+                        maxLines: 2,
+                        capitalization: TextCapitalization.words,
+                        validator: (value) => (value ?? '').trim().isEmpty
+                            ? 'Please add at least one skill.'
+                            : null,
+                      ),
+                      const SizedBox(height: 15),
+                      _textField(
+                        controller: _experienceController,
+                        label: 'Experience',
+                        hint: 'e.g. 3 years',
+                        icon: Icons.workspace_premium_outlined,
+                        validator: (value) => (value ?? '').trim().isEmpty
+                            ? 'Please add your experience.'
+                            : null,
+                      ),
+                      const SizedBox(height: 30),
+                      _sectionTitle('Location', Icons.location_on_outlined),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Choose a state and city from the location data maintained in Google Sheets.',
+                        style: ArtistTextStyles.caption,
+                      ),
+                      const SizedBox(height: 14),
+                      _stateDropdown(),
+                      const SizedBox(height: 14),
+                      _cityDropdown(),
+                      const SizedBox(height: 24),
+                      _informationCard(),
+                      const SizedBox(height: 26),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _saving ? null : _saveProfile,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ArtistColors.primary,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: ArtistColors.primary
+                                .withOpacity(0.55),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: _saving
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.check_rounded, size: 19),
+                                    const SizedBox(width: 7),
+                                    Text(
+                                      'Save Changes',
+                                      style: ArtistTextStyles.button,
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 14),
-              _buildTextField(
-                controller: _nameController,
-                label: 'Artist Name',
-                hint: 'Enter your artist name',
-                icon: Icons.person_outline_rounded,
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 15),
-              _buildEmailField(),
-              const SizedBox(height: 15),
-              _buildTextField(
-                controller: _phoneController,
-                label: 'Phone Number',
-                hint: 'Enter your phone number',
-                icon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 15),
-              _buildTextField(
-                controller: _bioController,
-                label: 'Bio',
-                hint: 'Tell people about yourself and your work',
-                icon: Icons.edit_note_rounded,
-                maxLines: 5,
-                maxLength: 300,
-                textCapitalization: TextCapitalization.sentences,
-              ),
-              const SizedBox(height: 30),
-              _buildSectionTitle('Artist Information', Icons.palette_outlined),
-              const SizedBox(height: 14),
-              _buildTextField(
-                controller: _skillsController,
-                label: 'Skills',
-                hint: 'e.g. Painting, Upcycling, Woodwork',
-                icon: Icons.auto_awesome_outlined,
-                maxLines: 3,
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 15),
-              _buildTextField(
-                controller: _experienceController,
-                label: 'Experience',
-                hint: 'e.g. 3 years',
-                icon: Icons.workspace_premium_outlined,
-              ),
-              const SizedBox(height: 30),
-              _buildSectionTitle('Location', Icons.location_on_outlined),
-              const SizedBox(height: 8),
-              Text(
-                'Update the state and city associated with your artist profile.',
-                style: ArtistTextStyles.caption,
-              ),
-              const SizedBox(height: 14),
-              _buildStateDropdown(),
-              const SizedBox(height: 14),
-              _buildCityDropdown(),
-              const SizedBox(height: 30),
-              _buildInformationCard(),
-              const SizedBox(height: 30),
-              _buildSaveButton(),
-            ],
-          ),
-        ),
       ),
     );
   }
 
-  // Renders profile photo avatar along with edit camera badge
   Widget _buildProfilePhoto() {
     return Center(
       child: Column(
@@ -399,39 +556,58 @@ class _EditProfileState extends State<EditProfile> {
             clipBehavior: Clip.none,
             children: [
               Container(
-                width: 96,
-                height: 96,
+                width: 104,
+                height: 104,
                 decoration: BoxDecoration(
                   color: ArtistColors.light,
                   shape: BoxShape.circle,
                   border: Border.all(color: ArtistColors.accent, width: 3),
                 ),
-                child: const Center(
-                  child: Icon(
-                    Icons.person_rounded,
-                    color: ArtistColors.primary,
-                    size: 44,
-                  ),
-                ),
+                clipBehavior: Clip.antiAlias,
+                child: _photoBytes != null
+                    ? Image.memory(_photoBytes!, fit: BoxFit.cover)
+                    : _profilePhotoUrl.isNotEmpty
+                    ? Image.network(
+                        _profilePhotoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.person_rounded,
+                          color: ArtistColors.primary,
+                          size: 48,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.person_rounded,
+                        color: ArtistColors.primary,
+                        size: 48,
+                      ),
               ),
               Positioned(
                 right: -2,
                 bottom: 2,
                 child: GestureDetector(
-                  onTap: _changeProfilePhoto,
+                  onTap: _uploadingPhoto ? null : _changeProfilePhoto,
                   child: Container(
-                    width: 32,
-                    height: 32,
+                    width: 34,
+                    height: 34,
                     decoration: BoxDecoration(
                       color: ArtistColors.primary,
                       shape: BoxShape.circle,
                       border: Border.all(color: ArtistColors.surface, width: 3),
                     ),
-                    child: const Icon(
-                      Icons.camera_alt_outlined,
-                      color: Colors.white,
-                      size: 15,
-                    ),
+                    child: _uploadingPhoto
+                        ? const Padding(
+                            padding: EdgeInsets.all(7),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.camera_alt_outlined,
+                            color: Colors.white,
+                            size: 15,
+                          ),
                   ),
                 ),
               ),
@@ -446,16 +622,18 @@ class _EditProfileState extends State<EditProfile> {
           ),
           const SizedBox(height: 3),
           Text(
-            'Tap the camera icon to change',
+            _uploadingPhoto
+                ? 'Uploading to your EcoLoop profile...'
+                : 'Tap the camera icon to choose a photo',
             style: ArtistTextStyles.caption,
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  // Form section header icon and label builder
-  Widget _buildSectionTitle(String title, IconData icon) {
+  Widget _sectionTitle(String title, IconData icon) {
     return Row(
       children: [
         Container(
@@ -473,68 +651,39 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-  // Custom formatted text input field builder
-  Widget _buildTextField({
+  Widget _textField({
     required TextEditingController controller,
     required String label,
     required String hint,
     required IconData icon,
     TextInputType? keyboardType,
-    TextCapitalization textCapitalization = TextCapitalization.none,
+    TextCapitalization capitalization = TextCapitalization.none,
     int maxLines = 1,
     int? maxLength,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: ArtistTextStyles.label.copyWith(fontSize: 12)),
         const SizedBox(height: 7),
-        TextField(
+        TextFormField(
           controller: controller,
           keyboardType: keyboardType,
-          textCapitalization: textCapitalization,
+          textCapitalization: capitalization,
           maxLines: maxLines,
           maxLength: maxLength,
+          validator: validator,
           style: ArtistTextStyles.bodyMedium.copyWith(
             color: ArtistColors.textPrimary,
           ),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: ArtistTextStyles.hint,
-            prefixIcon: Padding(
-              padding: EdgeInsets.only(bottom: maxLines > 1 ? 45 : 0),
-              child: Icon(icon, color: ArtistColors.primary, size: 19),
-            ),
-            counterStyle: ArtistTextStyles.small.copyWith(fontSize: 9),
-            filled: true,
-            fillColor: ArtistColors.surface,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: ArtistColors.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: ArtistColors.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: ArtistColors.primary,
-                width: 1.3,
-              ),
-            ),
-          ),
+          decoration: _decoration(hint, icon: icon, multiline: maxLines > 1),
         ),
       ],
     );
   }
 
-  // Read-only user email field with lock badge indicator
-  Widget _buildEmailField() {
+  Widget _emailField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -543,41 +692,25 @@ class _EditProfileState extends State<EditProfile> {
           style: ArtistTextStyles.label.copyWith(fontSize: 12),
         ),
         const SizedBox(height: 7),
-        TextField(
+        TextFormField(
           controller: _emailController,
           readOnly: true,
           keyboardType: TextInputType.emailAddress,
           style: ArtistTextStyles.bodyMedium.copyWith(
             color: ArtistColors.textSecondary,
           ),
-          decoration: InputDecoration(
-            hintText: 'Email address',
-            hintStyle: ArtistTextStyles.hint,
-            prefixIcon: const Icon(
-              Icons.email_outlined,
-              color: ArtistColors.textSecondary,
-              size: 19,
-            ),
-            suffixIcon: const Icon(
-              Icons.lock_outline_rounded,
-              color: ArtistColors.textMuted,
-              size: 17,
-            ),
-            filled: true,
-            fillColor: ArtistColors.surfaceSoft,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: ArtistColors.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: ArtistColors.border),
-            ),
-          ),
+          decoration:
+              _decoration(
+                'Email address',
+                icon: Icons.email_outlined,
+                readOnly: true,
+              ).copyWith(
+                suffixIcon: const Icon(
+                  Icons.lock_outline_rounded,
+                  color: ArtistColors.textMuted,
+                  size: 17,
+                ),
+              ),
         ),
         const SizedBox(height: 5),
         Row(
@@ -589,7 +722,7 @@ class _EditProfileState extends State<EditProfile> {
             ),
             const SizedBox(width: 5),
             Text(
-              'Email address cannot be changed here.',
+              'Email is loaded from your account and cannot be edited here.',
               style: ArtistTextStyles.small,
             ),
           ],
@@ -598,288 +731,121 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-  // Searchable state selection dropdown sheet widget
-  Widget _buildStateDropdown() {
+  InputDecoration _decoration(
+    String hint, {
+    required IconData icon,
+    bool multiline = false,
+    bool readOnly = false,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: ArtistTextStyles.hint,
+      prefixIcon: Padding(
+        padding: EdgeInsets.only(bottom: multiline ? 35 : 0),
+        child: Icon(
+          icon,
+          color: readOnly ? ArtistColors.textSecondary : ArtistColors.primary,
+          size: 19,
+        ),
+      ),
+      counterStyle: ArtistTextStyles.small.copyWith(fontSize: 9),
+      filled: true,
+      fillColor: readOnly ? ArtistColors.surfaceSoft : ArtistColors.surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: ArtistColors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: ArtistColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: ArtistColors.primary, width: 1.3),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: ArtistColors.error),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: ArtistColors.error, width: 1.3),
+      ),
+    );
+  }
+
+  Widget _stateDropdown() {
+    final selectedCode =
+        _states.any((state) => _stateCode(state) == _selectedStateCode)
+        ? _selectedStateCode
+        : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('State', style: ArtistTextStyles.label.copyWith(fontSize: 12)),
         const SizedBox(height: 7),
-        DropdownSearch<StateModel>(
-          selectedItem: _selectedState,
-          enabled: !_isLoadingStates && _states.isNotEmpty,
-          items: (filter, loadProps) => _states,
-          itemAsString: (StateModel state) => state.stateName,
-          compareFn: (StateModel a, StateModel b) => a.stateCode == b.stateCode,
-          onSelected: (StateModel? value) {
-            if (value == null) return;
-            setState(() {
-              _selectedState = value;
-              _selectedCity = null;
-              _initialCityName = null;
-
-              final cached = _citiesCache[value.stateCode];
-              if (cached != null) {
-                _cities = cached;
-                _isLoadingCities = false;
-              } else {
-                _cities = [];
-                _isLoadingCities = true;
-              }
-            });
-            _loadCities(value.stateCode);
-          },
-          decoratorProps: DropDownDecoratorProps(
-            decoration: InputDecoration(
-              hintText: _isLoadingStates ? 'Loading states...' : 'Select state',
-              prefixIcon: const Icon(
-                Icons.map_outlined,
-                color: ArtistColors.primary,
-                size: 19,
-              ),
-              filled: true,
-              fillColor: ArtistColors.surface,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 13,
-              ),
-              suffixIcon: _isLoadingStates
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: ArtistColors.primary,
-                        ),
-                      ),
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: ArtistColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: ArtistColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: ArtistColors.primary,
-                  width: 1.3,
-                ),
-              ),
-            ),
-          ),
-          popupProps: PopupProps.modalBottomSheet(
-            showSearchBox: true,
-            searchDelay: Duration.zero,
-            title: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-              child: Text(
-                'Select State',
-                style: ArtistTextStyles.body.copyWith(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: ArtistColors.textPrimary,
-                ),
-              ),
-            ),
-            searchFieldProps: TextFieldProps(
-              decoration: InputDecoration(
-                hintText: 'Search state...',
-                hintStyle: ArtistTextStyles.hint,
-                prefixIcon: const Icon(
-                  Icons.search_rounded,
-                  color: ArtistColors.primary,
-                ),
-                filled: true,
-                fillColor: ArtistColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: ArtistColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: ArtistColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: ArtistColors.primary),
-                ),
-              ),
-            ),
-            itemBuilder: (context, state, isDisabled, isSelected) {
-              return ListTile(
-                leading: Icon(
-                  Icons.map_outlined,
-                  color: isSelected
-                      ? ArtistColors.primary
-                      : ArtistColors.textSecondary,
-                ),
-                title: Text(
-                  state.stateName,
-                  style: ArtistTextStyles.body.copyWith(
-                    color: ArtistColors.textPrimary,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+        DropdownButtonFormField<String>(
+          value: selectedCode,
+          isExpanded: true,
+          decoration: _decoration('Select state', icon: Icons.map_outlined),
+          items: _states
+              .where((state) => _stateCode(state).isNotEmpty)
+              .map(
+                (state) => DropdownMenuItem<String>(
+                  value: _stateCode(state),
+                  child: Text(
+                    _stateName(state),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                trailing: isSelected
-                    ? const Icon(
-                        Icons.check_rounded,
-                        color: ArtistColors.primary,
-                      )
-                    : null,
-              );
-            },
-          ),
+              )
+              .toList(),
+          onChanged: _saving ? null : _selectState,
+          validator: (_) =>
+              _selectedStateCode == null ? 'Please select a state.' : null,
         ),
       ],
     );
   }
 
-  // Searchable city selection dropdown sheet widget based on active state
-  Widget _buildCityDropdown() {
+  Widget _cityDropdown() {
+    final selectedCity =
+        _cities.any((city) => _cityName(city) == _selectedCityName)
+        ? _selectedCityName
+        : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('City', style: ArtistTextStyles.label.copyWith(fontSize: 12)),
         const SizedBox(height: 7),
-        DropdownSearch<CityModel>(
-          selectedItem: _selectedCity,
-          enabled:
-              _selectedState != null && !_isLoadingCities && _cities.isNotEmpty,
-          items: (filter, loadProps) => _cities,
-          itemAsString: (CityModel city) => city.cityName,
-          compareFn: (CityModel a, CityModel b) => a.cityId == b.cityId,
-          onSelected: (CityModel? value) {
-            setState(() {
-              _selectedCity = value;
-            });
-          },
-          decoratorProps: DropDownDecoratorProps(
-            decoration: InputDecoration(
-              hintText: _selectedState == null
-                  ? 'Select state first'
-                  : _isLoadingCities
-                  ? 'Loading cities...'
-                  : _cities.isEmpty
-                  ? 'No cities available'
-                  : 'Select city',
-              prefixIcon: const Icon(
-                Icons.location_city_outlined,
-                color: ArtistColors.primary,
-                size: 19,
-              ),
-              filled: true,
-              fillColor: ArtistColors.surface,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 13,
-              ),
-              suffixIcon: _isLoadingCities
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: ArtistColors.primary,
-                        ),
-                      ),
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: ArtistColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: ArtistColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: ArtistColors.primary,
-                  width: 1.3,
-                ),
-              ),
-            ),
+        DropdownButtonFormField<String>(
+          value: selectedCity,
+          isExpanded: true,
+          decoration: _decoration(
+            'Select city',
+            icon: Icons.location_city_outlined,
           ),
-          popupProps: PopupProps.modalBottomSheet(
-            showSearchBox: true,
-            searchDelay: Duration.zero,
-            title: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-              child: Text(
-                _selectedState == null
-                    ? 'Select City'
-                    : 'Select City in ${_selectedState!.stateName}',
-                style: ArtistTextStyles.body.copyWith(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: ArtistColors.textPrimary,
+          items: _cities
+              .map(
+                (city) => DropdownMenuItem<String>(
+                  value: _cityName(city),
+                  child: Text(_cityName(city), overflow: TextOverflow.ellipsis),
                 ),
-              ),
-            ),
-            searchFieldProps: TextFieldProps(
-              decoration: InputDecoration(
-                hintText: 'Search city...',
-                hintStyle: ArtistTextStyles.hint,
-                prefixIcon: const Icon(
-                  Icons.search_rounded,
-                  color: ArtistColors.primary,
-                ),
-                filled: true,
-                fillColor: ArtistColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: ArtistColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: ArtistColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: ArtistColors.primary),
-                ),
-              ),
-            ),
-            itemBuilder: (context, city, isDisabled, isSelected) {
-              return ListTile(
-                leading: Icon(
-                  Icons.location_city_outlined,
-                  color: isSelected
-                      ? ArtistColors.primary
-                      : ArtistColors.textSecondary,
-                ),
-                title: Text(
-                  city.cityName,
-                  style: ArtistTextStyles.body.copyWith(
-                    color: ArtistColors.textPrimary,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-                trailing: isSelected
-                    ? const Icon(
-                        Icons.check_rounded,
-                        color: ArtistColors.primary,
-                      )
-                    : null,
-              );
-            },
-          ),
+              )
+              .where((item) => item.value != null && item.value!.isNotEmpty)
+              .toList(),
+          onChanged: _saving || _selectedStateCode == null
+              ? null
+              : (value) => setState(() => _selectedCityName = value),
+          validator: (_) =>
+              _selectedCityName == null ? 'Please select a city.' : null,
         ),
       ],
     );
   }
 
-  // Information banner component highlighting profile visibility
-  Widget _buildInformationCard() {
+  Widget _informationCard() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(15),
@@ -899,7 +865,7 @@ class _EditProfileState extends State<EditProfile> {
           const SizedBox(width: 9),
           Expanded(
             child: Text(
-              'Your profile information helps customers understand your work and discover your ReMaker profile.',
+              'Your details are saved to your artist record in Google Sheets. Your profile photo is uploaded to EcoLoop Drive and its URL is saved to the same record. Email is read-only.',
               style: ArtistTextStyles.small.copyWith(
                 fontSize: 10,
                 height: 1.45,
@@ -910,258 +876,94 @@ class _EditProfileState extends State<EditProfile> {
       ),
     );
   }
+}
 
-  // Primary profile save button with integrated loading state
-  Widget _buildSaveButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: _isSaving ? null : _saveProfile,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: ArtistColors.primary,
-          foregroundColor: Colors.white,
-          disabledBackgroundColor: ArtistColors.primary.withOpacity(0.55),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-        child: _isSaving
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2.5,
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.check_rounded, size: 19),
-                  const SizedBox(width: 7),
-                  Text('Save Changes', style: ArtistTextStyles.button),
-                ],
-              ),
-      ),
-    );
-  }
+class _PhotoOption extends StatelessWidget {
+  const _PhotoOption({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
-  // Bottom modal sheet trigger for profile image choices
-  void _changeProfilePhoto() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ArtistColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 25),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: ArtistColors.border,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Profile Photo', style: ArtistTextStyles.title),
-                ),
-                const SizedBox(height: 14),
-                _photoOption(
-                  icon: Icons.photo_library_outlined,
-                  title: 'Choose from Gallery',
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showComingSoon(
-                      'Gallery selection will be connected later.',
-                    );
-                  },
-                ),
-                const SizedBox(height: 9),
-                _photoOption(
-                  icon: Icons.camera_alt_outlined,
-                  title: 'Take a Photo',
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showComingSoon('Camera will be connected later.');
-                  },
-                ),
-                const SizedBox(height: 9),
-                _photoOption(
-                  icon: Icons.delete_outline_rounded,
-                  title: 'Remove Photo',
-                  destructive: true,
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showComingSoon('Photo removal will be connected later.');
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
 
-  // Reusable action row item builder for photo bottom sheet options
-  Widget _photoOption({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    bool destructive = false,
-  }) {
+  @override
+  Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(13),
       onTap: onTap,
+      borderRadius: BorderRadius.circular(13),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
-          color: destructive
-              ? ArtistColors.error.withOpacity(0.05)
-              : ArtistColors.background,
+          color: ArtistColors.background,
           borderRadius: BorderRadius.circular(13),
-          border: Border.all(
-            color: destructive
-                ? ArtistColors.error.withOpacity(0.2)
-                : ArtistColors.border.withOpacity(0.7),
-          ),
+          border: Border.all(color: ArtistColors.border.withOpacity(0.7)),
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 20,
-              color: destructive ? ArtistColors.error : ArtistColors.primary,
-            ),
+            Icon(icon, size: 20, color: ArtistColors.primary),
             const SizedBox(width: 10),
             Text(
-              title,
+              label,
               style: ArtistTextStyles.bodyMedium.copyWith(
-                color: destructive
-                    ? ArtistColors.error
-                    : ArtistColors.textPrimary,
+                color: ArtistColors.textPrimary,
                 fontSize: 12,
               ),
             ),
             const Spacer(),
-            Icon(
+            const Icon(
               Icons.chevron_right_rounded,
               size: 19,
-              color: destructive
-                  ? ArtistColors.error
-                  : ArtistColors.textSecondary,
+              color: ArtistColors.textSecondary,
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  // Form field validation and save handler
-  Future<void> _saveProfile() async {
-    FocusScope.of(context).unfocus();
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.message, required this.onRetry});
 
-    final name = _nameController.text.trim();
-    final phone = _phoneController.text.trim();
-    final bio = _bioController.text.trim();
-    final skills = _skillsController.text.trim();
-    final experience = _experienceController.text.trim();
+  final String message;
+  final VoidCallback onRetry;
 
-    if (name.isEmpty) {
-      _showValidationMessage('Please enter your artist name.');
-      return;
-    }
-    if (phone.isEmpty) {
-      _showValidationMessage('Please enter your phone number.');
-      return;
-    }
-    if (bio.isEmpty) {
-      _showValidationMessage('Please enter your bio.');
-      return;
-    }
-    if (skills.isEmpty) {
-      _showValidationMessage('Please enter your skills.');
-      return;
-    }
-    if (experience.isEmpty) {
-      _showValidationMessage('Please enter your experience.');
-      return;
-    }
-    if (_selectedState == null) {
-      _showValidationMessage('Please select your state.');
-      return;
-    }
-    if (_selectedCity == null) {
-      _showValidationMessage('Please select your city.');
-      return;
-    }
-
-    setState(() {
-      _isSaving = true;
-    });
-
-    await Future.delayed(const Duration(milliseconds: 700));
-
-    if (!mounted) return;
-
-    setState(() {
-      _isSaving = false;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Profile updated successfully.'),
-        behavior: SnackBarBehavior.floating,
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_outlined,
+              size: 42,
+              color: ArtistColors.error,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: ArtistTextStyles.body,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ArtistColors.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
-    );
-
-    Navigator.pop(context);
-  }
-
-  // Displays floating warning notifications for input validation
-  void _showValidationMessage(String message) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: ArtistColors.warning,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  // Displays API error message dialog/snackbar
-  void _showErrorMessage(String title, String message) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$title: $message'),
-        backgroundColor: ArtistColors.error,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  // Displays placeholder notification for upcoming feature connections
-  void _showComingSoon(String message) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 }

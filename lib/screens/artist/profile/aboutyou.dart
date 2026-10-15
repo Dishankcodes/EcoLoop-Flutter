@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 
+/// Shows the signed-in artist's real customer reviews and rating information.
+/// No sample review names, comments, dates, or rating counts are generated here.
 class AboutYou extends StatefulWidget {
   const AboutYou({super.key});
 
@@ -11,43 +14,122 @@ class AboutYou extends StatefulWidget {
 }
 
 class _AboutYouState extends State<AboutYou> {
-  final List<Map<String, dynamic>> reviews = [
-    {
-      'name': 'Priya Shah',
-      'date': '12 Sep 2026',
-      'rating': 5,
-      'review':
-          'Beautiful handmade work. The finishing and attention to detail were excellent.',
-    },
-    {
-      'name': 'Rahul Patel',
-      'date': '05 Sep 2026',
-      'rating': 5,
-      'review':
-          'Really happy with my purchase. The product looks exactly like the pictures.',
-    },
-    {
-      'name': 'Meera Joshi',
-      'date': '28 Aug 2026',
-      'rating': 4,
-      'review':
-          'Very creative and unique work. Delivery was smooth and the quality was good.',
-    },
-    {
-      'name': 'Aarav Mehta',
-      'date': '19 Aug 2026',
-      'rating': 4,
-      'review':
-          'Good craftsmanship and a beautiful design. Would definitely explore more products.',
-    },
-    {
-      'name': 'Kavya Patel',
-      'date': '11 Aug 2026',
-      'rating': 5,
-      'review':
-          'One of the most beautiful handmade products I have purchased. Highly recommended.',
-    },
-  ];
+  final EcoLoopApi _api = EcoLoopApi.instance;
+  bool _loading = true;
+  String? _error;
+  Map<String, dynamic> _profile = {};
+  Map<String, dynamic> _analytics = {};
+  List<Map<String, dynamic>> _reviews = [];
+
+  Map<String, dynamic> _map(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, item) => MapEntry(key.toString(), item));
+    }
+    return <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _list(dynamic value) {
+    if (value is List)
+      return value.map(_map).where((e) => e.isNotEmpty).toList();
+    final map = _map(value);
+    for (final key in ['reviews', 'items', 'results', 'data']) {
+      final nested = map[key];
+      if (nested is List) {
+        return nested.map(_map).where((e) => e.isNotEmpty).toList();
+      }
+    }
+    return [];
+  }
+
+  String _text(dynamic value, [String fallback = '']) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty || text.toLowerCase() == 'null' ? fallback : text;
+  }
+
+  double _number(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  int _rating(Map<String, dynamic> review) =>
+      _number(review['rating']).round().clamp(0, 5).toInt();
+
+  DateTime? _date(Map<String, dynamic> review) {
+    final raw = review['createdAt'] ?? review['date'] ?? review['updatedAt'];
+    if (raw == null || raw.toString().trim().isEmpty) return null;
+    return DateTime.tryParse(raw.toString());
+  }
+
+  String _formatDate(Map<String, dynamic> review) {
+    final date = _date(review);
+    if (date == null) return 'Date not provided';
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (mounted)
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    try {
+      final profile = _map(await _api.get('/profile'));
+      final artistId = _text(profile['artistId'] ?? profile['id']);
+      if (artistId.isEmpty) {
+        throw Exception(
+          'The backend did not return an artist ID for this account.',
+        );
+      }
+
+      final results = await Future.wait<dynamic>([
+        _api.get('/artists/$artistId/reviews'),
+        _api.get('/artist/analytics'),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _reviews = _list(results[0]);
+        _analytics = _map(results[1]);
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  double get _averageRating {
+    if (_reviews.isEmpty) return _number(_analytics['averageRating']);
+    final total = _reviews.fold<int>(0, (sum, review) => sum + _rating(review));
+    return total / _reviews.length;
+  }
+
+  int _countForRating(int rating) =>
+      _reviews.where((review) => _rating(review) == rating).length;
 
   @override
   Widget build(BuildContext context) {
@@ -77,10 +159,10 @@ class _AboutYouState extends State<AboutYou> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Help',
-            onPressed: _showAboutHelp,
+            tooltip: 'Refresh reviews',
+            onPressed: _loading ? null : _load,
             icon: const Icon(
-              Icons.info_outline_rounded,
+              Icons.refresh_rounded,
               color: ArtistColors.textPrimary,
               size: 21,
             ),
@@ -89,46 +171,96 @@ class _AboutYouState extends State<AboutYou> {
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'What People Say About You',
-                style: ArtistTextStyles.heading.copyWith(
-                  fontSize: 23,
-                  fontWeight: FontWeight.w700,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+            ? _buildError()
+            : RefreshIndicator(
+                onRefresh: _load,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'What People Say About You',
+                        style: ArtistTextStyles.heading.copyWith(
+                          fontSize: 23,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        'Customer feedback from reviews stored in EcoLoop.',
+                        style: ArtistTextStyles.body.copyWith(
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      _buildArtistProfile(),
+                      const SizedBox(height: 16),
+                      _buildRatingSummary(),
+                      const SizedBox(height: 20),
+                      _buildReviewsHeader(),
+                      const SizedBox(height: 12),
+                      if (_reviews.isEmpty)
+                        _buildEmptyReviews()
+                      else
+                        ..._reviews.map(_buildReviewCard),
+                      const SizedBox(height: 2),
+                      _buildInfoCard(),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 5),
-              Text(
-                'See what customers think about your work, products and overall experience.',
-                style: ArtistTextStyles.body.copyWith(
-                  fontSize: 13,
-                  height: 1.4,
-                ),
+      ),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_outlined,
+              size: 42,
+              color: ArtistColors.textMuted,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: ArtistTextStyles.body.copyWith(height: 1.4),
+            ),
+            const SizedBox(height: 14),
+            ElevatedButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ArtistColors.primary,
+                foregroundColor: Colors.white,
               ),
-              const SizedBox(height: 18),
-              _buildArtistProfile(),
-              const SizedBox(height: 16),
-              _buildRatingSummary(),
-              const SizedBox(height: 20),
-              _buildReviewsHeader(),
-              const SizedBox(height: 12),
-              ...reviews.map(_buildReviewCard),
-              const SizedBox(height: 2),
-              _buildInfoCard(),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // Artist profile card.
   Widget _buildArtistProfile() {
+    final name = _text(_profile['userName'], 'Artist');
+    final role = _text(_profile['role'], 'artist');
+    final photo = _text(_profile['profilePhotoUrl']);
+    final rating = _averageRating;
+    final ratingCount = _reviews.length;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -157,11 +289,22 @@ class _AboutYouState extends State<AboutYou> {
                 width: 2,
               ),
             ),
-            child: const Icon(
-              Icons.person_rounded,
-              color: ArtistColors.primary,
-              size: 34,
-            ),
+            clipBehavior: Clip.antiAlias,
+            child: photo.isEmpty
+                ? const Icon(
+                    Icons.person_rounded,
+                    color: ArtistColors.primary,
+                    size: 34,
+                  )
+                : Image.network(
+                    photo,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.person_rounded,
+                      color: ArtistColors.primary,
+                      size: 34,
+                    ),
+                  ),
           ),
           const SizedBox(width: 13),
           Expanded(
@@ -169,14 +312,19 @@ class _AboutYouState extends State<AboutYou> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Artist Profile',
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: ArtistTextStyles.title.copyWith(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text('Handmade Artist', style: ArtistTextStyles.caption),
+                Text(
+                  role[0].toUpperCase() + role.substring(1),
+                  style: ArtistTextStyles.caption,
+                ),
                 const SizedBox(height: 7),
                 Row(
                   children: [
@@ -187,36 +335,23 @@ class _AboutYouState extends State<AboutYou> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '4.8',
+                      rating.toStringAsFixed(1),
                       style: ArtistTextStyles.bodyMedium.copyWith(
                         color: ArtistColors.textPrimary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(width: 5),
-                    Text(
-                      'from 5 reviews',
-                      style: ArtistTextStyles.caption.copyWith(fontSize: 10),
+                    Flexible(
+                      child: Text(
+                        '$ratingCount ${ratingCount == 1 ? 'review' : 'reviews'}',
+                        overflow: TextOverflow.ellipsis,
+                        style: ArtistTextStyles.caption.copyWith(fontSize: 10),
+                      ),
                     ),
                   ],
                 ),
               ],
-            ),
-          ),
-          Material(
-            color: ArtistColors.light,
-            borderRadius: BorderRadius.circular(10),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: _editAboutYou,
-              child: const Padding(
-                padding: EdgeInsets.all(9),
-                child: Icon(
-                  Icons.edit_outlined,
-                  color: ArtistColors.primary,
-                  size: 19,
-                ),
-              ),
             ),
           ),
         ],
@@ -224,8 +359,8 @@ class _AboutYouState extends State<AboutYou> {
     );
   }
 
-  // Rating summary.
   Widget _buildRatingSummary() {
+    final rating = _averageRating;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -241,7 +376,7 @@ class _AboutYouState extends State<AboutYou> {
             child: Column(
               children: [
                 Text(
-                  '4.8',
+                  rating.toStringAsFixed(1),
                   style: ArtistTextStyles.heading.copyWith(
                     fontSize: 32,
                     fontWeight: FontWeight.w800,
@@ -251,8 +386,10 @@ class _AboutYouState extends State<AboutYou> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(
                     5,
-                    (index) => const Icon(
-                      Icons.star_rounded,
+                    (index) => Icon(
+                      index < rating.round()
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
                       color: ArtistColors.primary,
                       size: 15,
                     ),
@@ -260,7 +397,8 @@ class _AboutYouState extends State<AboutYou> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Overall Rating',
+                  'Average rating',
+                  textAlign: TextAlign.center,
                   style: ArtistTextStyles.caption.copyWith(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w600,
@@ -272,13 +410,10 @@ class _AboutYouState extends State<AboutYou> {
           const SizedBox(width: 16),
           Expanded(
             child: Column(
-              children: [
-                _ratingBar(5, 4),
-                _ratingBar(4, 1),
-                _ratingBar(3, 0),
-                _ratingBar(2, 0),
-                _ratingBar(1, 0),
-              ],
+              children: List.generate(5, (index) {
+                final stars = 5 - index;
+                return _ratingBar(stars, _countForRating(stars));
+              }),
             ),
           ),
         ],
@@ -286,10 +421,8 @@ class _AboutYouState extends State<AboutYou> {
     );
   }
 
-  // Rating progress row.
   Widget _ratingBar(int rating, int count) {
-    final progress = reviews.isEmpty ? 0.0 : count / reviews.length;
-
+    final progress = _reviews.isEmpty ? 0.0 : count / _reviews.length;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -321,7 +454,7 @@ class _AboutYouState extends State<AboutYou> {
           ),
           const SizedBox(width: 6),
           SizedBox(
-            width: 14,
+            width: 20,
             child: Text(
               '$count',
               textAlign: TextAlign.right,
@@ -333,7 +466,6 @@ class _AboutYouState extends State<AboutYou> {
     );
   }
 
-  // Reviews header.
   Widget _buildReviewsHeader() {
     return Row(
       children: [
@@ -353,7 +485,7 @@ class _AboutYouState extends State<AboutYou> {
             borderRadius: BorderRadius.circular(9),
           ),
           child: Text(
-            '${reviews.length} Reviews',
+            '${_reviews.length} ${_reviews.length == 1 ? 'Review' : 'Reviews'}',
             style: ArtistTextStyles.caption.copyWith(
               color: ArtistColors.primary,
               fontSize: 10,
@@ -365,14 +497,46 @@ class _AboutYouState extends State<AboutYou> {
     );
   }
 
-  // Review card.
-  Widget _buildReviewCard(Map<String, dynamic> review) {
-    final rating = review['rating'] as int;
-    final name = review['name']?.toString() ?? 'Customer';
-    final date = review['date']?.toString() ?? '';
-    final reviewText = review['review']?.toString() ?? '';
-    final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'C';
+  Widget _buildEmptyReviews() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: ArtistColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ArtistColors.border),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.rate_review_outlined,
+            size: 34,
+            color: ArtistColors.textMuted,
+          ),
+          const SizedBox(height: 9),
+          Text(
+            'No customer reviews yet',
+            style: ArtistTextStyles.title.copyWith(fontSize: 14),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Reviews will appear here after customers submit feedback for your artist profile.',
+            textAlign: TextAlign.center,
+            style: ArtistTextStyles.caption.copyWith(height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildReviewCard(Map<String, dynamic> review) {
+    final rating = _rating(review);
+    final name = _text(
+      review['reviewerName'] ?? review['name'],
+      'EcoLoop buyer',
+    );
+    final comment = _text(review['comment'] ?? review['review']);
+    final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'C';
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 10),
@@ -422,7 +586,7 @@ class _AboutYouState extends State<AboutYou> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      date,
+                      _formatDate(review),
                       style: ArtistTextStyles.caption.copyWith(fontSize: 9.5),
                     ),
                   ],
@@ -466,52 +630,22 @@ class _AboutYouState extends State<AboutYou> {
               ),
             ),
           ),
-          const SizedBox(height: 7),
-          Text(
-            reviewText,
-            style: ArtistTextStyles.body.copyWith(
-              color: ArtistColors.textPrimary,
-              fontSize: 11.5,
-              height: 1.45,
+          if (comment.isNotEmpty) ...[
+            const SizedBox(height: 7),
+            Text(
+              comment,
+              style: ArtistTextStyles.body.copyWith(
+                color: ArtistColors.textPrimary,
+                fontSize: 11.5,
+                height: 1.45,
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(
-                Icons.thumb_up_alt_outlined,
-                color: ArtistColors.textMuted,
-                size: 14,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                'Helpful review',
-                style: ArtistTextStyles.caption.copyWith(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () => _showReviewOptions(review),
-                child: const Padding(
-                  padding: EdgeInsets.all(3),
-                  child: Icon(
-                    Icons.more_horiz_rounded,
-                    color: ArtistColors.textMuted,
-                    size: 19,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          ],
         ],
       ),
     );
   }
 
-  // Information card.
   Widget _buildInfoCard() {
     return Container(
       width: double.infinity,
@@ -525,14 +659,14 @@ class _AboutYouState extends State<AboutYou> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(
-            Icons.auto_awesome_outlined,
+            Icons.info_outline_rounded,
             color: ArtistColors.primary,
             size: 20,
           ),
           const SizedBox(width: 9),
           Expanded(
             child: Text(
-              'Your customer reviews help visitors understand your work and build trust in your artist profile.',
+              'This page displays reviews returned by EcoLoop. If no reviews exist in the backend, the page stays empty instead of showing sample feedback.',
               style: ArtistTextStyles.body.copyWith(
                 color: ArtistColors.textPrimary,
                 fontSize: 10.5,
@@ -543,242 +677,5 @@ class _AboutYouState extends State<AboutYou> {
         ],
       ),
     );
-  }
-
-  // Edit action.
-  void _editAboutYou() {
-    _showMessage('Edit About You is ready to connect.');
-  }
-
-  // Review options.
-  void _showReviewOptions(Map<String, dynamic> review) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ArtistColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: ArtistColors.border,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: ArtistColors.light,
-                        borderRadius: BorderRadius.circular(11),
-                      ),
-                      child: const Icon(
-                        Icons.rate_review_outlined,
-                        color: ArtistColors.primary,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 11),
-                    Text(
-                      'Review Options',
-                      style: ArtistTextStyles.title.copyWith(fontSize: 18),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _sheetOption(
-                  icon: Icons.visibility_outlined,
-                  title: 'View Review',
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showMessage('Review selected.');
-                  },
-                ),
-                _sheetOption(
-                  icon: Icons.flag_outlined,
-                  title: 'Report Review',
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showMessage('Review reported.');
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // Bottom sheet option.
-  Widget _sheetOption({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 2),
-      leading: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: ArtistColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: ArtistColors.primary, size: 19),
-      ),
-      title: Text(
-        title,
-        style: ArtistTextStyles.bodyMedium.copyWith(
-          color: ArtistColors.textPrimary,
-        ),
-      ),
-      trailing: const Icon(
-        Icons.chevron_right_rounded,
-        color: ArtistColors.textMuted,
-      ),
-      onTap: onTap,
-    );
-  }
-
-  // Help dialog.
-  void _showAboutHelp() {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: ArtistColors.surface,
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: ArtistColors.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ArtistColors.border),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: ArtistColors.light,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.info_outline_rounded,
-                        color: ArtistColors.primary,
-                        size: 23,
-                      ),
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Text(
-                        'About You',
-                        style: ArtistTextStyles.title.copyWith(fontSize: 18),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        Navigator.pop(dialogContext);
-                      },
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: ArtistColors.textMuted,
-                        size: 21,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Customer Reviews',
-                  style: ArtistTextStyles.bodyMedium.copyWith(
-                    color: ArtistColors.textPrimary,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  'This section shows reviews and ratings given by customers who have interacted with your products or services.',
-                  style: ArtistTextStyles.body.copyWith(
-                    fontSize: 11,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Use customer feedback to understand their experience and improve your artist profile and products.',
-                  style: ArtistTextStyles.body.copyWith(
-                    fontSize: 11,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 17),
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(dialogContext);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ArtistColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(11),
-                      ),
-                    ),
-                    child: Text(
-                      'Got It',
-                      style: ArtistTextStyles.button.copyWith(fontSize: 13),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // Snackbar message.
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: ArtistTextStyles.body.copyWith(
-              color: Colors.white,
-              fontSize: 12,
-            ),
-          ),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: ArtistColors.accent,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(11),
-          ),
-        ),
-      );
   }
 }

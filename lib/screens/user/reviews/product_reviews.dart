@@ -24,6 +24,8 @@ class _ProductReviewsState extends State<ProductReviews> {
   List<Map<String, dynamic>> _reviews = <Map<String, dynamic>>[];
   String _filter = 'All';
   String _sort = 'Newest';
+  String? _eligibleOrderId;
+  bool _checkingEligibility = true;
 
   final EcoLoopApi _api = EcoLoopApi.instance;
 
@@ -45,9 +47,12 @@ class _ProductReviewsState extends State<ProductReviews> {
           .toString()
           .trim();
 
-  String get _title =>
-      (widget.product['title'] ?? widget.product['name'] ?? 'Product')
-          .toString();
+  String get _title {
+    final title = (widget.product['title'] ?? widget.product['name'] ?? '')
+        .toString()
+        .trim();
+    return title.isEmpty ? 'Product' : title;
+  }
 
   String get _image {
     final dynamic images =
@@ -79,6 +84,123 @@ class _ProductReviewsState extends State<ProductReviews> {
   void initState() {
     super.initState();
     _load();
+    _loadEligibleOrder();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProductReviews oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.product != widget.product ||
+        oldWidget.orderId != widget.orderId) {
+      _load();
+      _loadEligibleOrder();
+    }
+  }
+
+  List<Map<String, dynamic>> _extractRows(dynamic response) {
+    dynamic rows;
+    if (response is List) {
+      rows = response;
+    } else if (response is Map) {
+      final data = response['data'];
+      if (response['orders'] is List) {
+        rows = response['orders'];
+      } else if (data is List) {
+        rows = data;
+      } else if (data is Map && data['orders'] is List) {
+        rows = data['orders'];
+      } else if (response['items'] is List) {
+        rows = response['items'];
+      } else if (response['results'] is List) {
+        rows = response['results'];
+      }
+    }
+    if (rows is! List) return <Map<String, dynamic>>[];
+    return rows
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
+  }
+
+  String _normaliseId(dynamic value) => (value ?? '').toString().trim();
+
+  Future<void> _loadEligibleOrder() async {
+    if (!mounted) return;
+    setState(() {
+      _checkingEligibility = true;
+      _eligibleOrderId = null;
+    });
+
+    try {
+      if (_id.isEmpty) {
+        if (mounted) setState(() => _checkingEligibility = false);
+        return;
+      }
+
+      // Eligibility is derived from the signed-in user's actual orders.
+      // The backend still performs the authoritative check on submission.
+      final dynamic response = await _api.get('/orders');
+      final orders = _extractRows(response);
+      final productId = _normaliseId(int.tryParse(_id) ?? _id);
+
+      final eligible = orders.where((order) {
+        final orderedProductId = _normaliseId(
+          order['productId'] ?? order['product_id'] ?? order['productID'],
+        );
+        final status = (order['status'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replaceAll('-', '_')
+            .replaceAll(' ', '_');
+        return orderedProductId == productId && status == 'delivered';
+      }).toList();
+
+      eligible.sort((a, b) {
+        final aDate =
+            DateTime.tryParse(
+              (a['deliveredAt'] ?? a['updatedAt'] ?? a['createdAt'] ?? '')
+                  .toString(),
+            ) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate =
+            DateTime.tryParse(
+              (b['deliveredAt'] ?? b['updatedAt'] ?? b['createdAt'] ?? '')
+                  .toString(),
+            ) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
+
+      String? chosenOrderId;
+      final suppliedOrderId = (widget.orderId ?? '').trim();
+      if (suppliedOrderId.isNotEmpty) {
+        for (final order in eligible) {
+          final currentId = _normaliseId(order['orderId'] ?? order['id']);
+          if (currentId == suppliedOrderId) {
+            chosenOrderId = currentId;
+            break;
+          }
+        }
+      }
+      chosenOrderId ??= eligible.isNotEmpty
+          ? _normaliseId(eligible.first['orderId'] ?? eligible.first['id'])
+          : null;
+
+      if (!mounted) return;
+      setState(() {
+        _eligibleOrderId = chosenOrderId == null || chosenOrderId.isEmpty
+            ? null
+            : chosenOrderId;
+        _checkingEligibility = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _eligibleOrderId = null;
+        _checkingEligibility = false;
+      });
+    }
   }
 
   Future<void> _load() async {
@@ -198,21 +320,26 @@ class _ProductReviewsState extends State<ProductReviews> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: widget.orderId == null || widget.orderId!.isEmpty
+                onPressed: _checkingEligibility || _eligibleOrderId == null
                     ? null
                     : _openWriteReview,
                 icon: const Icon(Icons.rate_review_outlined),
                 label: const Text('Write a review'),
               ),
             ),
-            if (widget.orderId == null || widget.orderId!.isEmpty) ...[
-              const SizedBox(height: 4),
-              const Text(
-                'A review can be submitted only for an eligible purchase.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            const SizedBox(height: 4),
+            Text(
+              _checkingEligibility
+                  ? 'Checking your delivered orders…'
+                  : _eligibleOrderId == null
+                  ? 'You can review this product after your order is delivered.'
+                  : 'Verified purchase: you can review this product.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
               ),
-            ],
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -279,8 +406,10 @@ class _ProductReviewsState extends State<ProductReviews> {
   }
 
   Future<void> _openWriteReview() async {
-    final orderId = widget.orderId;
-    if (orderId == null || orderId.trim().isEmpty) return;
+    final orderId = _eligibleOrderId;
+    if (_checkingEligibility || orderId == null || orderId.trim().isEmpty) {
+      return;
+    }
 
     final result = await Navigator.push<bool>(
       context,
@@ -290,7 +419,7 @@ class _ProductReviewsState extends State<ProductReviews> {
     );
 
     if (result == true && mounted) {
-      await _load();
+      await Future.wait<void>([_load(), _loadEligibleOrder()]);
     }
   }
 

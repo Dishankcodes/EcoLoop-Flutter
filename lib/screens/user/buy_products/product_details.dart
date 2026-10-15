@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:share_plus/share_plus.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
 import '../../../widgets/cart_popup.dart';
-import '../../artist/profile/artist_profile.dart';
 import '../reviews/product_reviews.dart';
 import '../reviews/write_review.dart';
+import 'artist_profile.dart';
 import 'checkout.dart';
 import 'seller_profile.dart';
 
@@ -30,6 +32,11 @@ class _ProductDetailsState extends State<ProductDetails> {
   int _quantity = 1;
   bool _isWishlisted = false;
   bool _wishlistBusy = false;
+  bool _reviewsLoading = false;
+  bool _eligibilityLoading = false;
+  bool _canReview = false;
+  String? _eligibleOrderId;
+  List<Map<String, dynamic>> _liveReviews = [];
   final EcoLoopApi _api = EcoLoopApi.instance;
 
   @override
@@ -41,6 +48,8 @@ class _ProductDetailsState extends State<ProductDetails> {
         _product['isWishlisted'] == true || _product['wishlisted'] == true;
     _loadProductDetails();
     _syncWishlistState();
+    _loadReviews();
+    _checkReviewEligibility();
   }
 
   /// Refreshes the selected listing from the backend so artist/user edits and
@@ -156,6 +165,15 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   double get rating {
+    if (_liveReviews.isNotEmpty) {
+      final values = _liveReviews
+          .map((r) => _intValue(r['rating']))
+          .where((v) => v >= 1 && v <= 5)
+          .toList();
+      if (values.isNotEmpty) {
+        return values.reduce((a, b) => a + b) / values.length;
+      }
+    }
     final value = _product['rating'];
     if (value is num) {
       return value.toDouble();
@@ -164,6 +182,7 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   int get reviewCount {
+    if (_liveReviews.isNotEmpty) return _liveReviews.length;
     final value = _product['reviewCount'] ?? _product['reviews'] ?? 0;
     if (value is num) {
       return value.toInt();
@@ -881,7 +900,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  /// Rating breakdown, review cards, and review creation trigger.
+  /// Reviews are loaded from the backend; no sample reviews are displayed.
   Widget _buildReviewsSection() {
     return _section(
       child: Column(
@@ -900,49 +919,189 @@ class _ProductDetailsState extends State<ProductDetails> {
               const Spacer(),
               TextButton(
                 onPressed: _openAllReviews,
-                child: const Text(
-                  'See all',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                ),
+                child: const Text('See all'),
               ),
             ],
           ),
           const SizedBox(height: 8),
           _buildRatingSummary(),
-          const SizedBox(height: 16),
-          _buildReviewCard(
-            name: 'Priya S.',
-            rating: 5,
-            date: '2 weeks ago',
-            review:
-                'Great quality! Exactly as shown. Very sturdy and easy to assemble.',
-            imageCount: 2,
-          ),
-          const SizedBox(height: 10),
-          _buildReviewCard(
-            name: 'Amit K.',
-            rating: 4,
-            date: '1 month ago',
-            review:
-                'Good product for the price. Minor scratches but overall great.',
-            imageCount: 1,
-          ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 43,
-            child: OutlinedButton.icon(
-              onPressed: _writeReview,
-              icon: const Icon(Icons.rate_review_outlined, size: 17),
-              label: const Text(
-                'Write a Review',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          if (_reviewsLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
+              ),
+            )
+          else if (_liveReviews.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Center(
+                child: Text(
+                  'No reviews for this product yet.',
+                  style: AppTextStyles.caption,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+          else
+            ..._liveReviews
+                .take(3)
+                .map(
+                  (review) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _buildReviewCard(
+                      name:
+                          (review['reviewerName'] ??
+                                  review['name'] ??
+                                  review['userName'] ??
+                                  'EcoLoop buyer')
+                              .toString(),
+                      rating: _intValue(review['rating']).clamp(1, 5),
+                      date: _displayReviewDate(
+                        review['createdAt'] ?? review['date'],
+                      ),
+                      review:
+                          (review['comment'] ??
+                                  review['review'] ??
+                                  review['text'] ??
+                                  '')
+                              .toString(),
+                      imageCount: 0,
+                    ),
+                  ),
+                ),
+          const SizedBox(height: 8),
+          if (_eligibilityLoading)
+            const LinearProgressIndicator(minHeight: 2)
+          else if (_canReview)
+            SizedBox(
+              width: double.infinity,
+              height: 43,
+              child: OutlinedButton.icon(
+                onPressed: _writeReview,
+                icon: const Icon(Icons.rate_review_outlined, size: 17),
+                label: const Text(
+                  'Write a Review',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ),
+            )
+          else
+            Text(
+              'Only buyers whose order for this product is marked Delivered can review it.',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
               ),
             ),
-          ),
         ],
       ),
     );
+  }
+
+  Future<void> _loadReviews() async {
+    final id = _currentProductId;
+    if (id.isEmpty) return;
+    if (mounted) setState(() => _reviewsLoading = true);
+    try {
+      final response = await _api.get('/products/$id/reviews');
+      final root = _asMap(response);
+      final nested = _asMap(root['data']);
+      final dynamic rows = response is List
+          ? response
+          : (root['reviews'] ??
+                root['items'] ??
+                nested['reviews'] ??
+                nested['items'] ??
+                const []);
+      final parsed = rows is List
+          ? rows
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList()
+          : <Map<String, dynamic>>[];
+      if (!mounted) return;
+      setState(() => _liveReviews = parsed);
+    } catch (_) {
+      if (mounted) setState(() => _liveReviews = []);
+    } finally {
+      if (mounted) setState(() => _reviewsLoading = false);
+    }
+  }
+
+  Future<void> _checkReviewEligibility() async {
+    final productId = _currentProductId;
+    if (productId.isEmpty) return;
+    if (mounted) setState(() => _eligibilityLoading = true);
+    try {
+      final response = await _api.get('/orders');
+      final root = _asMap(response);
+      final nested = _asMap(root['data']);
+      final dynamic rows = response is List
+          ? response
+          : (root['orders'] ??
+                root['items'] ??
+                nested['orders'] ??
+                nested['items'] ??
+                const []);
+      String? eligibleOrder;
+      if (rows is List) {
+        for (final raw in rows) {
+          if (raw is! Map) continue;
+          final order = Map<String, dynamic>.from(raw);
+          final orderedProductId =
+              (order['productId'] ?? order['product_id'] ?? '').toString();
+          final status = (order['status'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase()
+              .replaceAll('_', ' ');
+          if (orderedProductId == productId && status == 'delivered') {
+            eligibleOrder = (order['orderId'] ?? order['order_id'] ?? '')
+                .toString();
+            if (eligibleOrder.isNotEmpty) break;
+          }
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _eligibleOrderId = eligibleOrder;
+        _canReview =
+            eligibleOrder != null &&
+            eligibleOrder.isNotEmpty &&
+            !_liveReviews.any(
+              (r) =>
+                  (r['userId'] ?? r['buyerId'] ?? '').toString().isNotEmpty &&
+                  (r['productId'] ?? '').toString() == productId,
+            );
+      });
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          _canReview = false;
+          _eligibleOrderId = null;
+        });
+    } finally {
+      if (mounted) setState(() => _eligibilityLoading = false);
+    }
+  }
+
+  int _intValue(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  String _displayReviewDate(dynamic value) {
+    if (value == null || value.toString().trim().isEmpty)
+      return 'Date unavailable';
+    final date = DateTime.tryParse(value.toString());
+    if (date == null) return value.toString();
+    final local = date.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/'
+        '${local.month.toString().padLeft(2, '0')}/${local.year}';
   }
 
   /// Summary bar showing average score and distribution chart for star ratings.
@@ -1701,16 +1860,138 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   /// Opens form interface for submitting a new review.
-  void _writeReview() {
-    Navigator.push(
+  Future<void> _writeReview() async {
+    if (!_canReview || _eligibleOrderId == null) {
+      _showMessage('A delivered purchase is required before you can review.');
+      return;
+    }
+    final productForReview = <String, dynamic>{
+      ..._product,
+      'reviewOrderId': _eligibleOrderId,
+    };
+    final submitted = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => WriteReview(product: _product)),
+      MaterialPageRoute(builder: (_) => WriteReview(product: productForReview)),
     );
+    if (submitted == true && mounted) {
+      await _loadReviews();
+      await _checkReviewEligibility();
+    }
   }
 
   /// Triggers product sharing option placeholder.
-  void _shareProduct() {
-    _showMessage('Product sharing will be connected later.');
+
+  /// Shares the current EcoLoop product through the device's native share sheet.
+  /// Includes the real product details and attaches the first product image
+  /// when that image can be downloaded successfully.
+  Future<void> _shareProduct() async {
+    if (!mounted) return;
+
+    final productName = title;
+    final productPrice = price;
+    final productCondition = condition;
+    final productCategory = category;
+    final productDescription = description;
+    final productId = _currentProductId.trim();
+
+    // Do not invent a URL: the current app does not yet define a public
+    // product-details URL that recipients can open.
+    final shareText =
+        '''
+♻️ Check out this product on EcoLoop!
+
+$productName
+
+💰 Price: $productPrice
+📦 Condition: $productCondition
+🏷️ Category: $productCategory
+
+$productDescription
+
+${productId.isNotEmpty ? 'Product ID: $productId' : ''}
+
+Discover sustainable products with EcoLoop!
+'''
+            .trim();
+
+    try {
+      // Use the first available image from the real product data.
+      final imageUrl = images.cast<String?>().firstWhere((url) {
+        if (url == null || url.trim().isEmpty) return false;
+
+        final uri = Uri.tryParse(url.trim());
+        return uri != null &&
+            (uri.scheme == 'https' || uri.scheme == 'http') &&
+            uri.host.isNotEmpty;
+      }, orElse: () => null);
+
+      XFile? imageFile;
+
+      if (imageUrl != null) {
+        try {
+          final response = await http
+              .get(Uri.parse(imageUrl.trim()))
+              .timeout(const Duration(seconds: 15));
+
+          if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+            final uri = Uri.parse(imageUrl.trim());
+            final path = uri.path.toLowerCase();
+
+            final extension = path.endsWith('.png')
+                ? 'png'
+                : path.endsWith('.webp')
+                ? 'webp'
+                : path.endsWith('.gif')
+                ? 'gif'
+                : 'jpg';
+
+            final mimeType = extension == 'png'
+                ? 'image/png'
+                : extension == 'webp'
+                ? 'image/webp'
+                : extension == 'gif'
+                ? 'image/gif'
+                : 'image/jpeg';
+
+            imageFile = XFile.fromData(response.bodyBytes, mimeType: mimeType);
+          }
+        } catch (_) {
+          // If the image cannot be downloaded, share the product details
+          // as text instead of failing the entire share action.
+        }
+      }
+
+      final shareParams = ShareParams(
+        text: shareText,
+        subject: 'Check out $productName on EcoLoop',
+        title: 'Share EcoLoop Product',
+        files: imageFile == null ? null : [imageFile],
+        fileNameOverrides: imageFile == null
+            ? null
+            : ['ecoloop_product.${_sharedImageExtension()}'],
+      );
+
+      await SharePlus.instance.share(shareParams);
+    } catch (e) {
+      if (!mounted) return;
+
+      _showMessage('Unable to share this product. Please try again.');
+    }
+  }
+
+  /// Returns a safe filename extension for the downloaded image.
+  /// This helper is only for the shared file's filename.
+  String _sharedImageExtension() {
+    if (images.isEmpty) return 'jpg';
+
+    final uri = Uri.tryParse(images.first);
+    final path = uri?.path.toLowerCase() ?? '';
+
+    if (path.endsWith('.png')) return 'png';
+    if (path.endsWith('.webp')) return 'webp';
+    if (path.endsWith('.gif')) return 'gif';
+
+    return 'jpg';
   }
 
   /// Displays bottom sheet with secondary actions.
