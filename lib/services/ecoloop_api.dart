@@ -7,7 +7,9 @@ import '../shared_preferences_util.dart';
 
 class EcoLoopApiException implements Exception {
   final String message;
+
   const EcoLoopApiException(this.message);
+
   @override
   String toString() => message;
 }
@@ -20,6 +22,7 @@ class EcoLoopApi {
       'https://script.google.com/macros/s/AKfycbzvHq06GwL_I8qH2IPyQP36dRlESN62PYF4Ak5WkRE2VjHL5a-tr0Yk_KEtSvU_ZL6IbQ/exec';
 
   EcoLoopApi._();
+
   static final EcoLoopApi instance = EcoLoopApi._();
 
   String get _token =>

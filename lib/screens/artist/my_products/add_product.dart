@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../services/eco_image_picker.dart';
-import '../../../services/ecoloop_api.dart';
-
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
-import 'edit_product.dart';
+import '../../../services/eco_image_picker.dart';
+import '../../../services/ecoloop_api.dart';
 
 class AddProduct extends StatefulWidget {
   const AddProduct({super.key});
@@ -29,18 +27,46 @@ class _AddProductState extends State<AddProduct> {
 
   String? selectedCategory;
   String? selectedCondition;
-  String? selectedListingType;
+  String? selectedListingType = 'Sell';
+  List<Map<String, dynamic>> _categories = [];
+  bool _isLoadingCategories = true;
+  String? _categoryLoadError;
 
-  final List<String> categories = [
-    'Furniture',
-    'Electronics',
-    'Home & Decor',
-    'Books',
-    'Clothing',
-    'Kitchen',
-    'Sports',
-    'Other',
-  ];
+  List<String> get categories => _categories
+      .map((category) => category['name']?.toString() ?? '')
+      .where((name) => name.isNotEmpty)
+      .toList();
+
+  int? _selectedCategoryId() {
+    for (final category in _categories) {
+      if (category['name']?.toString() == selectedCategory) {
+        return int.tryParse(category['categoryId'].toString());
+      }
+    }
+    return null;
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final result = await EcoLoopApi.instance.get('/categories');
+      final rows = result is List ? result : <dynamic>[];
+      if (!mounted) return;
+      setState(() {
+        _categories = rows
+            .whereType<Map>()
+            .map((row) => Map<String, dynamic>.from(row))
+            .toList();
+        _isLoadingCategories = false;
+        _categoryLoadError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingCategories = false;
+        _categoryLoadError = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
 
   final List<String> conditions = [
     'New',
@@ -50,7 +76,13 @@ class _AddProductState extends State<AddProduct> {
     'Needs Repair',
   ];
 
-  final List<String> listingTypes = ['Sell', 'Donate'];
+  final List<String> listingTypes = ['Sell'];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
 
   @override
   void dispose() {
@@ -128,10 +160,15 @@ class _AddProductState extends State<AddProduct> {
             _buildDropdown(
               value: selectedCategory,
               label: 'Category',
-              hint: 'Select category',
+              hint: _isLoadingCategories
+                  ? 'Loading categories…'
+                  : (_categoryLoadError == null
+                        ? 'Select category'
+                        : 'Could not load categories'),
               icon: Icons.category_outlined,
               items: categories,
               onChanged: (value) {
+                if (_isLoadingCategories) return;
                 setState(() {
                   selectedCategory = value;
                 });
@@ -543,10 +580,16 @@ class _AddProductState extends State<AddProduct> {
     }
     setState(() => _isSubmitting = true);
     try {
+      final categoryId = _selectedCategoryId();
+      if (categoryId == null) {
+        throw Exception(
+          _categoryLoadError ?? 'Please select a valid category.',
+        );
+      }
       await EcoLoopApi.instance.post('/products', {
         'title': titleController.text.trim(),
         'description': descriptionController.text.trim(),
-        'categoryId': EcoLoopApi.categoryId(selectedCategory),
+        'categoryId': categoryId,
         'listingType': 'b2c',
         'condition': (selectedCondition ?? 'used').toLowerCase().replaceAll(
           ' ',

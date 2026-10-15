@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/eco_image_picker.dart';
+import '../../../services/ecoloop_api.dart';
 
 class EditProduct extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -26,17 +28,17 @@ class _EditProductState extends State<EditProduct> {
   String? _selectedListingType;
 
   bool _isSaving = false;
+  bool _isLoadingCategories = true;
+  bool _imagesChanged = false;
+  List<Map<String, dynamic>> _categories = [];
+  List<String> _existingImageUrls = [];
+  List<SelectedEcoImage> _newImages = [];
+  String? _categoryLoadError;
 
-  final List<String> _categories = [
-    'Furniture',
-    'Electronics',
-    'Home & Decor',
-    'Books',
-    'Clothing',
-    'Kitchen',
-    'Sports',
-    'Other',
-  ];
+  List<String> get _categoryNames => _categories
+      .map((category) => category['name']?.toString() ?? '')
+      .where((name) => name.isNotEmpty)
+      .toList();
 
   final List<String> _conditions = [
     'New',
@@ -46,7 +48,7 @@ class _EditProductState extends State<EditProduct> {
     'Needs Repair',
   ];
 
-  final List<String> _listingTypes = ['Sell', 'Donate'];
+  final List<String> _listingTypes = ['Sell'];
 
   @override
   void initState() {
@@ -74,14 +76,67 @@ class _EditProductState extends State<EditProduct> {
       text: product['availableQuantity']?.toString() ?? '',
     );
 
-    _selectedCategory = _getInitialCategory(product);
-
-    _selectedCondition = _getInitialValue(product['condition'], _conditions);
-
-    _selectedListingType = _getInitialValue(
-      product['listingType'],
-      _listingTypes,
+    _selectedCategory = null;
+    _selectedCondition = _getInitialValue(
+      product['condition']?.toString().replaceAll('_', ' '),
+      _conditions,
     );
+    _selectedListingType = 'Sell';
+    _existingImageUrls = _readImageUrls(product);
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final result = await EcoLoopApi.instance.get('/categories');
+      final rows = result is List ? result : <dynamic>[];
+      if (!mounted) return;
+      setState(() {
+        _categories = rows
+            .whereType<Map>()
+            .map((row) => Map<String, dynamic>.from(row))
+            .toList();
+        _isLoadingCategories = false;
+        _categoryLoadError = null;
+        final id = int.tryParse(widget.product['categoryId']?.toString() ?? '');
+        final match = _categories.where(
+          (item) => int.tryParse(item['categoryId'].toString()) == id,
+        );
+        if (match.isNotEmpty) {
+          _selectedCategory = match.first['name']?.toString();
+        } else if (!_categoryNames.contains(_selectedCategory)) {
+          _selectedCategory = null;
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingCategories = false;
+        _categoryLoadError = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  List<String> _readImageUrls(Map<String, dynamic> product) {
+    final dynamic value = product['imageUrls'];
+    if (value is List) {
+      return value
+          .map((item) => item.toString())
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    if (value is String && value.trim().isNotEmpty) return [value.trim()];
+    final image = product['image']?.toString() ?? '';
+    return image.isEmpty ? <String>[] : <String>[image];
+  }
+
+  int? _selectedCategoryId() {
+    for (final category in _categories) {
+      if (category['name']?.toString() == _selectedCategory) {
+        return int.tryParse(category['categoryId'].toString());
+      }
+    }
+    return null;
   }
 
   @override
@@ -191,9 +246,11 @@ class _EditProductState extends State<EditProduct> {
             _buildDropdown(
               label: 'Category',
               value: _selectedCategory,
-              hint: 'Select category',
+              hint: _isLoadingCategories
+                  ? 'Loading categories…'
+                  : 'Select category',
               icon: Icons.category_outlined,
-              items: _categories,
+              items: _categoryNames,
               onChanged: (value) {
                 setState(() {
                   _selectedCategory = value;
@@ -449,9 +506,75 @@ class _EditProductState extends State<EditProduct> {
   }
 
   Widget _buildPhotoSection() {
-    final String imageUrl =
-        widget.product['image']?.toString() ?? _firstImageUrl(widget.product);
-
+    final images = <Widget>[];
+    for (var index = 0; index < _existingImageUrls.length; index++) {
+      final url = _existingImageUrls[index];
+      images.add(
+        _buildImageTile(
+          child: Image.network(
+            url,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Center(
+              child: Icon(
+                Icons.broken_image_outlined,
+                color: ArtistColors.textMuted,
+              ),
+            ),
+            loadingBuilder: (context, child, progress) => progress == null
+                ? child
+                : const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+          ),
+          onRemove: () => setState(() {
+            _existingImageUrls.removeAt(index);
+            _imagesChanged = true;
+          }),
+          isMain: index == 0 && _newImages.isEmpty,
+        ),
+      );
+    }
+    for (var index = 0; index < _newImages.length; index++) {
+      final image = _newImages[index];
+      images.add(
+        _buildImageTile(
+          child: Image.memory(image.bytes, fit: BoxFit.cover),
+          onRemove: () => setState(() {
+            _newImages.removeAt(index);
+            _imagesChanged = true;
+          }),
+          isMain: _existingImageUrls.isEmpty && index == 0,
+        ),
+      );
+    }
+    if (_existingImageUrls.length + _newImages.length < 4) {
+      images.add(
+        GestureDetector(
+          onTap: _pickMoreImages,
+          child: Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: ArtistColors.surfaceSoft,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: ArtistColors.border),
+            ),
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.add_photo_alternate_outlined,
+                  color: ArtistColors.primary,
+                  size: 25,
+                ),
+                SizedBox(height: 6),
+                Text('Add photo'),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -467,41 +590,17 @@ class _EditProductState extends State<EditProduct> {
               Expanded(
                 child: Text('Product Images', style: ArtistTextStyles.label),
               ),
-
-              Text('Up to 4 photos', style: ArtistTextStyles.small),
+              Text(
+                '${_existingImageUrls.length + _newImages.length}/4 photos',
+                style: ArtistTextStyles.small,
+              ),
             ],
           ),
-
           const SizedBox(height: 12),
-
-          SizedBox(
-            height: 105,
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: _buildExistingImage(imageUrl: imageUrl, isMain: true),
-                ),
-
-                const SizedBox(width: 10),
-
-                Expanded(child: _buildPhotoPlaceholder(label: 'Photo 2')),
-
-                const SizedBox(width: 10),
-
-                Expanded(child: _buildPhotoPlaceholder(label: 'Photo 3')),
-
-                const SizedBox(width: 10),
-
-                Expanded(child: _buildPhotoPlaceholder(label: 'Photo 4')),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
+          Wrap(spacing: 10, runSpacing: 10, children: images),
+          const SizedBox(height: 10),
           Text(
-            'Tap a photo to replace or remove it.',
+            'Photos are stored in Google Drive when you save changes.',
             style: ArtistTextStyles.small,
           ),
         ],
@@ -509,132 +608,68 @@ class _EditProductState extends State<EditProduct> {
     );
   }
 
-  Widget _buildExistingImage({required String imageUrl, required bool isMain}) {
-    return GestureDetector(
-      onTap: () {
-        _showImageOptions(isExisting: imageUrl.isNotEmpty);
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(13),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Container(
-              color: ArtistColors.surfaceSoft,
-              child: imageUrl.isEmpty
-                  ? const Center(
-                      child: Icon(
-                        Icons.image_outlined,
-                        color: ArtistColors.textMuted,
-                        size: 30,
-                      ),
-                    )
-                  : Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) {
-                        return const Center(
-                          child: Icon(
-                            Icons.image_not_supported_outlined,
-                            color: ArtistColors.textMuted,
-                            size: 28,
-                          ),
-                        );
-                      },
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) {
-                          return child;
-                        }
-
-                        return const Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: ArtistColors.primary,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-
-            if (isMain)
-              Positioned(
-                left: 7,
-                bottom: 7,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: ArtistColors.accent.withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(7),
-                  ),
-                  child: Text(
-                    'Main',
-                    style: ArtistTextStyles.small.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 9,
-                    ),
-                  ),
-                ),
-              ),
-
+  Widget _buildImageTile({
+    required Widget child,
+    required VoidCallback onRemove,
+    required bool isMain,
+  }) {
+    return SizedBox(
+      width: 100,
+      height: 100,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(borderRadius: BorderRadius.circular(13), child: child),
+          if (isMain)
             Positioned(
-              right: 6,
-              top: 6,
+              left: 5,
+              bottom: 5,
               child: Container(
-                width: 28,
-                height: 28,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                 decoration: BoxDecoration(
-                  color: ArtistColors.surface.withOpacity(0.94),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: ArtistColors.border),
-                ),
-                child: const Icon(
-                  Icons.edit_outlined,
-                  size: 15,
                   color: ArtistColors.primary,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Main',
+                  style: ArtistTextStyles.small.copyWith(color: Colors.white),
                 ),
               ),
             ),
-          ],
-        ),
+          Positioned(
+            right: 3,
+            top: 3,
+            child: IconButton.filledTonal(
+              visualDensity: VisualDensity.compact,
+              onPressed: onRemove,
+              icon: const Icon(Icons.close_rounded, size: 15),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildPhotoPlaceholder({required String label}) {
-    return GestureDetector(
-      onTap: () {
-        _showImageOptions();
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: ArtistColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: ArtistColors.border),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.add_photo_alternate_outlined,
-              color: ArtistColors.primary,
-              size: 23,
-            ),
-
-            const SizedBox(height: 5),
-
-            Text(label, style: ArtistTextStyles.small.copyWith(fontSize: 9)),
-          ],
-        ),
-      ),
-    );
+  Future<void> _pickMoreImages() async {
+    final remaining = 4 - _existingImageUrls.length;
+    if (remaining <= 0) {
+      _showErrorMessage('Remove an existing photo before adding another.');
+      return;
+    }
+    try {
+      final picked = await EcoImagePicker.pick(
+        current: _newImages,
+        maxImages: remaining,
+      );
+      if (!mounted) return;
+      setState(() {
+        _newImages = picked;
+        _imagesChanged = true;
+      });
+    } catch (error) {
+      if (mounted)
+        _showErrorMessage(error.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   Widget _buildTextField({
@@ -977,172 +1012,72 @@ class _EditProductState extends State<EditProduct> {
 
   Future<void> _saveChanges() async {
     FocusScope.of(context).unfocus();
+    if (!_formKey.currentState!.validate()) return;
 
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    final int? totalQuantity = int.tryParse(_quantityController.text.trim());
-
-    final int? availableQuantity = int.tryParse(
+    final totalQuantity = int.tryParse(_quantityController.text.trim());
+    final availableQuantity = int.tryParse(
       _availableQuantityController.text.trim(),
     );
-
-    if (totalQuantity != null &&
-        availableQuantity != null &&
-        availableQuantity > totalQuantity) {
+    final categoryId = _selectedCategoryId();
+    if (totalQuantity == null ||
+        availableQuantity == null ||
+        categoryId == null) {
+      _showErrorMessage(
+        _categoryLoadError ?? 'Please select a valid category and quantity.',
+      );
+      return;
+    }
+    if (availableQuantity > totalQuantity) {
       _showErrorMessage('Available quantity cannot exceed total quantity.');
       return;
     }
+    if (_existingImageUrls.length + _newImages.length > 4) {
+      _showErrorMessage('You can keep up to 4 product photos.');
+      return;
+    }
 
-    setState(() {
-      _isSaving = true;
-    });
-
-    await Future.delayed(const Duration(milliseconds: 700));
-
-    if (!mounted) return;
-
-    widget.product['title'] = _titleController.text.trim();
-
-    widget.product['description'] = _descriptionController.text.trim();
-
-    widget.product['price'] =
-        double.tryParse(_priceController.text.trim()) ?? 0;
-
-    widget.product['quantity'] =
-        int.tryParse(_quantityController.text.trim()) ?? 0;
-
-    widget.product['availableQuantity'] =
-        int.tryParse(_availableQuantityController.text.trim()) ?? 0;
-
-    widget.product['category'] = _selectedCategory;
-
-    widget.product['condition'] = _selectedCondition;
-
-    widget.product['listingType'] = _selectedListingType;
-
-    setState(() {
-      _isSaving = false;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Product updated successfully.',
-          style: ArtistTextStyles.bodyMedium.copyWith(
-            color: Colors.white,
-            fontSize: 13,
-          ),
+    setState(() => _isSaving = true);
+    try {
+      final payload = <String, dynamic>{
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'categoryId': categoryId,
+        'listingType': 'b2c',
+        'condition': (_selectedCondition ?? 'Used').toLowerCase().replaceAll(
+          ' ',
+          '_',
         ),
-        backgroundColor: ArtistColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
-
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    if (!mounted) return;
-
-    Navigator.pop(context, true);
-  }
-
-  void _showImageOptions({bool isExisting = false}) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ArtistColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: ArtistColors.border,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-
-                Text(
-                  isExisting ? 'Edit Product Photo' : 'Add Product Photo',
-                  style: ArtistTextStyles.title.copyWith(fontSize: 19),
-                ),
-
-                const SizedBox(height: 18),
-
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: _buildSheetIcon(Icons.photo_library_outlined),
-                  title: Text(
-                    'Choose from Gallery',
-                    style: ArtistTextStyles.bodyMedium,
-                  ),
-                  subtitle: Text(
-                    'Select an existing image',
-                    style: ArtistTextStyles.small,
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showPhotoMessage('Gallery option selected.');
-                  },
-                ),
-
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: _buildSheetIcon(Icons.camera_alt_outlined),
-                  title: Text(
-                    'Take a Photo',
-                    style: ArtistTextStyles.bodyMedium,
-                  ),
-                  subtitle: Text(
-                    'Use your camera',
-                    style: ArtistTextStyles.small,
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showPhotoMessage('Camera option selected.');
-                  },
-                ),
-
-                if (isExisting)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: _buildSheetIcon(
-                      Icons.delete_outline_rounded,
-                      color: ArtistColors.error,
-                    ),
-                    title: Text(
-                      'Remove Photo',
-                      style: ArtistTextStyles.bodyMedium.copyWith(
-                        color: ArtistColors.error,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Remove this product image',
-                      style: ArtistTextStyles.small,
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _showPhotoMessage('Photo removed from selection.');
-                    },
-                  ),
-              ],
-            ),
-          ),
+        'price': double.parse(_priceController.text.trim()),
+        'quantity': totalQuantity,
+        'availableQuantity': availableQuantity,
+      };
+      if (_imagesChanged) {
+        payload['existingImageUrls'] = _existingImageUrls;
+        payload['imageBase64'] = await EcoImagePicker.payload(_newImages);
+      }
+      final id = int.tryParse(widget.product['productId']?.toString() ?? '');
+      if (id == null)
+        throw Exception(
+          'Invalid product ID. Refresh My Products and try again.',
         );
-      },
-    );
+      final updated = await EcoLoopApi.instance.put('/products/$id', payload);
+      if (!mounted) return;
+      if (updated is Map) {
+        widget.product.addAll(Map<String, dynamic>.from(updated));
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Product updated successfully.'),
+          backgroundColor: ArtistColors.primary,
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted)
+        _showErrorMessage(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   Widget _buildSheetIcon(IconData icon, {Color? color}) {
@@ -1157,16 +1092,6 @@ class _EditProductState extends State<EditProduct> {
       ),
       child: Icon(icon, color: iconColor),
     );
-  }
-
-  String? _getInitialCategory(Map<String, dynamic> product) {
-    final String category = product['category']?.toString() ?? '';
-
-    if (_categories.contains(category)) {
-      return category;
-    }
-
-    return null;
   }
 
   String? _getInitialValue(dynamic value, List<String> options) {

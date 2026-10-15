@@ -1,15 +1,13 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
-import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 
 import '../../../api/api_manager.dart';
-import '../../../models/location/city_model.dart';
-import '../../../models/location/state_model.dart';
-
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
+import '../../../models/location/city_model.dart';
+import '../../../models/location/state_model.dart';
 import '../../../shared_preferences_util.dart';
 
 class AddAddress extends StatefulWidget {
@@ -81,8 +79,9 @@ class _AddAddressState extends State<AddAddress> {
   }
 
   Future<void> _loadLocationAndProfile() async {
-    if (_token.isEmpty) return;
-    if (!widget.isEditing) {
+    // Prefill the saved account details first, then resolve state/city IDs
+    // against the location API. If profile lookup fails, the form still works.
+    if (_token.isNotEmpty && !widget.isEditing) {
       final dio = _dio();
       try {
         final response = await dio.get<dynamic>(
@@ -95,15 +94,33 @@ class _AddAddressState extends State<AddAddress> {
             ? Map<String, dynamic>.from(outer['data'])
             : outer;
         if (mounted) {
-          if (_phoneController.text.trim().isEmpty) {
-            _phoneController.text = (data['phone'] ?? '').toString();
+          final profileName =
+              (data['name'] ??
+                      data['fullName'] ??
+                      data['displayName'] ??
+                      data['userName'] ??
+                      '')
+                  .toString()
+                  .trim();
+          final profilePhone =
+              (data['phone'] ?? data['mobile'] ?? data['phoneNumber'] ?? '')
+                  .toString()
+                  .trim();
+
+          if (_nameController.text.trim().isEmpty && profileName.isNotEmpty) {
+            _nameController.text = profileName;
           }
-          if ((data['state'] ?? '').toString().trim().isNotEmpty) {
-            _initialStateName = data['state'].toString();
+          if (_phoneController.text.trim().isEmpty && profilePhone.isNotEmpty) {
+            _phoneController.text = profilePhone;
           }
-          if ((data['city'] ?? '').toString().trim().isNotEmpty) {
-            _initialCityName = data['city'].toString();
-          }
+          final state = (data['state'] ?? data['stateName'] ?? '')
+              .toString()
+              .trim();
+          final city = (data['city'] ?? data['cityName'] ?? '')
+              .toString()
+              .trim();
+          if (state.isNotEmpty) _initialStateName = state;
+          if (city.isNotEmpty) _initialCityName = city;
         }
       } catch (_) {
         // Keep the form usable if account prefill fails.
@@ -111,6 +128,7 @@ class _AddAddressState extends State<AddAddress> {
         dio.close(force: true);
       }
     }
+    // Always load states, even when no token is available.
     await _loadStates();
   }
 
@@ -326,11 +344,20 @@ class _AddAddressState extends State<AddAddress> {
       'street': _streetController.text.trim(),
       'area': _areaController.text.trim(),
       'landmark': _landmarkController.text.trim(),
+      // The deployed Code.gs address endpoint requires addressLine.
+      'addressLine': [
+        _houseController.text.trim(),
+        _streetController.text.trim(),
+        _areaController.text.trim(),
+        if (_landmarkController.text.trim().isNotEmpty)
+          'Landmark: ${_landmarkController.text.trim()}',
+      ].where((part) => part.trim().isNotEmpty).join(', '),
       'city': _selectedCity?.cityName ?? '',
       'state': _selectedState?.stateName ?? '',
       'stateCode': _selectedState?.stateCode ?? '',
       'pincode': _pincodeController.text.trim(),
       'type': _addressType,
+      'label': _addressType,
       'isDefault': _isDefault,
     };
 
@@ -384,132 +411,281 @@ class _AddAddressState extends State<AddAddress> {
 
   void _showMessage(String message, {bool error = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: error ? AppColors.error : AppColors.success,
-        ),
-      );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      if (messenger == null || !messenger.mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(message),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: error ? AppColors.error : AppColors.success,
+          ),
+        );
+    });
   }
 
   String? _required(String? value) =>
       value == null || value.trim().isEmpty ? 'This field is required' : null;
 
   Widget _buildStateDropdown() {
-    return DropdownSearch<StateModel>(
-      selectedItem: _selectedState,
-      enabled: !_isLoadingStates && _states.isNotEmpty && !_isSaving,
-      items: (filter, loadProps) => _states,
-      itemAsString: (StateModel state) => state.stateName,
-      compareFn: (StateModel a, StateModel b) => a.stateCode == b.stateCode,
-      onSelected: (StateModel? value) {
-        if (value == null) return;
-        setState(() {
-          _selectedState = value;
-          _selectedCity = null;
-          _initialCityName = null;
-          _cities = _citiesCache[value.stateCode] ?? [];
-          _isLoadingCities = !_citiesCache.containsKey(value.stateCode);
-        });
-        _loadCities(value.stateCode);
-      },
-      validator: (value) => value == null ? 'Please select your state' : null,
-      decoratorProps: DropDownDecoratorProps(
-        decoration:
-            _decoration(
-              label: 'State',
-              hint: _isLoadingStates ? 'Loading states...' : 'Select state',
-              icon: Icons.map_outlined,
-            ).copyWith(
-              suffixIcon: _isLoadingStates
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : null,
-            ),
-      ),
-      popupProps: PopupProps.modalBottomSheet(
-        showSearchBox: true,
-        searchDelay: Duration.zero,
-        title: const Padding(
-          padding: EdgeInsets.fromLTRB(20, 18, 20, 8),
-          child: Text(
-            'Select State',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+    return TextFormField(
+      key: ValueKey(_selectedState?.stateCode ?? 'state-empty'),
+      readOnly: true,
+      initialValue: _selectedState?.stateName ?? '',
+      onTap: (_isLoadingStates || _isSaving) ? null : _selectState,
+      validator: (_) =>
+          _selectedState == null ? 'Please select your state' : null,
+      decoration:
+          _decoration(
+            label: 'State',
+            hint: _isLoadingStates
+                ? 'Loading states...'
+                : (_states.isEmpty
+                      ? 'States unavailable — tap to retry'
+                      : 'Select state'),
+            icon: Icons.map_outlined,
+          ).copyWith(
+            suffixIcon: _isLoadingStates
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : const Icon(Icons.keyboard_arrow_down_rounded),
           ),
-        ),
-        searchFieldProps: TextFieldProps(
-          decoration: InputDecoration(
-            hintText: 'Search state...',
-            prefixIcon: const Icon(Icons.search_rounded),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-      ),
     );
   }
 
-  Widget _buildCityDropdown() {
-    return DropdownSearch<CityModel>(
-      selectedItem: _selectedCity,
-      enabled:
-          _selectedState != null &&
-          !_isLoadingCities &&
-          _cities.isNotEmpty &&
-          !_isSaving,
-      items: (filter, loadProps) => _cities,
-      itemAsString: (CityModel city) => city.cityName,
-      compareFn: (CityModel a, CityModel b) => a.cityId == b.cityId,
-      onSelected: (CityModel? value) => setState(() => _selectedCity = value),
-      validator: (value) => value == null ? 'Please select your city' : null,
-      decoratorProps: DropDownDecoratorProps(
-        decoration:
-            _decoration(
-              label: 'City',
-              hint: _selectedState == null
-                  ? 'Select state first'
-                  : (_isLoadingCities ? 'Loading cities...' : 'Select city'),
-              icon: Icons.location_city_outlined,
-            ).copyWith(
-              suffixIcon: _isLoadingCities
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : null,
-            ),
-      ),
-      popupProps: PopupProps.modalBottomSheet(
-        showSearchBox: true,
-        searchDelay: Duration.zero,
-        title: const Padding(
-          padding: EdgeInsets.fromLTRB(20, 18, 20, 8),
-          child: Text(
-            'Select City',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-        ),
-        searchFieldProps: TextFieldProps(
-          decoration: InputDecoration(
-            hintText: 'Search city...',
-            prefixIcon: const Icon(Icons.search_rounded),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-      ),
+  Future<void> _selectState() async {
+    if (_states.isEmpty) {
+      await _loadStates();
+      if (!mounted || _states.isEmpty) return;
+    }
+    final selected = await _showSearchPicker<StateModel>(
+      title: 'Select State',
+      searchHint: 'Search state...',
+      items: _states,
+      itemLabel: (state) => state.stateName,
+      selectedItem: _selectedState,
     );
+    if (!mounted || selected == null) return;
+    if (_selectedState?.stateCode == selected.stateCode) return;
+    setState(() {
+      _selectedState = selected;
+      _selectedCity = null;
+      _initialCityName = null;
+      _cities = _citiesCache[selected.stateCode] ?? [];
+      _isLoadingCities = !_citiesCache.containsKey(selected.stateCode);
+    });
+    await _loadCities(selected.stateCode);
+  }
+
+  Widget _buildCityDropdown() {
+    return TextFormField(
+      key: ValueKey(
+        '${_selectedState?.stateCode ?? 'no-state'}-${_selectedCity?.cityId ?? 'city-empty'}',
+      ),
+      readOnly: true,
+      initialValue: _selectedCity?.cityName ?? '',
+      onTap: (_selectedState == null || _isLoadingCities || _isSaving)
+          ? null
+          : _selectCity,
+      validator: (_) =>
+          _selectedCity == null ? 'Please select your city' : null,
+      decoration:
+          _decoration(
+            label: 'City',
+            hint: _selectedState == null
+                ? 'Select state first'
+                : (_isLoadingCities
+                      ? 'Loading cities...'
+                      : (_cities.isEmpty
+                            ? 'Cities unavailable — tap to retry'
+                            : 'Select city')),
+            icon: Icons.location_city_outlined,
+          ).copyWith(
+            suffixIcon: _isLoadingCities
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : const Icon(Icons.keyboard_arrow_down_rounded),
+          ),
+    );
+  }
+
+  Future<void> _selectCity() async {
+    final state = _selectedState;
+    if (state == null) return;
+    if (_cities.isEmpty && !_isLoadingCities) {
+      await _loadCities(state.stateCode);
+      if (!mounted || _cities.isEmpty) return;
+    }
+    if (_isLoadingCities) return;
+    final selected = await _showSearchPicker<CityModel>(
+      title: 'Select City',
+      searchHint: 'Search city...',
+      items: _cities,
+      itemLabel: (city) => city.cityName,
+      selectedItem: _selectedCity,
+    );
+    if (!mounted || selected == null) return;
+    setState(() => _selectedCity = selected);
+  }
+
+  Future<T?> _showSearchPicker<T>({
+    required String title,
+    required String searchHint,
+    required List<T> items,
+    required String Function(T) itemLabel,
+    required T? selectedItem,
+  }) async {
+    if (!mounted) return null;
+    final searchController = TextEditingController();
+    try {
+      return await showModalBottomSheet<T>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          return StatefulBuilder(
+            builder: (context, setSheetState) {
+              final query = searchController.text.trim().toLowerCase();
+              final filtered = items
+                  .where(
+                    (item) => itemLabel(item).toLowerCase().contains(query),
+                  )
+                  .toList();
+              return SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
+                  ),
+                  child: Material(
+                    color: AppColors.surface,
+                    clipBehavior: Clip.antiAlias,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                    child: SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.72,
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 18, 12, 12),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    title,
+                                    style: AppTextStyles.title.copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () =>
+                                      Navigator.of(sheetContext).pop(),
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: TextField(
+                              controller: searchController,
+                              autofocus: true,
+                              onChanged: (_) => setSheetState(() {}),
+                              decoration: InputDecoration(
+                                hintText: searchHint,
+                                prefixIcon: const Icon(Icons.search_rounded),
+                                filled: true,
+                                fillColor: AppColors.background,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: filtered.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      'No matching results',
+                                      style: AppTextStyles.body.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  )
+                                : ListView.separated(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      12,
+                                      4,
+                                      12,
+                                      16,
+                                    ),
+                                    itemCount: filtered.length,
+                                    separatorBuilder: (_, index) =>
+                                        const Divider(height: 1),
+                                    itemBuilder: (context, index) {
+                                      final item = filtered[index];
+                                      final isSelected =
+                                          selectedItem != null &&
+                                          item == selectedItem;
+                                      return Material(
+                                        color: isSelected
+                                            ? AppColors.light
+                                            : AppColors.surface,
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: ListTile(
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          title: Text(itemLabel(item)),
+                                          trailing: isSelected
+                                              ? const Icon(
+                                                  Icons.check_circle_rounded,
+                                                  color: AppColors.primary,
+                                                )
+                                              : null,
+                                          onTap: () => Navigator.of(
+                                            sheetContext,
+                                          ).pop(item),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      searchController.dispose();
+    }
   }
 
   String? _phoneValidator(String? value) {
@@ -569,9 +745,15 @@ class _AddAddressState extends State<AddAddress> {
         backgroundColor: AppColors.background,
         elevation: 0,
         foregroundColor: AppColors.textPrimary,
+        toolbarHeight: 56,
+        titleSpacing: 4,
         title: Text(
           widget.isEditing ? 'Edit Address' : 'Add Address',
-          style: AppTextStyles.heading.copyWith(color: AppColors.textPrimary),
+          style: AppTextStyles.title.copyWith(
+            color: AppColors.textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
       body: SafeArea(
@@ -588,6 +770,8 @@ class _AddAddressState extends State<AddAddress> {
                       : 'Add a new address',
                   style: AppTextStyles.title.copyWith(
                     color: AppColors.textPrimary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -834,10 +1018,10 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.light),
       ),
       child: Column(
@@ -846,8 +1030,8 @@ class _SectionCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: AppColors.light,
                   borderRadius: BorderRadius.circular(12),
@@ -858,14 +1042,16 @@ class _SectionCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: AppTextStyles.heading.copyWith(
+                  style: AppTextStyles.title.copyWith(
                     color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           ...children,
         ],
       ),

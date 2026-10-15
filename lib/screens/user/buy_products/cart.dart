@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import 'checkout.dart';
 
 class Cart extends StatefulWidget {
@@ -21,6 +22,9 @@ class Cart extends StatefulWidget {
 class _CartState extends State<Cart> {
   final List<Map<String, dynamic>> _cartItems = [];
   final List<Map<String, dynamic>> _savedForLater = [];
+  List<Map<String, dynamic>> _similarProducts = [];
+  bool _similarProductsLoading = false;
+  String? _similarProductsError;
 
   String? _appliedCoupon;
   double _couponDiscount = 0;
@@ -35,6 +39,7 @@ class _CartState extends State<Cart> {
   void initState() {
     super.initState();
     _loadInitialItems();
+    _loadSimilarProducts();
   }
 
   // INITIAL DATA
@@ -44,6 +49,78 @@ class _CartState extends State<Cart> {
 
     for (final item in incoming) {
       _addOrMergeItem(item);
+    }
+  }
+
+  Future<void> _loadSimilarProducts() async {
+    if (mounted) {
+      setState(() {
+        _similarProductsLoading = true;
+        _similarProductsError = null;
+      });
+    }
+
+    try {
+      final response = await EcoLoopApi.instance.get('/products');
+      if (response is! List) {
+        throw const EcoLoopApiException(
+          'The products response has an unexpected format.',
+        );
+      }
+
+      final products = response
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .where((item) {
+            final status = (item['status'] ?? 'published')
+                .toString()
+                .toLowerCase();
+            final available = _toInt(
+              item['availableQuantity'] ?? item['quantity'],
+              fallback: 0,
+            );
+            return status == 'published' && available > 0;
+          })
+          .toList();
+
+      final cartIds = _cartItems
+          .map((item) => item['productId'].toString())
+          .toSet();
+      final savedIds = _savedForLater
+          .map((item) => item['productId'].toString())
+          .toSet();
+
+      products.removeWhere((product) {
+        final id = (product['productId'] ?? product['id'] ?? '').toString();
+        return id.isEmpty || cartIds.contains(id) || savedIds.contains(id);
+      });
+
+      final categoryId = _cartItems.isNotEmpty
+          ? _toInt(_cartItems.first['categoryId'], fallback: -1)
+          : -1;
+
+      if (categoryId > 0) {
+        products.sort((a, b) {
+          final aMatch = _toInt(a['categoryId'], fallback: -1) == categoryId;
+          final bMatch = _toInt(b['categoryId'], fallback: -1) == categoryId;
+          if (aMatch == bMatch) return 0;
+          return aMatch ? -1 : 1;
+        });
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _similarProducts = products.take(10).toList();
+        _similarProductsLoading = false;
+        _similarProductsError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _similarProducts = [];
+        _similarProductsLoading = false;
+        _similarProductsError = error.toString();
+      });
     }
   }
 
@@ -1725,35 +1802,89 @@ class _CartState extends State<Cart> {
   // SIMILAR PRODUCTS
 
   Widget _buildSimilarProducts() {
-    final products = [
-      {
-        'productId': 'cart_sim_1',
-        'title': 'Recycled Glass Decor',
-        'price': 650,
-        'category': 'Decor',
-        'condition': 'Recycled',
-        'seller': 'Neha',
-        'image': '',
-      },
-      {
-        'productId': 'cart_sim_2',
-        'title': 'Craft Wood Pieces',
-        'price': 450,
-        'category': 'Materials',
-        'condition': 'Recycled',
-        'seller': 'EcoCraft',
-        'image': '',
-      },
-      {
-        'productId': 'cart_sim_3',
-        'title': 'Upcycled Bottle Lamp',
-        'price': 899,
-        'category': 'Decor',
-        'condition': 'Upcycled',
-        'seller': 'Priya',
-        'image': '',
-      },
-    ];
+    final cartIds = _cartItems
+        .map((item) => item['productId'].toString())
+        .toSet();
+    final savedIds = _savedForLater
+        .map((item) => item['productId'].toString())
+        .toSet();
+    final products = _similarProducts.where((product) {
+      final id = (product['productId'] ?? product['id'] ?? '').toString();
+      return id.isNotEmpty && !cartIds.contains(id) && !savedIds.contains(id);
+    }).toList();
+
+    if (_similarProductsLoading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'You may also like',
+            style: AppTextStyles.title.copyWith(fontSize: 18),
+          ),
+          const SizedBox(height: 5),
+          Text('More useful finds from EcoLoop', style: AppTextStyles.caption),
+          const SizedBox(height: 16),
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_similarProductsError != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'You may also like',
+            style: AppTextStyles.title.copyWith(fontSize: 18),
+          ),
+          const SizedBox(height: 5),
+          Text('More useful finds from EcoLoop', style: AppTextStyles.caption),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.wifi_off_rounded,
+                  color: AppColors.textSecondary,
+                  size: 28,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Could not load recommendations.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: _loadSimilarProducts,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Try again'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (products.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1782,7 +1913,8 @@ class _CartState extends State<Cart> {
 
   Widget _buildSimilarProductCard(Map<String, dynamic> product) {
     final image = _productImage(product);
-    final title = product['title'].toString();
+    final title = (product['title'] ?? product['name'] ?? 'EcoLoop Product')
+        .toString();
     final price = _toDouble(product['price']);
 
     return Container(

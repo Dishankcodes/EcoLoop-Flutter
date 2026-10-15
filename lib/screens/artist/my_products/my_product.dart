@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import 'edit_product.dart';
 import 'listing_details.dart';
 
@@ -35,101 +36,105 @@ class _MyProductsState extends State<MyProducts> {
     'Most Sold',
   ];
 
-  // Demo products data list
-  final List<Map<String, dynamic>> _products = [
-    {
-      'productId': 'PRD001',
-      'title': 'Handcrafted Wooden Table',
-      'description':
-          'Beautiful handcrafted wooden table made from reclaimed wood.',
-      'price': 4500.0,
-      'category': 'Furniture',
-      'categoryId': 'CAT001',
-      'listingType': 'Sell',
-      'condition': 'Good',
-      'quantity': 4,
-      'availableQuantity': 3,
-      'status': 'active',
-      'views': 248,
-      'wishlistCount': 34,
-      'salesCount': 6,
-      'image': 'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc',
-      'createdAt': '2026-09-25',
-    },
-    {
-      'productId': 'PRD002',
-      'title': 'Upcycled Glass Vase',
-      'description': 'Decorative vase created from recycled glass materials.',
-      'price': 850.0,
-      'category': 'Home & Decor',
-      'categoryId': 'CAT002',
-      'listingType': 'Sell',
-      'condition': 'Like New',
-      'quantity': 10,
-      'availableQuantity': 7,
-      'status': 'active',
-      'views': 184,
-      'wishlistCount': 21,
-      'salesCount': 9,
-      'image': 'https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c',
-      'createdAt': '2026-09-22',
-    },
-    {
-      'productId': 'PRD003',
-      'title': 'Recycled Fabric Tote Bag',
-      'description': 'Eco-friendly tote bag created using recycled fabric.',
-      'price': 550.0,
-      'category': 'Clothing',
-      'categoryId': 'CAT003',
-      'listingType': 'Sell',
-      'condition': 'New',
-      'quantity': 5,
-      'availableQuantity': 0,
-      'status': 'active',
-      'views': 321,
-      'wishlistCount': 46,
-      'salesCount': 12,
-      'image': 'https://images.unsplash.com/photo-1590874103328-eac38a683ce7',
-      'createdAt': '2026-09-19',
-    },
-    {
-      'productId': 'PRD004',
-      'title': 'Reclaimed Wood Wall Decor',
-      'description':
-          'Handmade wall decor created using reclaimed wooden pieces.',
-      'price': 1250.0,
-      'category': 'Home & Decor',
-      'categoryId': 'CAT002',
-      'listingType': 'Sell',
-      'condition': 'Good',
-      'quantity': 3,
-      'availableQuantity': 2,
-      'status': 'pending',
-      'views': 96,
-      'wishlistCount': 12,
-      'salesCount': 2,
-      'image': 'https://images.unsplash.com/photo-1577083552431-6e5fd01aa342',
-      'createdAt': '2026-09-16',
-    },
-    {
-      'productId': 'PRD005',
-      'title': 'Recycled Metal Planter',
-      'description': 'Decorative planter made from reused metal materials.',
-      'price': 950.0,
-      'category': 'Home & Decor',
-      'categoryId': 'CAT002',
-      'listingType': 'Sell',
-      'condition': 'New',
-      'quantity': 6,
-      'availableQuantity': 6,
-      'status': 'inactive',
-      'views': 71,
-      'wishlistCount': 8,
-      'salesCount': 0,
-      'image': 'https://images.unsplash.com/photo-1485955900006-10f4d324d411',
-      'createdAt': '2026-09-10',
-    },
-  ];
+  final List<Map<String, dynamic>> _products = [];
+  bool _isLoading = true;
+  String? _loadError;
+  bool _isMutating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  String _displayStatus(dynamic rawStatus) {
+    switch ((rawStatus ?? '').toString().toLowerCase()) {
+      case 'published':
+        return 'active';
+      case 'archived':
+        return 'inactive';
+      case 'draft':
+        return 'pending';
+      case 'out_of_stock':
+        return 'out_of_stock';
+      case 'sold':
+        return 'sold';
+      default:
+        return (rawStatus ?? '').toString().toLowerCase();
+    }
+  }
+
+  Future<void> _loadProducts() async {
+    if (mounted)
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    try {
+      final results = await Future.wait([
+        EcoLoopApi.instance.get('/categories'),
+        EcoLoopApi.instance.get('/my/products'),
+      ]);
+      final categoryRows = results[0] is List
+          ? results[0] as List
+          : <dynamic>[];
+      final productRows = results[1] is List ? results[1] as List : <dynamic>[];
+      final categories = categoryRows
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+      final categoryNames = <int, String>{};
+      for (final category in categories) {
+        final id = int.tryParse(category['categoryId']?.toString() ?? '');
+        if (id != null) categoryNames[id] = category['name']?.toString() ?? '';
+      }
+      final products = productRows.whereType<Map>().map((raw) {
+        final product = Map<String, dynamic>.from(raw);
+        final rawStatus = product['status']?.toString() ?? '';
+        final imageUrls = product['imageUrls'] is List
+            ? (product['imageUrls'] as List)
+                  .map((value) => value.toString())
+                  .where((value) => value.isNotEmpty)
+                  .toList()
+            : <String>[];
+        product['imageUrls'] = imageUrls;
+        product['image'] = imageUrls.isNotEmpty ? imageUrls.first : '';
+        product['category'] =
+            categoryNames[int.tryParse(
+              product['categoryId']?.toString() ?? '',
+            )] ??
+            '';
+        product['_backendStatus'] = rawStatus;
+        product['status'] = _displayStatus(rawStatus);
+        product['price'] =
+            double.tryParse(product['price']?.toString() ?? '') ?? 0.0;
+        product['quantity'] =
+            int.tryParse(product['quantity']?.toString() ?? '') ?? 0;
+        product['availableQuantity'] =
+            int.tryParse(product['availableQuantity']?.toString() ?? '') ?? 0;
+        product['views'] =
+            int.tryParse(product['views']?.toString() ?? '') ?? 0;
+        product['wishlistCount'] =
+            int.tryParse(product['wishlistCount']?.toString() ?? '') ?? 0;
+        product['salesCount'] =
+            int.tryParse(product['salesCount']?.toString() ?? '') ?? 0;
+        return product;
+      }).toList();
+      if (!mounted) return;
+      setState(() {
+        _products
+          ..clear()
+          ..addAll(products);
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -168,10 +173,10 @@ class _MyProductsState extends State<MyProducts> {
             return status == 'pending';
 
           case 'Sold Out':
-            return available == 0;
+            return status == 'out_of_stock' || available == 0;
 
           case 'Inactive':
-            return status == 'inactive';
+            return status == 'inactive' || status == 'sold';
 
           default:
             return true;
@@ -189,25 +194,33 @@ class _MyProductsState extends State<MyProducts> {
 
       case 'Price: Low to High':
         products.sort(
-          (a, b) => (a['price'] as double).compareTo(b['price'] as double),
+          (a, b) => (double.tryParse(a['price'].toString()) ?? 0).compareTo(
+            double.tryParse(b['price'].toString()) ?? 0,
+          ),
         );
         break;
 
       case 'Price: High to Low':
         products.sort(
-          (a, b) => (b['price'] as double).compareTo(a['price'] as double),
+          (a, b) => (double.tryParse(b['price'].toString()) ?? 0).compareTo(
+            double.tryParse(a['price'].toString()) ?? 0,
+          ),
         );
         break;
 
       case 'Most Viewed':
         products.sort(
-          (a, b) => (b['views'] as int).compareTo(a['views'] as int),
+          (a, b) => (int.tryParse(b['views'].toString()) ?? 0).compareTo(
+            int.tryParse(a['views'].toString()) ?? 0,
+          ),
         );
         break;
 
       case 'Most Sold':
         products.sort(
-          (a, b) => (b['salesCount'] as int).compareTo(a['salesCount'] as int),
+          (a, b) => (int.tryParse(b['salesCount'].toString()) ?? 0).compareTo(
+            int.tryParse(a['salesCount'].toString()) ?? 0,
+          ),
         );
         break;
 
@@ -262,7 +275,11 @@ class _MyProductsState extends State<MyProducts> {
           _buildSummary(),
           _buildFilterChips(),
           Expanded(
-            child: products.isEmpty
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _loadError != null
+                ? _buildLoadError()
+                : products.isEmpty
                 ? _buildEmptyState()
                 : RefreshIndicator(
                     color: ArtistColors.primary,
@@ -324,11 +341,11 @@ class _MyProductsState extends State<MyProducts> {
 
     final active = _products.where((product) {
       return product['status'] == 'active' &&
-          (product['availableQuantity'] as int) > 0;
+          (int.tryParse(product['availableQuantity'].toString()) ?? 0) > 0;
     }).length;
 
     final soldOut = _products.where((product) {
-      return (product['availableQuantity'] as int) == 0;
+      return (int.tryParse(product['availableQuantity'].toString()) ?? 0) == 0;
     }).length;
 
     return Padding(
@@ -452,10 +469,12 @@ class _MyProductsState extends State<MyProducts> {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: () {
-          Navigator.push(
+          Navigator.push<bool>(
             context,
             MaterialPageRoute(builder: (_) => ListingDetails(listing: product)),
-          );
+          ).then((changed) {
+            if (changed == true) _loadProducts();
+          });
         },
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -491,33 +510,41 @@ class _MyProductsState extends State<MyProducts> {
         width: 92,
         height: 105,
         color: ArtistColors.surfaceSoft,
-        child: Image.network(
-          product['image'].toString(),
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
-            return const Center(
-              child: Icon(
-                Icons.image_not_supported_outlined,
-                color: ArtistColors.textMuted,
-                size: 28,
-              ),
-            );
-          },
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
+        child: (product['image']?.toString().isNotEmpty ?? false)
+            ? Image.network(
+                product['image'].toString(),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) {
+                  return const Center(
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      color: ArtistColors.textMuted,
+                      size: 28,
+                    ),
+                  );
+                },
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
 
-            return const Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: ArtistColors.primary,
+                  return const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: ArtistColors.primary,
+                      ),
+                    ),
+                  );
+                },
+              )
+            : const Center(
+                child: Icon(
+                  Icons.image_outlined,
+                  color: ArtistColors.textMuted,
+                  size: 28,
                 ),
               ),
-            );
-          },
-        ),
       ),
     );
   }
@@ -949,17 +976,21 @@ class _MyProductsState extends State<MyProducts> {
   void _handleProductMenu(String value, Map<String, dynamic> product) {
     switch (value) {
       case 'view':
-        Navigator.push(
+        Navigator.push<bool>(
           context,
           MaterialPageRoute(builder: (_) => ListingDetails(listing: product)),
-        );
+        ).then((changed) {
+          if (changed == true) _loadProducts();
+        });
         break;
 
       case 'edit':
-        Navigator.push(
+        Navigator.push<bool>(
           context,
           MaterialPageRoute(builder: (_) => EditProduct(product: product)),
-        );
+        ).then((changed) {
+          if (changed == true) _loadProducts();
+        });
         break;
 
       case 'status':
@@ -1008,7 +1039,7 @@ class _MyProductsState extends State<MyProducts> {
                     color: ArtistColors.success,
                     onTap: () {
                       Navigator.pop(context);
-                      _showComingSoon('Activate Product');
+                      _setProductStatus(product, 'published');
                     },
                   ),
                   _buildStatusOption(
@@ -1018,7 +1049,7 @@ class _MyProductsState extends State<MyProducts> {
                     color: ArtistColors.textSecondary,
                     onTap: () {
                       Navigator.pop(context);
-                      _showComingSoon('Deactivate Product');
+                      _setProductStatus(product, 'archived');
                     },
                   ),
                   _buildStatusOption(
@@ -1028,7 +1059,7 @@ class _MyProductsState extends State<MyProducts> {
                     color: ArtistColors.warning,
                     onTap: () {
                       Navigator.pop(context);
-                      _showComingSoon('Update Product Status');
+                      _setProductStatus(product, 'draft');
                     },
                   ),
                 ],
@@ -1081,12 +1112,12 @@ class _MyProductsState extends State<MyProducts> {
             borderRadius: BorderRadius.circular(18),
           ),
           title: Text(
-            'Delete Product?',
+            'Archive Product?',
             style: ArtistTextStyles.title.copyWith(fontSize: 20),
           ),
           content: Text(
-            'Are you sure you want to delete "${product['title']}"?\n\n'
-            'This action cannot be undone.',
+            'Archive "${product['title']}"?\n\n'
+            'This hides the listing from buyers. You can still find it under Inactive.',
             style: ArtistTextStyles.body,
           ),
           actions: [
@@ -1102,22 +1133,25 @@ class _MyProductsState extends State<MyProducts> {
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(dialogContext);
-
-                setState(() {
-                  _products.remove(product);
-                });
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '"${product['title']}" deleted successfully.',
-                    ),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: ArtistColors.primary,
-                  ),
-                );
+                final id = int.tryParse(product['productId']?.toString() ?? '');
+                if (id == null) {
+                  _showOperationMessage('Invalid product ID.');
+                  return;
+                }
+                try {
+                  await EcoLoopApi.instance.delete('/products/$id');
+                  if (!mounted) return;
+                  _showOperationMessage('Product archived successfully.');
+                  await _loadProducts();
+                } catch (error) {
+                  if (mounted) {
+                    _showOperationMessage(
+                      error.toString().replaceFirst('Exception: ', ''),
+                    );
+                  }
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: ArtistColors.error,
@@ -1127,7 +1161,7 @@ class _MyProductsState extends State<MyProducts> {
                   borderRadius: BorderRadius.circular(9),
                 ),
               ),
-              child: const Text('Delete'),
+              child: const Text('Archive'),
             ),
           ],
         );
@@ -1136,29 +1170,64 @@ class _MyProductsState extends State<MyProducts> {
   }
 
   // Simulates pull-to-refresh action
-  Future<void> _refreshProducts() async {
-    await Future.delayed(const Duration(milliseconds: 700));
+  Future<void> _refreshProducts() => _loadProducts();
 
-    if (!mounted) return;
-
-    setState(() {});
+  Future<void> _setProductStatus(
+    Map<String, dynamic> product,
+    String status,
+  ) async {
+    final id = int.tryParse(product['productId']?.toString() ?? '');
+    if (id == null || _isMutating) return;
+    setState(() => _isMutating = true);
+    try {
+      await EcoLoopApi.instance.post('/products/$id/status', {
+        'status': status,
+      });
+      if (!mounted) return;
+      _showOperationMessage('Product status updated.');
+      await _loadProducts();
+    } catch (error) {
+      if (mounted)
+        _showOperationMessage(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isMutating = false);
+    }
   }
 
-  // Displays coming soon snackbar message
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$feature will be connected in the next phase.',
-          style: ArtistTextStyles.bodyMedium.copyWith(
-            color: Colors.white,
-            fontSize: 13,
-          ),
+  Widget _buildLoadError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_outlined,
+              size: 42,
+              color: ArtistColors.textMuted,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _loadError ?? 'Could not load products.',
+              textAlign: TextAlign.center,
+              style: ArtistTextStyles.body,
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: _loadProducts,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
         ),
-        backgroundColor: ArtistColors.accent,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
+    );
+  }
+
+  void _showOperationMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 

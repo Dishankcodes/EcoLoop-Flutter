@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
+import '../profile/add_address.dart';
 import 'payment.dart';
 
 class Checkout extends StatefulWidget {
@@ -145,10 +146,27 @@ class _CheckoutState extends State<Checkout> {
       final data = await EcoLoopApi.instance.get('/addresses');
 
       final list = data is List
-          ? data
-                .whereType<Map>()
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList()
+          ? data.whereType<Map>().map((e) {
+              final address = Map<String, dynamic>.from(e);
+              // AddAddress.dart stores house/street/type; keep checkout
+              // compatible with both that schema and older address records.
+              address['label'] =
+                  address['label'] ?? address['type'] ?? 'Address';
+              address['addressLine'] =
+                  address['addressLine'] ??
+                  [address['house'], address['street']]
+                      .where(
+                        (value) =>
+                            value != null && value.toString().trim().isNotEmpty,
+                      )
+                      .join(', ');
+              address['area'] = address['area'] ?? address['landmark'] ?? '';
+              address['addressId'] =
+                  address['addressId'] ??
+                  address['id'] ??
+                  address['address_id'];
+              return address;
+            }).toList()
           : <Map<String, dynamic>>[];
 
       if (!mounted) return;
@@ -202,179 +220,89 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Future<void> _addAddress() async {
-    final formKey = GlobalKey<FormState>();
+    if (_savingAddress) return;
 
-    final controllers = <String, TextEditingController>{
-      'label': TextEditingController(text: 'Home'),
-      'name': TextEditingController(),
-      'phone': TextEditingController(),
-      'addressLine': TextEditingController(),
-      'area': TextEditingController(),
-      'city': TextEditingController(),
-      'state': TextEditingController(),
-      'pincode': TextEditingController(),
-    };
-
-    bool makeDefault = _addresses.isEmpty;
+    setState(() {
+      _savingAddress = true;
+    });
 
     try {
-      final saved = await showModalBottomSheet<bool>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: AppColors.surface,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      // Open the full Add Address page instead of a dialog/bottom sheet.
+      final result = await Navigator.push<Map<String, dynamic>>(
+        context,
+        MaterialPageRoute<Map<String, dynamic>>(
+          builder: (_) => const AddAddress(),
         ),
-        builder: (sheetContext) {
-          return StatefulBuilder(
-            builder: (context, setSheetState) {
-              return SafeArea(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    20,
-                    22,
-                    20,
-                    MediaQuery.of(context).viewInsets.bottom + 20,
-                  ),
-                  child: Form(
-                    key: formKey,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Add delivery address',
-                            style: AppTextStyles.title.copyWith(fontSize: 20),
-                          ),
-                          const SizedBox(height: 16),
-                          for (final field in const [
-                            ('label', 'Label (Home / Work)', false),
-                            ('name', 'Recipient name', false),
-                            ('phone', 'Phone number', false),
-                            ('addressLine', 'House / street address', false),
-                            ('area', 'Area / landmark', true),
-                            ('city', 'City', false),
-                            ('state', 'State', false),
-                            ('pincode', 'PIN code', false),
-                          ])
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: TextFormField(
-                                controller: controllers[field.$1],
-                                decoration: InputDecoration(
-                                  labelText: field.$2,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                keyboardType:
-                                    field.$1 == 'phone' || field.$1 == 'pincode'
-                                    ? TextInputType.phone
-                                    : TextInputType.text,
-                                validator: field.$3
-                                    ? null
-                                    : (value) {
-                                        if (value == null ||
-                                            value.trim().isEmpty) {
-                                          return 'Required';
-                                        }
-
-                                        return null;
-                                      },
-                              ),
-                            ),
-                          CheckboxListTile(
-                            contentPadding: EdgeInsets.zero,
-                            value: makeDefault,
-                            onChanged: (value) {
-                              setSheetState(() {
-                                makeDefault = value ?? false;
-                              });
-                            },
-                            title: const Text('Set as default address'),
-                          ),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: () {
-                                if (!formKey.currentState!.validate()) {
-                                  return;
-                                }
-
-                                Navigator.pop(sheetContext, true);
-                              },
-                              child: const Text('Save address'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
       );
 
       if (!mounted) return;
 
-      if (saved == true) {
-        setState(() {
-          _savingAddress = true;
-        });
+      // Always reload from the backend after returning, because the address
+      // page writes directly to the same Apps Script endpoint.
+      await _loadAddresses();
+      if (!mounted) return;
 
-        try {
-          final payload = <String, dynamic>{
-            for (final entry in controllers.entries)
-              entry.key: entry.value.text.trim(),
-            'isDefault': makeDefault,
-          };
-
-          final response = await EcoLoopApi.instance.post(
-            '/addresses',
-            payload,
+      if (result != null) {
+        final returnedId =
+            result['addressId'] ?? result['id'] ?? result['address_id'];
+        if (returnedId != null) {
+          final id = returnedId.toString();
+          final exists = _addresses.any(
+            (address) => address['addressId']?.toString() == id,
           );
-
-          if (!mounted) return;
-
-          await _loadAddresses();
-
-          if (!mounted) return;
-
-          if (response is Map && response['addressId'] != null) {
+          if (exists) {
             setState(() {
-              _selectedAddressId = response['addressId'].toString();
+              _selectedAddressId = id;
+            });
+          } else {
+            // If the API response didn't expose the ID consistently, select
+            // the newest saved address matching the returned fields.
+            final matching = _addresses.where((address) {
+              final sameName =
+                  (address['name'] ?? '').toString().trim() ==
+                  (result['name'] ?? '').toString().trim();
+              final samePhone =
+                  (address['phone'] ?? '').toString().trim() ==
+                  (result['phone'] ?? '').toString().trim();
+              final sameCity =
+                  (address['city'] ?? '').toString().trim() ==
+                  (result['city'] ?? '').toString().trim();
+              return sameName && samePhone && sameCity;
+            }).toList();
+
+            if (matching.isNotEmpty) {
+              setState(() {
+                _selectedAddressId = matching.last['addressId']?.toString();
+              });
+            }
+          }
+        } else {
+          // New address may not return an ID; reload still makes it available.
+          final matching = _addresses.where((address) {
+            return (address['name'] ?? '').toString().trim() ==
+                    (result['name'] ?? '').toString().trim() &&
+                (address['phone'] ?? '').toString().trim() ==
+                    (result['phone'] ?? '').toString().trim() &&
+                (address['city'] ?? '').toString().trim() ==
+                    (result['city'] ?? '').toString().trim();
+          }).toList();
+
+          if (matching.isNotEmpty) {
+            setState(() {
+              _selectedAddressId = matching.last['addressId']?.toString();
             });
           }
-        } catch (e) {
-          if (mounted) {
-            _message('Could not save address: $e');
-          }
-        } finally {
-          for (final controller in controllers.values) {
-            controller.dispose();
-          }
-
-          if (mounted) {
-            setState(() {
-              _savingAddress = false;
-            });
-          }
-        }
-      } else {
-        for (final controller in controllers.values) {
-          controller.dispose();
         }
       }
     } catch (e) {
-      for (final controller in controllers.values) {
-        controller.dispose();
-      }
-
       if (mounted) {
-        _message('Could not open address form: $e');
+        _message('Could not open Add Address page: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _savingAddress = false;
+        });
       }
     }
   }

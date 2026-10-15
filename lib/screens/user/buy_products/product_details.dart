@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
@@ -24,28 +22,68 @@ class ProductDetails extends StatefulWidget {
 
 class _ProductDetailsState extends State<ProductDetails> {
   late PageController _imageController;
+  late Map<String, dynamic> _product;
+  bool _detailsLoading = false;
+  String? _detailsError;
 
   int _currentImage = 0;
   int _quantity = 1;
   bool _isWishlisted = false;
   bool _wishlistBusy = false;
-  bool _reviewsLoading = false;
-  bool _reviewEligibilityLoading = false;
-  List<Map<String, dynamic>> _liveReviews = [];
-  Map<String, dynamic>? _reviewEligibility;
   final EcoLoopApi _api = EcoLoopApi.instance;
 
   @override
   void initState() {
     super.initState();
     _imageController = PageController();
-
+    _product = Map<String, dynamic>.from(widget.product);
     _isWishlisted =
-        widget.product['isWishlisted'] == true ||
-        widget.product['wishlisted'] == true;
+        _product['isWishlisted'] == true || _product['wishlisted'] == true;
+    _loadProductDetails();
     _syncWishlistState();
-    _loadLiveReviews();
-    _loadReviewEligibility();
+  }
+
+  /// Refreshes the selected listing from the backend so artist/user edits and
+  /// availability changes are reflected in the details page.
+  Future<void> _loadProductDetails() async {
+    final id =
+        (_product['productId'] ??
+                _product['product_id'] ??
+                _product['id'] ??
+                '')
+            .toString()
+            .trim();
+    if (id.isEmpty) return;
+    if (mounted) {
+      setState(() {
+        _detailsLoading = true;
+        _detailsError = null;
+      });
+    }
+    try {
+      final response = await _api.get('/products/$id');
+      final root = _asMap(response);
+      final nested = _asMap(root['data']);
+      final fetched = nested.isNotEmpty ? nested : root;
+      if (fetched.isNotEmpty && mounted) {
+        setState(() {
+          _product = <String, dynamic>{..._product, ...fetched};
+          final rawImages = _product['imageUrls'] ?? _product['images'];
+          if (rawImages is List && rawImages.isNotEmpty) {
+            _product['images'] = rawImages
+                .map((item) => item.toString())
+                .where((item) => item.isNotEmpty)
+                .toList();
+            _product['image'] ??= _product['images'].first;
+          }
+        });
+      }
+    } catch (e) {
+      // Keep the marketplace-provided product visible if refresh is unavailable.
+      if (mounted) setState(() => _detailsError = e.toString());
+    } finally {
+      if (mounted) setState(() => _detailsLoading = false);
+    }
   }
 
   @override
@@ -54,10 +92,10 @@ class _ProductDetailsState extends State<ProductDetails> {
     super.dispose();
   }
 
-  String get title => widget.product['title']?.toString() ?? 'Product';
+  String get title => _product['title']?.toString() ?? 'Product';
 
   int get priceValue {
-    final value = widget.product['price'];
+    final value = _product['price'];
     if (value is num) {
       return value.toInt();
     }
@@ -66,13 +104,13 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   String get price => '₹${_formatPrice(priceValue)}';
 
-  String get condition => widget.product['condition']?.toString() ?? 'Good';
+  String get condition => _product['condition']?.toString() ?? 'Good';
 
-  String get category => widget.product['category']?.toString() ?? 'Furniture';
+  String get category => _product['category']?.toString() ?? 'Furniture';
 
   String get seller =>
-      widget.product['sellerName']?.toString() ??
-      widget.product['seller']?.toString() ??
+      _product['sellerName']?.toString() ??
+      _product['seller']?.toString() ??
       'EcoLoop Member';
 
   /// Seller account type used for profile navigation.
@@ -85,10 +123,10 @@ class _ProductDetailsState extends State<ProductDetails> {
   /// break while the backend integration is still being implemented.
   String get sellerType {
     final type =
-        widget.product['sellerType'] ??
-        widget.product['sellerRole'] ??
-        widget.product['seller_role'] ??
-        widget.product['role'] ??
+        _product['sellerType'] ??
+        _product['sellerRole'] ??
+        _product['seller_role'] ??
+        _product['role'] ??
         'user';
 
     return type.toString().trim().toLowerCase();
@@ -101,16 +139,16 @@ class _ProductDetailsState extends State<ProductDetails> {
       sellerType == 're-maker';
 
   String get location => [
-    widget.product['sellerCity'],
-    widget.product['sellerState'],
+    _product['sellerCity'],
+    _product['sellerState'],
   ].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
 
   String get description =>
-      widget.product['description']?.toString() ??
+      _product['description']?.toString() ??
       'No description provided by the seller.';
 
   int get availableQuantity {
-    final value = widget.product['availableQuantity'];
+    final value = _product['availableQuantity'];
     if (value is num) {
       return value.toInt();
     }
@@ -118,13 +156,7 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   double get rating {
-    if (_liveReviews.isNotEmpty) {
-      return _liveReviews
-              .map((r) => _number(r['rating']))
-              .fold<double>(0, (a, b) => a + b) /
-          _liveReviews.length;
-    }
-    final value = widget.product['rating'];
+    final value = _product['rating'];
     if (value is num) {
       return value.toDouble();
     }
@@ -132,135 +164,27 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   int get reviewCount {
-    if (_liveReviews.isNotEmpty) {
-      return _liveReviews.length;
-    }
-    final value =
-        widget.product['reviewCount'] ?? widget.product['reviews'] ?? 0;
+    final value = _product['reviewCount'] ?? _product['reviews'] ?? 0;
     if (value is num) {
       return value.toInt();
     }
     return int.tryParse(value.toString()) ?? 0;
   }
 
-  double _number(dynamic value) => value is num
-      ? value.toDouble()
-      : double.tryParse((value ?? '').toString()) ?? 0;
-
-  List<Map<String, dynamic>> _toRows(dynamic value) {
-    if (value is List)
-      return value
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-    if (value is Map) {
-      final data = value['data'];
-      if (data is List)
-        return data
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList();
-      for (final key in ['reviews', 'items', 'results']) {
-        final rows = value[key] ?? (data is Map ? data[key] : null);
-        if (rows is List)
-          return rows
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-      }
-    }
-    return [];
-  }
-
-  Future<void> _loadLiveReviews() async {
-    final id = _currentProductId;
-    if (id.isEmpty) {
-      return;
-    }
-    if (mounted) setState(() => _reviewsLoading = true);
-    try {
-      final data = await _api.get('/products/$id/reviews');
-      if (mounted) setState(() => _liveReviews = _toRows(data));
-    } catch (_) {
-      if (mounted) setState(() => _liveReviews = []);
-    } finally {
-      if (mounted) setState(() => _reviewsLoading = false);
-    }
-  }
-
-  Future<void> _loadReviewEligibility() async {
-    final id = _currentProductId;
-    if (id.isEmpty) {
-      return;
-    }
-    if (mounted) setState(() => _reviewEligibilityLoading = true);
-    try {
-      final data = await _api.get('/products/$id/review-eligibility');
-      if (mounted)
-        setState(
-          () => _reviewEligibility = data is Map
-              ? Map<String, dynamic>.from(data)
-              : null,
-        );
-    } catch (_) {
-      if (mounted) setState(() => _reviewEligibility = {'eligible': false});
-    } finally {
-      if (mounted) setState(() => _reviewEligibilityLoading = false);
-    }
-  }
-
-  String _reviewDate(dynamic value) {
-    if (value == null || value.toString().trim().isEmpty)
-      return 'Date unavailable';
-    final parsed = DateTime.tryParse(value.toString());
-    if (parsed == null) {
-      return value.toString();
-    }
-    final local = parsed.isUtc ? parsed.toLocal() : parsed;
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${local.day} ${months[local.month - 1]} ${local.year}';
-  }
-
   List<String> get images {
-    dynamic productImages =
-        widget.product['images'] ?? widget.product['imageUrls'];
-    if (productImages is String && productImages.trim().isNotEmpty) {
-      try {
-        final decoded = jsonDecode(productImages);
-        if (decoded is List) productImages = decoded;
-      } catch (_) {
-        productImages = productImages.split(RegExp(r'[,\n]'));
-      }
-    }
+    final productImages = _product['images'] ?? _product['imageUrls'];
     if (productImages is List && productImages.isNotEmpty) {
       return productImages
-          .map((image) => image.toString().trim())
-          .where(
-            (image) =>
-                image.startsWith('http://') || image.startsWith('https://'),
-          )
-          .toSet()
+          .map((image) => image.toString())
+          .where((image) => image.isNotEmpty)
           .toList();
     }
-    final singleImage = (widget.product['image'] ?? widget.product['imageUrl'])
-        .toString()
-        .trim();
-    if (singleImage.startsWith('http')) {
+
+    final singleImage = _product['image']?.toString();
+    if (singleImage != null && singleImage.isNotEmpty) {
       return [singleImage];
     }
+
     return const <String>[];
   }
 
@@ -277,6 +201,21 @@ class _ProductDetailsState extends State<ProductDetails> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (_detailsLoading)
+                  const LinearProgressIndicator(
+                    minHeight: 2,
+                    color: AppColors.primary,
+                  ),
+                if (_detailsError != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Text(
+                      'Showing saved listing data because the latest refresh failed.',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
                 _buildImageGallery(),
                 _buildProductHeader(),
                 _buildSellerSection(),
@@ -364,7 +303,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                       images[index],
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
+                      errorBuilder: (_, __, ___) {
                         return Container(
                           color: AppColors.light,
                           child: const Center(
@@ -377,9 +316,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                         );
                       },
                       loadingBuilder: (context, child, progress) {
-                        if (progress == null) {
-                          return child;
-                        }
+                        if (progress == null) return child;
                         return Container(
                           color: AppColors.light,
                           child: const Center(
@@ -397,7 +334,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   top: 16,
                   right: 16,
                   child: Material(
-                    color: Colors.white.withValues(alpha: 0.95),
+                    color: Colors.white.withOpacity(0.95),
                     shape: const CircleBorder(),
                     elevation: 1,
                     child: InkWell(
@@ -427,7 +364,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
+                      color: Colors.black.withOpacity(0.55),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -543,7 +480,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               ),
               const SizedBox(width: 4),
               Text(
-                '${widget.product['views'] ?? 0} views',
+                '${_product['views'] ?? 0} views',
                 style: AppTextStyles.caption,
               ),
               const SizedBox(width: 16),
@@ -554,7 +491,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               ),
               const SizedBox(width: 4),
               Text(
-                '${widget.product['wishlistCount'] ?? 0} saved',
+                '${_product['wishlistCount'] ?? 0} saved',
                 style: AppTextStyles.caption,
               ),
             ],
@@ -577,9 +514,9 @@ class _ProductDetailsState extends State<ProductDetails> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.18)),
+        border: Border.all(color: color.withOpacity(0.18)),
       ),
       child: Row(
         children: [
@@ -665,9 +602,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               decoration: BoxDecoration(
                 color: AppColors.background,
                 borderRadius: BorderRadius.circular(15),
-                border: Border.all(
-                  color: AppColors.accent.withValues(alpha: 0.45),
-                ),
+                border: Border.all(color: AppColors.accent.withOpacity(0.45)),
               ),
               child: Row(
                 children: [
@@ -749,7 +684,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
-              color: AppColors.light.withValues(alpha: 0.55),
+              color: AppColors.light.withOpacity(0.55),
               borderRadius: BorderRadius.circular(11),
             ),
             child: const Row(
@@ -852,7 +787,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
-              color: AppColors.light.withValues(alpha: 0.65),
+              color: AppColors.light.withOpacity(0.65),
               borderRadius: BorderRadius.circular(11),
             ),
             child: const Row(
@@ -902,7 +837,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           _infoRow(
             Icons.calendar_today_outlined,
             'Listed',
-            widget.product['createdAt']?.toString() ?? 'Not available',
+            _product['createdAt']?.toString() ?? 'Not available',
           ),
           _infoRow(
             Icons.local_shipping_outlined,
@@ -975,61 +910,32 @@ class _ProductDetailsState extends State<ProductDetails> {
           const SizedBox(height: 8),
           _buildRatingSummary(),
           const SizedBox(height: 16),
-          if (_reviewsLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 18),
-              child: Center(
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.primary,
-                ),
-              ),
-            )
-          else if (_liveReviews.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'No verified reviews yet. Be the first eligible buyer to review this item.',
-                style: AppTextStyles.caption,
-              ),
-            )
-          else
-            ..._liveReviews
-                .take(3)
-                .map(
-                  (review) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _buildReviewCard(
-                      name:
-                          (review['reviewerName'] ??
-                                  review['userName'] ??
-                                  review['name'] ??
-                                  'EcoLoop buyer')
-                              .toString(),
-                      rating: _number(
-                        review['rating'],
-                      ).round().clamp(1, 5).toInt(),
-                      date: _reviewDate(review['createdAt']),
-                      review: (review['comment'] ?? review['review'] ?? '')
-                          .toString(),
-                      imageCount: 0,
-                    ),
-                  ),
-                ),
+          _buildReviewCard(
+            name: 'Priya S.',
+            rating: 5,
+            date: '2 weeks ago',
+            review:
+                'Great quality! Exactly as shown. Very sturdy and easy to assemble.',
+            imageCount: 2,
+          ),
+          const SizedBox(height: 10),
+          _buildReviewCard(
+            name: 'Amit K.',
+            rating: 4,
+            date: '1 month ago',
+            review:
+                'Good product for the price. Minor scratches but overall great.',
+            imageCount: 1,
+          ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             height: 43,
             child: OutlinedButton.icon(
-              onPressed: _reviewEligibilityLoading ? null : _writeReview,
+              onPressed: _writeReview,
               icon: const Icon(Icons.rate_review_outlined, size: 17),
-              label: Text(
-                _reviewEligibilityLoading
-                    ? 'Checking purchase…'
-                    : ((_reviewEligibility != null &&
-                              _reviewEligibility!['eligible'] == true)
-                          ? 'Write a Review'
-                          : 'Review after purchase'),
+              label: const Text(
+                'Write a Review',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
               ),
             ),
@@ -1046,7 +952,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+        border: Border.all(color: AppColors.accent.withOpacity(0.4)),
       ),
       child: Row(
         children: [
@@ -1095,6 +1001,40 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
+  /// Helper bar widget rendering percentage distribution for individual star ratings.
+  Widget _ratingBar(int number, double percentage) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 15,
+            child: Text(
+              '$number',
+              style: const TextStyle(
+                fontSize: 9,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const Icon(Icons.star_rounded, size: 11, color: Color(0xFFFFB300)),
+          const SizedBox(width: 5),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: LinearProgressIndicator(
+                minHeight: 5,
+                value: percentage,
+                backgroundColor: AppColors.accent.withOpacity(0.3),
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Review item card showing reviewer details, score, text, and user media.
   Widget _buildReviewCard({
     required String name,
@@ -1108,7 +1048,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
+        border: Border.all(color: AppColors.accent.withOpacity(0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1336,7 +1276,7 @@ class _ProductDetailsState extends State<ProductDetails> {
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.only(right: 20),
               itemCount: products.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 11),
+              separatorBuilder: (_, __) => const SizedBox(width: 11),
               itemBuilder: (context, index) {
                 return _buildSimilarProductCard(products[index]);
               },
@@ -1353,9 +1293,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => ProductDetails(product: product),
-          ),
+          MaterialPageRoute(builder: (_) => ProductDetails(product: product)),
         );
       },
       child: SizedBox(
@@ -1374,7 +1312,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     child: Image.network(
                       product['image'].toString(),
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
+                      errorBuilder: (_, __, ___) {
                         return const Icon(
                           Icons.image_outlined,
                           color: AppColors.primary,
@@ -1390,7 +1328,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.94),
+                      color: Colors.white.withOpacity(0.94),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -1444,7 +1382,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           color: AppColors.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.10),
+              color: Colors.black.withOpacity(0.10),
               blurRadius: 15,
               offset: const Offset(0, -5),
             ),
@@ -1459,9 +1397,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 decoration: BoxDecoration(
                   color: AppColors.light,
                   borderRadius: BorderRadius.circular(13),
-                  border: Border.all(
-                    color: AppColors.accent.withValues(alpha: 0.4),
-                  ),
+                  border: Border.all(color: AppColors.accent.withOpacity(0.4)),
                 ),
                 child: Row(
                   children: [
@@ -1588,17 +1524,13 @@ class _ProductDetailsState extends State<ProductDetails> {
       return;
     }
 
-    final cartProduct = Map<String, dynamic>.from(widget.product);
+    final cartProduct = Map<String, dynamic>.from(_product);
 
     cartProduct['id'] =
-        widget.product['productId'] ??
-        widget.product['id'] ??
-        'product_${title.hashCode}';
+        _product['productId'] ?? _product['id'] ?? 'product_${title.hashCode}';
 
     cartProduct['productId'] =
-        widget.product['productId'] ??
-        widget.product['id'] ??
-        'product_${title.hashCode}';
+        _product['productId'] ?? _product['id'] ?? 'product_${title.hashCode}';
 
     cartProduct['title'] = title;
     cartProduct['price'] = priceValue;
@@ -1629,17 +1561,13 @@ class _ProductDetailsState extends State<ProductDetails> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            Checkout(product: widget.product, quantity: _quantity),
+        builder: (_) => Checkout(product: _product, quantity: _quantity),
       ),
     );
   }
 
   String get _currentProductId =>
-      (widget.product['productId'] ??
-              widget.product['product_id'] ??
-              widget.product['id'] ??
-              '')
+      (_product['productId'] ?? _product['product_id'] ?? _product['id'] ?? '')
           .toString();
 
   Map<String, dynamic> _asMap(dynamic value) {
@@ -1650,9 +1578,7 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   Future<void> _syncWishlistState() async {
     final id = _currentProductId;
-    if (id.isEmpty) {
-      return;
-    }
+    if (id.isEmpty) return;
     try {
       final response = await _api.get('/wishlist');
       final root = _asMap(response);
@@ -1694,9 +1620,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       _showMessage('This item has no product ID and cannot be saved.');
       return;
     }
-    if (_wishlistBusy) {
-      return;
-    }
+    if (_wishlistBusy) return;
     final wasSaved = _isWishlisted;
     setState(() {
       _wishlistBusy = true;
@@ -1708,11 +1632,10 @@ class _ProductDetailsState extends State<ProductDetails> {
       } else {
         await _api.post('/wishlist', <String, dynamic>{'productId': id});
       }
-      if (mounted) {
+      if (mounted)
         _showMessage(
           wasSaved ? 'Removed from your wishlist.' : 'Added to your wishlist.',
         );
-      }
     } catch (e) {
       if (mounted) {
         setState(() => _isWishlisted = wasSaved);
@@ -1729,14 +1652,18 @@ class _ProductDetailsState extends State<ProductDetails> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ArtistProfile(
+          builder: (_) => ArtistProfile(
             artist: {
-              'artistId':
-                  widget.product['sellerId'] ?? widget.product['artistId'],
+              'artistId': _product['sellerId'] ?? _product['artistId'],
+              'sellerType': 'artist',
+              'profileImage':
+                  _product['sellerImage'] ?? _product['artistImage'] ?? '',
               'name': seller,
               'location': location,
-              'rating': widget.product['rating'] ?? 0,
-              'reviews': widget.product['reviewCount'] ?? 0,
+              'rating': _product['rating'] ?? 0,
+              'reviews': _product['reviewCount'] ?? 0,
+              'followers': _product['followerCount'] ?? 0,
+              'products': _product['sellerProductCount'] ?? 0,
             },
           ),
         ),
@@ -1747,13 +1674,18 @@ class _ProductDetailsState extends State<ProductDetails> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SellerProfile(
+        builder: (_) => SellerProfile(
           seller: {
-            'userId': widget.product['sellerId'] ?? widget.product['userId'],
+            'userId': _product['sellerId'] ?? _product['userId'],
+            'sellerType': 'user',
+            'profileImage': _product['sellerImage'] ?? '',
             'name': seller,
             'location': location,
-            'rating': widget.product['rating'] ?? 0,
-            'reviews': widget.product['reviewCount'] ?? 0,
+            'rating': _product['rating'] ?? 0,
+            'reviews': _product['reviewCount'] ?? 0,
+            'listings': _product['sellerProductCount'] ?? 0,
+            'sold': _product['salesCount'] ?? 0,
+            'positive': _product['positiveRating'] ?? 0,
           },
         ),
       ),
@@ -1764,43 +1696,16 @@ class _ProductDetailsState extends State<ProductDetails> {
   void _openAllReviews() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => ProductReviews(
-          product: widget.product,
-          orderId:
-              _reviewEligibility != null &&
-                  _reviewEligibility!['eligible'] == true
-              ? _reviewEligibility!['orderId']?.toString()
-              : null,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => ProductReviews(product: _product)),
     );
   }
 
   /// Opens form interface for submitting a new review.
-  Future<void> _writeReview() async {
-    final eligible =
-        _reviewEligibility != null && _reviewEligibility!['eligible'] == true;
-    final orderId = _reviewEligibility == null
-        ? null
-        : _reviewEligibility!['orderId'];
-    if (!eligible || orderId == null) {
-      _showMessage(
-        'You must purchase and receive this product before leaving a review.',
-      );
-      return;
-    }
-    final submitted = await Navigator.push<bool>(
+  void _writeReview() {
+    Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) =>
-            WriteReview(product: widget.product, orderId: orderId.toString()),
-      ),
+      MaterialPageRoute(builder: (_) => WriteReview(product: _product)),
     );
-    if (submitted == true) {
-      await _loadLiveReviews();
-      await _loadReviewEligibility();
-    }
   }
 
   /// Triggers product sharing option placeholder.
@@ -1922,93 +1827,250 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  /// Displays bottom sheet form with listing reporting categories.
+  /// Opens a report form and submits the report to the existing Apps Script API.
+  /// Code.gs handles POST /reports/product and stores the report in the Reports sheet.
   void _reportProduct() {
-    showModalBottomSheet(
+    final productId = int.tryParse(_currentProductId.trim());
+    if (productId == null || productId <= 0) {
+      _showMessage(
+        'This listing has an invalid product ID and cannot be reported.',
+      );
+      return;
+    }
+
+    const reasons = <Map<String, dynamic>>[
+      {'label': 'Misleading information', 'icon': Icons.info_outline_rounded},
+      {'label': 'Inappropriate content', 'icon': Icons.block_outlined},
+      {
+        'label': 'Suspicious or scam listing',
+        'icon': Icons.warning_amber_outlined,
+      },
+      {
+        'label': 'Counterfeit or prohibited item',
+        'icon': Icons.gpp_bad_outlined,
+      },
+      {'label': 'Other', 'icon': Icons.more_horiz_rounded},
+    ];
+
+    final detailsController = TextEditingController();
+    String selectedReason = reasons.first['label'] as String;
+    bool submitting = false;
+    String? formError;
+
+    showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 25),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    height: 4,
-                    width: 42,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> submitReport() async {
+              if (submitting) return;
+              if (selectedReason == 'Other' &&
+                  detailsController.text.trim().isEmpty) {
+                setSheetState(() {
+                  formError = 'Please describe the issue for an Other report.';
+                });
+                return;
+              }
+
+              setSheetState(() {
+                submitting = true;
+                formError = null;
+              });
+
+              try {
+                final response = await _api
+                    .post('/reports/product', <String, dynamic>{
+                      'productId': productId,
+                      'reason': selectedReason,
+                      'details': detailsController.text.trim(),
+                    });
+
+                if (!mounted) return;
+                Navigator.of(sheetContext).pop();
+                final result = _asMap(response);
+                final message = result['message']?.toString().trim();
+                _showMessage(
+                  message != null && message.isNotEmpty
+                      ? message
+                      : 'Report submitted for review.',
+                );
+              } catch (error) {
+                setSheetState(() {
+                  submitting = false;
+                  formError = error.toString().replaceFirst('Exception: ', '');
+                });
+              }
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  14,
+                  20,
+                  20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          height: 4,
+                          width: 42,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Report Listing',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Tell us why this listing should be reviewed. Your report will be sent to EcoLoop for moderation.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.45,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      ...reasons.map((reason) {
+                        final label = reason['label'] as String;
+                        final icon = reason['icon'] as IconData;
+                        final selected = selectedReason == label;
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          leading: Icon(
+                            icon,
+                            color: selected
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                          ),
+                          title: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          trailing: Icon(
+                            selected
+                                ? Icons.radio_button_checked_rounded
+                                : Icons.radio_button_unchecked_rounded,
+                            color: selected
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                          ),
+                          onTap: submitting
+                              ? null
+                              : () {
+                                  setSheetState(() {
+                                    selectedReason = label;
+                                    formError = null;
+                                  });
+                                },
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: detailsController,
+                        enabled: !submitting,
+                        minLines: 2,
+                        maxLines: 4,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: InputDecoration(
+                          labelText: selectedReason == 'Other'
+                              ? 'Describe the issue (required)'
+                              : 'Additional details (optional)',
+                          hintText:
+                              'Add details to help us review this listing',
+                          alignLabelWithHint: true,
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppColors.accent),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: AppColors.accent),
+                          ),
+                        ),
+                      ),
+                      if (formError != null) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          formError!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: submitting ? null : submitReport,
+                          icon: submitting
+                              ? const SizedBox(
+                                  width: 17,
+                                  height: 17,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.flag_outlined, size: 18),
+                          label: Text(
+                            submitting
+                                ? 'Submitting report...'
+                                : 'Submit Report',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: AppColors.primary
+                                .withOpacity(0.6),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Report Listing',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Why are you reporting this listing?',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 15),
-                _reportOption(
-                  'Misleading information',
-                  Icons.info_outline,
-                  sheetContext,
-                ),
-                _reportOption(
-                  'Inappropriate content',
-                  Icons.block_outlined,
-                  sheetContext,
-                ),
-                _reportOption(
-                  'Suspicious or scam listing',
-                  Icons.warning_amber_outlined,
-                  sheetContext,
-                ),
-                _reportOption('Other', Icons.more_horiz_rounded, sheetContext),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
-    );
-  }
-
-  /// Option tile item rendered inside the listing report bottom sheet.
-  Widget _reportOption(String title, IconData icon, BuildContext sheetContext) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-      leading: Icon(icon, color: AppColors.textSecondary),
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-      ),
-      trailing: const Icon(
-        Icons.arrow_forward_ios_rounded,
-        size: 14,
-        color: AppColors.textSecondary,
-      ),
-      onTap: () {
-        Navigator.pop(sheetContext);
-        _showMessage('Report submitted for review.');
-      },
-    );
+    ).whenComplete(detailsController.dispose);
   }
 
   /// Helper parsing formatted price strings into integer values.

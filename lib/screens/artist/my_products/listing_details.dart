@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import 'edit_product.dart';
 
 class ListingDetails extends StatefulWidget {
@@ -15,6 +16,8 @@ class ListingDetails extends StatefulWidget {
 
 class _ListingDetailsState extends State<ListingDetails> {
   late String _status;
+  bool _isUpdatingStatus = false;
+  bool _hasChanged = false;
 
   @override
   void initState() {
@@ -26,12 +29,15 @@ class _ListingDetailsState extends State<ListingDetails> {
   String _normalizeStatus(String? value) {
     switch ((value ?? '').toLowerCase()) {
       case 'active':
+      case 'published':
         return 'Active';
 
       case 'pending':
         return 'Pending';
 
       case 'inactive':
+      case 'archived':
+      case 'out_of_stock':
         return 'Unavailable';
 
       case 'sold':
@@ -46,8 +52,7 @@ class _ListingDetailsState extends State<ListingDetails> {
     }
   }
 
-  String get title =>
-      widget.listing['title']?.toString() ?? 'Handcrafted Product';
+  String get title => widget.listing['title']?.toString() ?? '';
 
   String get price {
     final value = widget.listing['price'];
@@ -63,16 +68,14 @@ class _ListingDetailsState extends State<ListingDetails> {
     return '₹${parsed.toStringAsFixed(2)}';
   }
 
-  String get condition => widget.listing['condition']?.toString() ?? 'Good';
+  String get condition =>
+      (widget.listing['condition']?.toString() ?? '').replaceAll('_', ' ');
 
-  String get category =>
-      widget.listing['category']?.toString() ?? 'Home & Decor';
+  String get category => widget.listing['category']?.toString() ?? '—';
 
-  String get description =>
-      widget.listing['description']?.toString() ??
-      'No description available for this product.';
+  String get description => widget.listing['description']?.toString() ?? '';
 
-  String get productId => widget.listing['productId']?.toString() ?? 'PRD001';
+  String get productId => widget.listing['productId']?.toString() ?? '—';
 
   String get views => '${widget.listing['views']?.toString() ?? '0'} views';
 
@@ -89,7 +92,14 @@ class _ListingDetailsState extends State<ListingDetails> {
   String get date =>
       widget.listing['createdAt']?.toString() ?? 'Listed recently';
 
-  String get imageUrl => widget.listing['image']?.toString() ?? '';
+  String get imageUrl {
+    final image = widget.listing['image']?.toString() ?? '';
+    if (image.isNotEmpty) return image;
+    final urls = widget.listing['imageUrls'];
+    if (urls is List && urls.isNotEmpty) return urls.first.toString();
+    if (urls is String) return urls;
+    return '';
+  }
 
   bool get isSold => _status == 'Sold';
 
@@ -109,7 +119,7 @@ class _ListingDetailsState extends State<ListingDetails> {
         backgroundColor: ArtistColors.surface,
         elevation: 0,
         leading: IconButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context, _hasChanged),
           icon: const Icon(
             Icons.arrow_back_rounded,
             color: ArtistColors.textPrimary,
@@ -726,29 +736,70 @@ class _ListingDetailsState extends State<ListingDetails> {
     );
   }
 
-  void _editListing() {
-    Navigator.push(
+  Future<void> _editListing() async {
+    final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => EditProduct(product: widget.listing)),
     );
+    if (changed != true || !mounted) return;
+    _hasChanged = true;
+    try {
+      final result = await EcoLoopApi.instance.get('/categories');
+      if (result is List) {
+        final categoryId = int.tryParse(
+          widget.listing['categoryId']?.toString() ?? '',
+        );
+        for (final item in result.whereType<Map>()) {
+          if (int.tryParse(item['categoryId']?.toString() ?? '') ==
+              categoryId) {
+            widget.listing['category'] = item['name']?.toString() ?? '';
+            break;
+          }
+        }
+      }
+    } catch (_) {
+      // Product changes are already saved; category label refresh is best-effort.
+    }
+    if (mounted) {
+      setState(() {
+        _status = _normalizeStatus(widget.listing['status']?.toString());
+      });
+    }
+  }
+
+  Future<void> _setProductStatus(String status, String successMessage) async {
+    final id = int.tryParse(widget.listing['productId']?.toString() ?? '');
+    if (id == null || _isUpdatingStatus) return;
+    setState(() => _isUpdatingStatus = true);
+    try {
+      final result = await EcoLoopApi.instance.post('/products/$id/status', {
+        'status': status,
+      });
+      if (!mounted) return;
+      if (result is Map)
+        widget.listing.addAll(Map<String, dynamic>.from(result));
+      _hasChanged = true;
+      setState(() => _status = _normalizeStatus(status));
+      _showMessage(successMessage);
+    } catch (error) {
+      if (mounted)
+        _showMessage(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isUpdatingStatus = false);
+    }
   }
 
   void _toggleAvailability() {
-    setState(() {
-      _status = isUnavailable ? 'Active' : 'Unavailable';
-    });
-
-    _showMessage(
-      isActive ? 'Listing is now active.' : 'Listing is now hidden.',
+    _setProductStatus(
+      isUnavailable ? 'published' : 'archived',
+      isUnavailable
+          ? 'Listing is now visible to buyers.'
+          : 'Listing is now hidden.',
     );
   }
 
   void _publishListing() {
-    setState(() {
-      _status = 'Active';
-    });
-
-    _showMessage('Listing published successfully.');
+    _setProductStatus('published', 'Listing published successfully.');
   }
 
   void _showMoreOptions() {
@@ -865,12 +916,12 @@ class _ListingDetailsState extends State<ListingDetails> {
             borderRadius: BorderRadius.circular(18),
           ),
           title: Text(
-            'Delete Product?',
+            'Archive Product?',
             style: ArtistTextStyles.title.copyWith(fontSize: 20),
           ),
           content: Text(
             'Are you sure you want to delete "$title"?\n\n'
-            'This action cannot be undone.',
+            'This hides the listing from buyers. You can still find it under Inactive.',
             style: ArtistTextStyles.body,
           ),
           actions: [
@@ -886,10 +937,26 @@ class _ListingDetailsState extends State<ListingDetails> {
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(dialogContext);
-
-                _showMessage('Delete will be connected later.');
+                final id = int.tryParse(
+                  widget.listing['productId']?.toString() ?? '',
+                );
+                if (id == null) {
+                  _showMessage('Invalid product ID.');
+                  return;
+                }
+                try {
+                  await EcoLoopApi.instance.delete('/products/$id');
+                  if (!mounted) return;
+                  _showMessage('Product archived successfully.');
+                  Navigator.pop(context, true);
+                } catch (error) {
+                  if (mounted)
+                    _showMessage(
+                      error.toString().replaceFirst('Exception: ', ''),
+                    );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: ArtistColors.error,
@@ -899,7 +966,7 @@ class _ListingDetailsState extends State<ListingDetails> {
                   borderRadius: BorderRadius.circular(9),
                 ),
               ),
-              child: const Text('Delete'),
+              child: const Text('Archive'),
             ),
           ],
         );
