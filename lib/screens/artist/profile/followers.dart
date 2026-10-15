@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import 'artist_profile.dart';
 
 class Followers extends StatefulWidget {
@@ -14,111 +15,14 @@ class Followers extends StatefulWidget {
 class _FollowersState extends State<Followers> {
   final TextEditingController _searchController = TextEditingController();
 
-  final List<Map<String, dynamic>> _followers = [
-    {
-      'name': 'Sumit Meraiya',
-      'username': '@sumiitmeraiiya',
-      'followers': '128 followers',
-      'image':
-          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80',
-      'following': true,
+  final EcoLoopApi _api = EcoLoopApi.instance;
 
-      // Public Artist Profile data
-      'location': 'Ahmedabad, Gujarat',
-      'specialty': 'Upcycling & Home Decor',
-      'bio':
-          'Creative ReMaker passionate about turning unused materials into beautiful and meaningful products.',
-      'rating': 4.8,
-      'reviews': 24,
-      'sold': 36,
-      'verified': true,
-    },
-    {
-      'name': 'Dishank Prajapati',
-      'username': '@dishank.prajapati',
-      'followers': '94 followers',
-      'image':
-          'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&q=80',
-      'following': true,
-
-      'location': 'Ahmedabad, Gujarat',
-      'specialty': 'Wood & Recycled Crafts',
-      'bio':
-          'ReMaker creating practical and sustainable products from reusable materials.',
-      'rating': 4.7,
-      'reviews': 18,
-      'sold': 28,
-      'verified': true,
-    },
-    {
-      'name': 'Nivya Maniyar',
-      'username': '@nivyaa07',
-      'followers': '76 followers',
-      'image':
-          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80',
-      'following': false,
-
-      'location': 'Ahmedabad, Gujarat',
-      'specialty': 'Art & Handmade Crafts',
-      'bio':
-          'Passionate creator transforming everyday materials into unique handmade artwork.',
-      'rating': 4.9,
-      'reviews': 31,
-      'sold': 42,
-      'verified': true,
-    },
-    {
-      'name': 'Isha Mehta',
-      'username': '@isha.mehta',
-      'followers': '61 followers',
-      'image':
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80',
-      'following': true,
-
-      'location': 'Ahmedabad, Gujarat',
-      'specialty': 'Fashion Upcycling',
-      'bio':
-          'Sustainable fashion creator focused on giving old fabrics a fresh new life.',
-      'rating': 4.6,
-      'reviews': 15,
-      'sold': 22,
-      'verified': true,
-    },
-    {
-      'name': 'Kunal Joshi',
-      'username': '@kunal.joshi',
-      'followers': '53 followers',
-      'image':
-          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80',
-      'following': false,
-
-      'location': 'Ahmedabad, Gujarat',
-      'specialty': 'Woodwork & Furniture',
-      'bio':
-          'Maker creating functional furniture and decor using reclaimed wood.',
-      'rating': 4.5,
-      'reviews': 12,
-      'sold': 19,
-      'verified': true,
-    },
-    {
-      'name': 'Nisha Patel',
-      'username': '@nisha.patel',
-      'followers': '47 followers',
-      'image':
-          'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&q=80',
-      'following': true,
-
-      'location': 'Ahmedabad, Gujarat',
-      'specialty': 'Paper & Decorative Crafts',
-      'bio':
-          'Creative ReMaker specialising in sustainable paper crafts and decorative pieces.',
-      'rating': 4.8,
-      'reviews': 20,
-      'sold': 27,
-      'verified': true,
-    },
-  ];
+  List<Map<String, dynamic>> _followers = [];
+  bool _loading = true;
+  bool _refreshing = false;
+  String? _error;
+  int _artistId = 0;
+  int _totalFollowers = 0;
 
   List<Map<String, dynamic>> get _filteredFollowers {
     final query = _searchController.text.trim().toLowerCase();
@@ -139,6 +43,7 @@ class _FollowersState extends State<Followers> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _loadFollowers();
   }
 
   @override
@@ -159,10 +64,110 @@ class _FollowersState extends State<Followers> {
   // ============================================================
 
   void _openArtistProfile(Map<String, dynamic> follower) {
+    if ((follower['role'] ?? '').toString().toLowerCase() != 'artist') {
+      _showMessage('This follower has a user account.');
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ArtistProfile(artist: follower)),
     );
+  }
+
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
+    }
+    return <String, dynamic>{};
+  }
+
+  List<dynamic> _asList(dynamic value) {
+    return value is List ? value : <dynamic>[];
+  }
+
+  int _toInt(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse((value ?? '').toString()) ?? 0;
+  }
+
+  Future<void> _loadFollowers({bool refresh = false}) async {
+    if (!mounted) return;
+    setState(() {
+      if (refresh) {
+        _refreshing = true;
+      } else {
+        _loading = true;
+      }
+      _error = null;
+    });
+
+    try {
+      final profile = _asMap(await _api.get('/profile'));
+      final artistId = _toInt(profile['artistId'] ?? profile['id']);
+      if (artistId <= 0) {
+        throw const EcoLoopApiException(
+          'Could not identify the signed-in artist account.',
+        );
+      }
+
+      final response = _asMap(await _api.get('/artists/$artistId/followers'));
+      final list = _asList(
+        response['followers'],
+      ).map((item) => _asMap(item)).where((item) => item.isNotEmpty).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _artistId = artistId;
+        _totalFollowers = _toInt(response['count']);
+        _followers = list;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _refreshing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleFollow(Map<String, dynamic> follower) async {
+    final role = (follower['role'] ?? '').toString().toLowerCase();
+    final targetId = _toInt(follower['artistId'] ?? follower['id']);
+    if (role != 'artist' || targetId <= 0) {
+      _showMessage('Only artist accounts can be followed.');
+      return;
+    }
+    if (targetId == _artistId) {
+      _showMessage('You cannot follow your own profile.');
+      return;
+    }
+
+    final wasFollowing = follower['following'] == true;
+    try {
+      if (wasFollowing) {
+        await _api.delete('/artists/$targetId/follow');
+      } else {
+        await _api.post('/artists/$targetId/follow', <String, dynamic>{});
+      }
+      await _loadFollowers(refresh: true);
+      if (mounted) {
+        final name = (follower['name'] ?? follower['userName'] ?? 'artist')
+            .toString();
+        _showMessage(wasFollowing ? 'Unfollowed $name' : 'Following $name');
+      }
+    } catch (e) {
+      if (mounted) {
+        _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      }
+    }
   }
 
   @override
@@ -212,22 +217,39 @@ class _FollowersState extends State<Followers> {
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 5, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 16),
-              _buildFollowerSummary(),
-              const SizedBox(height: 14),
-              _buildSearch(),
-              const SizedBox(height: 18),
-              _buildFollowerTitle(filtered.length),
-              const SizedBox(height: 10),
-              filtered.isEmpty
-                  ? _buildEmptyState()
-                  : _buildFollowerList(filtered),
-            ],
-          ),
+          child: _loading
+              ? const Padding(
+                  padding: EdgeInsets.only(top: 100),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : _error != null && _followers.isEmpty
+              ? _buildLoadError()
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 16),
+                    _buildFollowerSummary(),
+                    const SizedBox(height: 14),
+                    _buildSearch(),
+                    const SizedBox(height: 18),
+                    _buildFollowerTitle(filtered.length),
+                    const SizedBox(height: 10),
+                    if (_error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Text(
+                          _error!,
+                          style: ArtistTextStyles.caption.copyWith(
+                            color: ArtistColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    filtered.isEmpty
+                        ? _buildEmptyState()
+                        : _buildFollowerList(filtered),
+                  ],
+                ),
         ),
       ),
     );
@@ -320,7 +342,7 @@ class _FollowersState extends State<Followers> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${_followers.length}',
+                '$_totalFollowers',
                 style: ArtistTextStyles.heading.copyWith(
                   fontSize: 21,
                   fontWeight: FontWeight.w800,
@@ -467,13 +489,23 @@ class _FollowersState extends State<Followers> {
   Widget _buildFollowerCard(Map<String, dynamic> follower) {
     final bool isFollowing = follower['following'] == true;
 
-    final String name = follower['name']?.toString() ?? 'User';
+    final String name =
+        follower['name']?.toString() ??
+        follower['userName']?.toString() ??
+        'EcoLoop User';
 
-    final String username = follower['username']?.toString() ?? '';
+    final String username = _displayUsername(follower);
 
     final String followerCount = follower['followers']?.toString() ?? '';
 
-    final String image = follower['image']?.toString() ?? '';
+    final String image =
+        follower['image']?.toString() ??
+        follower['profilePhotoUrl']?.toString() ??
+        '';
+
+    final bool canFollow =
+        follower['canFollow'] == true &&
+        (follower['role'] ?? '').toString().toLowerCase() == 'artist';
 
     return Material(
       color: Colors.transparent,
@@ -572,7 +604,7 @@ class _FollowersState extends State<Followers> {
 
               // Keep button separate so tapping it does NOT
               // open the artist profile.
-              _buildFollowButton(follower, isFollowing),
+              _buildFollowButton(follower, isFollowing, canFollow),
 
               const SizedBox(width: 3),
 
@@ -583,6 +615,53 @@ class _FollowersState extends State<Followers> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  String _displayUsername(Map<String, dynamic> follower) {
+    final raw = (follower['username'] ?? follower['userName'] ?? '')
+        .toString()
+        .trim();
+    if (raw.isEmpty) return '';
+    return raw.startsWith('@') ? raw : '@$raw';
+  }
+
+  Widget _buildLoadError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 70, horizontal: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_rounded,
+              color: ArtistColors.primary,
+              size: 38,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Could not load followers',
+              style: ArtistTextStyles.title.copyWith(fontSize: 17),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _error ?? 'Please try again.',
+              textAlign: TextAlign.center,
+              style: ArtistTextStyles.body.copyWith(fontSize: 12),
+            ),
+            const SizedBox(height: 14),
+            ElevatedButton.icon(
+              onPressed: () => _loadFollowers(),
+              icon: const Icon(Icons.refresh_rounded, size: 17),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ArtistColors.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -637,24 +716,23 @@ class _FollowersState extends State<Followers> {
   // FOLLOW BUTTON
   // ============================================================
 
-  Widget _buildFollowButton(Map<String, dynamic> follower, bool isFollowing) {
+  Widget _buildFollowButton(
+    Map<String, dynamic> follower,
+    bool isFollowing,
+    bool canFollow,
+  ) {
+    final bool enabled = canFollow || isFollowing;
+    final String label =
+        (follower['role'] ?? '').toString().toLowerCase() == 'artist'
+        ? (isFollowing ? 'Following' : 'Follow')
+        : 'User';
+
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
-
-        // Prevent the card's navigation from triggering.
-        onTap: () {
-          setState(() {
-            follower['following'] = !isFollowing;
-          });
-
-          final name = follower['name']?.toString() ?? 'user';
-
-          _showMessage(isFollowing ? 'Unfollowed $name' : 'Following $name');
-        },
-
+        onTap: enabled ? () => _toggleFollow(follower) : null,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
           decoration: BoxDecoration(
@@ -663,7 +741,7 @@ class _FollowersState extends State<Followers> {
             border: Border.all(color: ArtistColors.primary),
           ),
           child: Text(
-            isFollowing ? 'Following' : 'Follow',
+            label,
             style: ArtistTextStyles.caption.copyWith(
               color: isFollowing ? ArtistColors.primary : Colors.white,
               fontSize: 9.5,
@@ -794,8 +872,7 @@ class _FollowersState extends State<Followers> {
                   title: 'Refresh Followers',
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    setState(() {});
-                    _showMessage('Followers refreshed.');
+                    _loadFollowers(refresh: true);
                   },
                 ),
               ],

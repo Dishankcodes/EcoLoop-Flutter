@@ -25,6 +25,7 @@ class _ProductReviewsState extends State<ProductReviews> {
   String _filter = 'All';
   String _sort = 'Newest';
   String? _eligibleOrderId;
+  String _eligibilityMessage = 'Checking your order…';
   bool _checkingEligibility = true;
 
   final EcoLoopApi _api = EcoLoopApi.instance;
@@ -97,110 +98,75 @@ class _ProductReviewsState extends State<ProductReviews> {
     }
   }
 
-  List<Map<String, dynamic>> _extractRows(dynamic response) {
-    dynamic rows;
-    if (response is List) {
-      rows = response;
-    } else if (response is Map) {
-      final data = response['data'];
-      if (response['orders'] is List) {
-        rows = response['orders'];
-      } else if (data is List) {
-        rows = data;
-      } else if (data is Map && data['orders'] is List) {
-        rows = data['orders'];
-      } else if (response['items'] is List) {
-        rows = response['items'];
-      } else if (response['results'] is List) {
-        rows = response['results'];
+  Map<String, dynamic>? _extractMap(dynamic response) {
+    if (response is Map) {
+      final direct = Map<String, dynamic>.from(response);
+      if (direct.containsKey('eligible') || direct.containsKey('orderId')) {
+        return direct;
       }
+      final data = direct['data'];
+      if (data is Map) return Map<String, dynamic>.from(data);
+      final result = direct['result'];
+      if (result is Map) return Map<String, dynamic>.from(result);
     }
-    if (rows is! List) return <Map<String, dynamic>>[];
-    return rows
-        .whereType<Map>()
-        .map((row) => Map<String, dynamic>.from(row))
-        .toList();
+    return null;
   }
-
-  String _normaliseId(dynamic value) => (value ?? '').toString().trim();
 
   Future<void> _loadEligibleOrder() async {
     if (!mounted) return;
     setState(() {
       _checkingEligibility = true;
       _eligibleOrderId = null;
+      _eligibilityMessage = 'Checking your order…';
     });
 
     try {
       if (_id.isEmpty) {
-        if (mounted) setState(() => _checkingEligibility = false);
+        if (mounted) {
+          setState(() {
+            _checkingEligibility = false;
+            _eligibilityMessage = 'This product has no valid product ID.';
+          });
+        }
         return;
       }
 
-      // Eligibility is derived from the signed-in user's actual orders.
-      // The backend still performs the authoritative check on submission.
-      final dynamic response = await _api.get('/orders');
-      final orders = _extractRows(response);
-      final productId = _normaliseId(int.tryParse(_id) ?? _id);
-
-      final eligible = orders.where((order) {
-        final orderedProductId = _normaliseId(
-          order['productId'] ?? order['product_id'] ?? order['productID'],
-        );
-        final status = (order['status'] ?? '')
-            .toString()
-            .trim()
-            .toLowerCase()
-            .replaceAll('-', '_')
-            .replaceAll(' ', '_');
-        return orderedProductId == productId && status == 'delivered';
-      }).toList();
-
-      eligible.sort((a, b) {
-        final aDate =
-            DateTime.tryParse(
-              (a['deliveredAt'] ?? a['updatedAt'] ?? a['createdAt'] ?? '')
-                  .toString(),
-            ) ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        final bDate =
-            DateTime.tryParse(
-              (b['deliveredAt'] ?? b['updatedAt'] ?? b['createdAt'] ?? '')
-                  .toString(),
-            ) ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        return bDate.compareTo(aDate);
-      });
-
-      String? chosenOrderId;
-      final suppliedOrderId = (widget.orderId ?? '').trim();
-      if (suppliedOrderId.isNotEmpty) {
-        for (final order in eligible) {
-          final currentId = _normaliseId(order['orderId'] ?? order['id']);
-          if (currentId == suppliedOrderId) {
-            chosenOrderId = currentId;
-            break;
-          }
-        }
-      }
-      chosenOrderId ??= eligible.isNotEmpty
-          ? _normaliseId(eligible.first['orderId'] ?? eligible.first['id'])
-          : null;
+      // The backend is the source of truth: it checks the signed-in buyer,
+      // order status, paid status, product match, and duplicate reviews.
+      final dynamic response = await _api.get(
+        '/products/$_id/review-eligibility',
+      );
+      final result = _extractMap(response);
+      final eligible =
+          result?['eligible'] == true ||
+          result?['eligible']?.toString().toLowerCase() == 'true';
+      final rawOrderId = result?['orderId'] ?? result?['order_id'];
+      final orderId = (rawOrderId ?? '').toString().trim();
+      final reason = (result?['reason'] ?? '').toString().trim();
 
       if (!mounted) return;
       setState(() {
-        _eligibleOrderId = chosenOrderId == null || chosenOrderId.isEmpty
-            ? null
-            : chosenOrderId;
+        _eligibleOrderId = eligible && orderId.isNotEmpty ? orderId : null;
         _checkingEligibility = false;
+        _eligibilityMessage = eligible && orderId.isNotEmpty
+            ? 'Verified purchase: you can review this product.'
+            : reason.isNotEmpty
+            ? reason
+            : 'A confirmed or delivered order with paid payment is required, and each product can be reviewed only once.';
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _eligibleOrderId = null;
         _checkingEligibility = false;
+        _eligibilityMessage =
+            'Could not verify review eligibility. Please refresh and try again.';
       });
     }
+  }
+
+  Future<void> _refreshAll() async {
+    await Future.wait<void>([_load(), _loadEligibleOrder()]);
   }
 
   Future<void> _load() async {
@@ -304,7 +270,7 @@ class _ProductReviewsState extends State<ProductReviews> {
         elevation: 0,
       ),
       body: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: _refreshAll,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
@@ -329,11 +295,7 @@ class _ProductReviewsState extends State<ProductReviews> {
             ),
             const SizedBox(height: 4),
             Text(
-              _checkingEligibility
-                  ? 'Checking your delivered orders…'
-                  : _eligibleOrderId == null
-                  ? 'You can review this product after your order is delivered.'
-                  : 'Verified purchase: you can review this product.',
+              _eligibilityMessage,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: AppColors.textSecondary,
@@ -419,7 +381,7 @@ class _ProductReviewsState extends State<ProductReviews> {
     );
 
     if (result == true && mounted) {
-      await Future.wait<void>([_load(), _loadEligibleOrder()]);
+      await _refreshAll();
     }
   }
 

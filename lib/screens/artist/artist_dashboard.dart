@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../../app_theme/artist/artist_colors.dart';
 import '../../app_theme/artist/artist_text_styles.dart';
+import '../../services/ecoloop_api.dart';
 import '../../widgets/artist_more_menu.dart';
 import 'buy_products/marketplace.dart';
 import 'my_products/add_product.dart';
+import 'my_products/my_product.dart';
+import 'my_products/product_analytics.dart';
 import 'my_products/selling_orders.dart';
+import 'reviews/review_history.dart';
 
-/// Artist dashboard screen displaying store analytics,
-/// quick action shortcuts, recent orders, and top products.
+/// Artist dashboard. Business figures and lists are loaded from Code.gs;
+/// this screen does not use demonstration orders, products, or analytics.
 class ArtistHome extends StatefulWidget {
   const ArtistHome({super.key});
 
@@ -17,18 +21,18 @@ class ArtistHome extends StatefulWidget {
 }
 
 class _ArtistHomeState extends State<ArtistHome> {
-  final List<Map<String, dynamic>> _stats = [
-    {
-      'title': 'Total Sales',
-      'value': '56',
-      'icon': Icons.shopping_bag_outlined,
-    },
-    {'title': 'Products', 'value': '12', 'icon': Icons.inventory_2_outlined},
-    {'title': 'Orders', 'value': '18', 'icon': Icons.receipt_long_outlined},
-    {'title': 'Views', 'value': '2,450', 'icon': Icons.visibility_outlined},
-  ];
+  final EcoLoopApi _api = EcoLoopApi.instance;
 
-  final List<Map<String, dynamic>> _quickActions = [
+  bool _loading = true;
+  bool _refreshing = false;
+  String? _error;
+  Map<String, dynamic> _profile = {};
+  Map<String, dynamic> _analytics = {};
+  Map<String, dynamic> _earnings = {};
+  List<Map<String, dynamic>> _orders = [];
+  List<Map<String, dynamic>> _products = [];
+
+  final List<Map<String, dynamic>> _quickActions = const [
     {'title': 'Add Product', 'icon': Icons.add_box_outlined, 'type': 'add'},
     {
       'title': 'Marketplace',
@@ -49,78 +53,129 @@ class _ArtistHomeState extends State<ArtistHome> {
     {'title': 'Reviews', 'icon': Icons.star_outline_rounded, 'type': 'reviews'},
   ];
 
-  final List<Map<String, dynamic>> _recentOrders = [
-    {
-      'id': '#EL10245',
-      'product': 'Upcycled Coffee Table',
-      'customer': 'Rahul Patel',
-      'price': '₹4,500',
-      'status': 'Pending',
-      'date': '26 Sep 2026',
-    },
-    {
-      'id': '#EL10244',
-      'product': 'Vintage Wall Lamp',
-      'customer': 'Priya Shah',
-      'price': '₹1,850',
-      'status': 'Confirmed',
-      'date': '25 Sep 2026',
-    },
-    {
-      'id': '#EL10243',
-      'product': 'Recycled Wood Shelf',
-      'customer': 'Aarav Mehta',
-      'price': '₹2,200',
-      'status': 'Processing',
-      'date': '24 Sep 2026',
-    },
-    {
-      'id': '#EL10242',
-      'product': 'Planter Stand',
-      'customer': 'Neha Joshi',
-      'price': '₹1,200',
-      'status': 'Completed',
-      'date': '23 Sep 2026',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboard();
+  }
 
-  final List<Map<String, dynamic>> _topProducts = [
-    {
-      'name': 'Upcycled Coffee Table',
-      'category': 'Furniture',
-      'price': '₹4,500',
-      'sold': '18 sold',
-      'views': '324 views',
-      'icon': Icons.table_restaurant_outlined,
-    },
-    {
-      'name': 'Vintage Wall Lamp',
-      'category': 'Home Decor',
-      'price': '₹1,850',
-      'sold': '14 sold',
-      'views': '268 views',
-      'icon': Icons.light_outlined,
-    },
-    {
-      'name': 'Recycled Wood Shelf',
-      'category': 'Furniture',
-      'price': '₹2,200',
-      'sold': '11 sold',
-      'views': '215 views',
-      'icon': Icons.shelves,
-    },
-    {
-      'name': 'Planter Stand',
-      'category': 'Decor',
-      'price': '₹1,200',
-      'sold': '9 sold',
-      'views': '180 views',
-      'icon': Icons.yard_outlined,
-    },
-  ];
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
+    }
+    return <String, dynamic>{};
+  }
 
-  /// Displays a feedback floating snackbar message.
+  List<Map<String, dynamic>> _asMapList(dynamic value) {
+    if (value is! List) return <Map<String, dynamic>>[];
+    return value.map(_asMap).where((item) => item.isNotEmpty).toList();
+  }
+
+  int _int(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse((value ?? '').toString().replaceAll(',', '')) ?? 0;
+  }
+
+  double _double(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse((value ?? '').toString().replaceAll(',', '')) ?? 0;
+  }
+
+  String _value(dynamic value, {String fallback = ''}) {
+    final text = (value ?? '').toString().trim();
+    return text.isEmpty ? fallback : text;
+  }
+
+  String _money(dynamic value) {
+    final amount = _double(value);
+    final whole = amount.round().toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < whole.length; i++) {
+      if (i > 0 && (whole.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(whole[i]);
+    }
+    return '₹${buffer.toString()}';
+  }
+
+  String _date(dynamic value) {
+    final raw = _value(value);
+    if (raw.isEmpty) return 'Date unavailable';
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${parsed.day} ${months[parsed.month - 1]} ${parsed.year}';
+  }
+
+  Future<void> _loadDashboard({bool refresh = false}) async {
+    if (!mounted) return;
+    setState(() {
+      _error = null;
+      if (refresh) {
+        _refreshing = true;
+      } else {
+        _loading = true;
+      }
+    });
+
+    try {
+      // Each endpoint is implemented by the currently supplied Code.gs.
+      final results = await Future.wait<dynamic>([
+        _api.get('/profile'),
+        _api.get('/artist/analytics'),
+        _api.get('/artist/analytics/earnings'),
+        _api.get('/artist/analytics/products'),
+        _api.get('/artist/orders'),
+      ]);
+
+      if (!mounted) return;
+      setState(() {
+        _profile = _asMap(results[0]);
+        _analytics = _asMap(results[1]);
+        _earnings = _asMap(results[2]);
+        _products = _asMapList(results[3]);
+        _orders = _asMapList(results[4]);
+        _loading = false;
+        _refreshing = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _refreshing = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  String get _artistName => _value(_profile['userName'], fallback: 'Artist');
+
+  int get _sales => _int(_analytics['sales']);
+
+  int get _productCount => _int(_analytics['totalProducts']);
+
+  int get _orderCount => _int(_analytics['totalOrders']);
+
+  int get _views => _int(_analytics['productViews']);
+
+  double get _totalEarnings =>
+      _double(_earnings['totalEarnings'] ?? _analytics['revenue']);
+
   void _showMessage(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
@@ -131,7 +186,7 @@ class _ArtistHomeState extends State<ArtistHome> {
           ),
           backgroundColor: ArtistColors.primary,
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 1),
+          duration: const Duration(seconds: 2),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -139,40 +194,30 @@ class _ArtistHomeState extends State<ArtistHome> {
       );
   }
 
-  /// Handles routing for quick action shortcuts.
+  Future<void> _openPage(Widget page) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    if (mounted) _loadDashboard(refresh: true);
+  }
+
   void _handleQuickAction(String type) {
     switch (type) {
       case 'add':
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AddProduct()),
-        );
+        _openPage(const AddProduct());
         break;
-
       case 'marketplace':
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const Marketplace()),
-        );
+        _openPage(const Marketplace());
         break;
-
-      case 'orders':
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SellingOrders()),
-        );
-        break;
-
-      case 'earnings':
-        _showMessage('Earnings section will be connected later.');
-        break;
-
       case 'products':
-        _showMessage('My Products will be connected later.');
+        _openPage(const MyProducts());
         break;
-
+      case 'orders':
+        _openPage(const SellingOrders());
+        break;
+      case 'earnings':
+        _openPage(const ProductAnalytics());
+        break;
       case 'reviews':
-        _showMessage('Reviews will be connected later.');
+        _openPage(const ReviewHistory());
         break;
     }
   }
@@ -183,96 +228,119 @@ class _ArtistHomeState extends State<ArtistHome> {
       backgroundColor: ArtistColors.background,
       body: SafeArea(
         bottom: false,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final bool isWide = constraints.maxWidth >= 700;
-
-            return SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(
-                isWide ? 32 : 20,
-                18,
-                isWide ? 32 : 20,
-                110,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1100),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(),
-
-                      const SizedBox(height: 22),
-
-                      _buildEarningsCard(),
-
-                      const SizedBox(height: 18),
-
-                      _buildStats(isWide),
-
-                      const SizedBox(height: 30),
-
-                      _buildSectionHeader('Quick Actions', 'Manage your store'),
-
-                      const SizedBox(height: 12),
-
-                      _buildQuickActions(isWide),
-
-                      const SizedBox(height: 30),
-
-                      _buildSectionHeader(
-                        'Recent Orders',
-                        'View all',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const SellingOrders(),
-                            ),
-                          );
-                        },
+        child: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: ArtistColors.primary),
+              )
+            : RefreshIndicator(
+                color: ArtistColors.primary,
+                onRefresh: () => _loadDashboard(refresh: true),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 700;
+                    return SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
                       ),
-
-                      const SizedBox(height: 12),
-
-                      _buildRecentOrders(),
-
-                      const SizedBox(height: 30),
-
-                      _buildSectionHeader(
-                        'Top Performing Products',
-                        'View all',
-                        onTap: () {
-                          _showMessage('My Products will be connected later.');
-                        },
+                      padding: EdgeInsets.fromLTRB(
+                        isWide ? 32 : 20,
+                        18,
+                        isWide ? 32 : 20,
+                        110,
                       ),
-
-                      const SizedBox(height: 12),
-
-                      _buildTopProducts(),
-
-                      const SizedBox(height: 30),
-
-                      _buildSectionHeader('Performance Overview', 'This Month'),
-
-                      const SizedBox(height: 12),
-
-                      _buildPerformanceCard(),
-
-                      const SizedBox(height: 24),
-                    ],
-                  ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1100),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildHeader(),
+                              if (_error != null) ...[
+                                const SizedBox(height: 14),
+                                _buildErrorBanner(),
+                              ],
+                              const SizedBox(height: 22),
+                              _buildEarningsCard(),
+                              const SizedBox(height: 18),
+                              _buildStats(isWide),
+                              const SizedBox(height: 30),
+                              _buildSectionHeader(
+                                'Quick Actions',
+                                'Manage your store',
+                              ),
+                              const SizedBox(height: 12),
+                              _buildQuickActions(isWide),
+                              const SizedBox(height: 30),
+                              _buildSectionHeader(
+                                'Recent Orders',
+                                'View all',
+                                onTap: () => _handleQuickAction('orders'),
+                              ),
+                              const SizedBox(height: 12),
+                              _buildRecentOrders(),
+                              const SizedBox(height: 30),
+                              _buildSectionHeader(
+                                'Top Performing Products',
+                                'View all',
+                                onTap: () => _handleQuickAction('products'),
+                              ),
+                              const SizedBox(height: 12),
+                              _buildTopProducts(),
+                              const SizedBox(height: 30),
+                              _buildSectionHeader(
+                                'Store Overview',
+                                'Analytics',
+                              ),
+                              const SizedBox(height: 12),
+                              _buildPerformanceCard(),
+                              if (_refreshing) ...[
+                                const SizedBox(height: 12),
+                                const LinearProgressIndicator(
+                                  color: ArtistColors.primary,
+                                  minHeight: 2,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
-            );
-          },
-        ),
       ),
     );
   }
 
-  /// Dashboard greeting header with store title and overflow popup menu.
+  Widget _buildErrorBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: ArtistColors.error.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: ArtistColors.error.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off_outlined, color: ArtistColors.error),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Some dashboard data could not be loaded. $_error',
+              style: ArtistTextStyles.small.copyWith(color: ArtistColors.error),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Retry',
+            onPressed: () => _loadDashboard(refresh: true),
+            icon: const Icon(Icons.refresh_rounded, color: ArtistColors.error),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     return Row(
       children: [
@@ -281,7 +349,7 @@ class _ArtistHomeState extends State<ArtistHome> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Hi, Creative Studio',
+                'Hi, $_artistName',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: ArtistTextStyles.heading.copyWith(
@@ -290,9 +358,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                   letterSpacing: -0.5,
                 ),
               ),
-
               const SizedBox(height: 5),
-
               Text(
                 'Here is what is happening with your store.',
                 style: ArtistTextStyles.caption.copyWith(fontSize: 12.5),
@@ -300,20 +366,15 @@ class _ArtistHomeState extends State<ArtistHome> {
             ],
           ),
         ),
-
         const SizedBox(width: 12),
-
         const ArtistMoreMenu(),
       ],
     );
   }
 
-  /// Total earnings summary card gradient block.
   Widget _buildEarningsCard() {
     return InkWell(
-      onTap: () {
-        _showMessage('Earnings details will be connected later.');
-      },
+      onTap: () => _handleQuickAction('earnings'),
       borderRadius: BorderRadius.circular(24),
       child: Container(
         width: double.infinity,
@@ -347,51 +408,24 @@ class _ArtistHomeState extends State<ArtistHome> {
                       fontSize: 13,
                     ),
                   ),
-
                   const SizedBox(height: 7),
-
                   Text(
-                    '₹24,850',
+                    _money(_totalEarnings),
                     style: ArtistTextStyles.heading.copyWith(
                       fontSize: 30,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -1,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: ArtistColors.success.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(7),
-                        ),
-                        child: Text(
-                          '+12%',
-                          style: ArtistTextStyles.caption.copyWith(
-                            color: ArtistColors.success,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(width: 8),
-
-                      Text('from last month', style: ArtistTextStyles.caption),
-                    ],
+                  Text(
+                    'From recorded paid transactions',
+                    style: ArtistTextStyles.caption,
                   ),
                 ],
               ),
             ),
-
             const SizedBox(width: 16),
-
             Container(
               width: 60,
               height: 60,
@@ -422,14 +456,36 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  /// Store metrics statistics cards grid/row.
   Widget _buildStats(bool isWide) {
+    final stats = <Map<String, dynamic>>[
+      {
+        'title': 'Total Sales',
+        'value': _sales.toString(),
+        'icon': Icons.shopping_bag_outlined,
+      },
+      {
+        'title': 'Products',
+        'value': _productCount.toString(),
+        'icon': Icons.inventory_2_outlined,
+      },
+      {
+        'title': 'Orders',
+        'value': _orderCount.toString(),
+        'icon': Icons.receipt_long_outlined,
+      },
+      {
+        'title': 'Views',
+        'value': _views.toString(),
+        'icon': Icons.visibility_outlined,
+      },
+    ];
+
     if (isWide) {
       return Row(
-        children: _stats.map((stat) {
+        children: stats.map((stat) {
           return Expanded(
             child: Padding(
-              padding: EdgeInsets.only(right: stat == _stats.last ? 0 : 12),
+              padding: EdgeInsets.only(right: stat == stats.last ? 0 : 12),
               child: _buildStatCard(stat),
             ),
           );
@@ -442,38 +498,35 @@ class _ArtistHomeState extends State<ArtistHome> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        itemCount: _stats.length,
+        itemCount: stats.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (context, index) {
-          return SizedBox(width: 112, child: _buildStatCard(_stats[index]));
-        },
+        itemBuilder: (context, index) =>
+            SizedBox(width: 112, child: _buildStatCard(stats[index])),
       ),
     );
   }
 
-  /// Helper widget rendering individual stat metric cards.
-  ///
-  /// FIX:
-  /// The card now has a finite height so that the Spacer()
-  /// inside the Column has a finite amount of remaining space.
   Widget _buildStatCard(Map<String, dynamic> stat) {
     return InkWell(
       onTap: () {
-        _showMessage('${stat['title']} selected.');
+        final title = stat['title'];
+        if (title == 'Orders') {
+          _handleQuickAction('orders');
+        } else if (title == 'Products' ||
+            title == 'Total Sales' ||
+            title == 'Views') {
+          _handleQuickAction('earnings');
+        }
       },
       borderRadius: BorderRadius.circular(17),
       child: Container(
-        // FIXED HEIGHT
         height: 112,
-
         padding: const EdgeInsets.all(13),
-
         decoration: BoxDecoration(
           color: ArtistColors.surface,
           borderRadius: BorderRadius.circular(17),
           border: Border.all(color: ArtistColors.border),
         ),
-
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -490,22 +543,16 @@ class _ArtistHomeState extends State<ArtistHome> {
                 color: ArtistColors.primary,
               ),
             ),
-
-            // This is now safe because the parent
-            // Container has a finite height.
             const Spacer(),
-
             Text(
-              stat['value'] as String,
+              stat['value'].toString(),
               style: ArtistTextStyles.title.copyWith(
                 fontSize: 19,
                 fontWeight: FontWeight.w800,
                 color: ArtistColors.primary,
               ),
             ),
-
             const SizedBox(height: 2),
-
             Text(
               stat['title'] as String,
               maxLines: 1,
@@ -521,7 +568,6 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  /// Reusable section title with action label button.
   Widget _buildSectionHeader(
     String title,
     String action, {
@@ -538,7 +584,6 @@ class _ArtistHomeState extends State<ArtistHome> {
             ),
           ),
         ),
-
         if (onTap != null)
           InkWell(
             onTap: onTap,
@@ -558,7 +603,6 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  /// Quick action shortcuts layout builder.
   Widget _buildQuickActions(bool isWide) {
     if (isWide) {
       return Row(
@@ -585,18 +629,14 @@ class _ArtistHomeState extends State<ArtistHome> {
         mainAxisSpacing: 10,
         childAspectRatio: 1.02,
       ),
-      itemBuilder: (context, index) {
-        return _buildQuickActionCard(_quickActions[index]);
-      },
+      itemBuilder: (context, index) =>
+          _buildQuickActionCard(_quickActions[index]),
     );
   }
 
-  /// Shortcut tile item card.
   Widget _buildQuickActionCard(Map<String, dynamic> action) {
     return InkWell(
-      onTap: () {
-        _handleQuickAction(action['type'] as String);
-      },
+      onTap: () => _handleQuickAction(action['type'] as String),
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
@@ -622,9 +662,7 @@ class _ArtistHomeState extends State<ArtistHome> {
                 size: 20,
               ),
             ),
-
             const SizedBox(height: 6),
-
             Flexible(
               child: Text(
                 action['title'] as String,
@@ -645,8 +683,18 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  /// List of recent incoming customer orders.
   Widget _buildRecentOrders() {
+    if (_orders.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.receipt_long_outlined,
+        title: 'No orders yet',
+        subtitle: 'New orders for your products will appear here.',
+        actionLabel: 'Open orders',
+        onAction: () => _handleQuickAction('orders'),
+      );
+    }
+
+    final recent = _orders.take(4).toList();
     return Container(
       decoration: BoxDecoration(
         color: ArtistColors.surface,
@@ -654,21 +702,23 @@ class _ArtistHomeState extends State<ArtistHome> {
         border: Border.all(color: ArtistColors.border),
       ),
       child: Column(
-        children: List.generate(_recentOrders.length, (index) {
-          final order = _recentOrders[index];
-
-          return _buildOrderItem(order, index == _recentOrders.length - 1);
+        children: List.generate(recent.length, (index) {
+          final order = recent[index];
+          return _buildOrderItem(order, index == recent.length - 1);
         }),
       ),
     );
   }
 
-  /// Helper row widget for individual order items.
   Widget _buildOrderItem(Map<String, dynamic> order, bool isLast) {
+    final orderId = _value(order['orderId'], fallback: '—');
+    final product = _value(order['productName'], fallback: 'Product');
+    final buyer = _value(order['buyerName'], fallback: 'Buyer');
+    final status = _value(order['status'], fallback: 'Unknown');
+    final amount =
+        order['totalAmount'] ?? order['subtotal'] ?? order['unitPrice'];
     return InkWell(
-      onTap: () {
-        _showMessage('Order ${order['id']} selected.');
-      },
+      onTap: () => _handleQuickAction('orders'),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -688,55 +738,51 @@ class _ArtistHomeState extends State<ArtistHome> {
                     size: 22,
                   ),
                 ),
-
                 const SizedBox(width: 12),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        order['product'] as String,
+                        product,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: ArtistTextStyles.bodyMedium.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-
                       const SizedBox(height: 3),
-
                       Text(
-                        '${order['id']} • ${order['customer']}',
+                        '#$orderId • $buyer',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        style: ArtistTextStyles.small,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        _date(order['createdAt']),
                         style: ArtistTextStyles.small,
                       ),
                     ],
                   ),
                 ),
-
                 const SizedBox(width: 8),
-
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      order['price'] as String,
+                      _money(amount),
                       style: ArtistTextStyles.bodyMedium.copyWith(
                         color: ArtistColors.primary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-
                     const SizedBox(height: 5),
-
-                    _buildStatusBadge(order['status'] as String),
+                    _buildStatusBadge(status),
                   ],
                 ),
               ],
             ),
-
             if (!isLast) ...[
               const SizedBox(height: 14),
               Divider(height: 1, color: ArtistColors.border),
@@ -747,10 +793,8 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
-  /// Status badge label for order state.
   Widget _buildStatusBadge(String status) {
-    final Color color = _statusColor(status);
-
+    final color = _statusColor(status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -758,7 +802,7 @@ class _ArtistHomeState extends State<ArtistHome> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        status,
+        _prettyStatus(status),
         style: ArtistTextStyles.small.copyWith(
           color: color,
           fontSize: 9.5,
@@ -768,50 +812,68 @@ class _ArtistHomeState extends State<ArtistHome> {
     );
   }
 
+  String _prettyStatus(String status) {
+    return status
+        .split('_')
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+  }
+
   Color _statusColor(String status) {
-    switch (status) {
-      case 'Pending':
+    switch (status.toLowerCase()) {
+      case 'pending':
         return ArtistColors.warning;
-
-      case 'Confirmed':
+      case 'confirmed':
+      case 'shipped':
+      case 'out_for_delivery':
         return ArtistColors.info;
-
-      case 'Processing':
+      case 'packed':
+      case 'processing':
         return ArtistColors.primary;
-
-      case 'Completed':
+      case 'delivered':
+      case 'completed':
         return ArtistColors.success;
-
-      case 'Cancelled':
+      case 'cancelled':
         return ArtistColors.error;
-
       default:
         return ArtistColors.textSecondary;
     }
   }
 
-  /// Horizontal carousel of top-performing items.
   Widget _buildTopProducts() {
+    if (_products.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.inventory_2_outlined,
+        title: 'No product analytics yet',
+        subtitle:
+            'Your listed products and their performance will appear here.',
+        actionLabel: 'Manage products',
+        onAction: () => _handleQuickAction('products'),
+      );
+    }
+
+    final products = List<Map<String, dynamic>>.from(_products)
+      ..sort((a, b) => _int(b['salesCount']).compareTo(_int(a['salesCount'])));
+    final top = products.take(6).toList();
+
     return SizedBox(
       height: 235,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        itemCount: _topProducts.length,
+        itemCount: top.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          return _buildProductCard(_topProducts[index]);
-        },
+        itemBuilder: (context, index) => _buildProductCard(top[index]),
       ),
     );
   }
 
-  /// Product item card inside top products horizontal list.
   Widget _buildProductCard(Map<String, dynamic> product) {
+    final title = _value(product['title'], fallback: 'Product');
+    final status = _value(product['status'], fallback: 'Unknown');
     return InkWell(
-      onTap: () {
-        _showMessage('${product['name']} selected.');
-      },
+      onTap: () => _handleQuickAction('products'),
       borderRadius: BorderRadius.circular(18),
       child: Container(
         width: 190,
@@ -831,44 +893,43 @@ class _ArtistHomeState extends State<ArtistHome> {
                 color: ArtistColors.surfaceSoft,
                 borderRadius: BorderRadius.circular(13),
               ),
-              child: Icon(
-                product['icon'] as IconData,
+              child: const Icon(
+                Icons.inventory_2_outlined,
                 size: 36,
                 color: ArtistColors.primary,
               ),
             ),
-
             const SizedBox(height: 8),
-
             Text(
-              product['name'] as String,
+              title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: ArtistTextStyles.bodyMedium.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
-
             const SizedBox(height: 2),
-
-            Text(product['category'] as String, style: ArtistTextStyles.small),
-
+            Text(
+              '${_int(product['views'])} views',
+              style: ArtistTextStyles.small,
+            ),
             const Spacer(),
-
             Row(
               children: [
-                Text(
-                  product['price'] as String,
-                  style: ArtistTextStyles.bodyMedium.copyWith(
-                    color: ArtistColors.primary,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Text(
+                    _money(product['revenue']),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ArtistTextStyles.bodyMedium.copyWith(
+                      color: ArtistColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-
-                const Spacer(),
-
+                const SizedBox(width: 5),
                 Text(
-                  product['sold'] as String,
+                  '${_int(product['salesCount'])} sold',
                   style: ArtistTextStyles.small.copyWith(
                     color: ArtistColors.success,
                     fontWeight: FontWeight.w600,
@@ -876,14 +937,21 @@ class _ArtistHomeState extends State<ArtistHome> {
                 ),
               ],
             ),
+            const SizedBox(height: 4),
+            Text(_prettyStatus(status), style: ArtistTextStyles.small),
           ],
         ),
       ),
     );
   }
 
-  /// Monthly performance chart section block.
   Widget _buildPerformanceCard() {
+    final followers = _int(_analytics['followers']);
+    final reviews = _int(_analytics['reviews']);
+    final rating = _double(_analytics['averageRating']);
+    final pending = _int(_analytics['pendingOrders']);
+    final completed = _int(_analytics['completedOrders']);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -902,124 +970,176 @@ class _ArtistHomeState extends State<ArtistHome> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '₹24,850',
+                      _money(_totalEarnings),
                       style: ArtistTextStyles.title.copyWith(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
                         color: ArtistColors.primary,
                       ),
                     ),
-
                     const SizedBox(height: 3),
-
                     Text(
-                      'Total earnings this month',
+                      'Total recorded earnings',
                       style: ArtistTextStyles.small,
                     ),
                   ],
                 ),
               ),
-
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
                 decoration: BoxDecoration(
-                  color: ArtistColors.success.withOpacity(0.10),
+                  color: ArtistColors.surfaceSoft,
                   borderRadius: BorderRadius.circular(9),
                 ),
-                child: Text(
-                  '+12%',
-                  style: ArtistTextStyles.small.copyWith(
-                    color: ArtistColors.success,
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.star_rounded,
+                      size: 17,
+                      color: ArtistColors.warning,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      rating.toStringAsFixed(1),
+                      style: ArtistTextStyles.small.copyWith(
+                        color: ArtistColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 20),
-
-          SizedBox(
-            height: 115,
-            width: double.infinity,
-            child: CustomPaint(painter: _PerformanceChartPainter()),
-          ),
-
-          const SizedBox(height: 8),
-
+          const SizedBox(height: 18),
+          Divider(height: 1, color: ArtistColors.border),
+          const SizedBox(height: 14),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']
-                .map((month) => Text(month, style: ArtistTextStyles.small))
-                .toList(),
+            children: [
+              Expanded(
+                child: _overviewMetric(
+                  'Followers',
+                  followers.toString(),
+                  Icons.people_outline,
+                ),
+              ),
+              Expanded(
+                child: _overviewMetric(
+                  'Reviews',
+                  reviews.toString(),
+                  Icons.reviews_outlined,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _overviewMetric(
+                  'Pending orders',
+                  pending.toString(),
+                  Icons.pending_actions_outlined,
+                ),
+              ),
+              Expanded(
+                child: _overviewMetric(
+                  'Completed orders',
+                  completed.toString(),
+                  Icons.task_alt_outlined,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
-}
 
-/// Custom painter rendering smooth earnings overview line chart graph.
-class _PerformanceChartPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint gridPaint = Paint()
-      ..color = ArtistColors.border.withOpacity(0.55)
-      ..strokeWidth = 1;
-
-    final Paint linePaint = Paint()
-      ..color = ArtistColors.primary
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final Paint fillPaint = Paint()
-      ..color = ArtistColors.light.withOpacity(0.22)
-      ..style = PaintingStyle.fill;
-
-    for (int i = 1; i <= 3; i++) {
-      final double y = size.height * i / 4;
-
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-
-    final List<Offset> points = [
-      Offset(0, size.height * 0.72),
-      Offset(size.width * 0.16, size.height * 0.62),
-      Offset(size.width * 0.32, size.height * 0.67),
-      Offset(size.width * 0.48, size.height * 0.43),
-      Offset(size.width * 0.64, size.height * 0.50),
-      Offset(size.width * 0.80, size.height * 0.28),
-      Offset(size.width, size.height * 0.18),
-    ];
-
-    final Path linePath = Path()..moveTo(points.first.dx, points.first.dy);
-
-    for (int i = 1; i < points.length; i++) {
-      linePath.lineTo(points[i].dx, points[i].dy);
-    }
-
-    final Path fillPath = Path.from(linePath)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-
-    canvas.drawPath(fillPath, fillPaint);
-
-    canvas.drawPath(linePath, linePaint);
-
-    final Paint pointPaint = Paint()
-      ..color = ArtistColors.primary
-      ..style = PaintingStyle.fill;
-
-    for (final point in points) {
-      canvas.drawCircle(point, 3.5, pointPaint);
-    }
+  Widget _overviewMetric(String label, String value, IconData icon) {
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: ArtistColors.surfaceSoft,
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(icon, size: 18, color: ArtistColors.primary),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: ArtistTextStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: ArtistColors.primary,
+                ),
+              ),
+              Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: ArtistTextStyles.small,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String actionLabel,
+    required VoidCallback onAction,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: ArtistColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: ArtistColors.border),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 32, color: ArtistColors.textSecondary),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: ArtistTextStyles.bodyMedium.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: ArtistTextStyles.small.copyWith(
+              color: ArtistColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: onAction,
+            child: Text(
+              actionLabel,
+              style: const TextStyle(
+                color: ArtistColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

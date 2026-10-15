@@ -18,6 +18,7 @@ import 'aboutyou.dart';
 import 'address_list.dart';
 import 'edit_profile.dart';
 import 'followers.dart';
+import 'following_list.dart';
 import 'notification.dart';
 import 'portfolio.dart';
 import 'settings.dart';
@@ -40,6 +41,7 @@ class _ProfileState extends State<Profile> {
   String? _error;
   Map<String, dynamic> _profile = {};
   Map<String, dynamic> _analytics = {};
+  int _followingCount = 0;
 
   @override
   void initState() {
@@ -100,10 +102,25 @@ class _ProfileState extends State<Profile> {
             '${e.toString().replaceFirst('Exception: ', '')}';
       }
 
+      int followingCount = _followingCount;
+      try {
+        final followingResponse = _asMap(await _api.get('/my/following'));
+        final followingRows =
+            followingResponse['artists'] ??
+            followingResponse['following'] ??
+            followingResponse['data'];
+        if (followingRows is List) {
+          followingCount = followingRows.length;
+        }
+      } catch (_) {
+        // Keep the last successfully loaded following count if this request fails.
+      }
+
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _analytics = analytics;
+        _followingCount = followingCount;
         _loading = false;
         _refreshing = false;
         _error = analyticsError;
@@ -183,6 +200,8 @@ class _ProfileState extends State<Profile> {
                         const SizedBox(height: 12),
                       ],
                       _buildProfileHeader(context),
+                      const SizedBox(height: 16),
+                      _buildFollowCards(context),
                       const SizedBox(height: 18),
                       if (_refreshing)
                         const LinearProgressIndicator(
@@ -254,6 +273,18 @@ class _ProfileState extends State<Profile> {
                 ? Image.network(
                     _photoUrl,
                     fit: BoxFit.cover,
+                    frameBuilder:
+                        (context, child, frame, wasSynchronouslyLoaded) {
+                          if (wasSynchronouslyLoaded || frame != null)
+                            return child;
+                          return const Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        },
                     errorBuilder: (_, __, ___) => const Icon(
                       Icons.person_rounded,
                       size: 48,
@@ -424,61 +455,94 @@ class _ProfileState extends State<Profile> {
     );
   }
 
+  Widget _buildFollowCards(BuildContext context) {
+    final followers = _int(_analytics['followers']);
+
+    return Row(
+      children: [
+        Expanded(
+          child: _FollowCountCard(
+            icon: Icons.people_alt_outlined,
+            label: 'Followers',
+            count: followers,
+            subtitle: 'People following you',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Followers()),
+            ).then((_) => _loadProfile(refresh: true)),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _FollowCountCard(
+            icon: Icons.person_add_alt_1_rounded,
+            label: 'Following',
+            count: _followingCount,
+            subtitle: 'Artists you follow',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FollowingList()),
+            ).then((_) => _loadProfile(refresh: true)),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildQuickStats(BuildContext context) {
     final products = _int(_analytics['totalProducts']);
     final orders = _int(_analytics['totalOrders']);
     final rating = _double(_analytics['averageRating']);
-    final followers = _int(_analytics['followers']);
-    return Row(
-      children: [
-        Expanded(
-          child: _QuickStatCard(
-            icon: Icons.inventory_2_outlined,
-            value: products.toString(),
-            label: 'Products',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const MyProducts()),
-            ),
-          ),
+
+    final stats = <Widget>[
+      _QuickStatCard(
+        icon: Icons.inventory_2_outlined,
+        value: products.toString(),
+        label: 'Products',
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MyProducts()),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _QuickStatCard(
-            icon: Icons.shopping_bag_outlined,
-            value: orders.toString(),
-            label: 'Orders',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SellingOrders()),
-            ),
-          ),
+      ),
+      _QuickStatCard(
+        icon: Icons.shopping_bag_outlined,
+        value: orders.toString(),
+        label: 'Orders',
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SellingOrders()),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _QuickStatCard(
-            icon: Icons.star_outline_rounded,
-            value: rating.toStringAsFixed(1),
-            label: 'Rating',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ReviewHistory()),
-            ),
-          ),
+      ),
+      _QuickStatCard(
+        icon: Icons.star_outline_rounded,
+        value: rating.toStringAsFixed(1),
+        label: 'Rating',
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ReviewHistory()),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _QuickStatCard(
-            icon: Icons.people_outline_rounded,
-            value: _compactCount(followers),
-            label: 'Followers',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const Followers()),
-            ),
-          ),
-        ),
-      ],
+      ),
+    ];
+
+    // Use a responsive grid instead of forcing four cards into one narrow row.
+    // This prevents tight constraints and text clipping on smaller phones.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width - 36;
+        final columns = availableWidth >= 520 ? 4 : 2;
+        final spacing = 8.0;
+        final cardWidth = (availableWidth - spacing * (columns - 1)) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: stats
+              .map((stat) => SizedBox(width: cardWidth, child: stat))
+              .toList(),
+        );
+      },
     );
   }
 
@@ -1014,6 +1078,98 @@ class _ProfileDivider extends StatelessWidget {
         height: 1,
         thickness: 0.7,
         color: ArtistColors.border.withOpacity(0.7),
+      ),
+    );
+  }
+}
+
+class _FollowCountCard extends StatelessWidget {
+  const _FollowCountCard({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final int count;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: ArtistColors.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 116),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: ArtistColors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: ArtistColors.light,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(icon, color: ArtistColors.primary, size: 19),
+                  ),
+                  const Spacer(),
+                  const Icon(
+                    Icons.arrow_outward_rounded,
+                    size: 16,
+                    color: ArtistColors.textSecondary,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    count.toString(),
+                    style: ArtistTextStyles.title.copyWith(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: Text(
+                      label,
+                      style: ArtistTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: ArtistTextStyles.small.copyWith(
+                  color: ArtistColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
