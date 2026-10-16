@@ -16,28 +16,74 @@ class BuyingOrderDetails extends StatefulWidget {
 
 class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   late String _status;
+  bool _productReviewSubmitted = false;
+  bool _sellerReviewSubmitted = false;
 
   @override
   void initState() {
     super.initState();
-    _status = widget.order['status']?.toString() ?? 'Confirmed';
+    _status = widget.order['status']?.toString() ?? 'Status unavailable';
   }
 
   String get productName =>
-      widget.order['product']?.toString() ?? 'Wooden Study Table';
+      (widget.order['productName'] ??
+              widget.order['productTitle'] ??
+              widget.order['product'] ??
+              widget.order['title'] ??
+              'Product details unavailable')
+          .toString();
 
-  String get price => widget.order['price']?.toString() ?? '₹2,500';
+  String get price {
+    final value =
+        widget.order['price'] ??
+        widget.order['unitPrice'] ??
+        widget.order['totalAmount'];
+    if (value == null) return 'Price unavailable';
+    if (value.toString().trim().startsWith('₹')) return value.toString();
+    final amount = value is num ? value : num.tryParse('$value');
+    return amount == null ? 'Price unavailable' : '₹${amount.round()}';
+  }
 
-  String get orderId => widget.order['orderId']?.toString() ?? '#ECO-ORD-10021';
+  String get orderId {
+    final value = widget.order['orderId'] ?? widget.order['id'];
+    return value == null ? 'Order ID unavailable' : value.toString();
+  }
 
-  String get orderDate => widget.order['date']?.toString() ?? '01 Sep 2026';
+  String get orderDate {
+    final value =
+        widget.order['createdAt'] ??
+        widget.order['created_at'] ??
+        widget.order['date'];
+    if (value == null || value.toString().trim().isEmpty)
+      return 'Date unavailable';
+    final parsed = DateTime.tryParse(value.toString());
+    if (parsed == null) return value.toString();
+    final date = parsed.toLocal();
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}';
+  }
 
   String get sellerName =>
-      widget.order['seller']?.toString() ??
-      widget.order['sellerName']?.toString() ??
-      'Rahul Sharma';
+      (widget.order['sellerName'] ??
+              widget.order['seller'] ??
+              'Seller details unavailable')
+          .toString();
 
-  String get quantity => widget.order['quantity']?.toString() ?? '1';
+  String get quantity =>
+      widget.order['quantity']?.toString() ?? 'Quantity unavailable';
 
   String get payment =>
       widget.order['payment']?.toString() ??
@@ -59,13 +105,18 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   String get deliveryMethod =>
       widget.order['deliveryMethod']?.toString() ?? 'EcoLoop Delivery';
 
-  String get expectedDate =>
-      widget.order['expectedDelivery']?.toString() ?? '03 Sep 2026';
+  String get expectedDate {
+    final value =
+        widget.order['expectedDelivery'] ?? widget.order['expected_delivery'];
+    return value == null || value.toString().trim().isEmpty
+        ? 'Not available'
+        : value.toString();
+  }
 
   IconData get productIcon =>
       widget.order['icon'] as IconData? ?? Icons.inventory_2_outlined;
 
-  bool get isCancelled => _status == 'Cancelled';
+  bool get isCancelled => _status.trim().toLowerCase() == 'cancelled';
 
   bool get isDelivered => _status.toLowerCase() == 'delivered';
 
@@ -89,10 +140,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     }.contains(value);
   }
 
-  bool get _canReview =>
-      (_normalizedOrderStatus == 'delivered' ||
-          _normalizedOrderStatus == 'confirmed') &&
-      _paymentPaid;
+  bool get _canReview => _normalizedOrderStatus == 'delivered' && _paymentPaid;
 
   int _safeId(dynamic value) =>
       value is num ? value.toInt() : int.tryParse('$value') ?? 0;
@@ -122,7 +170,10 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: productId > 0 && orderNumericId > 0
+              onPressed:
+                  productId > 0 &&
+                      orderNumericId > 0 &&
+                      !_productReviewSubmitted
                   ? () => _writeReview(
                       title: 'Review product',
                       endpoint: '/reviews/product',
@@ -133,7 +184,11 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                     )
                   : null,
               icon: const Icon(Icons.inventory_2_outlined),
-              label: const Text('Write Product Review'),
+              label: Text(
+                _productReviewSubmitted
+                    ? 'Product Reviewed'
+                    : 'Write Product Review',
+              ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary),
@@ -145,19 +200,32 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: sellerId > 0 && orderNumericId > 0
+              onPressed:
+                  sellerId > 0 && orderNumericId > 0 && !_sellerReviewSubmitted
                   ? () => _writeReview(
-                      title: 'Review seller',
-                      endpoint: '/reviews/seller',
-                      payloadIds: {
-                        'sellerId': sellerId,
-                        'sellerType': sellerType,
-                        'orderId': orderNumericId,
-                      },
+                      title: sellerType == 'artist' || sellerType == 'remaker'
+                          ? 'Review ReMaker'
+                          : 'Review seller',
+                      endpoint:
+                          sellerType == 'artist' || sellerType == 'remaker'
+                          ? '/reviews/artist'
+                          : '/reviews/seller',
+                      payloadIds:
+                          sellerType == 'artist' || sellerType == 'remaker'
+                          ? {'artistId': sellerId, 'orderId': orderNumericId}
+                          : {
+                              'sellerId': sellerId,
+                              'sellerType': 'user',
+                              'orderId': orderNumericId,
+                            },
                     )
                   : null,
               icon: const Icon(Icons.storefront_outlined),
-              label: const Text('Write Seller Review'),
+              label: Text(
+                _sellerReviewSubmitted
+                    ? 'Seller Reviewed'
+                    : 'Write Seller Review',
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -246,6 +314,13 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       };
       await EcoLoopApi.instance.post(endpoint, payload);
       if (mounted) {
+        setState(() {
+          if (endpoint == '/reviews/product') {
+            _productReviewSubmitted = true;
+          } else {
+            _sellerReviewSubmitted = true;
+          }
+        });
         _showMessage('Review submitted successfully.');
       }
     } catch (error) {

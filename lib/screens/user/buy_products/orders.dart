@@ -119,7 +119,7 @@ class _OrdersState extends State<Orders> {
         .trim()
         .toLowerCase()
         .replaceAll('_', ' ');
-    final statusAllowed = status == 'delivered' || status == 'confirmed';
+    final statusAllowed = status == 'delivered';
     final paid = const {
       'paid',
       'completed',

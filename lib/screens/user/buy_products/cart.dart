@@ -25,30 +25,128 @@ class _CartState extends State<Cart> {
   List<Map<String, dynamic>> _similarProducts = [];
   bool _similarProductsLoading = false;
   String? _similarProductsError;
+  bool _loadingCart = true;
+  bool _cartMutationBusy = false;
+  String? _cartError;
 
   String? _appliedCoupon;
   double _couponDiscount = 0;
 
   bool _useEcoPoints = false;
 
-  // UI-only points for now.
-  // This will come from GET /rewards later.
-  final int _ecoPoints = 120;
+  // Eco-point redemption is intentionally disabled until the backend supports
+  // validating and applying points to an order. Never apply a UI-only discount.
+  final int _ecoPoints = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadInitialItems();
+    _loadCart();
     _loadSimilarProducts();
   }
 
-  // INITIAL DATA
+  // PERSISTENT CART
 
-  void _loadInitialItems() {
-    final incoming = widget.initialItems ?? [];
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return <String, dynamic>{};
+  }
 
-    for (final item in incoming) {
-      _addOrMergeItem(item);
+  List<Map<String, dynamic>> _extractCartRows(dynamic response) {
+    if (response is List) {
+      return response.whereType<Map>().map((row) => _asMap(row)).toList();
+    }
+    final root = _asMap(response);
+    if (root['data'] is List) {
+      return (root['data'] as List)
+          .whereType<Map>()
+          .map((row) => _asMap(row))
+          .toList();
+    }
+    final nested = _asMap(root['data']);
+    for (final source in [root, nested]) {
+      for (final key in ['items', 'cart', 'products', 'results']) {
+        final value = source[key];
+        if (value is List) {
+          return value.whereType<Map>().map((row) => _asMap(row)).toList();
+        }
+      }
+    }
+    return <Map<String, dynamic>>[];
+  }
+
+  Future<void> _loadCart() async {
+    if (!mounted) return;
+    setState(() {
+      _loadingCart = true;
+      _cartError = null;
+    });
+    try {
+      var rows = _extractCartRows(await EcoLoopApi.instance.get('/cart'));
+
+      // Migrate any items passed by older navigation/cart-popup callers only
+      // when that product is not already in the account-scoped server cart.
+      final incoming = widget.initialItems ?? const <Map<String, dynamic>>[];
+      final knownIds = rows
+          .map(
+            (row) => (row['productId'] ?? row['product_id'] ?? row['id'] ?? '')
+                .toString(),
+          )
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      for (final item in incoming) {
+        final id = (item['productId'] ?? item['product_id'] ?? item['id'] ?? '')
+            .toString();
+        final numericId = int.tryParse(id);
+        if (numericId == null || numericId <= 0 || knownIds.contains(id))
+          continue;
+        await EcoLoopApi.instance.post('/cart', {
+          'productId': numericId,
+          'quantity': _toInt(item['quantity'], fallback: 1).clamp(1, 999),
+        });
+        knownIds.add(id);
+      }
+      if (incoming.isNotEmpty) {
+        rows = _extractCartRows(await EcoLoopApi.instance.get('/cart'));
+      }
+
+      final active = <Map<String, dynamic>>[];
+      final saved = <Map<String, dynamic>>[];
+      for (final row in rows) {
+        final item = _normalizeItem(row);
+        final isSaved =
+            row['isSavedForLater'] == true ||
+            row['isSavedForLater']?.toString().toLowerCase() == 'true' ||
+            row['isSavedForLater']?.toString() == '1';
+        if (isSaved) {
+          saved.add(item);
+        } else {
+          active.add(item);
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _cartItems
+          ..clear()
+          ..addAll(active);
+        _savedForLater
+          ..clear()
+          ..addAll(saved);
+        _loadingCart = false;
+        _cartError = null;
+        _appliedCoupon = null;
+        _couponDiscount = 0;
+        _useEcoPoints = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingCart = false;
+        _cartError = error.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
@@ -150,29 +248,24 @@ class _CartState extends State<Cart> {
     final copy = Map<String, dynamic>.from(item);
 
     final productId =
-        copy['productId'] ??
-        copy['id'] ??
-        DateTime.now().microsecondsSinceEpoch.toString();
+        copy['productId'] ?? copy['product_id'] ?? copy['id'] ?? '';
 
     final title = copy['title'] ?? copy['name'] ?? 'EcoLoop Product';
 
     final price = _toDouble(copy['price']);
 
     final availableQuantity = _toInt(
-      copy['availableQuantity'] ?? copy['stock'] ?? copy['quantity'] ?? 10,
-      fallback: 10,
-    );
+      copy['availableQuantity'] ?? copy['available_quantity'] ?? copy['stock'],
+      fallback: 0,
+    ).clamp(0, 999999);
 
-    final quantity = _safeQuantity(
-      _toInt(copy['quantity'], fallback: 1),
-      availableQuantity <= 0 ? 1 : availableQuantity,
-    );
+    final quantity = _toInt(copy['quantity'], fallback: 1).clamp(1, 999);
 
     copy['productId'] = productId;
     copy['title'] = title;
     copy['price'] = price;
     copy['quantity'] = quantity;
-    copy['availableQuantity'] = availableQuantity <= 0 ? 1 : availableQuantity;
+    copy['availableQuantity'] = availableQuantity;
 
     return copy;
   }
@@ -216,9 +309,10 @@ class _CartState extends State<Cart> {
   }
 
   int _availableQuantity(Map<String, dynamic> item) {
-    final available = _toInt(item['availableQuantity'], fallback: 1);
-
-    return available <= 0 ? 1 : available;
+    return _toInt(
+      item['availableQuantity'] ?? item['available_quantity'],
+      fallback: 0,
+    ).clamp(0, 999999).toInt();
   }
 
   int _safeQuantity(int quantity, int maxQuantity) {
@@ -329,17 +423,9 @@ class _CartState extends State<Cart> {
     return total;
   }
 
-  double get _deliveryFee {
-    if (_cartItems.isEmpty) {
-      return 0;
-    }
-
-    if (_subtotal >= 999) {
-      return 0;
-    }
-
-    return 49;
-  }
+  // Delivery depends on the selected address and each seller's city, so it is
+  // calculated at checkout by the backend rather than estimated here.
+  double get _deliveryFee => 0;
 
   double get _ecoPointDiscount {
     if (!_useEcoPoints) {
@@ -364,44 +450,58 @@ class _CartState extends State<Cart> {
 
   // QUANTITY
 
-  void _increaseQuantity(int index) {
-    if (index < 0 || index >= _cartItems.length) {
+  Future<void> _setQuantity(int index, int nextQuantity) async {
+    if (_cartMutationBusy || index < 0 || index >= _cartItems.length) return;
+    final item = _cartItems[index];
+    final productId = int.tryParse('${item['productId'] ?? ''}');
+    final max = _availableQuantity(item);
+    if (productId == null || productId <= 0) {
+      _showMessage('This cart item has an invalid product ID.');
       return;
     }
-
-    final item = _cartItems[index];
-
-    final current = _toInt(item['quantity'], fallback: 1);
-
-    final max = _availableQuantity(item);
-
-    if (current >= max) {
+    if (nextQuantity < 1 || nextQuantity > max) {
       _showMessage('Only $max item${max == 1 ? '' : 's'} available.');
       return;
     }
+    final oldQuantity = _toInt(item['quantity'], fallback: 1);
+    if (nextQuantity == oldQuantity) return;
 
-    setState(() {
-      item['quantity'] = current + 1;
-    });
+    setState(() => _cartMutationBusy = true);
+    try {
+      final response = await EcoLoopApi.instance.put('/cart/$productId', {
+        'quantity': nextQuantity,
+      });
+      final root = _asMap(response);
+      final nested = _asMap(root['item'] ?? root['data']);
+      setState(() {
+        _cartItems[index]['quantity'] = _toInt(
+          nested['quantity'],
+          fallback: nextQuantity,
+        );
+      });
+    } catch (error) {
+      _showMessage(
+        'Could not update quantity: ${error.toString().replaceFirst('Exception: ', '')}',
+      );
+    } finally {
+      if (mounted) setState(() => _cartMutationBusy = false);
+    }
+  }
+
+  void _increaseQuantity(int index) {
+    if (index < 0 || index >= _cartItems.length) return;
+    final item = _cartItems[index];
+    _setQuantity(index, _toInt(item['quantity'], fallback: 1) + 1);
   }
 
   void _decreaseQuantity(int index) {
-    if (index < 0 || index >= _cartItems.length) {
-      return;
-    }
-
-    final item = _cartItems[index];
-
-    final current = _toInt(item['quantity'], fallback: 1);
-
+    if (index < 0 || index >= _cartItems.length) return;
+    final current = _toInt(_cartItems[index]['quantity'], fallback: 1);
     if (current <= 1) {
       _confirmRemove(index);
       return;
     }
-
-    setState(() {
-      item['quantity'] = current - 1;
-    });
+    _setQuantity(index, current - 1);
   }
 
   // REMOVE
@@ -484,54 +584,101 @@ class _CartState extends State<Cart> {
     );
   }
 
-  void _removeItem(int index) {
-    if (index < 0 || index >= _cartItems.length) {
+  Future<void> _removeItem(int index) async {
+    if (_cartMutationBusy || index < 0 || index >= _cartItems.length) return;
+    final item = _cartItems[index];
+    final productId = int.tryParse('${item['productId'] ?? ''}');
+    if (productId == null || productId <= 0) {
+      _showMessage('This cart item has an invalid product ID.');
       return;
     }
-
-    final item = _cartItems[index];
-
-    setState(() {
-      _cartItems.removeAt(index);
-    });
-
-    _recalculateDiscount();
-
-    _showMessage('${item['title']} removed from cart.');
+    setState(() => _cartMutationBusy = true);
+    try {
+      await EcoLoopApi.instance.delete('/cart/$productId');
+      if (!mounted) return;
+      setState(
+        () => _cartItems.removeWhere(
+          (row) => '${row['productId']}' == '$productId',
+        ),
+      );
+      _recalculateDiscount();
+      _showMessage('${item['title']} removed from cart.');
+    } catch (error) {
+      _showMessage(
+        'Could not remove item: ${error.toString().replaceFirst('Exception: ', '')}',
+      );
+    } finally {
+      if (mounted) setState(() => _cartMutationBusy = false);
+    }
   }
 
   // SAVE FOR LATER
 
-  void _saveForLater(int index) {
-    if (index < 0 || index >= _cartItems.length) {
+  Future<void> _saveForLater(int index) async {
+    if (_cartMutationBusy || index < 0 || index >= _cartItems.length) return;
+    final item = Map<String, dynamic>.from(_cartItems[index]);
+    final productId = int.tryParse('${item['productId'] ?? ''}');
+    if (productId == null || productId <= 0) {
+      _showMessage('This cart item has an invalid product ID.');
       return;
     }
-
-    final item = Map<String, dynamic>.from(_cartItems[index]);
-
-    setState(() {
-      _savedForLater.add(item);
-      _cartItems.removeAt(index);
-    });
-
-    _recalculateDiscount();
-
-    _showMessage('Item saved for later.');
+    setState(() => _cartMutationBusy = true);
+    try {
+      await EcoLoopApi.instance.put('/cart/$productId/saved', {
+        'isSavedForLater': true,
+      });
+      if (!mounted) return;
+      setState(() {
+        _cartItems.removeWhere((row) => '${row['productId']}' == '$productId');
+        _savedForLater.add(item);
+      });
+      _recalculateDiscount();
+      _showMessage('Item saved for later.');
+    } catch (error) {
+      _showMessage(
+        'Could not save item: ${error.toString().replaceFirst('Exception: ', '')}',
+      );
+    } finally {
+      if (mounted) setState(() => _cartMutationBusy = false);
+    }
   }
 
-  void _moveBackToCart(int index) {
-    if (index < 0 || index >= _savedForLater.length) {
+  Future<void> _moveBackToCart(int index) async {
+    if (_cartMutationBusy || index < 0 || index >= _savedForLater.length)
+      return;
+    final item = Map<String, dynamic>.from(_savedForLater[index]);
+    final productId = int.tryParse('${item['productId'] ?? ''}');
+    if (productId == null || productId <= 0) {
+      _showMessage('This saved item has an invalid product ID.');
       return;
     }
-
-    final item = Map<String, dynamic>.from(_savedForLater[index]);
-
-    setState(() {
-      _savedForLater.removeAt(index);
-      _addOrMergeItem(item);
-    });
-
-    _showMessage('Item moved back to cart.');
+    if (_availableQuantity(item) < 1) {
+      _showMessage(
+        'This product is currently unavailable and cannot be moved to cart.',
+      );
+      return;
+    }
+    setState(() => _cartMutationBusy = true);
+    try {
+      await EcoLoopApi.instance.put('/cart/$productId/saved', {
+        'isSavedForLater': false,
+      });
+      if (!mounted) return;
+      item['isSavedForLater'] = false;
+      setState(() {
+        _savedForLater.removeWhere(
+          (row) => '${row['productId']}' == '$productId',
+        );
+        _addOrMergeItem(item);
+      });
+      _showMessage('Item moved back to cart.');
+    } catch (error) {
+      _showMessage(
+        'Could not move item: ${error.toString().replaceFirst('Exception: ', '')}',
+      );
+    } finally {
+      if (mounted) setState(() => _cartMutationBusy = false);
+    }
   }
 
   // CLEAR CART
@@ -572,7 +719,7 @@ class _CartState extends State<Cart> {
                 Text('Clear your cart?', style: AppTextStyles.title),
                 const SizedBox(height: 8),
                 Text(
-                  'All items currently in your cart will be removed.',
+                  'Items in your cart will be removed. Saved-for-later items will remain.',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.body,
                 ),
@@ -593,16 +740,32 @@ class _CartState extends State<Cart> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.error,
                         ),
-                        onPressed: () {
-                          Navigator.pop(sheetContext);
-
-                          setState(() {
-                            _cartItems.clear();
-                            _appliedCoupon = null;
-                            _couponDiscount = 0;
-                            _useEcoPoints = false;
-                          });
-                        },
+                        onPressed: _cartMutationBusy
+                            ? null
+                            : () async {
+                                Navigator.pop(sheetContext);
+                                setState(() => _cartMutationBusy = true);
+                                try {
+                                  await EcoLoopApi.instance.post(
+                                    '/cart/clear',
+                                    <String, dynamic>{},
+                                  );
+                                  if (!mounted) return;
+                                  setState(() {
+                                    _cartItems.clear();
+                                    _appliedCoupon = null;
+                                    _couponDiscount = 0;
+                                    _useEcoPoints = false;
+                                  });
+                                } catch (error) {
+                                  _showMessage(
+                                    'Could not clear cart: ${error.toString().replaceFirst('Exception: ', '')}',
+                                  );
+                                } finally {
+                                  if (mounted)
+                                    setState(() => _cartMutationBusy = false);
+                                }
+                              },
                         child: const Text('Clear Cart'),
                       ),
                     ),
@@ -781,33 +944,10 @@ class _CartState extends State<Cart> {
           const SizedBox(width: 8),
           TextButton(
             onPressed: () {
-              if (_subtotal < minimumOrder) {
-                _showMessage(
-                  'Minimum order value is ${_formatPrice(minimumOrder)}.',
-                );
-                return;
-              }
-
-              double calculatedDiscount = 0;
-
-              if (discount != null) {
-                calculatedDiscount = discount;
-              } else if (discountPercent != null) {
-                calculatedDiscount = _subtotal * discountPercent;
-              }
-
-              if (calculatedDiscount > _subtotal) {
-                calculatedDiscount = _subtotal;
-              }
-
-              setState(() {
-                _appliedCoupon = code;
-                _couponDiscount = calculatedDiscount;
-              });
-
               Navigator.pop(sheetContext);
-
-              _showMessage('$code applied successfully.');
+              _showMessage(
+                'Coupon validation is not available yet. No discount has been applied.',
+              );
             },
             child: Text(
               alreadyApplied ? 'Applied' : 'Apply',
@@ -832,36 +972,10 @@ class _CartState extends State<Cart> {
   }
 
   void _recalculateDiscount() {
-    if (_appliedCoupon == null) {
-      return;
-    }
-
-    if (_appliedCoupon == 'ECO100') {
-      if (_subtotal < 1499) {
-        _appliedCoupon = null;
-        _couponDiscount = 0;
-      } else {
-        _couponDiscount = 100;
-      }
-    }
-
-    if (_appliedCoupon == 'FIRSTLOOP') {
-      if (_subtotal < 500) {
-        _appliedCoupon = null;
-        _couponDiscount = 0;
-      } else {
-        _couponDiscount = _subtotal * 0.10;
-      }
-    }
-
-    if (_appliedCoupon == 'RECYCLE20') {
-      if (_subtotal < 499) {
-        _appliedCoupon = null;
-        _couponDiscount = 0;
-      } else {
-        _couponDiscount = 20;
-      }
-    }
+    // Coupons are displayed for continuity, but never discount an order until
+    // a server-side validation/redemption endpoint exists.
+    _appliedCoupon = null;
+    _couponDiscount = 0;
   }
 
   // ECO POINTS
@@ -890,9 +1004,7 @@ class _CartState extends State<Cart> {
       MaterialPageRoute(
         builder: (_) => Checkout(
           items: List<Map<String, dynamic>>.from(_cartItems),
-          initialCouponCode: _appliedCoupon,
-          initialCouponDiscount: _couponDiscount,
-          initialEcoPointDiscount: _ecoPointDiscount,
+          clearCartAfterOrder: true,
         ),
       ),
     );
@@ -960,7 +1072,40 @@ class _CartState extends State<Cart> {
           const SizedBox(width: 6),
         ],
       ),
-      body: hasItems ? _buildCartContent() : _buildEmptyCart(),
+      body: _loadingCart
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
+          : _cartError != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.cloud_off_outlined,
+                      size: 42,
+                      color: AppColors.error,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _cartError!,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.body,
+                    ),
+                    const SizedBox(height: 14),
+                    ElevatedButton(
+                      onPressed: _loadCart,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : hasItems
+          ? _buildCartContent()
+          : _buildEmptyCart(),
     );
   }
 
@@ -1059,9 +1204,6 @@ class _CartState extends State<Cart> {
   // FREE DELIVERY BANNER
 
   Widget _buildFreeDeliveryBanner() {
-    final remaining = 999 - _subtotal;
-    final hasFreeDelivery = _subtotal >= 999;
-
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1078,10 +1220,8 @@ class _CartState extends State<Cart> {
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              hasFreeDelivery
-                  ? Icons.local_shipping_rounded
-                  : Icons.local_shipping_outlined,
+            child: const Icon(
+              Icons.local_shipping_outlined,
               color: AppColors.primary,
             ),
           ),
@@ -1090,11 +1230,9 @@ class _CartState extends State<Cart> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  hasFreeDelivery
-                      ? 'You unlocked FREE delivery!'
-                      : 'Free delivery on orders above ₹999',
-                  style: const TextStyle(
+                const Text(
+                  'Delivery charges calculated at checkout',
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -1102,9 +1240,7 @@ class _CartState extends State<Cart> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  hasFreeDelivery
-                      ? 'Your order qualifies for free delivery.'
-                      : 'Add ${_formatPrice(remaining)} more to unlock it.',
+                  'Charges depend on your selected address and seller location.',
                   style: AppTextStyles.caption,
                 ),
               ],
@@ -1594,10 +1730,8 @@ class _CartState extends State<Cart> {
           const SizedBox(height: 10),
           _priceRow(
             'Delivery',
-            _deliveryFee == 0 ? 'FREE' : _formatPrice(_deliveryFee),
-            valueColor: _deliveryFee == 0
-                ? AppColors.success
-                : AppColors.textPrimary,
+            'Calculated at checkout',
+            valueColor: AppColors.textSecondary,
           ),
           const SizedBox(height: 14),
           Divider(color: Colors.grey.shade200),
@@ -2064,15 +2198,14 @@ class _CartState extends State<Cart> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    if (_deliveryFee == 0)
-                      const Text(
-                        'Free delivery',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.success,
-                        ),
+                    const Text(
+                      'Delivery at checkout',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
                       ),
+                    ),
                   ],
                 ),
               ),

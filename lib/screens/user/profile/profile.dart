@@ -138,6 +138,24 @@ class _ProfileState extends State<Profile> {
 
   String get _email => (_account?['email'] ?? '').toString();
 
+  /// Converts Google Drive viewer/share URLs into an image URL Flutter can request.
+  /// The Apps Script backend also stores direct-view URLs; this handles legacy rows.
+  String _displayableProfilePhotoUrl(String rawUrl) {
+    final url = rawUrl.trim();
+    if (url.isEmpty) return '';
+    final match =
+        RegExp(
+          r'(?:drive\.google\.com|docs\.google\.com)/(?:file/d/|open\?id=|uc\?[^#]*?id=)([A-Za-z0-9_-]+)',
+          caseSensitive: false,
+        ).firstMatch(url) ??
+        RegExp(r'[?&]id=([A-Za-z0-9_-]+)').firstMatch(url);
+    if (match != null &&
+        (url.contains('drive.google.com') || url.contains('docs.google.com'))) {
+      return 'https://drive.google.com/uc?export=view&id=${match.group(1)}';
+    }
+    return url;
+  }
+
   String get _photoUrl =>
       (_account?['profilePhotoUrl'] ?? '').toString().trim();
 
@@ -231,7 +249,10 @@ class _ProfileState extends State<Profile> {
                       )
                     : (_photoUrl.isNotEmpty
                           ? Image.network(
-                              _photoUrl,
+                              _displayableProfilePhotoUrl(_photoUrl),
+                              key: ValueKey<String>(
+                                _displayableProfilePhotoUrl(_photoUrl),
+                              ),
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => const Icon(
                                 Icons.person_rounded,

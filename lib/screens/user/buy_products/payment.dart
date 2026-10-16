@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
@@ -23,6 +21,7 @@ class Payment extends StatefulWidget {
     this.deliveryMethod = 'Standard Delivery',
 
     this.savings = 0,
+    this.clearCartAfterSuccess = false,
   });
 
   final double totalAmount;
@@ -34,19 +33,22 @@ class Payment extends StatefulWidget {
   final String deliveryMethod;
 
   final double savings;
+  final bool clearCartAfterSuccess;
 
   @override
   State<Payment> createState() => _PaymentState();
 }
 
 class _PaymentState extends State<Payment> {
-  String _selectedMethod = 'upi';
+  String _selectedMethod = 'cod';
 
   String? _selectedUpiApp;
 
   String? _selectedBank;
 
   bool _isProcessing = false;
+  final String _checkoutRequestId = DateTime.now().microsecondsSinceEpoch
+      .toString();
 
   final TextEditingController _upiController = TextEditingController();
 
@@ -162,12 +164,15 @@ class _PaymentState extends State<Payment> {
   /// Updates active payment mode selection.
 
   void _selectMethod(String method) {
+    if (method != 'cod') {
+      _showMessage(
+        'Online payments are paused for now. Please use Cash on Delivery.',
+      );
+      return;
+    }
     setState(() {
-      _selectedMethod = method;
-
-      if (method != 'upi') {
-        _selectedUpiApp = null;
-      }
+      _selectedMethod = 'cod';
+      _selectedUpiApp = null;
     });
   }
 
@@ -191,45 +196,98 @@ class _PaymentState extends State<Payment> {
       return;
     }
     setState(() => _isProcessing = true);
-    final createdOrders = <Map<String, dynamic>>[];
     try {
-      final shippingAddress = jsonEncode(widget.address);
+      final normalizedItems = <Map<String, dynamic>>[];
       for (final item in items) {
         final id = (item['productId'] ?? item['product_id'] ?? item['id'] ?? '')
             .toString();
         final quantity = _productQuantity(item);
-        if (int.tryParse(id) == null || quantity < 1) {
+        final numericId = int.tryParse(id);
+        if (numericId == null || numericId <= 0 || quantity < 1) {
           throw Exception('A cart item has an invalid product ID or quantity.');
         }
-        final response = await EcoLoopApi.instance.post('/orders', {
-          'productId': int.parse(id),
-          'quantity': quantity,
-          'shippingAddress': shippingAddress,
-          'paymentMethod': 'cod',
-        });
-        if (response is! Map || response['order'] is! Map) {
-          throw Exception('The backend did not confirm this order.');
-        }
-        createdOrders.add(Map<String, dynamic>.from(response['order'] as Map));
+        normalizedItems.add({'productId': numericId, 'quantity': quantity});
+      }
+
+      // One server-side batch validates the whole basket, reserves stock and
+      // rolls back on failure. It also avoids partially created multi-item orders.
+      final response = await EcoLoopApi.instance.post('/orders/batch', {
+        'items': normalizedItems,
+        'shippingAddress': widget.address,
+        'paymentMethod': 'cod',
+        'deliveryMethod': 'standard',
+        'clearCartAfterSuccess': widget.clearCartAfterSuccess,
+        'requestId': _checkoutRequestId,
+      });
+      final root = response is Map
+          ? Map<String, dynamic>.from(response)
+          : <String, dynamic>{};
+      if (root['success'] == false) {
+        throw Exception(
+          root['message'] ?? root['error'] ?? 'Order was rejected.',
+        );
+      }
+      final data = root['data'] is Map
+          ? Map<String, dynamic>.from(root['data'] as Map)
+          : root;
+      final rawOrders = data['orders'];
+      if (rawOrders is! List || rawOrders.isEmpty) {
+        throw Exception('The backend did not confirm the order batch.');
+      }
+      final createdOrders = rawOrders
+          .whereType<Map>()
+          .map((order) => Map<String, dynamic>.from(order))
+          .toList();
+      final requestedQuantity = normalizedItems.fold<int>(
+        0,
+        (sum, item) => sum + (item['quantity'] as int),
+      );
+      final returnedQuantity = data['itemCount'] is num
+          ? (data['itemCount'] as num).toInt()
+          : createdOrders.fold<int>(
+              0,
+              (sum, order) => sum + _productQuantity(order),
+            );
+      if (returnedQuantity != requestedQuantity) {
+        throw Exception(
+          'The backend returned an incomplete order confirmation. Check Order History before retrying.',
+        );
       }
       if (!mounted) return;
-      CartPopup.clear();
-      final total = createdOrders.fold<double>(0, (sum, order) {
-        final value = order['totalAmount'];
-        return sum +
-            (value is num ? value.toDouble() : double.tryParse('$value') ?? 0);
-      });
-      final orderIds = createdOrders.map((o) => '${o['orderId']}').join(', ');
+
+      if (widget.clearCartAfterSuccess) CartPopup.clear();
+      final serverTotal = data['totalAmount'];
+      final total = serverTotal is num
+          ? serverTotal.toDouble()
+          : double.tryParse('$serverTotal') ??
+                createdOrders.fold<double>(0, (sum, order) {
+                  final value = order['totalAmount'];
+                  return sum +
+                      (value is num
+                          ? value.toDouble()
+                          : double.tryParse('$value') ?? 0);
+                });
+      final orderIds = createdOrders
+          .map((order) => '${order['orderId'] ?? ''}')
+          .where((id) => id.isNotEmpty && id != 'null')
+          .join(', ');
+      if (orderIds.isEmpty) {
+        throw Exception(
+          'The server did not return order IDs. Check Order History before retrying.',
+        );
+      }
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => OrderSuccess(
             orderId: orderIds,
             totalAmount: total,
-            itemCount: items.fold<int>(
-              0,
-              (sum, item) => sum + _productQuantity(item),
-            ),
+            itemCount: data['itemCount'] is num
+                ? (data['itemCount'] as num).toInt()
+                : items.fold<int>(
+                    0,
+                    (sum, item) => sum + _productQuantity(item),
+                  ),
             paymentMethod: 'Cash on Delivery',
             address: widget.address,
             deliveryMethod: widget.deliveryMethod,
@@ -237,7 +295,10 @@ class _PaymentState extends State<Payment> {
         ),
       );
     } catch (error) {
-      if (mounted) _showMessage('Order could not be completed: $error');
+      if (mounted)
+        _showMessage(
+          'Order could not be completed: ${error.toString().replaceFirst('Exception: ', '')}',
+        );
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }

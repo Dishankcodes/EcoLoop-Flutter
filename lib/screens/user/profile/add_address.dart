@@ -62,9 +62,17 @@ class _AddAddressState extends State<AddAddress> {
     final a = widget.address;
     _nameController = TextEditingController(text: _value(a, 'name'));
     _phoneController = TextEditingController(text: _value(a, 'phone'));
-    _houseController = TextEditingController(text: _value(a, 'house'));
+    final hasSplitAddress =
+        _value(a, 'house').isNotEmpty || _value(a, 'street').isNotEmpty;
+    _houseController = TextEditingController(
+      text: _value(a, 'house').isNotEmpty
+          ? _value(a, 'house')
+          : (hasSplitAddress ? '' : _value(a, 'addressLine')),
+    );
     _streetController = TextEditingController(text: _value(a, 'street'));
-    _areaController = TextEditingController(text: _value(a, 'area'));
+    _areaController = TextEditingController(
+      text: hasSplitAddress ? _value(a, 'area') : '',
+    );
     _landmarkController = TextEditingController(text: _value(a, 'landmark'));
     _initialStateName = _value(a, 'state').isNotEmpty
         ? _value(a, 'state')
@@ -72,7 +80,10 @@ class _AddAddressState extends State<AddAddress> {
     _initialCityName = _value(a, 'city').isNotEmpty ? _value(a, 'city') : null;
     _loadLocationAndProfile();
     _pincodeController = TextEditingController(text: _value(a, 'pincode'));
-    _addressType = _value(a, 'type').isEmpty ? 'Home' : _value(a, 'type');
+    final savedLabel = _value(a, 'type').isNotEmpty
+        ? _value(a, 'type')
+        : _value(a, 'label');
+    _addressType = savedLabel.isEmpty ? 'Home' : savedLabel;
     _isDefault =
         a?['isDefault'] == true ||
         a?['isDefault']?.toString().toLowerCase() == 'true';

@@ -32,6 +32,7 @@ class _ProductDetailsState extends State<ProductDetails> {
   int _quantity = 1;
   bool _isWishlisted = false;
   bool _wishlistBusy = false;
+  bool _cartAdding = false;
   bool _reviewsLoading = false;
   bool _eligibilityLoading = false;
   bool _canReview = false;
@@ -1677,20 +1678,23 @@ class _ProductDetailsState extends State<ProductDetails> {
   }
 
   /// Formats product data and presents the cart popup drawer.
-  void _addToCart() {
+  Future<void> _addToCart() async {
+    if (_cartAdding) return;
     if (availableQuantity <= 0) {
       _showMessage('This product is currently unavailable.');
       return;
     }
+    final productId = int.tryParse(_currentProductId);
+    if (productId == null || productId <= 0) {
+      _showMessage(
+        'This product has an invalid ID and cannot be added to cart.',
+      );
+      return;
+    }
 
     final cartProduct = Map<String, dynamic>.from(_product);
-
-    cartProduct['id'] =
-        _product['productId'] ?? _product['id'] ?? 'product_${title.hashCode}';
-
-    cartProduct['productId'] =
-        _product['productId'] ?? _product['id'] ?? 'product_${title.hashCode}';
-
+    cartProduct['id'] = productId;
+    cartProduct['productId'] = productId;
     cartProduct['title'] = title;
     cartProduct['price'] = priceValue;
     cartProduct['quantity'] = _quantity;
@@ -1699,15 +1703,27 @@ class _ProductDetailsState extends State<ProductDetails> {
     cartProduct['seller'] = seller;
     cartProduct['location'] = location;
     cartProduct['availableQuantity'] = availableQuantity;
-
     if (!cartProduct.containsKey('image') && images.isNotEmpty) {
       cartProduct['image'] = images.first;
     }
-
     if (!cartProduct.containsKey('images')) {
       cartProduct['images'] = images;
     }
-    CartPopup.addItem(context, item: cartProduct);
+
+    setState(() => _cartAdding = true);
+    try {
+      await _api.post('/cart', {'productId': productId, 'quantity': _quantity});
+      if (!mounted) return;
+      CartPopup.addItem(context, item: cartProduct);
+    } catch (error) {
+      if (mounted) {
+        _showMessage(
+          'Could not add item to cart: ${error.toString().replaceFirst('Exception: ', '')}',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cartAdding = false);
+    }
   }
 
   /// Directs user immediately to the checkout flow with selected quantity.

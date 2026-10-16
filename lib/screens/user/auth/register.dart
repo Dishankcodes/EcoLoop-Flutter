@@ -187,6 +187,11 @@ class _RegisterPageState extends State<RegisterPage> {
       return 'Unable to complete registration. Please try again.';
     }
 
+    final message = error.toString();
+    if (message.startsWith('Exception: ')) {
+      return message.substring('Exception: '.length);
+    }
+
     return 'Something went wrong. Please try again.';
   }
 
@@ -211,8 +216,6 @@ class _RegisterPageState extends State<RegisterPage> {
           _states = response.data!;
           _isLoadingStates = false;
         });
-
-        _prefetchCitiesInBackground();
       } else {
         setState(() {
           _isLoadingStates = false;
@@ -265,22 +268,44 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<List<CityModel>> _requestCities(String stateCode) async {
     try {
-      final response = await ApiManager().client.getCities(
-        '/locations/cities',
-        stateCode,
-      );
+      // Retry one time for transient connection/timeout failures. Do not turn
+      // failures into an empty list: an empty list means the API succeeded but
+      // the selected state genuinely has no active cities.
+      for (var attempt = 0; attempt < 2; attempt++) {
+        try {
+          final response = await ApiManager().client.getCities(
+            '/locations/cities',
+            stateCode,
+          );
 
-      if (response.success == true && response.data != null) {
-        final cities = response.data!;
+          if (response.success == true && response.data != null) {
+            final cities = response.data!;
+            _citiesCache[stateCode] = cities;
+            return cities;
+          }
 
-        _citiesCache[stateCode] = cities;
+          final message = response.error?.trim();
+          throw Exception(
+            message != null && message.isNotEmpty
+                ? message
+                : 'The server could not load cities. Please try again.',
+          );
+        } on DioException catch (error) {
+          final retryable =
+              error.type == DioExceptionType.connectionTimeout ||
+              error.type == DioExceptionType.receiveTimeout ||
+              error.type == DioExceptionType.sendTimeout ||
+              error.type == DioExceptionType.connectionError;
 
-        return cities;
+          if (attempt == 0 && retryable) {
+            await Future.delayed(const Duration(milliseconds: 700));
+            continue;
+          }
+          rethrow;
+        }
       }
 
-      return [];
-    } catch (_) {
-      return [];
+      throw Exception('Unable to load cities. Please try again.');
     } finally {
       _cityLoadingFutures.remove(stateCode);
     }

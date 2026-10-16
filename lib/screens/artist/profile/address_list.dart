@@ -57,72 +57,91 @@ class _AddressListState extends State<AddressList> {
 
   Map<String, dynamic> _map(dynamic value) {
     if (value is Map) return Map<String, dynamic>.from(value);
+
     if (value is String) {
       try {
         final decoded = jsonDecode(value);
-        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
       } catch (_) {}
     }
+
     return {};
   }
 
   List<dynamic> _list(dynamic value) {
     if (value is List) return value;
+
     if (value is String) {
       try {
         final decoded = jsonDecode(value);
         if (decoded is List) return decoded;
       } catch (_) {}
     }
+
     return [];
   }
 
   Future<dynamic> _unwrapRedirect(Dio dio, Response<dynamic> response) async {
     final status = response.statusCode;
+
     if (status == 301 ||
         status == 302 ||
         status == 303 ||
         status == 307 ||
         status == 308) {
       final location = response.headers.value('location');
+
       if (location == null || location.isEmpty) {
         throw Exception('The API redirected without a response URL.');
       }
+
       final redirected = await dio.get<dynamic>(
         location,
         options: Options(followRedirects: false, maxRedirects: 0),
       );
+
       if (redirected.statusCode != 200) {
         throw Exception('Server returned HTTP ${redirected.statusCode}.');
       }
+
       return redirected.data;
     }
+
     return response.data;
   }
 
   String _errorMessage(Object error) {
     if (error is DioException) {
       final body = _map(error.response?.data);
+
       if (body.isNotEmpty) {
         final message = body['message'] ?? body['error'];
+
         if (message != null && message.toString().isNotEmpty) {
           return message.toString();
         }
       }
+
       if (error.response?.statusCode == 404) {
         return 'Address API is not deployed yet. Add the /addresses routes in Code.gs.';
       }
+
       if (error.response?.statusCode == 401 ||
           error.response?.statusCode == 403) {
         return 'Your session has expired. Please sign in again.';
       }
+
       return error.message ?? 'Unable to connect to the server.';
     }
+
     return error.toString().replaceFirst('Exception: ', '');
   }
 
   Future<void> _loadAddresses() async {
     if (!mounted) return;
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -137,11 +156,13 @@ class _AddressListState extends State<AddressList> {
     }
 
     final dio = _dio();
+
     try {
       final response = await dio.get<dynamic>(
         _uri('/addresses', {'token': _token}).toString(),
         options: Options(followRedirects: false, maxRedirects: 0),
       );
+
       final raw = await _unwrapRedirect(dio, response);
       final outer = _map(raw);
 
@@ -152,17 +173,22 @@ class _AddressListState extends State<AddressList> {
       }
 
       dynamic data = outer.containsKey('data') ? outer['data'] : raw;
+
       if (data is Map) {
         data = data['addresses'] ?? data['items'] ?? data['results'] ?? [];
       }
 
       final parsed = <AddressItem>[];
+
       for (final item in _list(data)) {
         final map = _map(item);
-        if (map.isNotEmpty) parsed.add(AddressItem.fromMap(map));
+        if (map.isNotEmpty) {
+          parsed.add(AddressItem.fromMap(map));
+        }
       }
 
       if (!mounted) return;
+
       setState(() {
         _addresses = parsed;
         _isLoading = false;
@@ -170,6 +196,7 @@ class _AddressListState extends State<AddressList> {
       });
     } catch (error) {
       if (!mounted) return;
+
       setState(() {
         _isLoading = false;
         _error = _errorMessage(error);
@@ -184,22 +211,28 @@ class _AddressListState extends State<AddressList> {
     required String method,
     Map<String, dynamic> body = const {},
   }) async {
-    if (_token.isEmpty) throw Exception('Please sign in again.');
+    if (_token.isEmpty) {
+      throw Exception('Please sign in again.');
+    }
 
     final dio = _dio();
+
     try {
       final response = await dio.post<dynamic>(
         _uri(path).toString(),
         data: {...body, 'token': _token, '_method': method},
         options: Options(followRedirects: false, maxRedirects: 0),
       );
+
       final raw = await _unwrapRedirect(dio, response);
       final result = _map(raw);
+
       if (result['success'] == false) {
         throw Exception(
           result['message'] ?? result['error'] ?? 'Request failed.',
         );
       }
+
       return result['data'] is Map
           ? Map<String, dynamic>.from(result['data'])
           : result;
@@ -213,7 +246,9 @@ class _AddressListState extends State<AddressList> {
       context,
       MaterialPageRoute(builder: (_) => AddAddress(address: address?.toMap())),
     );
+
     if (!mounted || result == null) return;
+
     // The AddAddress page saves to the backend before returning.
     await _loadAddresses();
   }
@@ -258,42 +293,58 @@ class _AddressListState extends State<AddressList> {
     if (confirmed != true || !mounted || _isMutating) return;
 
     setState(() => _isMutating = true);
+
     try {
       await _sendMutation(
         '/addresses/${Uri.encodeComponent(address.id)}',
         method: 'DELETE',
       );
+
       if (!mounted) return;
+
       _showMessage('Address deleted.');
       await _loadAddresses();
     } catch (error) {
-      if (mounted) _showMessage(_errorMessage(error), error: true);
+      if (mounted) {
+        _showMessage(_errorMessage(error), error: true);
+      }
     } finally {
-      if (mounted) setState(() => _isMutating = false);
+      if (mounted) {
+        setState(() => _isMutating = false);
+      }
     }
   }
 
   Future<void> _setDefaultAddress(AddressItem address) async {
     if (address.isDefault || _isMutating) return;
+
     setState(() => _isMutating = true);
+
     try {
       await _sendMutation(
         '/addresses/${Uri.encodeComponent(address.id)}',
         method: 'PUT',
         body: {'isDefault': true},
       );
+
       if (!mounted) return;
+
       _showMessage('Default address updated.');
       await _loadAddresses();
     } catch (error) {
-      if (mounted) _showMessage(_errorMessage(error), error: true);
+      if (mounted) {
+        _showMessage(_errorMessage(error), error: true);
+      }
     } finally {
-      if (mounted) setState(() => _isMutating = false);
+      if (mounted) {
+        setState(() => _isMutating = false);
+      }
     }
   }
 
   void _showMessage(String message, {bool error = false}) {
     if (!mounted) return;
+
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -351,6 +402,8 @@ class _AddressListState extends State<AddressList> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: ArtistColors.primary,
                 foregroundColor: ArtistColors.surface,
+                disabledBackgroundColor: ArtistColors.light,
+                disabledForegroundColor: ArtistColors.textSecondary,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -483,8 +536,11 @@ class AddressItem {
 
   factory AddressItem.fromMap(Map<String, dynamic> map) {
     String read(String key) => map[key]?.toString() ?? '';
+
     final id = read('addressId').isNotEmpty ? read('addressId') : read('id');
+
     final defaultValue = map['isDefault'];
+
     return AddressItem(
       id: id,
       name: read('name'),
@@ -712,6 +768,7 @@ class _AddressCard extends StatelessWidget {
       address.state,
       address.pincode,
     ].where((part) => part.trim().isNotEmpty).toList();
+
     return parts.join(', ');
   }
 
@@ -795,10 +852,30 @@ class _EmptyAddressState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: onAddAddress,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Add Address'),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: onAddAddress,
+                icon: const Icon(Icons.add_rounded, size: 21),
+                label: Text(
+                  'Add Address',
+                  style: ArtistTextStyles.body.copyWith(
+                    color: ArtistColors.surface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ArtistColors.primary,
+                  foregroundColor: ArtistColors.surface,
+                  disabledBackgroundColor: ArtistColors.light,
+                  disabledForegroundColor: ArtistColors.textSecondary,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
             ),
           ],
         ),

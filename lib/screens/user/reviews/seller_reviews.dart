@@ -163,44 +163,77 @@ class _SellerReviewsState extends State<SellerReviews> {
           if (value.isNotEmpty && value != '0') eligibleOrderId = value;
         }
       } else {
-        final dynamic response = await _api.get('/orders');
-        final rows = _extractRows(response);
-        final eligibleOrders = rows
-            .whereType<Map>()
-            .map((row) {
-              return Map<String, dynamic>.from(row);
-            })
-            .where((order) {
-              final currentSellerId = _int(
-                order['sellerId'] ?? order['artistId'] ?? order['seller_id'],
-              );
-              final status = _string(
-                order['status'],
-              ).toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
-              final payment = _string(
-                order['paymentStatus'] ??
-                    order['payment_status'] ??
-                    order['payment'],
-              ).toLowerCase().replaceAll('_', ' ');
-              final paid = const <String>{
-                'paid',
-                'completed',
-                'success',
-                'successful',
-                'captured',
-                'cod paid',
-              }.contains(payment);
-              final type = _string(
-                order['sellerType'] ?? order['seller_type'],
-              ).toLowerCase();
-              final sellerTypeMatches =
-                  type.isEmpty || type == 'artist' || type == 'remaker';
-              return currentSellerId == sellerId &&
-                  status == 'delivered' &&
-                  paid &&
-                  sellerTypeMatches;
-            })
-            .toList();
+        final responses = await Future.wait<dynamic>([
+          _api.get('/orders'),
+          _api.get('/my/reviews'),
+        ]);
+        final rows = _extractRows(responses[0]);
+        final myReviews = _extractRows(responses[1]);
+        final alreadyReviewedArtist = myReviews.whereType<Map>().any((raw) {
+          final review = Map<String, dynamic>.from(raw);
+          final reviewArtistId = _int(
+            review['artistId'] ??
+                review['artist_id'] ??
+                ((review['sellerType'] ?? review['seller_type'])
+                            ?.toString()
+                            .toLowerCase() ==
+                        'artist'
+                    ? review['sellerId'] ?? review['seller_id']
+                    : null),
+          );
+          final type = _string(
+            review['reviewType'] ?? review['review_type'],
+          ).toLowerCase();
+          final active =
+              _string(review['status']).isEmpty ||
+              _string(review['status']).toLowerCase() == 'active';
+          return active &&
+              reviewArtistId == sellerId &&
+              (type == 'artist' ||
+                  type == 'seller' ||
+                  review['artistId'] != null ||
+                  review['artist_id'] != null);
+        });
+        final eligibleOrders = alreadyReviewedArtist
+            ? <Map<String, dynamic>>[]
+            : rows
+                  .whereType<Map>()
+                  .map((row) {
+                    return Map<String, dynamic>.from(row);
+                  })
+                  .where((order) {
+                    final currentSellerId = _int(
+                      order['sellerId'] ??
+                          order['artistId'] ??
+                          order['seller_id'],
+                    );
+                    final status = _string(
+                      order['status'],
+                    ).toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+                    final payment = _string(
+                      order['paymentStatus'] ??
+                          order['payment_status'] ??
+                          order['payment'],
+                    ).toLowerCase().replaceAll('_', ' ');
+                    final paid = const <String>{
+                      'paid',
+                      'completed',
+                      'success',
+                      'successful',
+                      'captured',
+                      'cod paid',
+                    }.contains(payment);
+                    final type = _string(
+                      order['sellerType'] ?? order['seller_type'],
+                    ).toLowerCase();
+                    final sellerTypeMatches =
+                        type.isEmpty || type == 'artist' || type == 'remaker';
+                    return currentSellerId == sellerId &&
+                        status == 'delivered' &&
+                        paid &&
+                        sellerTypeMatches;
+                  })
+                  .toList();
 
         eligibleOrders.sort((a, b) {
           final dateA =

@@ -274,8 +274,9 @@ class _AddressListState extends State<AddressList> {
     setState(() => _isMutating = true);
     try {
       await _sendMutation(
-        '/addresses/${Uri.encodeComponent(address.id)}/default',
-        method: 'POST',
+        '/addresses/${Uri.encodeComponent(address.id)}',
+        method: 'PUT',
+        body: <String, dynamic>{'isDefault': true},
       );
       if (!mounted) return;
       _showMessage('Default address updated.');
@@ -482,14 +483,17 @@ class AddressItem {
       id: id,
       name: read('name'),
       phone: read('phone'),
-      house: read('house'),
+      // The deployed API stores the formatted street address as addressLine.
+      house: read('house').isNotEmpty ? read('house') : read('addressLine'),
       street: read('street'),
       area: read('area'),
       landmark: read('landmark'),
       city: read('city'),
       state: read('state'),
       pincode: read('pincode'),
-      type: read('type').isEmpty ? 'Home' : read('type'),
+      type: (read('type').isNotEmpty ? read('type') : read('label')).isEmpty
+          ? 'Home'
+          : (read('type').isNotEmpty ? read('type') : read('label')),
       isDefault:
           defaultValue == true ||
           defaultValue?.toString().toLowerCase() == 'true' ||
@@ -696,15 +700,21 @@ class _AddressCard extends StatelessWidget {
   }
 
   String _fullAddress() {
-    final parts = [
-      address.house,
-      address.street,
-      address.area,
-      if (address.landmark.trim().isNotEmpty) address.landmark,
-      address.city,
-      address.state,
-      address.pincode,
-    ].where((part) => part.trim().isNotEmpty).toList();
+    final parts = <String>[];
+    void addIfMissing(String value) {
+      final part = value.trim();
+      if (part.isEmpty) return;
+      final current = parts.join(', ').toLowerCase();
+      if (!current.contains(part.toLowerCase())) parts.add(part);
+    }
+
+    addIfMissing(address.house);
+    addIfMissing(address.street);
+    addIfMissing(address.area);
+    addIfMissing(address.landmark);
+    addIfMissing(address.city);
+    addIfMissing(address.state);
+    addIfMissing(address.pincode);
     return parts.join(', ');
   }
 

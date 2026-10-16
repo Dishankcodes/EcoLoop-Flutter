@@ -160,19 +160,26 @@ class _ArtistProfileState extends State<ArtistProfile> {
     });
 
     final alreadyReviewed = myReviews.any((item) {
-      final id = _value(item, [
-        'artistId',
-        'artist_id',
-        'sellerId',
-        'seller_id',
-      ]);
-      final type = _value(item, [
-        'reviewType',
+      final artistId = _value(item, ['artistId', 'artist_id']);
+      final sellerId = _value(item, ['sellerId', 'seller_id']);
+      final sellerType = _value(item, [
         'sellerType',
+        'seller_type',
+      ]).toLowerCase();
+      final reviewType = _value(item, [
+        'reviewType',
+        'review_type',
         'type',
       ]).toLowerCase();
-      return id == _artistId &&
-          (type.isEmpty || type.contains('artist') || type.contains('remaker'));
+      final status = _value(item, ['status']).toLowerCase();
+      final active = status.isEmpty || status == 'active';
+      final belongsToArtist =
+          artistId == _artistId ||
+          (sellerId == _artistId &&
+              (sellerType == 'artist' || sellerType == 'remaker')) ||
+          reviewType == 'artist' ||
+          reviewType == 'remaker';
+      return active && belongsToArtist;
     });
 
     final eligibleOrder = _findEligibleOrder(orders, artistProducts);
@@ -264,14 +271,15 @@ class _ArtistProfileState extends State<ArtistProfile> {
         'paymentStatus',
         'payment_status',
         'paymentState',
-      ]).toLowerCase();
-      if (!(status == 'confirmed' ||
-          status == 'delivered' ||
-          status == 'completed'))
-        continue;
+        'payment',
+      ]).toLowerCase().replaceAll('_', ' ').trim();
+      if (status != 'delivered') continue;
       if (!(payment == 'paid' ||
+          payment == 'completed' ||
           payment == 'success' ||
-          payment == 'successful'))
+          payment == 'successful' ||
+          payment == 'captured' ||
+          payment == 'cod paid'))
         continue;
 
       final orderId = _value(order, ['orderId', 'order_id', 'id']);
@@ -281,23 +289,31 @@ class _ArtistProfileState extends State<ArtistProfile> {
             order['order_items'] ??
             order['products'],
       );
-      final directArtist = _value(order, [
-        'artistId',
-        'artist_id',
-        'sellerId',
-        'seller_id',
-      ]);
+      final directArtistId = _value(order, ['artistId', 'artist_id']);
+      final directSellerId = _value(order, ['sellerId', 'seller_id']);
+      final directSellerType = _value(order, [
+        'sellerType',
+        'seller_type',
+      ]).toLowerCase();
+      final directProductId = _value(order, ['productId', 'product_id']);
       final hasArtist =
-          directArtist == _artistId ||
+          directArtistId == _artistId ||
+          (directSellerId == _artistId &&
+              (directSellerType == 'artist' ||
+                  directSellerType == 'remaker')) ||
+          productIds.contains(directProductId) ||
           items.any((item) {
-            final artistId = _value(item, [
-              'artistId',
-              'artist_id',
-              'sellerId',
-              'seller_id',
-            ]);
+            final artistId = _value(item, ['artistId', 'artist_id']);
+            final sellerId = _value(item, ['sellerId', 'seller_id']);
+            final sellerType = _value(item, [
+              'sellerType',
+              'seller_type',
+            ]).toLowerCase();
             final productId = _value(item, ['productId', 'product_id', 'id']);
-            return artistId == _artistId || productIds.contains(productId);
+            return artistId == _artistId ||
+                (sellerId == _artistId &&
+                    (sellerType == 'artist' || sellerType == 'remaker')) ||
+                productIds.contains(productId);
           });
       if (hasArtist && orderId.isNotEmpty) return orderId;
     }

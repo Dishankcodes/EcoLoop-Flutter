@@ -84,7 +84,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
       'payment_status',
       'payment',
     ]).toLowerCase().replaceAll('_', ' ').trim();
-    const allowedStatuses = {'confirmed', 'delivered'};
+    const allowedStatuses = {'delivered'};
     const paidStatuses = {
       'paid',
       'completed',

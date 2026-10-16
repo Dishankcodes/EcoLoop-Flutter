@@ -15,6 +15,7 @@ class Checkout extends StatefulWidget {
   final int quantity;
   final String? initialCouponCode;
   final double initialCouponDiscount;
+  final bool clearCartAfterOrder;
 
   const Checkout({
     super.key,
@@ -23,6 +24,7 @@ class Checkout extends StatefulWidget {
     this.quantity = 1,
     this.initialCouponCode,
     this.initialCouponDiscount = 0,
+    this.clearCartAfterOrder = false,
     // Kept temporarily for compatibility with existing navigation call sites; Eco Points are not used in checkout.
     double initialEcoPointDiscount = 0,
   });
@@ -51,8 +53,10 @@ class _CheckoutState extends State<Checkout> {
   @override
   void initState() {
     super.initState();
-    _couponCode = widget.initialCouponCode;
-    _couponDiscount = widget.initialCouponDiscount;
+    // No coupon endpoint currently validates/redempts discounts. Do not allow
+    // a UI-provided amount to change the order total.
+    _couponCode = null;
+    _couponDiscount = 0;
 
     if (widget.items != null) {
       for (final item in widget.items!) {
@@ -119,7 +123,7 @@ class _CheckoutState extends State<Checkout> {
           item['available_quantity'] ??
           item['stock'] ??
           item['quantityAvailable'],
-      1,
+      0,
     ).clamp(0, 999999);
     item['image'] = _productImage(item);
     item['seller'] =
@@ -691,20 +695,11 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  void _continueToPayment() {
+  Future<void> _continueToPayment() async {
     if (_proceeding) return;
     if (_items.isEmpty) {
       _message('Add at least one product to continue.');
       return;
-    }
-    for (final item in _items) {
-      final id = item['productId'].toString();
-      final quantity = _integer(item['quantity'], 0);
-      final stock = _integer(item['availableQuantity'], 0);
-      if (id.isEmpty || quantity < 1 || quantity > stock) {
-        _message('Please check product IDs and quantities before continuing.');
-        return;
-      }
     }
     if (_selectedAddress == null) {
       _message('Please add and select a delivery address.');
@@ -712,20 +707,81 @@ class _CheckoutState extends State<Checkout> {
     }
 
     final address = Map<String, dynamic>.from(_selectedAddress!);
-    address['addressId'] = address['addressId'] ?? address['id'];
-    final savings = _couponSavings;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Payment(
-          totalAmount: _grandTotal,
-          items: _items.map((item) => Map<String, dynamic>.from(item)).toList(),
-          address: address,
-          deliveryMethod: 'Standard Delivery',
-          savings: savings,
+    final addressId =
+        address['addressId'] ?? address['address_id'] ?? address['id'];
+    if (addressId == null || addressId.toString().trim().isEmpty) {
+      _message('Please select a saved address again before continuing.');
+      return;
+    }
+    address['addressId'] = addressId;
+
+    setState(() => _proceeding = true);
+    try {
+      // Re-read authoritative product data just before checkout. The server
+      // still performs final stock validation atomically during batch ordering.
+      final refreshed = <Map<String, dynamic>>[];
+      for (final current in _items) {
+        final id =
+            (current['productId'] ??
+                    current['product_id'] ??
+                    current['id'] ??
+                    '')
+                .toString();
+        final quantity = _integer(current['quantity'], 0);
+        final numericId = int.tryParse(id);
+        if (numericId == null || numericId <= 0 || quantity < 1) {
+          throw Exception('A cart item has an invalid product ID or quantity.');
+        }
+        final response = await _api.get('/products/$numericId/validate');
+        final root = _asMap(response);
+        final product = _asMap(root['data'] ?? root['product'] ?? response);
+        if (product.isEmpty) {
+          throw Exception(
+            'Could not validate product #$numericId. Please try again.',
+          );
+        }
+        final normalized = _normalizeItem({...current, ...product});
+        final status = (normalized['status'] ?? 'published')
+            .toString()
+            .toLowerCase();
+        final stock = _integer(normalized['availableQuantity'], 0);
+        if (status != 'published' || stock < quantity) {
+          throw Exception(
+            '${normalized['title']} is no longer available in the requested quantity. Update your cart.',
+          );
+        }
+        normalized['quantity'] = quantity;
+        refreshed.add(normalized);
+      }
+      if (!mounted) return;
+      setState(() {
+        _items
+          ..clear()
+          ..addAll(refreshed);
+      });
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => Payment(
+            totalAmount: _grandTotal,
+            items: refreshed
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList(),
+            address: address,
+            deliveryMethod: 'Standard Delivery',
+            savings: 0,
+            clearCartAfterSuccess: widget.clearCartAfterOrder,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (error) {
+      _message(
+        'Could not validate checkout: ${error.toString().replaceFirst('Exception: ', '')}',
+      );
+    } finally {
+      if (mounted) setState(() => _proceeding = false);
+    }
   }
 
   void _message(String message) {
@@ -736,24 +792,27 @@ class _CheckoutState extends State<Checkout> {
   }
 
   String _addressText(Map<String, dynamic> address) {
-    final parts =
-        [
-              address['addressLine'] ??
-                  address['address_line'] ??
-                  address['house'] ??
-                  address['address'],
-              address['area'] ?? address['landmark'],
-              address['city'],
-              address['state'],
-              address['pincode'] ??
-                  address['postalCode'] ??
-                  address['postal_code'],
-            ]
-            .where(
-              (value) => value != null && value.toString().trim().isNotEmpty,
-            )
-            .map((value) => value.toString().trim())
-            .toList();
+    final parts = <String>[];
+    void addIfMissing(dynamic value) {
+      if (value == null) return;
+      final part = value.toString().trim();
+      if (part.isEmpty) return;
+      final current = parts.join(', ').toLowerCase();
+      if (!current.contains(part.toLowerCase())) parts.add(part);
+    }
+
+    addIfMissing(
+      address['addressLine'] ??
+          address['address_line'] ??
+          address['house'] ??
+          address['address'],
+    );
+    addIfMissing(address['area'] ?? address['landmark']);
+    addIfMissing(address['city']);
+    addIfMissing(address['state']);
+    addIfMissing(
+      address['pincode'] ?? address['postalCode'] ?? address['postal_code'],
+    );
     return parts.join(', ');
   }
 
