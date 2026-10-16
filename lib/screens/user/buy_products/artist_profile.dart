@@ -2,61 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 
-/// ===============================================================
-/// PUBLIC ARTIST PROFILE
-/// ===============================================================
-///
-/// This page is used when a USER views another ARTIST / REMAKER.
-///
-/// It is intentionally separate from the artist's own Profile page.
-///
-/// Own Profile:
-///     - Edit profile
-///     - Manage products
-///     - Manage portfolio
-///     - Settings
-///
-/// Public Artist Profile:
-///     - Follow artist
-///     - Contact artist
-///     - About
-///     - Portfolio
-///     - Before / After work
-///     - Products
-///     - Reviews
-///     - Certification
-///     - Report / Block
-///
-/// Later, [artist] can be populated directly from the Django API.
-/// The current implementation contains safe demo fallback data so
-/// the UI can be developed and tested before the API is connected.
-/// ===============================================================
-
+/// Public profile shown when a user opens an artist/ReMaker from a listing.
+/// Profile details are taken from the selected backend artist record; portfolio,
+/// products, reviews, follow state and review eligibility are loaded from API.
 class ArtistProfile extends StatefulWidget {
   const ArtistProfile({super.key, required this.artist});
 
-  /// Artist data received from marketplace / artist listing.
-  ///
-  /// Supported keys:
-  ///
-  /// id
-  /// name / userName
-  /// email
-  /// phone
-  /// bio
-  /// city
-  /// state
-  /// location
-  /// skills
-  /// experience
-  /// rating
-  /// reviews
-  /// followers
-  /// products
-  /// sold
-  /// verified
-  /// profileImage
   final Map<String, dynamic> artist;
 
   @override
@@ -64,1516 +17,437 @@ class ArtistProfile extends StatefulWidget {
 }
 
 class _ArtistProfileState extends State<ArtistProfile> {
-  // ===============================================================
-  // UI STATE
-  // ===============================================================
+  final EcoLoopApi _api = EcoLoopApi.instance;
 
-  bool _isFollowing = false;
+  late Map<String, dynamic> _artist;
+  List<Map<String, dynamic>> _portfolio = [];
+  List<Map<String, dynamic>> _products = [];
+  List<Map<String, dynamic>> _reviews = [];
+  List<Map<String, dynamic>> _orders = [];
 
-  // ===============================================================
-  // DEMO PORTFOLIO
-  // ===============================================================
-  //
-  // These are intentionally structured so they can later be replaced
-  // by API response objects.
-  //
-  // BEFORE / AFTER is a core ReOrbit / EcoLoop artist feature.
-  // ===============================================================
-
-  late final List<Map<String, dynamic>> _portfolio;
-
-  // ===============================================================
-  // DEMO PRODUCTS
-  // ===============================================================
-
-  late final List<Map<String, dynamic>> _products;
+  bool _loading = true;
+  bool _refreshing = false;
+  bool _following = false;
+  bool _followBusy = false;
+  bool _reviewEligibilityChecked = false;
+  bool _canReview = false;
+  bool _alreadyReviewed = false;
+  String? _eligibleOrderId;
+  String? _loadError;
 
   @override
   void initState() {
     super.initState();
-
-    _portfolio = [
-      {
-        'id': 1,
-        'title': 'Reclaimed Wood Coffee Table',
-        'category': 'Furniture',
-        'description':
-            'A discarded wooden frame transformed into a functional '
-            'and modern coffee table.',
-        'before':
-            'https://images.unsplash.com/photo-1519710164239-da123dc03ef4'
-            '?auto=format&fit=crop&w=1000&q=85',
-        'after':
-            'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc'
-            '?auto=format&fit=crop&w=1000&q=85',
-        'likes': 84,
-        'views': 312,
-        'featured': true,
-      },
-      {
-        'id': 2,
-        'title': 'Upcycled Wall Decor',
-        'category': 'Home Decor',
-        'description':
-            'Old materials redesigned into a handmade decorative '
-            'wall piece.',
-        'before':
-            'https://images.unsplash.com/photo-1501004318641-b39e6451bec6'
-            '?auto=format&fit=crop&w=1000&q=85',
-        'after':
-            'https://images.unsplash.com/photo-1549490349-8643362247b5'
-            '?auto=format&fit=crop&w=1000&q=85',
-        'likes': 61,
-        'views': 248,
-        'featured': true,
-      },
-      {
-        'id': 3,
-        'title': 'Recycled Wooden Organizer',
-        'category': 'Utility',
-        'description':
-            'Leftover wood pieces converted into a useful desk '
-            'organizer.',
-        'before':
-            'https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122'
-            '?auto=format&fit=crop&w=1000&q=85',
-        'after':
-            'https://images.unsplash.com/photo-1586023492125-27b2c045efd7'
-            '?auto=format&fit=crop&w=1000&q=85',
-        'likes': 42,
-        'views': 176,
-        'featured': false,
-      },
-      {
-        'id': 4,
-        'title': 'Decorative Shelf',
-        'category': 'Furniture',
-        'description':
-            'Reclaimed timber turned into a minimalist decorative shelf.',
-        'before':
-            'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4'
-            '?auto=format&fit=crop&w=1000&q=85',
-        'after':
-            'https://images.unsplash.com/photo-1594620302200-9a762244a156'
-            '?auto=format&fit=crop&w=1000&q=85',
-        'likes': 37,
-        'views': 151,
-        'featured': false,
-      },
-    ];
-
-    _products = [
-      {
-        'id': 101,
-        'title': 'Reclaimed Wood Coffee Table',
-        'price': 2500,
-        'category': 'Furniture',
-        'condition': 'Upcycled',
-        'image':
-            'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc'
-            '?auto=format&fit=crop&w=1000&q=85',
-      },
-      {
-        'id': 102,
-        'title': 'Handmade Wall Decor',
-        'price': 850,
-        'category': 'Home Decor',
-        'condition': 'Handmade',
-        'image':
-            'https://images.unsplash.com/photo-1549490349-8643362247b5'
-            '?auto=format&fit=crop&w=1000&q=85',
-      },
-      {
-        'id': 103,
-        'title': 'Wooden Desk Organizer',
-        'price': 650,
-        'category': 'Utility',
-        'condition': 'Upcycled',
-        'image':
-            'https://images.unsplash.com/photo-1586023492125-27b2c045efd7'
-            '?auto=format&fit=crop&w=1000&q=85',
-      },
-      {
-        'id': 104,
-        'title': 'Reclaimed Shelf',
-        'price': 1200,
-        'category': 'Furniture',
-        'condition': 'Upcycled',
-        'image':
-            'https://images.unsplash.com/photo-1594620302200-9a762244a156'
-            '?auto=format&fit=crop&w=1000&q=85',
-      },
-    ];
+    _artist = Map<String, dynamic>.from(widget.artist);
+    _loadProfileData();
   }
 
-  // ===============================================================
-  // DATA HELPERS
-  // ===============================================================
-
-  String _artistName() {
-    return widget.artist['name']?.toString() ??
-        widget.artist['userName']?.toString() ??
-        'Creative Studio';
+  String _firstValue(List<String> keys, {String fallback = ''}) {
+    for (final key in keys) {
+      final value = _artist[key];
+      if (value != null && value.toString().trim().isNotEmpty) {
+        return value.toString().trim();
+      }
+    }
+    return fallback;
   }
 
-  String _location() {
-    if (widget.artist['location'] != null) {
-      return widget.artist['location'].toString();
+  String get _artistId =>
+      _firstValue(['artistId', 'artist_id', 'id', 'userId', 'user_id']);
+
+  String get _name => _firstValue([
+    'name',
+    'artistName',
+    'artist_name',
+    'userName',
+    'username',
+    'fullName',
+  ], fallback: 'ReMaker');
+
+  String get _bio => _firstValue(['bio', 'about', 'description']);
+
+  String get _location {
+    final direct = _firstValue(['location', 'address']);
+    if (direct.isNotEmpty) return direct;
+    final city = _firstValue(['city']);
+    final state = _firstValue(['state', 'stateName']);
+    if (city.isNotEmpty && state.isNotEmpty) return '$city, $state';
+    return city.isNotEmpty ? city : state;
+  }
+
+  String get _avatar => _firstValue([
+    'profileImage',
+    'profile_image',
+    'profileImageUrl',
+    'profile_image_url',
+    'image',
+    'avatarUrl',
+    'avatar_url',
+  ]);
+
+  String get _email => _firstValue(['email']);
+
+  String get _phone => _firstValue(['phone', 'mobile', 'phoneNumber']);
+
+  bool get _verified {
+    final value =
+        _artist['verified'] ?? _artist['isVerified'] ?? _artist['is_verified'];
+    return value == true || value?.toString().toLowerCase() == 'true';
+  }
+
+  Future<void> _loadProfileData({bool refresh = false}) async {
+    if (_artistId.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError =
+              'Artist ID is missing. Open this page using the artist record returned by the backend.';
+        });
+      }
+      return;
     }
 
-    final city = widget.artist['city']?.toString();
-    final state = widget.artist['state']?.toString();
-
-    if (city != null && city.isNotEmpty && state != null && state.isNotEmpty) {
-      return '$city, $state';
+    if (mounted) {
+      setState(() {
+        if (refresh) {
+          _refreshing = true;
+        } else {
+          _loading = true;
+        }
+        _loadError = null;
+      });
     }
 
-    if (city != null && city.isNotEmpty) {
-      return city;
+    final results = await Future.wait<dynamic>([
+      _safeGet('/artists/$_artistId/portfolio', fallback: <dynamic>[]),
+      _safeGet('/products', fallback: <dynamic>[]),
+      _safeGet('/artists/$_artistId/reviews', fallback: <dynamic>[]),
+      _safeGet('/my/following', fallback: <dynamic>[]),
+      _safeGet('/orders', fallback: <dynamic>[]),
+      _safeGet('/my/reviews', fallback: <dynamic>[]),
+    ]);
+
+    if (!mounted) return;
+
+    final portfolio = _asList(results[0]);
+    final allProducts = _asList(results[1]);
+    final reviews = _asList(results[2]);
+    final following = _asList(results[3]);
+    final orders = _asList(results[4]);
+    final myReviews = _asList(results[5]);
+
+    final artistProducts = allProducts.where((product) {
+      final owner = _value(product, [
+        'artistId',
+        'artist_id',
+        'sellerId',
+        'seller_id',
+        'ownerId',
+        'owner_id',
+      ]);
+      return owner.isNotEmpty && owner == _artistId && !_isUnavailable(product);
+    }).toList();
+
+    final followsArtist = following.any((item) {
+      final id = _value(item, [
+        'artistId',
+        'artist_id',
+        'id',
+        'userId',
+        'user_id',
+      ]);
+      return id == _artistId;
+    });
+
+    final alreadyReviewed = myReviews.any((item) {
+      final id = _value(item, [
+        'artistId',
+        'artist_id',
+        'sellerId',
+        'seller_id',
+      ]);
+      final type = _value(item, [
+        'reviewType',
+        'sellerType',
+        'type',
+      ]).toLowerCase();
+      return id == _artistId &&
+          (type.isEmpty || type.contains('artist') || type.contains('remaker'));
+    });
+
+    final eligibleOrder = _findEligibleOrder(orders, artistProducts);
+    setState(() {
+      _portfolio = portfolio.where((item) => !_isUnavailable(item)).toList();
+      _products = artistProducts;
+      _reviews = reviews;
+      _orders = orders;
+      _following = followsArtist;
+      _alreadyReviewed = alreadyReviewed;
+      _eligibleOrderId = eligibleOrder;
+      _canReview = eligibleOrder != null && !alreadyReviewed;
+      _reviewEligibilityChecked = true;
+      _loading = false;
+      _refreshing = false;
+    });
+  }
+
+  Future<dynamic> _safeGet(String path, {required dynamic fallback}) async {
+    try {
+      return await _api.get(path);
+    } catch (_) {
+      return fallback;
     }
-
-    return 'Ahmedabad, Gujarat';
   }
 
-  String _bio() {
-    return widget.artist['bio']?.toString() ??
-        'I create meaningful products by giving discarded materials '
-            'a new life through thoughtful design, craftsmanship and '
-            'sustainable creativity.';
-  }
-
-  String _rating() {
-    return widget.artist['rating']?.toString() ?? '4.8';
-  }
-
-  int _reviewCount() {
-    return _toInt(widget.artist['reviews'], 42);
-  }
-
-  int _followers() {
-    return _toInt(widget.artist['followers'], 1240);
-  }
-
-  int _sold() {
-    return _toInt(widget.artist['sold'], 42);
-  }
-
-  bool _isVerified() {
-    return widget.artist['verified'] != false;
-  }
-
-  String? _profileImage() {
-    final image =
-        widget.artist['profileImage'] ??
-        widget.artist['profile_image'] ??
-        widget.artist['image'];
-
-    if (image == null) {
-      return null;
+  List<Map<String, dynamic>> _asList(dynamic value) {
+    dynamic current = value;
+    if (current is Map) {
+      current =
+          current['items'] ??
+          current['results'] ??
+          current['data'] ??
+          current['portfolio'] ??
+          current['products'] ??
+          current['reviews'] ??
+          current['orders'] ??
+          current['following'];
+      if (current is Map) {
+        current = current['items'] ?? current['results'] ?? current['data'];
+      }
     }
-
-    final value = image.toString().trim();
-
-    return value.isEmpty ? null : value;
-  }
-
-  int _toInt(dynamic value, int fallback) {
-    if (value is int) {
-      return value;
-    }
-
-    if (value is num) {
-      return value.toInt();
-    }
-
-    return int.tryParse(value?.toString() ?? '') ?? fallback;
-  }
-
-  // ===============================================================
-  // BUILD
-  // ===============================================================
-
-  @override
-  Widget build(BuildContext context) {
-    final name = _artistName();
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-
-      // ===========================================================
-      // APP BAR
-      // ===========================================================
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-
-        leading: IconButton(
-          tooltip: 'Back',
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: AppColors.textPrimary,
-          ),
-        ),
-
-        title: Text(
-          'Artist Profile',
-          style: AppTextStyles.title.copyWith(fontSize: 19),
-        ),
-
-        actions: [
-          IconButton(
-            tooltip: 'More',
-            onPressed: _showMoreOptions,
-            icon: const Icon(
-              Icons.more_vert_rounded,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(width: 5),
-        ],
-      ),
-
-      // ===========================================================
-      // BODY
-      // ===========================================================
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: _refreshProfile,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
-            ),
-            padding: const EdgeInsets.fromLTRB(18, 5, 18, 35),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildArtistHeader(),
-
-                const SizedBox(height: 17),
-
-                _buildActionButtons(),
-
-                const SizedBox(height: 21),
-
-                _buildStats(),
-
-                const SizedBox(height: 24),
-
-                _buildAboutSection(),
-
-                const SizedBox(height: 24),
-
-                _buildSkillsSection(),
-
-                const SizedBox(height: 24),
-
-                _buildPortfolioSection(),
-
-                const SizedBox(height: 24),
-
-                _buildProductsSection(),
-
-                const SizedBox(height: 24),
-
-                _buildReviewsSection(),
-
-                const SizedBox(height: 24),
-
-                _buildCertificationSection(),
-
-                const SizedBox(height: 20),
-
-                _buildMemberSection(),
-
-                const SizedBox(height: 10),
-
-                Center(
-                  child: Text(
-                    'EcoLoop • Give Things a New Life',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.textSecondary.withOpacity(0.65),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ===============================================================
-  // ARTIST HEADER
-  // ===============================================================
-
-  Widget _buildArtistHeader() {
-    final name = _artistName();
-    final location = _location();
-    final image = _profileImage();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(21),
-        border: Border.all(color: AppColors.light),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.055),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // -------------------------------------------------------
-          // PROFILE IMAGE
-          // -------------------------------------------------------
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 102,
-                height: 102,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.light,
-                  border: Border.all(
-                    color: AppColors.primary.withOpacity(0.35),
-                    width: 2.5,
-                  ),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: image != null
-                    ? Image.network(
-                        image,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) {
-                          return _buildInitialAvatar(name, fontSize: 38);
-                        },
-                      )
-                    : _buildInitialAvatar(name, fontSize: 38),
-              ),
-
-              if (_isVerified())
-                Positioned(
-                  right: 0,
-                  bottom: 2,
-                  child: Container(
-                    width: 31,
-                    height: 31,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.surface, width: 3),
-                    ),
-                    child: const Icon(
-                      Icons.check_rounded,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-
-          const SizedBox(height: 13),
-
-          // -------------------------------------------------------
-          // NAME
-          // -------------------------------------------------------
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text(
-                  name,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.title.copyWith(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-
-              if (_isVerified()) ...[
-                const SizedBox(width: 6),
-                const Icon(
-                  Icons.verified_rounded,
-                  size: 19,
-                  color: AppColors.primary,
-                ),
-              ],
-            ],
-          ),
-
-          const SizedBox(height: 5),
-
-          // -------------------------------------------------------
-          // REMAKER LABEL
-          // -------------------------------------------------------
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppColors.light,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              'Verified ReMaker',
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-                fontSize: 10,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 9),
-
-          // -------------------------------------------------------
-          // RATING
-          // -------------------------------------------------------
-          GestureDetector(
-            onTap: _openReviews,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.star_rounded,
-                  color: AppColors.primary,
-                  size: 18,
-                ),
-
-                const SizedBox(width: 4),
-
-                Text(
-                  _rating(),
-                  style: AppTextStyles.body
-                      .copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w500,
-                      )
-                      .copyWith(fontWeight: FontWeight.w700),
-                ),
-
-                const SizedBox(width: 4),
-
-                Text(
-                  '(${_reviewCount()} reviews)',
-                  style: AppTextStyles.caption,
-                ),
-
-                const SizedBox(width: 2),
-
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textSecondary,
-                  size: 17,
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 6),
-
-          // -------------------------------------------------------
-          // LOCATION
-          // -------------------------------------------------------
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.location_on_outlined,
-                size: 15,
-                color: AppColors.textSecondary,
-              ),
-
-              const SizedBox(width: 4),
-
-              Flexible(
-                child: Text(
-                  location,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 13),
-
-          // -------------------------------------------------------
-          // SPECIALTY
-          // -------------------------------------------------------
-          Text(
-            'Sustainable crafts • Upcycling • Handmade creations',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.caption.copyWith(
-              height: 1.45,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===============================================================
-  // INITIAL AVATAR
-  // ===============================================================
-
-  Widget _buildInitialAvatar(String name, {double fontSize = 30}) {
-    final firstLetter = name.isNotEmpty ? name.trim()[0].toUpperCase() : 'A';
-
-    return Center(
-      child: Text(
-        firstLetter,
-        style: TextStyle(
-          color: AppColors.primary,
-          fontSize: fontSize,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-
-  // ===============================================================
-  // ACTION BUTTONS
-  // ===============================================================
-
-  Widget _buildActionButtons() {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _toggleFollow,
-            icon: Icon(
-              _isFollowing
-                  ? Icons.check_rounded
-                  : Icons.person_add_alt_1_outlined,
-              size: 18,
-            ),
-            label: Text(_isFollowing ? 'Following' : 'Follow'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: const BorderSide(color: AppColors.primary),
-              minimumSize: const Size(0, 47),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 10),
-
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: _contactArtist,
-            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-            label: const Text('Contact'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              minimumSize: const Size(0, 47),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ===============================================================
-  // STATS
-  // ===============================================================
-
-  Widget _buildStats() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 17),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: AppColors.light),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _ProfileStat(
-              icon: Icons.people_outline_rounded,
-              value: _formatCount(_followers()),
-              label: 'Followers',
-            ),
-          ),
-
-          _statDivider(),
-
-          Expanded(
-            child: _ProfileStat(
-              icon: Icons.collections_outlined,
-              value: '${_portfolio.length}',
-              label: 'Works',
-            ),
-          ),
-
-          _statDivider(),
-
-          Expanded(
-            child: _ProfileStat(
-              icon: Icons.shopping_bag_outlined,
-              value: '${_sold()}',
-              label: 'Sold',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statDivider() {
-    return Container(width: 1, height: 43, color: AppColors.light);
-  }
-
-  // ===============================================================
-  // ABOUT
-  // ===============================================================
-
-  Widget _buildAboutSection() {
-    return _ProfileSection(
-      title: 'About',
-      icon: Icons.person_outline_rounded,
-      child: Text(_bio(), style: AppTextStyles.body.copyWith(height: 1.55)),
-    );
-  }
-
-  // ===============================================================
-  // SKILLS
-  // ===============================================================
-
-  Widget _buildSkillsSection() {
-    final rawSkills = widget.artist['skills'];
-
-    List<String> skills = [];
-
-    if (rawSkills is List) {
-      skills = rawSkills
-          .map((e) => e.toString().trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
-    } else if (rawSkills != null) {
-      skills = rawSkills
-          .toString()
-          .split(',')
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
-    }
-
-    if (skills.isEmpty) {
-      skills = const [
-        'Upcycling',
-        'Furniture',
-        'Handmade',
-        'Home Decor',
-        'Sustainable Design',
-      ];
-    }
-
-    return _ProfileSection(
-      title: 'Skills & Specialties',
-      icon: Icons.auto_awesome_outlined,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: skills.map(_skillChip).toList(),
-      ),
-    );
-  }
-
-  Widget _skillChip(String skill) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-      decoration: BoxDecoration(
-        color: AppColors.light,
-        borderRadius: BorderRadius.circular(9),
-      ),
-      child: Text(
-        skill,
-        style: AppTextStyles.caption.copyWith(
-          color: AppColors.primary,
-          fontWeight: FontWeight.w600,
-          fontSize: 10,
-        ),
-      ),
-    );
-  }
-
-  // ===============================================================
-  // PORTFOLIO
-  // ===============================================================
-
-  Widget _buildPortfolioSection() {
-    final featured = _portfolio
-        .where((item) => item['featured'] == true)
-        .take(2)
+    if (current is! List) return <Map<String, dynamic>>[];
+    return current
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
         .toList();
+  }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
+  String _value(Map<String, dynamic> map, List<String> keys) {
+    for (final key in keys) {
+      final value = map[key];
+      if (value != null && value.toString().trim().isNotEmpty) {
+        return value.toString().trim();
+      }
+    }
+    return '';
+  }
+
+  bool _isUnavailable(Map<String, dynamic> item) {
+    final status = _value(item, [
+      'status',
+      'productStatus',
+      'product_status',
+    ]).toLowerCase();
+    return status == 'deleted' ||
+        status == 'inactive' ||
+        status == 'draft' ||
+        status == 'rejected' ||
+        status == 'hidden';
+  }
+
+  String? _findEligibleOrder(
+    List<Map<String, dynamic>> orders,
+    List<Map<String, dynamic>> artistProducts,
+  ) {
+    final productIds = artistProducts
+        .map((p) => _value(p, ['productId', 'product_id', 'id']))
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    for (final order in orders) {
+      final status = _value(order, [
+        'status',
+        'orderStatus',
+        'order_status',
+      ]).toLowerCase();
+      final payment = _value(order, [
+        'paymentStatus',
+        'payment_status',
+        'paymentState',
+      ]).toLowerCase();
+      if (!(status == 'confirmed' ||
+          status == 'delivered' ||
+          status == 'completed'))
+        continue;
+      if (!(payment == 'paid' ||
+          payment == 'success' ||
+          payment == 'successful'))
+        continue;
+
+      final orderId = _value(order, ['orderId', 'order_id', 'id']);
+      final items = _asList(
+        order['items'] ??
+            order['orderItems'] ??
+            order['order_items'] ??
+            order['products'],
+      );
+      final directArtist = _value(order, [
+        'artistId',
+        'artist_id',
+        'sellerId',
+        'seller_id',
+      ]);
+      final hasArtist =
+          directArtist == _artistId ||
+          items.any((item) {
+            final artistId = _value(item, [
+              'artistId',
+              'artist_id',
+              'sellerId',
+              'seller_id',
+            ]);
+            final productId = _value(item, ['productId', 'product_id', 'id']);
+            return artistId == _artistId || productIds.contains(productId);
+          });
+      if (hasArtist && orderId.isNotEmpty) return orderId;
+    }
+    return null;
+  }
+
+  Future<void> _toggleFollow() async {
+    if (_artistId.isEmpty || _followBusy) return;
+    setState(() => _followBusy = true);
+    try {
+      if (_following) {
+        await _api.delete('/artists/$_artistId/follow');
+      } else {
+        await _api.post('/artists/$_artistId/follow', <String, dynamic>{});
+      }
+      if (mounted) setState(() => _following = !_following);
+    } catch (e) {
+      _message('Could not update follow status: $e');
+    } finally {
+      if (mounted) setState(() => _followBusy = false);
+    }
+  }
+
+  Future<void> _openWriteReview() async {
+    if (!_canReview || _eligibleOrderId == null) return;
+    final rating = ValueNotifier<int>(5);
+    final commentController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final submitted = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Container(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Form(
+            key: formKey,
+            child: SingleChildScrollView(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Portfolio',
-                    style: AppTextStyles.title.copyWith(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    'Review $_name',
+                    style: AppTextStyles.title.copyWith(fontSize: 20),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 8),
                   Text(
-                    'Before & after transformations',
+                    'Share feedback about your purchase from this ReMaker.',
                     style: AppTextStyles.caption,
                   ),
-                ],
-              ),
-            ),
-
-            TextButton(
-              onPressed: _openFullPortfolio,
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                padding: EdgeInsets.zero,
-              ),
-              child: const Text('View All'),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 11),
-
-        if (featured.isEmpty)
-          _buildEmptyPortfolio()
-        else
-          SizedBox(
-            height: 305,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: featured.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (_, index) {
-                return _buildPortfolioPreviewCard(featured[index]);
-              },
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildPortfolioPreviewCard(Map<String, dynamic> item) {
-    return GestureDetector(
-      onTap: () => _openPortfolioItem(item),
-      child: Container(
-        width: 275,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.light),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.045),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: _buildBeforeAfterPreview(item)),
-
-            Padding(
-              padding: const EdgeInsets.fromLTRB(13, 10, 13, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item['title'].toString(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.body
-                        .copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w500,
-                        )
-                        .copyWith(fontWeight: FontWeight.w700),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  Text(
-                    item['category'].toString(),
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.favorite_border_rounded,
-                        size: 14,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${item['likes']}',
-                        style: AppTextStyles.caption.copyWith(fontSize: 10),
-                      ),
-                      const SizedBox(width: 11),
-                      const Icon(
-                        Icons.visibility_outlined,
-                        size: 14,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${item['views']}',
-                        style: AppTextStyles.caption.copyWith(fontSize: 10),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ===============================================================
-  // BEFORE / AFTER PREVIEW
-  // ===============================================================
-
-  Widget _buildBeforeAfterPreview(Map<String, dynamic> item) {
-    final before = item['before']?.toString();
-    final after = item['after']?.toString();
-
-    return Row(
-      children: [
-        Expanded(
-          child: _BeforeAfterImage(
-            image: before,
-            label: 'BEFORE',
-            alignment: Alignment.center,
-          ),
-        ),
-
-        Container(width: 1, color: AppColors.surface),
-
-        Expanded(
-          child: _BeforeAfterImage(
-            image: after,
-            label: 'AFTER',
-            alignment: Alignment.center,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ===============================================================
-  // EMPTY PORTFOLIO
-  // ===============================================================
-
-  Widget _buildEmptyPortfolio() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(25),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: AppColors.light),
-      ),
-      child: Column(
-        children: [
-          const Icon(
-            Icons.collections_outlined,
-            color: AppColors.primary,
-            size: 35,
-          ),
-          const SizedBox(height: 9),
-          Text(
-            'No portfolio work yet',
-            style: AppTextStyles.body
-                .copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w500,
-                )
-                .copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'This artist has not added portfolio work yet.',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.caption,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===============================================================
-  // PRODUCTS
-  // ===============================================================
-
-  Widget _buildProductsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Products',
-                    style: AppTextStyles.title.copyWith(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Available creations from this artist',
-                    style: AppTextStyles.caption,
-                  ),
-                ],
-              ),
-            ),
-
-            TextButton(
-              onPressed: _openProducts,
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                padding: EdgeInsets.zero,
-              ),
-              child: const Text('View All'),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 11),
-
-        SizedBox(
-          height: 248,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: _products.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (_, index) {
-              return _buildProductCard(_products[index]);
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProductCard(Map<String, dynamic> product) {
-    return GestureDetector(
-      onTap: () => _showProductDetails(product),
-      child: Container(
-        width: 190,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: AppColors.light),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Image.network(
-                      product['image'].toString(),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) {
-                        return Container(
-                          color: AppColors.light,
-                          child: const Center(
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              color: AppColors.primary,
-                              size: 30,
-                            ),
+                  const SizedBox(height: 16),
+                  ValueListenableBuilder<int>(
+                    valueListenable: rating,
+                    builder: (_, value, __) => Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        5,
+                        (index) => IconButton(
+                          onPressed: () => rating.value = index + 1,
+                          icon: Icon(
+                            index < value
+                                ? Icons.star_rounded
+                                : Icons.star_outline_rounded,
+                            color: AppColors.primary,
+                            size: 34,
                           ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.92),
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      child: Text(
-                        product['condition'].toString(),
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 9, 10, 11),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product['title'].toString(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.body
-                        .copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w500,
-                        )
-                        .copyWith(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  Text(
-                    '₹${product['price']}',
-                    style: AppTextStyles.title.copyWith(
-                      fontSize: 16,
-                      color: AppColors.primary,
-                    ),
-                  ),
-
-                  const SizedBox(height: 3),
-
-                  Text(
-                    product['category'].toString(),
-                    style: AppTextStyles.caption.copyWith(fontSize: 9),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ===============================================================
-  // REVIEWS
-  // ===============================================================
-
-  Widget _buildReviewsSection() {
-    return _ProfileSection(
-      title: 'Reviews',
-      icon: Icons.star_outline_rounded,
-      trailing: TextButton(
-        onPressed: _openReviews,
-        style: TextButton.styleFrom(
-          foregroundColor: AppColors.primary,
-          padding: EdgeInsets.zero,
-        ),
-        child: const Text('View All'),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: AppColors.light,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.star_rounded,
-                  color: AppColors.primary,
-                  size: 31,
-                ),
-              ),
-
-              const SizedBox(width: 13),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _rating(),
-                      style: AppTextStyles.title.copyWith(
-                        fontSize: 21,
-                        fontWeight: FontWeight.w700,
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: commentController,
+                    minLines: 3,
+                    maxLines: 5,
+                    maxLength: 1000,
+                    decoration: InputDecoration(
+                      labelText: 'Your review',
+                      hintText:
+                          'Tell others about the product and your experience...',
+                      filled: true,
+                      fillColor: AppColors.background,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-
-                    const SizedBox(height: 2),
-
-                    Text(
-                      '${_reviewCount()} reviews from buyers',
-                      style: AppTextStyles.caption,
+                    validator: (value) =>
+                        (value == null || value.trim().length < 5)
+                        ? 'Please write at least 5 characters.'
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        if (!(formKey.currentState?.validate() ?? false))
+                          return;
+                        Navigator.pop(sheetContext, true);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      child: const Text('Submit Review'),
                     ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(13),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.format_quote_rounded,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-
-                const SizedBox(width: 8),
-
-                Expanded(
-                  child: Text(
-                    'Beautiful craftsmanship and the transformation '
-                    'was exactly what I expected.',
-                    style: AppTextStyles.caption.copyWith(height: 1.5),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===============================================================
-  // CERTIFICATION
-  // ===============================================================
-
-  Widget _buildCertificationSection() {
-    return _ProfileSection(
-      title: 'Certification',
-      icon: Icons.workspace_premium_outlined,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: AppColors.light),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.light,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.verified_outlined,
-                color: AppColors.primary,
-                size: 25,
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'EcoLoop ReMaker',
-                    style: AppTextStyles.body
-                        .copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w500,
-                        )
-                        .copyWith(fontWeight: FontWeight.w700),
-                  ),
-
-                  const SizedBox(height: 3),
-
-                  Text(
-                    'Verified sustainable creator',
-                    style: AppTextStyles.caption,
                   ),
                 ],
               ),
             ),
-
-            const Icon(
-              Icons.check_circle_rounded,
-              color: AppColors.success,
-              size: 21,
-            ),
-          ],
+          ),
         ),
       ),
     );
+
+    if (submitted == true) {
+      try {
+        await _api.post('/reviews/artist', <String, dynamic>{
+          'artistId': _artistId,
+          'orderId': _eligibleOrderId,
+          'rating': rating.value,
+          'comment': commentController.text.trim(),
+          'review': commentController.text.trim(),
+        });
+        if (mounted) {
+          _message('Review submitted.');
+          await _loadProfileData(refresh: true);
+        }
+      } catch (e) {
+        _message('Could not submit review: $e');
+      }
+    }
+    rating.dispose();
+    commentController.dispose();
   }
 
-  // ===============================================================
-  // MEMBER INFO
-  // ===============================================================
-
-  Widget _buildMemberSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: AppColors.light),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.eco_outlined, color: AppColors.primary, size: 21),
-
-          const SizedBox(width: 9),
-
-          Expanded(
-            child: Text(
-              'Supporting reuse and sustainable creativity on EcoLoop.',
-              style: AppTextStyles.caption.copyWith(height: 1.45),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===============================================================
-  // OPEN FULL PORTFOLIO
-  // ===============================================================
-
-  void _openFullPortfolio() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ArtistPublicPortfolio(
-          artistName: _artistName(),
-          portfolio: _portfolio,
-        ),
-      ),
-    );
-  }
-
-  // ===============================================================
-  // OPEN PORTFOLIO ITEM
-  // ===============================================================
-
-  void _openPortfolioItem(Map<String, dynamic> item) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) {
-        return _PortfolioWorkSheet(item: item);
-      },
-    );
-  }
-
-  // ===============================================================
-  // PRODUCTS
-  // ===============================================================
-
-  void _openProducts() {
-    _showMessage('Artist product marketplace will open here.');
-  }
-
-  void _showProductDetails(Map<String, dynamic> product) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) {
-        return _ProductPreviewSheet(product: product);
-      },
-    );
-  }
-
-  // ===============================================================
-  // REVIEWS
-  // ===============================================================
-
-  void _openReviews() {
-    _showMessage('Artist reviews will open here.');
-  }
-
-  // ===============================================================
-  // FOLLOW
-  // ===============================================================
-
-  void _toggleFollow() {
-    setState(() {
-      _isFollowing = !_isFollowing;
-    });
-
-    _showMessage(
-      _isFollowing
-          ? 'You are now following ${_artistName()}.'
-          : 'You unfollowed ${_artistName()}.',
-    );
-  }
-
-  // ===============================================================
-  // CONTACT
-  // ===============================================================
-
-  void _contactArtist() {
-    _showMessage('Artist messaging will be connected here.');
-  }
-
-  // ===============================================================
-  // MORE
-  // ===============================================================
-
-  void _showMoreOptions() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(23)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.light,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-
-                _MoreOption(
-                  icon: Icons.share_outlined,
-                  title: 'Share Artist',
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showMessage('Artist sharing will be connected here.');
-                  },
-                ),
-
-                const SizedBox(height: 8),
-
-                _MoreOption(
-                  icon: Icons.flag_outlined,
-                  title: 'Report Artist',
-                  destructive: true,
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showMessage('Report artist option selected.');
-                  },
-                ),
-
-                const SizedBox(height: 8),
-
-                _MoreOption(
-                  icon: Icons.block_outlined,
-                  title: 'Block Artist',
-                  destructive: true,
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showMessage('Block artist option selected.');
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ===============================================================
-  // REFRESH
-  // ===============================================================
-
-  Future<void> _refreshProfile() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-
+  void _message(String message) {
     if (!mounted) return;
-
-    _showMessage('Artist profile refreshed.');
-  }
-
-  // ===============================================================
-  // SNACKBAR
-  // ===============================================================
-
-  void _showMessage(String message) {
-    if (!mounted) return;
-
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
@@ -1581,64 +455,336 @@ class _ArtistProfileState extends State<ArtistProfile> {
       );
   }
 
-  // ===============================================================
-  // FORMAT COUNT
-  // ===============================================================
-
-  String _formatCount(int value) {
-    if (value >= 1000000) {
-      final result = (value / 1000000).toStringAsFixed(1);
-
-      return result.endsWith('.0')
-          ? '${result.substring(0, result.length - 2)}M'
-          : '${result}M';
-    }
-
-    if (value >= 1000) {
-      final result = (value / 1000).toStringAsFixed(1);
-
-      return result.endsWith('.0')
-          ? '${result.substring(0, result.length - 2)}K'
-          : '${result}K';
-    }
-
-    return value.toString();
-  }
-}
-
-// ==================================================================
-// PROFILE SECTION
-// ==================================================================
-
-class _ProfileSection extends StatelessWidget {
-  const _ProfileSection({
-    required this.title,
-    required this.icon,
-    required this.child,
-    this.trailing,
-  });
-
-  final String title;
-  final IconData icon;
-  final Widget child;
-  final Widget? trailing;
-
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: Text(
+          'Artist Profile',
+          style: AppTextStyles.title.copyWith(fontSize: 19),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh profile',
+            onPressed: () => _loadProfileData(refresh: true),
+            icon: const Icon(
+              Icons.refresh_rounded,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () => _loadProfileData(refresh: true),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                padding: const EdgeInsets.fromLTRB(18, 6, 18, 32),
+                children: [
+                  if (_loadError != null) _errorBanner(_loadError!),
+                  _buildHeader(),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _followBusy ? null : _toggleFollow,
+                          icon: _followBusy
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(
+                                  _following
+                                      ? Icons.check_rounded
+                                      : Icons.person_add_alt_1_outlined,
+                                ),
+                          label: Text(_following ? 'Following' : 'Follow'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.primary),
+                            minimumSize: const Size(0, 46),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _email.isNotEmpty || _phone.isNotEmpty
+                              ? _contactArtist
+                              : null,
+                          icon: const Icon(Icons.chat_bubble_outline_rounded),
+                          label: const Text('Contact'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(0, 46),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  _buildStats(),
+                  if (_bio.isNotEmpty) ...[
+                    const SizedBox(height: 22),
+                    _section(
+                      'About',
+                      Icons.person_outline_rounded,
+                      Text(
+                        _bio,
+                        style: AppTextStyles.body.copyWith(height: 1.55),
+                      ),
+                    ),
+                  ],
+                  if (_skills.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    _section(
+                      'Skills & Specialties',
+                      Icons.auto_awesome_outlined,
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _skills.map(_skillChip).toList(),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 22),
+                  _buildPortfolio(),
+                  const SizedBox(height: 22),
+                  _buildProducts(),
+                  const SizedBox(height: 22),
+                  _buildReviews(),
+                  const SizedBox(height: 22),
+                  if (_verified) _buildCertification(),
+                  const SizedBox(height: 14),
+                  const Center(child: Text('EcoLoop • Give Things a New Life')),
+                ],
+              ),
+            ),
+    );
+  }
+
+  List<String> get _skills {
+    final raw =
+        _artist['skills'] ?? _artist['specialties'] ?? _artist['categories'];
+    if (raw is List)
+      return raw
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    if (raw is String)
+      return raw
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    return const [];
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.light),
+      ),
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 48,
+            backgroundColor: AppColors.light,
+            backgroundImage: _avatar.isNotEmpty ? NetworkImage(_avatar) : null,
+            child: _avatar.isEmpty
+                ? Text(
+                    _name.trim().isEmpty ? 'R' : _name.trim()[0].toUpperCase(),
+                    style: AppTextStyles.title.copyWith(
+                      fontSize: 34,
+                      color: AppColors.primary,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  _name,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.title.copyWith(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (_verified) ...[
+                const SizedBox(width: 5),
+                const Icon(
+                  Icons.verified_rounded,
+                  color: AppColors.primary,
+                  size: 19,
+                ),
+              ],
+            ],
+          ),
+          if (_verified) ...[
+            const SizedBox(height: 7),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.light,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'Verified ReMaker',
+                style: AppTextStyles.caption.copyWith(color: AppColors.primary),
+              ),
+            ),
+          ],
+          if (_location.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 15,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    _location,
+                    style: AppTextStyles.caption,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (_email.isNotEmpty || _phone.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              [_email, _phone].where((e) => e.isNotEmpty).join(' • '),
+              textAlign: TextAlign.center,
+              style: AppTextStyles.caption,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStats() {
+    final followers = _number(
+      _artist['followersCount'] ?? _artist['followers'],
+    );
+    final sold = _number(
+      _artist['soldCount'] ?? _artist['sold'] ?? _artist['totalSold'],
+    );
+    final average = _averageRating();
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.light),
+      ),
+      child: Row(
+        children: [
+          _stat('people_outline_rounded', _compact(followers), 'Followers'),
+          Container(width: 1, height: 40, color: AppColors.light),
+          _stat('collections_outlined', '${_portfolio.length}', 'Works'),
+          Container(width: 1, height: 40, color: AppColors.light),
+          _stat('shopping_bag_outlined', '$sold', 'Sold'),
+          Container(width: 1, height: 40, color: AppColors.light),
+          _stat(
+            'star_rounded',
+            average == null ? '—' : average.toStringAsFixed(1),
+            'Rating',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stat(String iconName, String value, String label) {
+    final icons = <String, IconData>{
+      'people_outline_rounded': Icons.people_outline_rounded,
+      'collections_outlined': Icons.collections_outlined,
+      'shopping_bag_outlined': Icons.shopping_bag_outlined,
+      'star_rounded': Icons.star_rounded,
+    };
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icons[iconName], color: AppColors.primary, size: 19),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            style: AppTextStyles.title.copyWith(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(label, style: AppTextStyles.caption.copyWith(fontSize: 9)),
+        ],
+      ),
+    );
+  }
+
+  int _number(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  String _compact(int value) {
+    if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
+    if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}K';
+    return '$value';
+  }
+
+  double? _averageRating() {
+    if (_reviews.isEmpty) {
+      final raw =
+          _artist['rating'] ??
+          _artist['averageRating'] ??
+          _artist['average_rating'];
+      return raw is num
+          ? raw.toDouble()
+          : double.tryParse(raw?.toString() ?? '');
+    }
+    final values = _reviews
+        .map((r) => double.tryParse(_value(r, ['rating', 'stars'])) ?? 0)
+        .where((r) => r > 0)
+        .toList();
+    if (values.isEmpty) return null;
+    return values.reduce((a, b) => a + b) / values.length;
+  }
+
+  Widget _section(String title, IconData icon, Widget child) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(17),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.light),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.025),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1646,418 +792,431 @@ class _ProfileSection extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 33,
-                height: 33,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: AppColors.light,
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(icon, color: AppColors.primary, size: 18),
               ),
-
               const SizedBox(width: 10),
-
               Expanded(
                 child: Text(
                   title,
-                  style: AppTextStyles.title.copyWith(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: AppTextStyles.title.copyWith(fontSize: 16),
                 ),
               ),
-
-              if (trailing != null) trailing!,
             ],
           ),
-
           const SizedBox(height: 13),
-
           child,
         ],
       ),
     );
   }
-}
 
-// ==================================================================
-// PROFILE STAT
-// ==================================================================
+  Widget _skillChip(String skill) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+    decoration: BoxDecoration(
+      color: AppColors.light,
+      borderRadius: BorderRadius.circular(9),
+    ),
+    child: Text(
+      skill,
+      style: AppTextStyles.caption.copyWith(color: AppColors.primary),
+    ),
+  );
 
-class _ProfileStat extends StatelessWidget {
-  const _ProfileStat({
-    required this.icon,
-    required this.value,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildPortfolio() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 19, color: AppColors.primary),
-
-        const SizedBox(height: 5),
-
-        Text(
-          value,
-          style: AppTextStyles.title.copyWith(
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-          ),
+        _sectionHeading(
+          'Portfolio',
+          'Before & after transformations',
+          onViewAll: _portfolio.isEmpty
+              ? null
+              : () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          _PortfolioListPage(name: _name, items: _portfolio),
+                    ),
+                  );
+                },
         ),
-
-        const SizedBox(height: 2),
-
-        Text(label, style: AppTextStyles.caption.copyWith(fontSize: 9)),
+        const SizedBox(height: 10),
+        if (_portfolio.isEmpty)
+          _emptyCard(
+            'No portfolio work yet',
+            'This ReMaker has not published portfolio projects.',
+          )
+        else
+          SizedBox(
+            height: 285,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _portfolio.length > 5 ? 5 : _portfolio.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (_, i) =>
+                  _PortfolioCard(item: _portfolio[i], width: 255),
+            ),
+          ),
       ],
     );
   }
-}
 
-// ==================================================================
-// BEFORE / AFTER IMAGE
-// ==================================================================
-
-class _BeforeAfterImage extends StatelessWidget {
-  const _BeforeAfterImage({
-    required this.image,
-    required this.label,
-    required this.alignment,
-  });
-
-  final String? image;
-  final String label;
-  final Alignment alignment;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
+  Widget _buildProducts() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (image != null)
-          Image.network(
-            image!,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) {
-              return _fallback();
-            },
+        _sectionHeading('Products', 'Available creations from this ReMaker'),
+        const SizedBox(height: 10),
+        if (_products.isEmpty)
+          _emptyCard(
+            'No available products',
+            'There are no active products listed by this ReMaker right now.',
           )
         else
-          _fallback(),
-
-        Positioned(
-          top: 9,
-          left: 9,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            decoration: BoxDecoration(
-              color: label == 'BEFORE'
-                  ? Colors.black.withOpacity(0.62)
-                  : AppColors.primary,
-              borderRadius: BorderRadius.circular(7),
-            ),
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.4,
+          SizedBox(
+            height: 240,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _products.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (_, i) => _ProductCard(
+                product: _products[i],
+                onTap: () => _showProduct(_products[i]),
               ),
             ),
           ),
-        ),
       ],
     );
   }
 
-  Widget _fallback() {
-    return Container(
-      color: AppColors.light,
-      child: const Center(
-        child: Icon(
-          Icons.image_not_supported_outlined,
-          color: AppColors.primary,
-          size: 27,
-        ),
-      ),
-    );
-  }
-}
-
-// ==================================================================
-// MORE OPTION
-// ==================================================================
-
-class _MoreOption extends StatelessWidget {
-  const _MoreOption({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-    this.destructive = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
-  final bool destructive;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = destructive ? AppColors.error : AppColors.primary;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(13),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          color: destructive
-              ? AppColors.error.withOpacity(0.045)
-              : AppColors.background,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(
-            color: destructive
-                ? AppColors.error.withOpacity(0.18)
-                : AppColors.light,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: color),
-
-            const SizedBox(width: 10),
-
-            Text(
-              title,
-              style: AppTextStyles.body
-                  .copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w500,
-                  )
-                  .copyWith(color: color, fontWeight: FontWeight.w600),
-            ),
-
-            const Spacer(),
-
-            Icon(Icons.chevron_right_rounded, size: 19, color: color),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ==================================================================
-// PUBLIC PORTFOLIO PAGE
-// ==================================================================
-//
-// This is READ-ONLY.
-// The artist's own Portfolio page handles CRUD.
-// ==================================================================
-
-class ArtistPublicPortfolio extends StatelessWidget {
-  const ArtistPublicPortfolio({
-    super.key,
-    required this.artistName,
-    required this.portfolio,
-  });
-
-  final String artistName;
-  final List<Map<String, dynamic>> portfolio;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        title: Text('Portfolio', style: AppTextStyles.title),
-      ),
-
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(18, 5, 18, 35),
+  Widget _sectionHeading(
+    String title,
+    String subtitle, {
+    VoidCallback? onViewAll,
+  }) {
+    return Row(
+      children: [
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AppColors.light),
+              Text(
+                title,
+                style: AppTextStyles.title.copyWith(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: AppColors.light,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        Icons.collections_bookmark_outlined,
-                        color: AppColors.primary,
-                      ),
+              ),
+              const SizedBox(height: 3),
+              Text(subtitle, style: AppTextStyles.caption),
+            ],
+          ),
+        ),
+        if (onViewAll != null)
+          TextButton(onPressed: onViewAll, child: const Text('View All')),
+      ],
+    );
+  }
+
+  Widget _emptyCard(String title, String subtitle) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(22),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppColors.light),
+    ),
+    child: Column(
+      children: [
+        const Icon(Icons.inbox_outlined, color: AppColors.primary, size: 32),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.caption,
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildReviews() {
+    final average = _averageRating();
+    return _section(
+      'Reviews',
+      Icons.star_outline_rounded,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.star_rounded,
+                color: AppColors.primary,
+                size: 29,
+              ),
+              const SizedBox(width: 7),
+              Text(
+                average?.toStringAsFixed(1) ?? '—',
+                style: AppTextStyles.title.copyWith(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 7),
+              Text('${_reviews.length} reviews', style: AppTextStyles.caption),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_reviews.isEmpty)
+            Text(
+              'No reviews have been published for this ReMaker yet.',
+              style: AppTextStyles.caption,
+            )
+          else
+            ..._reviews.take(3).map(_reviewTile),
+          const SizedBox(height: 14),
+          if (_reviewEligibilityChecked && _canReview)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _openWriteReview,
+                icon: const Icon(Icons.rate_review_outlined),
+                label: const Text('Write a Review'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            )
+          else if (_reviewEligibilityChecked && _alreadyReviewed)
+            Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_outline_rounded,
+                  color: AppColors.primary,
+                  size: 18,
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'You have already reviewed this ReMaker.',
+                    style: AppTextStyles.caption,
+                  ),
+                ),
+              ],
+            )
+          else if (_reviewEligibilityChecked)
+            Text(
+              'Write a review becomes available after a qualifying paid and confirmed/delivered purchase from this ReMaker.',
+              style: AppTextStyles.caption.copyWith(height: 1.4),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reviewTile(Map<String, dynamic> review) {
+    final name = _value(review, [
+      'reviewerName',
+      'userName',
+      'name',
+      'buyerName',
+    ]);
+    final comment = _value(review, [
+      'comment',
+      'review',
+      'reviewText',
+      'review_text',
+      'message',
+    ]);
+    final rating = _value(review, ['rating', 'stars']);
+    final date = _value(review, ['createdAt', 'created_at', 'date']);
+    return Container(
+      margin: const EdgeInsets.only(top: 9),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name.isEmpty ? 'Buyer' : name,
+                  style: AppTextStyles.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.star_rounded,
+                color: AppColors.primary,
+                size: 16,
+              ),
+              Text(rating.isEmpty ? '—' : rating),
+            ],
+          ),
+          if (date.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(date, style: AppTextStyles.caption.copyWith(fontSize: 10)),
+          ],
+          if (comment.isNotEmpty) ...[
+            const SizedBox(height: 7),
+            Text(comment, style: AppTextStyles.caption.copyWith(height: 1.45)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCertification() => _section(
+    'Certification',
+    Icons.workspace_premium_outlined,
+    Row(
+      children: [
+        const Icon(Icons.verified_rounded, color: AppColors.primary, size: 27),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'EcoLoop ReMaker',
+                style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700),
+              ),
+              Text('Verified creator profile', style: AppTextStyles.caption),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _errorBanner(String message) => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppColors.light),
+    ),
+    child: Text(message, style: AppTextStyles.caption),
+  );
+
+  void _contactArtist() {
+    final details = [_email, _phone].where((e) => e.isNotEmpty).join('\n');
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Contact $_name'),
+        content: Text(
+          details.isEmpty
+              ? 'No public contact information is available.'
+              : details,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showProduct(Map<String, dynamic> product) {
+    final title = _value(product, ['title', 'name']);
+    final price = _value(product, ['price', 'sellingPrice', 'selling_price']);
+    final description = _value(product, ['description', 'details']);
+    final image = _value(product, [
+      'imageUrl',
+      'image_url',
+      'image',
+      'thumbnail',
+    ]);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        constraints: const BoxConstraints(maxHeight: 620),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (image.isNotEmpty)
+                Image.network(
+                  image,
+                  width: double.infinity,
+                  height: 230,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox(
+                    height: 150,
+                    child: Center(
+                      child: Icon(Icons.image_not_supported_outlined),
                     ),
-
-                    const SizedBox(width: 12),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '$artistName Portfolio',
-                            style: AppTextStyles.title.copyWith(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            'Before & after transformations',
-                            style: AppTextStyles.caption,
-                          ),
-                        ],
+                  ),
+                )
+              else
+                const SizedBox(
+                  height: 150,
+                  child: Center(child: Icon(Icons.image_outlined, size: 42)),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title.isEmpty ? 'Product' : title,
+                      style: AppTextStyles.title.copyWith(fontSize: 20),
+                    ),
+                    if (price.isNotEmpty) ...[
+                      const SizedBox(height: 7),
+                      Text(
+                        '₹$price',
+                        style: AppTextStyles.title.copyWith(
+                          color: AppColors.primary,
+                          fontSize: 22,
+                        ),
+                      ),
+                    ],
+                    if (description.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        description,
+                        style: AppTextStyles.body.copyWith(height: 1.5),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Close'),
                       ),
                     ),
                   ],
                 ),
-              ),
-
-              const SizedBox(height: 22),
-
-              Text(
-                'Creative Work',
-                style: AppTextStyles.title.copyWith(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-
-              const SizedBox(height: 4),
-
-              Text(
-                '${portfolio.length} projects',
-                style: AppTextStyles.caption,
-              ),
-
-              const SizedBox(height: 13),
-
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: portfolio.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 14,
-                  childAspectRatio: 0.72,
-                ),
-                itemBuilder: (_, index) {
-                  final item = portfolio[index];
-
-                  return GestureDetector(
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) => _PortfolioWorkSheet(item: item),
-                      );
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(17),
-                        border: Border.all(color: AppColors.light),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _BeforeAfterImage(
-                                    image: item['before']?.toString(),
-                                    label: 'BEFORE',
-                                    alignment: Alignment.center,
-                                  ),
-                                ),
-                                Container(width: 1, color: AppColors.surface),
-                                Expanded(
-                                  child: _BeforeAfterImage(
-                                    image: item['after']?.toString(),
-                                    label: 'AFTER',
-                                    alignment: Alignment.center,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item['title'].toString(),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTextStyles.body
-                                      .copyWith(
-                                        color: AppColors.textPrimary,
-                                        fontWeight: FontWeight.w500,
-                                      )
-                                      .copyWith(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                ),
-
-                                const SizedBox(height: 3),
-
-                                Text(
-                                  item['category'].toString(),
-                                  style: AppTextStyles.caption.copyWith(
-                                    color: AppColors.primary,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
               ),
             ],
           ),
@@ -2067,203 +1226,199 @@ class ArtistPublicPortfolio extends StatelessWidget {
   }
 }
 
-// ==================================================================
-// PORTFOLIO WORK SHEET
-// ==================================================================
+class _PortfolioListPage extends StatelessWidget {
+  const _PortfolioListPage({required this.name, required this.items});
 
-class _PortfolioWorkSheet extends StatelessWidget {
-  const _PortfolioWorkSheet({required this.item});
+  final String name;
+  final List<Map<String, dynamic>> items;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.background,
+    appBar: AppBar(
+      backgroundColor: AppColors.background,
+      title: Text('$name Portfolio', style: AppTextStyles.title),
+    ),
+    body: GridView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: items.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: .72,
+      ),
+      itemBuilder: (_, i) =>
+          _PortfolioCard(item: items[i], width: double.infinity),
+    ),
+  );
+}
+
+class _PortfolioCard extends StatelessWidget {
+  const _PortfolioCard({required this.item, required this.width});
 
   final Map<String, dynamic> item;
+  final double width;
+
+  String _value(List<String> keys) {
+    for (final key in keys) {
+      final v = item[key];
+      if (v != null && v.toString().trim().isNotEmpty)
+        return v.toString().trim();
+    }
+    return '';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 700),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
+    final title = _value(['title', 'name']);
+    final category = _value(['category']);
+    final before = _value([
+      'beforeImageUrl',
+      'before_image_url',
+      'before',
+      'imageBefore',
+    ]);
+    final after = _value([
+      'afterImageUrl',
+      'after_image_url',
+      'after',
+      'imageUrl',
+      'image_url',
+      'image',
+    ]);
+    final description = _value(['description', 'caption']);
+    return GestureDetector(
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          constraints: const BoxConstraints(maxHeight: 700),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
                   height: 270,
-                  width: double.infinity,
                   child: Row(
                     children: [
-                      Expanded(
-                        child: _BeforeAfterImage(
-                          image: item['before']?.toString(),
-                          label: 'BEFORE',
-                          alignment: Alignment.center,
-                        ),
-                      ),
-
+                      Expanded(child: _image(before, 'BEFORE')),
                       Container(width: 2, color: AppColors.surface),
-
-                      Expanded(
-                        child: _BeforeAfterImage(
-                          image: item['after']?.toString(),
-                          label: 'AFTER',
-                          alignment: Alignment.center,
-                        ),
-                      ),
+                      Expanded(child: _image(after, 'AFTER')),
                     ],
                   ),
                 ),
-
-                Positioned(
-                  top: 13,
-                  right: 13,
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.45),
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: Colors.white,
-                        size: 20,
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title.isEmpty ? 'Portfolio project' : title,
+                        style: AppTextStyles.title.copyWith(fontSize: 20),
                       ),
-                    ),
+                      if (category.isNotEmpty) ...[
+                        const SizedBox(height: 5),
+                        Text(
+                          category,
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                      if (description.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          description,
+                          style: AppTextStyles.body.copyWith(height: 1.5),
+                        ),
+                      ],
+                      for (final pair in <List<String>>[
+                        [
+                          'Materials',
+                          _value(['materialsUsed', 'materials_used']),
+                        ],
+                        [
+                          'Process',
+                          _value(['processDescription', 'process_description']),
+                        ],
+                        [
+                          'Environmental impact',
+                          _value([
+                            'environmentalImpact',
+                            'environmental_impact',
+                          ]),
+                        ],
+                      ])
+                        if (pair[1].isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            pair[0],
+                            style: AppTextStyles.body.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            pair[1],
+                            style: AppTextStyles.caption.copyWith(height: 1.45),
+                          ),
+                        ],
+                    ],
                   ),
                 ),
               ],
             ),
-
+          ),
+        ),
+      ),
+      child: Container(
+        width: width,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.light),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(child: _image(before, 'BEFORE')),
+                  Container(width: 1, color: AppColors.surface),
+                  Expanded(child: _image(after, 'AFTER')),
+                ],
+              ),
+            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 25),
+              padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item['title'].toString(),
-                          style: AppTextStyles.title.copyWith(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.light,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.auto_awesome_rounded,
-                              color: AppColors.primary,
-                              size: 14,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Remade',
-                              style: TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 6),
-
                   Text(
-                    item['category'].toString(),
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
+                    title.isEmpty ? 'Portfolio project' : title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-
-                  const SizedBox(height: 14),
-
-                  Text(
-                    item['description'].toString(),
-                    style: AppTextStyles.body.copyWith(height: 1.55),
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(13),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(12),
+                  if (category.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      category,
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.primary,
+                      ),
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          Icons.eco_outlined,
-                          color: AppColors.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 9),
-                        Expanded(
-                          child: Text(
-                            'This project demonstrates how an existing '
-                            'material or object was transformed into '
-                            'a useful new creation.',
-                            style: AppTextStyles.caption.copyWith(height: 1.45),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.favorite_border_rounded,
-                        size: 17,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        '${item['likes']} likes',
-                        style: AppTextStyles.caption,
-                      ),
-                      const SizedBox(width: 15),
-                      const Icon(
-                        Icons.visibility_outlined,
-                        size: 17,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        '${item['views']} views',
-                        style: AppTextStyles.caption,
-                      ),
-                    ],
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -2272,137 +1427,145 @@ class _PortfolioWorkSheet extends StatelessWidget {
       ),
     );
   }
+
+  Widget _image(String url, String label) => Stack(
+    fit: StackFit.expand,
+    children: [
+      if (url.isNotEmpty)
+        Image.network(
+          url,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _fallback(),
+        )
+      else
+        _fallback(),
+      Positioned(
+        left: 7,
+        top: 7,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            color: label == 'BEFORE' ? Colors.black54 : AppColors.primary,
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+
+  Widget _fallback() => Container(
+    color: AppColors.light,
+    child: const Center(
+      child: Icon(Icons.image_not_supported_outlined, color: AppColors.primary),
+    ),
+  );
 }
 
-// ==================================================================
-// PRODUCT PREVIEW SHEET
-// ==================================================================
-
-class _ProductPreviewSheet extends StatelessWidget {
-  const _ProductPreviewSheet({required this.product});
+class _ProductCard extends StatelessWidget {
+  const _ProductCard({required this.product, required this.onTap});
 
   final Map<String, dynamic> product;
+  final VoidCallback onTap;
+
+  String _value(List<String> keys) {
+    for (final key in keys) {
+      final value = product[key];
+      if (value != null && value.toString().trim().isNotEmpty)
+        return value.toString().trim();
+    }
+    return '';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 620),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SingleChildScrollView(
+    final title = _value(['title', 'name']);
+    final price = _value(['price', 'sellingPrice', 'selling_price']);
+    final category = _value(['category', 'categoryName', 'category_name']);
+    final image = _value([
+      'imageUrl',
+      'image_url',
+      'image',
+      'thumbnail',
+      'primaryImage',
+    ]);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 185,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.light),
+        ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              children: [
-                Image.network(
-                  product['image'].toString(),
-                  width: double.infinity,
-                  height: 250,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) {
-                    return Container(
-                      height: 250,
+            Expanded(
+              child: image.isEmpty
+                  ? Container(
                       color: AppColors.light,
                       child: const Center(
                         child: Icon(
-                          Icons.image_not_supported_outlined,
+                          Icons.image_outlined,
                           color: AppColors.primary,
-                          size: 40,
+                          size: 35,
                         ),
                       ),
-                    );
-                  },
-                ),
-
-                Positioned(
-                  top: 13,
-                  right: 13,
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.45),
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: Colors.white,
-                        size: 20,
+                    )
+                  : Image.network(
+                      image,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: AppColors.light,
+                        child: const Center(
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            color: AppColors.primary,
+                            size: 30,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ],
             ),
-
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 25),
+              padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product['title'].toString(),
-                    style: AppTextStyles.title.copyWith(
-                      fontSize: 20,
+                    title.isEmpty ? 'Product' : title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-
-                  const SizedBox(height: 5),
-
-                  Text(
-                    product['category'].toString(),
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Text(
-                    '₹${product['price']}',
-                    style: AppTextStyles.title.copyWith(
-                      color: AppColors.primary,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  Text(
-                    'This product is created by the artist using '
-                    'sustainable or reclaimed materials.',
-                    style: AppTextStyles.body.copyWith(height: 1.5),
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                  const SizedBox(height: 4),
+                  if (price.isNotEmpty)
+                    Text(
+                      '₹$price',
+                      style: AppTextStyles.title.copyWith(
+                        color: AppColors.primary,
+                        fontSize: 16,
                       ),
-                      child: const Text('View Product'),
                     ),
-                  ),
+                  if (category.isNotEmpty)
+                    Text(
+                      category,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption,
+                    ),
                 ],
               ),
             ),

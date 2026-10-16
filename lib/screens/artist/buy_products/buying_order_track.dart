@@ -1,3 +1,4 @@
+import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
@@ -15,25 +16,39 @@ class OrderTracking extends StatefulWidget {
 }
 
 class _OrderTrackingState extends State<OrderTracking> {
+  late Map<String, dynamic> _order;
+  bool _isLoading = false;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _order = Map<String, dynamic>.from(widget.order);
+    _refreshOrder();
+  }
+
   // ORDER DATA
 
-  String get productName =>
-      widget.order['productTitle']?.toString() ??
-      widget.order['product']?.toString() ??
-      'Wooden Study Table';
+  String get productName {
+    final value =
+        _order['productTitle'] ?? _order['productName'] ?? _order['product'];
+    return value?.toString().trim().isNotEmpty == true
+        ? value.toString()
+        : 'Product details unavailable';
+  }
 
-  String get orderId => widget.order['orderId']?.toString() ?? '#ECO-ORD-10021';
+  String get orderId => (_order['orderId'] ?? _order['id'])?.toString() ?? '—';
 
   String get orderDate =>
-      widget.order['orderDate']?.toString() ??
-      widget.order['date']?.toString() ??
-      '01 Sep 2026';
+      (_order['createdAt'] ?? _order['orderDate'] ?? _order['date'])
+          ?.toString() ??
+      '—';
 
   String get price {
-    final value = widget.order['totalAmount'] ?? widget.order['price'];
+    final value = _order['totalAmount'] ?? _order['price'];
 
     if (value == null) {
-      return '₹2,500';
+      return '—';
     }
 
     if (value is num) {
@@ -43,30 +58,71 @@ class _OrderTrackingState extends State<OrderTracking> {
     return value.toString();
   }
 
-  String get quantity => widget.order['quantity']?.toString() ?? '1';
+  String get quantity => _order['quantity']?.toString() ?? '—';
 
   String get currentStatus {
-    final status = widget.order['status']?.toString() ?? 'shipped';
+    final status =
+        (_order['status'] ?? _order['orderStatus'])?.toString() ?? 'pending';
 
     return _displayStatus(status);
   }
 
-  String get rawStatus => widget.order['status']?.toString() ?? 'shipped';
+  String get rawStatus =>
+      (_order['status'] ?? _order['orderStatus'])?.toString() ?? 'pending';
 
-  IconData get productIcon =>
-      widget.order['icon'] as IconData? ?? Icons.inventory_2_outlined;
+  IconData get productIcon => _order['icon'] is IconData
+      ? _order['icon'] as IconData
+      : Icons.inventory_2_outlined;
 
   String get expectedDelivery =>
-      widget.order['expectedDelivery']?.toString() ?? '03 Sep 2026';
+      (_order['expectedDelivery'] ?? _order['estimatedDelivery'])?.toString() ??
+      'Not provided by seller';
 
   String get sellerName =>
-      widget.order['sellerName']?.toString() ?? 'EcoLoop Artist';
+      (_order['sellerName'] ?? _order['seller'])?.toString() ??
+      'Seller details unavailable';
 
   String get shippingAddress =>
-      widget.order['shippingAddress']?.toString() ?? 'Ahmedabad, Gujarat';
+      ((_order['shippingAddress'] ?? _order['address'])
+              ?.toString()
+              .trim()
+              .isNotEmpty ??
+          false)
+      ? (_order['shippingAddress'] ?? _order['address']).toString()
+      : 'Address not available';
 
-  String get paymentStatus =>
-      widget.order['paymentStatus']?.toString() ?? 'paid';
+  String get paymentStatus => _order['paymentStatus']?.toString() ?? 'pending';
+
+  Future<void> _refreshOrder() async {
+    final id = _order['orderId'] ?? _order['id'];
+    if (id == null || id.toString().trim().isEmpty) return;
+    if (mounted)
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    try {
+      final response = await EcoLoopApi.instance.get(
+        '/orders/${Uri.encodeComponent(id.toString())}',
+      );
+      final dynamic payload = response is Map
+          ? (response['order'] ?? response['data'] ?? response)
+          : response;
+      if (payload is Map && mounted) {
+        setState(() {
+          _order = {..._order, ...Map<String, dynamic>.from(payload)};
+          _loadError = null;
+        });
+      }
+    } catch (error) {
+      if (mounted)
+        setState(
+          () => _loadError = error.toString().replaceFirst('Exception: ', ''),
+        );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   // BUILD
 
@@ -79,6 +135,21 @@ class _OrderTrackingState extends State<OrderTracking> {
         padding: const EdgeInsets.only(bottom: 30),
         child: Column(
           children: [
+            if (_isLoading)
+              const LinearProgressIndicator(
+                minHeight: 2,
+                color: ArtistColors.primary,
+              ),
+            if (_loadError != null)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  'Could not refresh order status: $_loadError',
+                  style: ArtistTextStyles.small.copyWith(
+                    color: ArtistColors.error,
+                  ),
+                ),
+              ),
             _buildTrackingHeader(),
             _buildCurrentStatus(),
             _buildTrackingTimeline(),
@@ -314,7 +385,7 @@ class _OrderTrackingState extends State<OrderTracking> {
             icon: Icons.verified_rounded,
             title: 'Order Confirmed',
             subtitle: 'Seller confirmed your order',
-            date: 'Order confirmed',
+            date: '—',
             completed: _isStatusAtLeast('confirmed'),
             active: rawStatus.toLowerCase() == 'confirmed',
           ),
@@ -323,7 +394,7 @@ class _OrderTrackingState extends State<OrderTracking> {
             icon: Icons.inventory_2_rounded,
             title: 'Item Packed',
             subtitle: 'Seller packed your item',
-            date: 'Package prepared',
+            date: '—',
             completed: _isStatusAtLeast('packed'),
             active: rawStatus.toLowerCase() == 'packed',
           ),
@@ -332,7 +403,7 @@ class _OrderTrackingState extends State<OrderTracking> {
             icon: Icons.local_shipping_rounded,
             title: 'Shipped',
             subtitle: 'Your package is on the way',
-            date: 'Package dispatched',
+            date: '—',
             completed: _isStatusAtLeast('shipped'),
             active: rawStatus.toLowerCase() == 'shipped',
           ),
@@ -341,7 +412,7 @@ class _OrderTrackingState extends State<OrderTracking> {
             icon: Icons.delivery_dining_rounded,
             title: 'Out for Delivery',
             subtitle: 'Package will reach you soon',
-            date: 'Expected on delivery day',
+            date: '—',
             completed: _isStatusAtLeast('out_for_delivery'),
             active: rawStatus.toLowerCase() == 'out_for_delivery',
           ),
@@ -350,9 +421,7 @@ class _OrderTrackingState extends State<OrderTracking> {
             icon: Icons.home_rounded,
             title: 'Delivered',
             subtitle: 'Package delivered successfully',
-            date: rawStatus.toLowerCase() == 'delivered'
-                ? 'Delivered successfully'
-                : 'Awaiting delivery',
+            date: rawStatus.toLowerCase() == 'delivered' ? '—' : '—',
             completed: rawStatus.toLowerCase() == 'delivered',
             active: rawStatus.toLowerCase() == 'delivered',
             isLast: true,
@@ -545,11 +614,29 @@ class _OrderTrackingState extends State<OrderTracking> {
                     color: ArtistColors.light,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(
-                    productIcon,
-                    size: 35,
-                    color: ArtistColors.primary,
-                  ),
+                  child:
+                      (_order['productImage'] ?? _order['imageUrl'] ?? '')
+                          .toString()
+                          .trim()
+                          .isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.network(
+                            (_order['productImage'] ?? _order['imageUrl'])
+                                .toString(),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(
+                              productIcon,
+                              size: 35,
+                              color: ArtistColors.primary,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          productIcon,
+                          size: 35,
+                          color: ArtistColors.primary,
+                        ),
                 ),
 
                 const SizedBox(width: 12),
@@ -803,7 +890,9 @@ class _OrderTrackingState extends State<OrderTracking> {
 
             IconButton(
               onPressed: () {
-                _showMessage('Order support will be connected later.');
+                _showMessage(
+                  'Please use the support option in your account settings.',
+                );
               },
               icon: const Icon(
                 Icons.arrow_forward_rounded,
@@ -832,12 +921,23 @@ class _OrderTrackingState extends State<OrderTracking> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _sheetOption(
+                icon: Icons.refresh_rounded,
+                title: 'Refresh Tracking',
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _refreshOrder();
+                },
+              ),
+
+              _sheetOption(
                 icon: Icons.share_outlined,
                 title: 'Share Tracking',
                 onTap: () {
                   Navigator.pop(sheetContext);
 
-                  _showMessage('Sharing will be connected later.');
+                  _showMessage(
+                    'Use the order ID to identify this order: $orderId',
+                  );
                 },
               ),
 
@@ -859,7 +959,9 @@ class _OrderTrackingState extends State<OrderTracking> {
                 onTap: () {
                   Navigator.pop(sheetContext);
 
-                  _showMessage('Support will be connected later.');
+                  _showMessage(
+                    'Please use the support option in your account settings.',
+                  );
                 },
               ),
 

@@ -1,3 +1,4 @@
+import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
@@ -15,58 +16,70 @@ class BuyingOrderDetails extends StatefulWidget {
 
 class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   late String _status;
+  late Map<String, dynamic> _order;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
 
-    _status = widget.order['status']?.toString() ?? 'pending';
+    _order = Map<String, dynamic>.from(widget.order);
+    _status = (_order['status'] ?? _order['orderStatus'] ?? 'pending')
+        .toString();
+    _refreshOrder(showErrors: false);
   }
 
   // GETTERS
 
   String get productName {
-    return widget.order['productTitle']?.toString() ??
-        widget.order['product']?.toString() ??
-        'Product';
+    final value =
+        _order['productTitle'] ?? _order['productName'] ?? _order['product'];
+    return value?.toString().trim().isNotEmpty == true
+        ? value.toString()
+        : 'Product details unavailable';
   }
 
   String get orderId {
-    return widget.order['orderId']?.toString() ?? 'ECO-ORD-10021';
+    return _order['orderId']?.toString() ?? _order['id']?.toString() ?? '—';
   }
 
   String get orderDate {
-    return _formatDate(widget.order['createdAt']);
+    return _formatDate(_order['createdAt']);
   }
 
   String get sellerName {
-    return widget.order['sellerName']?.toString() ??
-        widget.order['seller']?.toString() ??
-        'Seller';
+    final value = _order['sellerName'] ?? _order['seller'];
+    return value?.toString().trim().isNotEmpty == true
+        ? value.toString()
+        : 'Seller details unavailable';
   }
 
   String get quantity {
-    return widget.order['quantity']?.toString() ?? '1';
+    return _order['quantity']?.toString() ?? '—';
   }
 
   double get unitPrice {
-    return _amountValue(widget.order['unitPrice']);
+    return _amountValue(_order['unitPrice']);
   }
 
   double get totalAmount {
-    return _amountValue(widget.order['totalAmount']);
+    return _amountValue(_order['totalAmount']);
   }
 
   String get paymentStatus {
-    return widget.order['paymentStatus']?.toString() ?? 'pending';
+    return _order['paymentStatus']?.toString() ?? 'pending';
   }
 
   String get shippingAddress {
-    return widget.order['shippingAddress']?.toString() ?? 'Delivery address';
+    return (_order['shippingAddress'] ?? '').toString().trim().isEmpty
+        ? 'Address not available'
+        : (_order['shippingAddress']).toString();
   }
 
   IconData get productIcon {
-    return widget.order['icon'] as IconData? ?? Icons.inventory_2_outlined;
+    return _order['icon'] is IconData
+        ? _order['icon'] as IconData
+        : Icons.inventory_2_outlined;
   }
 
   bool get isCancelled {
@@ -361,7 +374,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
                 Expanded(
                   child: Text(
-                    'Detailed delivery tracking will be available here.',
+                    'Detailed carrier tracking is not provided by the current order API.',
                     style: ArtistTextStyles.body.copyWith(fontSize: 11),
                   ),
                 ),
@@ -522,11 +535,29 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                     color: ArtistColors.light,
                     borderRadius: BorderRadius.circular(15),
                   ),
-                  child: Icon(
-                    productIcon,
-                    size: 38,
-                    color: ArtistColors.primary,
-                  ),
+                  child:
+                      (_order['productImage'] ?? _order['imageUrl'] ?? '')
+                          .toString()
+                          .trim()
+                          .isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(15),
+                          child: Image.network(
+                            (_order['productImage'] ?? _order['imageUrl'])
+                                .toString(),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(
+                              productIcon,
+                              size: 38,
+                              color: ArtistColors.primary,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          productIcon,
+                          size: 38,
+                          color: ArtistColors.primary,
+                        ),
                 ),
 
                 const SizedBox(width: 13),
@@ -627,7 +658,11 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                         const SizedBox(width: 3),
 
                         Text(
-                          '4.8  •  Verified Seller',
+                          (_order['sellerType']?.toString() ?? '')
+                                      .toLowerCase() ==
+                                  'artist'
+                              ? 'Artist seller'
+                              : 'Seller',
                           style: ArtistTextStyles.small.copyWith(fontSize: 10),
                         ),
                       ],
@@ -638,7 +673,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
               OutlinedButton(
                 onPressed: () {
-                  _showMessage('Seller contact will be connected later.');
+                  _showMessage(
+                    'Seller contact details are not available for this order.',
+                  );
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: ArtistColors.primary,
@@ -729,7 +766,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           _detailRow(
             Icons.local_shipping_outlined,
             'Delivery',
-            'EcoLoop Delivery',
+            (_order['deliveryMethod'] ?? '').toString().trim().isEmpty
+                ? 'Delivery method not provided'
+                : _order['deliveryMethod'].toString(),
           ),
 
           const SizedBox(height: 12),
@@ -737,7 +776,12 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           _detailRow(
             Icons.event_outlined,
             'Expected',
-            isDelivered ? 'Delivered successfully' : 'Delivery in progress',
+            isDelivered
+                ? 'Delivered successfully'
+                : (_order['expectedDelivery'] ??
+                          _order['estimatedDelivery'] ??
+                          'Not provided by seller')
+                      .toString(),
           ),
         ],
       ),
@@ -755,18 +799,31 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
           const SizedBox(height: 18),
 
-          _billRow('Item total', _formatCurrency(totalAmount)),
+          _billRow(
+            'Item subtotal',
+            _formatCurrency(
+              _amountValue(_order['subtotal']) > 0
+                  ? _amountValue(_order['subtotal'])
+                  : totalAmount,
+            ),
+          ),
 
-          _billRow('EcoLoop handling charge', '₹20'),
+          _billRow(
+            'Platform fee',
+            _formatCurrency(_amountValue(_order['platformFee'])),
+          ),
 
-          _billRow('Delivery charges', 'FREE'),
+          _billRow(
+            'Delivery charges',
+            _formatCurrency(_amountValue(_order['deliveryCharge'])),
+          ),
 
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 5),
             child: Divider(color: ArtistColors.border),
           ),
 
-          _billRow('Total Paid', _formatCurrency(totalAmount), bold: true),
+          _billRow('Order total', _formatCurrency(totalAmount), bold: true),
 
           const SizedBox(height: 5),
 
@@ -838,10 +895,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
           _informationRow('Order placed', orderDate),
 
-          _informationRow(
-            'Product ID',
-            widget.order['productId']?.toString() ?? '-',
-          ),
+          _informationRow('Product ID', _order['productId']?.toString() ?? '-'),
 
           _informationRow('Payment', _formatPaymentStatus(paymentStatus)),
 
@@ -972,7 +1026,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
           InkWell(
             onTap: () {
-              _showMessage('Order support will be connected later.');
+              _showMessage(
+                'Please use the support option in your account settings.',
+              );
             },
             borderRadius: BorderRadius.circular(15),
             child: Container(
@@ -1127,7 +1183,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   onTap: () {
                     Navigator.pop(context);
 
-                    _showMessage('Order receipt will be available here.');
+                    _showMessage(
+                      'A downloadable receipt is not available from the current backend response.',
+                    );
                   },
                 ),
 
@@ -1137,7 +1195,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   onTap: () {
                     Navigator.pop(context);
 
-                    _showMessage('Order sharing will be connected later.');
+                    _showMessage('Order ID: $orderId');
                   },
                 ),
 
@@ -1147,7 +1205,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   onTap: () {
                     Navigator.pop(context);
 
-                    _showMessage('Order support will be connected later.');
+                    _showMessage(
+                      'Please use the support option in your account settings.',
+                    );
                   },
                 ),
               ],
@@ -1192,73 +1252,129 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   void _trackOrder() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => OrderTracking(order: widget.order)),
+      MaterialPageRoute(builder: (_) => OrderTracking(order: _order)),
     );
   }
 
   // CANCEL ORDER
 
-  void _cancelOrder() {
-    if (_status.toLowerCase() == 'shipped' ||
-        _status.toLowerCase() == 'out_for_delivery' ||
-        _status.toLowerCase() == 'delivered') {
+  Future<void> _refreshOrder({bool showErrors = true}) async {
+    final id = _order['orderId'] ?? _order['id'];
+    if (id == null || id.toString().trim().isEmpty) return;
+    if (mounted) setState(() => _isRefreshing = true);
+    try {
+      final response = await EcoLoopApi.instance.get(
+        '/orders/${Uri.encodeComponent(id.toString())}',
+      );
+      final dynamic payload = response is Map
+          ? (response['order'] ?? response['data'] ?? response)
+          : response;
+      if (payload is Map) {
+        final fresh = Map<String, dynamic>.from(payload);
+        if (mounted) {
+          setState(() {
+            _order = {..._order, ...fresh};
+            _status = (_order['status'] ?? _order['orderStatus'] ?? _status)
+                .toString();
+          });
+        }
+      }
+    } catch (error) {
+      if (showErrors && mounted) {
+        _showMessage(
+          'Could not refresh order: ${error.toString().replaceFirst('Exception: ', '')}',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
+
+  Future<void> _cancelOrder() async {
+    if ([
+      'shipped',
+      'out_for_delivery',
+      'delivered',
+      'cancelled',
+    ].contains(_status.toLowerCase())) {
       _showMessage('This order can no longer be cancelled.');
       return;
     }
 
     showDialog(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: ArtistColors.surface,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: ArtistColors.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Cancel Order?',
+          style: ArtistTextStyles.title.copyWith(fontSize: 19),
+        ),
+        content: Text(
+          'Are you sure you want to cancel this order?',
+          style: ArtistTextStyles.body,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('Keep Order', style: ArtistTextStyles.bodyMedium),
           ),
-          title: Text(
-            'Cancel Order?',
-            style: ArtistTextStyles.title.copyWith(fontSize: 19),
-          ),
-          content: Text(
-            'Are you sure you want to cancel this order?',
-            style: ArtistTextStyles.body,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-              child: Text('Keep Order', style: ArtistTextStyles.bodyMedium),
-            ),
-
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-
-                setState(() {
-                  _status = 'cancelled';
-                });
-
-                _showMessage('Order cancelled.');
-              },
-              child: Text(
-                'Cancel Order',
-                style: ArtistTextStyles.bodyMedium.copyWith(
-                  color: ArtistColors.error,
-                  fontWeight: FontWeight.w600,
-                ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final id = _order['orderId'] ?? _order['id'];
+              if (id == null) {
+                _showMessage('Order ID is missing. Cannot cancel this order.');
+                return;
+              }
+              try {
+                final response = await EcoLoopApi.instance.post(
+                  '/orders/$id/cancel',
+                  {},
+                );
+                if (response is Map) {
+                  final dynamic payload =
+                      response['order'] ?? response['data'] ?? response;
+                  if (payload is Map)
+                    _order = {..._order, ...Map<String, dynamic>.from(payload)};
+                }
+                await _refreshOrder(showErrors: false);
+                if (mounted) {
+                  setState(
+                    () => _status =
+                        (_order['status'] ??
+                                _order['orderStatus'] ??
+                                'cancelled')
+                            .toString(),
+                  );
+                  _showMessage('Order cancellation confirmed by the server.');
+                }
+              } catch (error) {
+                _showMessage(
+                  'Cancellation failed: ${error.toString().replaceFirst('Exception: ', '')}',
+                );
+              }
+            },
+            child: Text(
+              'Cancel Order',
+              style: ArtistTextStyles.bodyMedium.copyWith(
+                color: ArtistColors.error,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 
   // BUY AGAIN
 
   void _buyAgain() {
-    _showMessage('Buy Again will be connected to the marketplace.');
+    _showMessage(
+      'Open the marketplace to check whether this item is available again.',
+    );
   }
 
   // COMMON SECTION

@@ -1,3 +1,4 @@
+import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
@@ -35,136 +36,16 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     'Amount: High to Low',
   ];
 
-  // DEMO BUYING ORDERS
+  // Live orders loaded from the authenticated buyer's account.
+  List<Map<String, dynamic>> _orders = [];
+  bool _isLoading = true;
+  String? _loadError;
 
-  final List<Map<String, dynamic>> _orders = [
-    {
-      'orderId': 10021,
-      'buyerId': 301,
-      'sellerId': 101,
-      'sellerType': 'artist',
-      'productId': 1,
-      'productTitle': 'Handcrafted Wooden Table',
-      'sellerName': 'Creative Studio',
-      'quantity': 1,
-      'unitPrice': 4500.0,
-      'totalAmount': 4500.0,
-      'shippingAddress': 'Ahmedabad, Gujarat',
-      'status': 'pending',
-      'paymentStatus': 'paid',
-      'createdAt': '2026-09-26',
-      'updatedAt': '2026-09-26',
-      'icon': Icons.table_restaurant_outlined,
-    },
-    {
-      'orderId': 10018,
-      'buyerId': 301,
-      'sellerId': 105,
-      'sellerType': 'artist',
-      'productId': 2,
-      'productTitle': 'Upcycled Glass Vase',
-      'sellerName': 'Eco Art Studio',
-      'quantity': 2,
-      'unitPrice': 850.0,
-      'totalAmount': 1700.0,
-      'shippingAddress': 'Ahmedabad, Gujarat',
-      'status': 'confirmed',
-      'paymentStatus': 'paid',
-      'createdAt': '2026-09-24',
-      'updatedAt': '2026-09-25',
-      'icon': Icons.local_drink_outlined,
-    },
-    {
-      'orderId': 10014,
-      'buyerId': 301,
-      'sellerId': 109,
-      'sellerType': 'artist',
-      'productId': 4,
-      'productTitle': 'Recycled Fabric Tote Bag',
-      'sellerName': 'Green Craft',
-      'quantity': 3,
-      'unitPrice': 550.0,
-      'totalAmount': 1650.0,
-      'shippingAddress': 'Ahmedabad, Gujarat',
-      'status': 'packed',
-      'paymentStatus': 'paid',
-      'createdAt': '2026-09-21',
-      'updatedAt': '2026-09-22',
-      'icon': Icons.shopping_bag_outlined,
-    },
-    {
-      'orderId': 10009,
-      'buyerId': 301,
-      'sellerId': 112,
-      'sellerType': 'artist',
-      'productId': 7,
-      'productTitle': 'Reclaimed Wood Wall Decor',
-      'sellerName': 'Wood & Earth',
-      'quantity': 1,
-      'unitPrice': 1250.0,
-      'totalAmount': 1250.0,
-      'shippingAddress': 'Ahmedabad, Gujarat',
-      'status': 'shipped',
-      'paymentStatus': 'paid',
-      'createdAt': '2026-09-18',
-      'updatedAt': '2026-09-20',
-      'icon': Icons.wallpaper_outlined,
-    },
-    {
-      'orderId': 10003,
-      'buyerId': 301,
-      'sellerId': 114,
-      'sellerType': 'artist',
-      'productId': 8,
-      'productTitle': 'Handmade Terracotta Planter',
-      'sellerName': 'Earthy Hands',
-      'quantity': 2,
-      'unitPrice': 700.0,
-      'totalAmount': 1400.0,
-      'shippingAddress': 'Ahmedabad, Gujarat',
-      'status': 'out_for_delivery',
-      'paymentStatus': 'paid',
-      'createdAt': '2026-09-14',
-      'updatedAt': '2026-09-17',
-      'icon': Icons.local_florist_outlined,
-    },
-    {
-      'orderId': 9997,
-      'buyerId': 301,
-      'sellerId': 118,
-      'sellerType': 'artist',
-      'productId': 11,
-      'productTitle': 'Recycled Paper Art Frame',
-      'sellerName': 'Paper Stories',
-      'quantity': 1,
-      'unitPrice': 900.0,
-      'totalAmount': 900.0,
-      'shippingAddress': 'Ahmedabad, Gujarat',
-      'status': 'delivered',
-      'paymentStatus': 'paid',
-      'createdAt': '2026-09-10',
-      'updatedAt': '2026-09-15',
-      'icon': Icons.image_outlined,
-    },
-    {
-      'orderId': 9989,
-      'buyerId': 301,
-      'sellerId': 121,
-      'sellerType': 'artist',
-      'productId': 13,
-      'productTitle': 'Upcycled Denim Cushion',
-      'sellerName': 'ReNew Studio',
-      'quantity': 2,
-      'unitPrice': 600.0,
-      'totalAmount': 1200.0,
-      'shippingAddress': 'Ahmedabad, Gujarat',
-      'status': 'cancelled',
-      'paymentStatus': 'refunded',
-      'createdAt': '2026-09-05',
-      'updatedAt': '2026-09-06',
-      'icon': Icons.weekend_outlined,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _refreshOrders();
+  }
 
   // LIFECYCLE
 
@@ -298,7 +179,11 @@ class _BuyingOrdersState extends State<BuyingOrders> {
           const SizedBox(height: 4),
 
           Expanded(
-            child: orders.isEmpty
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _loadError != null
+                ? _buildLoadError()
+                : orders.isEmpty
                 ? _buildEmptyState()
                 : RefreshIndicator(
                     color: ArtistColors.primary,
@@ -310,9 +195,8 @@ class _BuyingOrdersState extends State<BuyingOrders> {
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
                       itemCount: orders.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 14),
-                      itemBuilder: (context, index) {
-                        return _buildOrderCard(orders[index]);
-                      },
+                      itemBuilder: (context, index) =>
+                          _buildOrderCard(orders[index]),
                     ),
                   ),
           ),
@@ -595,11 +479,31 @@ class _BuyingOrdersState extends State<BuyingOrders> {
                     color: ArtistColors.light,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(
-                    order['icon'] as IconData? ?? Icons.shopping_bag_outlined,
-                    size: 30,
-                    color: ArtistColors.primary,
-                  ),
+                  child:
+                      (order['productImage'] ?? order['imageUrl'] ?? '')
+                          .toString()
+                          .trim()
+                          .isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.network(
+                            (order['productImage'] ?? order['imageUrl'])
+                                .toString(),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.shopping_bag_outlined,
+                              size: 30,
+                              color: ArtistColors.primary,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          order['icon'] is IconData
+                              ? order['icon'] as IconData
+                              : Icons.shopping_bag_outlined,
+                          size: 30,
+                          color: ArtistColors.primary,
+                        ),
                 ),
 
                 const SizedBox(width: 13),
@@ -811,11 +715,12 @@ class _BuyingOrdersState extends State<BuyingOrders> {
 
   // OPEN ORDER DETAILS
 
-  void _openOrderDetails(Map<String, dynamic> order) {
-    Navigator.push(
+  Future<void> _openOrderDetails(Map<String, dynamic> order) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => BuyingOrderDetails(order: order)),
     );
+    if (mounted) await _refreshOrders();
   }
 
   // EMPTY STATE
@@ -980,11 +885,93 @@ class _BuyingOrdersState extends State<BuyingOrders> {
   // REFRESH
 
   Future<void> _refreshOrders() async {
-    await Future.delayed(const Duration(milliseconds: 700));
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+    try {
+      final response = await EcoLoopApi.instance.get('/orders');
+      final dynamic rows = response is Map
+          ? (response['orders'] ?? response['items'] ?? response['data'] ?? [])
+          : response;
+      final list = rows is List ? rows : <dynamic>[];
+      final parsed = list
+          .whereType<Map>()
+          .map((row) => _normalizeOrder(Map<String, dynamic>.from(row)))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _orders = parsed;
+        _isLoading = false;
+        _loadError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
 
-    if (!mounted) return;
+  Map<String, dynamic> _normalizeOrder(Map<String, dynamic> order) {
+    final result = Map<String, dynamic>.from(order);
+    result['productTitle'] =
+        (result['productTitle'] ??
+                result['productName'] ??
+                result['title'] ??
+                'Product unavailable')
+            .toString();
+    result['sellerName'] =
+        (result['sellerName'] ?? result['seller'] ?? 'Seller unavailable')
+            .toString();
+    result['orderId'] ??= result['id'] ?? '';
+    result['status'] = (result['status'] ?? result['orderStatus'] ?? 'pending')
+        .toString()
+        .toLowerCase();
+    result['paymentStatus'] = (result['paymentStatus'] ?? 'pending')
+        .toString()
+        .toLowerCase();
+    result['totalAmount'] ??= result['total'] ?? result['amount'] ?? 0;
+    result['createdAt'] ??= result['orderDate'] ?? result['date'];
+    result['shippingAddress'] ??= result['address'] ?? '';
+    return result;
+  }
 
-    setState(() {});
+  Widget _buildLoadError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_outlined,
+              size: 38,
+              color: ArtistColors.textSecondary,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Could not load buying orders',
+              style: ArtistTextStyles.bodyMedium,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _loadError ?? 'Please try again.',
+              textAlign: TextAlign.center,
+              style: ArtistTextStyles.small,
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton(
+              onPressed: _refreshOrders,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // STATUS HELPERS

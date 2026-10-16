@@ -4,6 +4,7 @@ import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
 import '../../../widgets/back_button.dart';
+import 'edit_portfolio.dart';
 
 class Portfolio extends StatefulWidget {
   const Portfolio({super.key});
@@ -51,6 +52,15 @@ class _PortfolioState extends State<Portfolio> {
               ...item,
               'id': item['portfolioId'] ?? item['id'],
               'image': image,
+              'beforeImageUrl': (item['beforeImageUrl'] ?? '').toString(),
+              'afterImageUrl': (item['afterImageUrl'] ?? image).toString(),
+              'caption': (item['caption'] ?? '').toString(),
+              'materialsUsed': (item['materialsUsed'] ?? '').toString(),
+              'processDescription': (item['processDescription'] ?? '')
+                  .toString(),
+              'environmentalImpact': (item['environmentalImpact'] ?? '')
+                  .toString(),
+              'productId': item['productId'],
               'category': (item['category'] ?? '').toString(),
               'featured':
                   item['featured'] == true ||
@@ -871,167 +881,11 @@ class _PortfolioState extends State<Portfolio> {
   }
 
   Future<void> _showPortfolioEditor({Map<String, dynamic>? item}) async {
-    final formKey = GlobalKey<FormState>();
-    final titleController = TextEditingController(
-      text: item?['title']?.toString() ?? '',
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => PortfolioEditorPage(item: item)),
     );
-    final descriptionController = TextEditingController(
-      text: item?['description']?.toString() ?? '',
-    );
-    final categoryController = TextEditingController(
-      text: item?['category']?.toString() ?? '',
-    );
-    final imageController = TextEditingController(
-      text: (item?['imageUrl'] ?? item?['image'])?.toString() ?? '',
-    );
-    bool featured = item?['featured'] == true;
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      barrierDismissible: !_saving,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: ArtistColors.surface,
-              title: Text(
-                item == null ? 'Add Portfolio Work' : 'Edit Portfolio Work',
-                style: ArtistTextStyles.title.copyWith(fontSize: 19),
-              ),
-              content: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextFormField(
-                        controller: titleController,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: const InputDecoration(
-                          labelText: 'Project title *',
-                        ),
-                        validator: (value) =>
-                            (value == null || value.trim().isEmpty)
-                            ? 'Enter a project title'
-                            : null,
-                      ),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: descriptionController,
-                        minLines: 2,
-                        maxLines: 4,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: const InputDecoration(
-                          labelText: 'Description *',
-                        ),
-                        validator: (value) =>
-                            (value == null || value.trim().isEmpty)
-                            ? 'Enter a description'
-                            : null,
-                      ),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: categoryController,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(
-                          labelText: 'Category *',
-                        ),
-                        validator: (value) =>
-                            (value == null || value.trim().isEmpty)
-                            ? 'Enter a category'
-                            : null,
-                      ),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: imageController,
-                        keyboardType: TextInputType.url,
-                        decoration: const InputDecoration(
-                          labelText: 'Image URL (optional)',
-                          hintText: 'https://...',
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        value: featured,
-                        activeColor: ArtistColors.primary,
-                        title: const Text('Feature this work'),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        onChanged: (value) => setDialogState(() {
-                          featured = value ?? false;
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: _saving
-                      ? null
-                      : () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: _saving
-                      ? null
-                      : () {
-                          if (!formKey.currentState!.validate()) return;
-                          Navigator.pop(dialogContext, {
-                            'title': titleController.text.trim(),
-                            'description': descriptionController.text.trim(),
-                            'category': categoryController.text.trim(),
-                            'imageUrl': imageController.text.trim(),
-                            'featured': featured,
-                          });
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ArtistColors.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: Text(item == null ? 'Add Work' : 'Save Changes'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    titleController.dispose();
-    descriptionController.dispose();
-    categoryController.dispose();
-    imageController.dispose();
-    if (result == null || !mounted) return;
-
-    setState(() => _saving = true);
-    try {
-      if (item == null) {
-        await _api.post('/artist/portfolio', result);
-      } else {
-        final id = item['id'] ?? item['portfolioId'];
-        if (id == null) throw Exception('Portfolio item ID is missing.');
-        await _api.put('/artist/portfolio/$id', result);
-      }
+    if (changed == true && mounted) {
       await _loadPortfolio(showLoader: false);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              item == null
-                  ? 'Portfolio work added.'
-                  : 'Portfolio work updated.',
-            ),
-          ),
-        );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text(error.toString())));
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -1347,6 +1201,89 @@ class _StatCard extends StatelessWidget {
 
 // PORTFOLIO DETAILS SHEET
 
+class _PortfolioCompareImage extends StatelessWidget {
+  const _PortfolioCompareImage({required this.label, required this.url});
+
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: ArtistTextStyles.caption.copyWith(
+          color: ArtistColors.primary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      const SizedBox(height: 6),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          url,
+          height: 110,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            height: 110,
+            color: ArtistColors.light,
+            child: const Icon(
+              Icons.image_not_supported_outlined,
+              color: ArtistColors.primary,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _PortfolioStoryLine extends StatelessWidget {
+  const _PortfolioStoryLine({
+    required this.title,
+    required this.value,
+    required this.icon,
+  });
+
+  final String title;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: ArtistColors.background,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: ArtistColors.primary),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: ArtistTextStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(value, style: ArtistTextStyles.body.copyWith(height: 1.4)),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _PortfolioDetailsSheet extends StatelessWidget {
   const _PortfolioDetailsSheet({
     required this.item,
@@ -1378,7 +1315,7 @@ class _PortfolioDetailsSheet extends StatelessWidget {
                     top: Radius.circular(25),
                   ),
                   child: Image.network(
-                    item['image'].toString(),
+                    ((item['afterImageUrl'] ?? item['image']).toString()),
                     width: double.infinity,
                     height: 235,
                     fit: BoxFit.cover,
@@ -1468,12 +1405,89 @@ class _PortfolioDetailsSheet extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 15),
+                  if ((item['caption'] ?? '').toString().trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      item['caption'].toString(),
+                      style: ArtistTextStyles.bodyMedium.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: ArtistColors.textSecondary,
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+
+                  if ((item['beforeImageUrl'] ?? '')
+                      .toString()
+                      .trim()
+                      .isNotEmpty) ...[
+                    Text(
+                      'The transformation',
+                      style: ArtistTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _PortfolioCompareImage(
+                            label: 'BEFORE',
+                            url: item['beforeImageUrl'].toString(),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _PortfolioCompareImage(
+                            label: 'AFTER',
+                            url: ((item['afterImageUrl'] ?? item['image'])
+                                .toString()),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                  ],
 
                   Text(
                     item['description'].toString(),
                     style: ArtistTextStyles.body.copyWith(height: 1.55),
                   ),
+
+                  if ((item['materialsUsed'] ?? '')
+                      .toString()
+                      .trim()
+                      .isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _PortfolioStoryLine(
+                      title: 'Materials reused',
+                      value: item['materialsUsed'].toString(),
+                      icon: Icons.recycling_outlined,
+                    ),
+                  ],
+                  if ((item['processDescription'] ?? '')
+                      .toString()
+                      .trim()
+                      .isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _PortfolioStoryLine(
+                      title: 'Process',
+                      value: item['processDescription'].toString(),
+                      icon: Icons.handyman_outlined,
+                    ),
+                  ],
+                  if ((item['environmentalImpact'] ?? '')
+                      .toString()
+                      .trim()
+                      .isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _PortfolioStoryLine(
+                      title: 'Environmental impact',
+                      value: item['environmentalImpact'].toString(),
+                      icon: Icons.eco_outlined,
+                    ),
+                  ],
 
                   const SizedBox(height: 17),
 
@@ -1578,7 +1592,6 @@ class _DetailStat extends StatelessWidget {
         ),
 
         const SizedBox(width: 3),
-
         Text(label, style: ArtistTextStyles.caption),
       ],
     );

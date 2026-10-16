@@ -21,7 +21,7 @@ import 'edit_profile.dart';
 import 'followers.dart';
 import 'following_list.dart';
 import 'notification.dart';
-import 'portfolio.dart';
+import '../portfolio/portfolio.dart';
 import 'settings.dart';
 
 /// Artist profile backed by the live Apps Script / Google Sheets API.
