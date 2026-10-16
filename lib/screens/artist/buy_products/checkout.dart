@@ -1,3 +1,4 @@
+import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
@@ -17,11 +18,12 @@ class Checkout extends StatefulWidget {
   /// Quantity used when [product] is supplied.
   final int quantity;
 
-  /// Optional coupon values.
+  /// Optional coupon values kept for constructor compatibility.
   final String? initialCouponCode;
   final double initialCouponDiscount;
 
-  /// Optional Eco Point discount.
+  /// Legacy parameter retained so existing call sites continue to compile.
+  /// Eco Points are intentionally not used in checkout anymore.
   final double initialEcoPointDiscount;
 
   const Checkout({
@@ -45,34 +47,13 @@ class _CheckoutState extends State<Checkout> {
 
   // ADDRESS
 
-  final List<Map<String, dynamic>> _addresses = [
-    {
-      'id': 'home',
-      'label': 'Home',
-      'name': 'Dishank',
-      'phone': '+91 98765 43210',
-      'address': '123, Green Avenue',
-      'area': 'Satellite',
-      'city': 'Ahmedabad',
-      'state': 'Gujarat',
-      'pincode': '380015',
-      'isDefault': true,
-    },
-    {
-      'id': 'work',
-      'label': 'Work',
-      'name': 'Dishank',
-      'phone': '+91 98765 43210',
-      'address': 'EcoLoop Workspace',
-      'area': 'Navrangpura',
-      'city': 'Ahmedabad',
-      'state': 'Gujarat',
-      'pincode': '380009',
-      'isDefault': false,
-    },
-  ];
+  final List<Map<String, dynamic>> _addresses = [];
+  bool _isLoadingAddresses = false;
+  bool _isRefreshingProducts = false;
+  String? _addressError;
+  String? _productError;
 
-  String _selectedAddressId = 'home';
+  String? _selectedAddressId;
 
   // DELIVERY
 
@@ -82,11 +63,6 @@ class _CheckoutState extends State<Checkout> {
 
   String? _couponCode;
   double _couponDiscount = 0;
-
-  // ECO POINTS
-
-  final int _ecoPoints = 120;
-  bool _useEcoPoints = false;
 
   // UI STATE
 
@@ -99,9 +75,132 @@ class _CheckoutState extends State<Checkout> {
     super.initState();
 
     _loadItems();
+    // Coupons are shown in the existing UI, but are not applied locally because
+    // the backend does not yet validate/redeem coupon codes.
+    _couponCode = null;
+    _couponDiscount = 0;
+    _loadAddresses();
+    _refreshProducts();
+  }
 
-    _couponCode = widget.initialCouponCode;
-    _couponDiscount = widget.initialCouponDiscount;
+  Future<void> _loadAddresses() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingAddresses = true;
+        _addressError = null;
+      });
+    }
+    try {
+      final response = await EcoLoopApi.instance.get('/addresses');
+      final raw = response is List
+          ? response
+          : response is Map && response['addresses'] is List
+          ? response['addresses'] as List
+          : response is Map && response['data'] is List
+          ? response['data'] as List
+          : const <dynamic>[];
+      final rows = raw
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+
+      if (!mounted) return;
+      Map<String, dynamic>? defaultAddress;
+      for (final address in rows) {
+        final value = address['isDefault'];
+        if (value == true ||
+            value.toString().toLowerCase() == 'true' ||
+            value.toString() == '1') {
+          defaultAddress = address;
+          break;
+        }
+      }
+      setState(() {
+        _addresses
+          ..clear()
+          ..addAll(rows);
+        final selectedStillExists = rows.any(
+          (a) => (a['addressId'] ?? a['id']).toString() == _selectedAddressId,
+        );
+        _selectedAddressId = selectedStillExists
+            ? _selectedAddressId
+            : (defaultAddress?['addressId'] ??
+                      defaultAddress?['id'] ??
+                      (rows.isNotEmpty
+                          ? rows.first['addressId'] ?? rows.first['id']
+                          : null))
+                  ?.toString();
+        _isLoadingAddresses = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingAddresses = false;
+        _addressError = error.toString();
+      });
+    }
+  }
+
+  Future<void> _refreshProducts() async {
+    if (_items.isEmpty) return;
+    if (mounted) {
+      setState(() {
+        _isRefreshingProducts = true;
+        _productError = null;
+      });
+    }
+    try {
+      for (var index = 0; index < _items.length; index++) {
+        final item = _items[index];
+        final id = int.tryParse(
+          (item['productId'] ?? item['id'] ?? '').toString(),
+        );
+        if (id == null || id <= 0) {
+          throw Exception(
+            'A product has an invalid ID. Remove it and add it again.',
+          );
+        }
+        final response = await EcoLoopApi.instance.get(
+          '/products/$id/validate',
+        );
+        if (response is! Map)
+          throw Exception(
+            'Could not validate ${item['title'] ?? 'a product'}.',
+          );
+        final live = Map<String, dynamic>.from(response);
+        if ((live['status'] ?? '').toString().toLowerCase() != 'published') {
+          throw Exception(
+            '${live['title'] ?? 'A product'} is no longer available.',
+          );
+        }
+        final available = _toInt(
+          live['availableQuantity'] ?? live['stock'],
+          fallback: 0,
+        );
+        final quantity = _toInt(item['quantity'], fallback: 1);
+        if (available < quantity) {
+          throw Exception(
+            'Only $available item(s) remain for ${live['title'] ?? 'this product'}.',
+          );
+        }
+        _items[index] = {
+          ...item,
+          ...live,
+          'productId': live['productId'] ?? id,
+          'quantity': quantity,
+          'availableQuantity': available,
+        };
+      }
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (mounted)
+        setState(
+          () =>
+              _productError = error.toString().replaceFirst('Exception: ', ''),
+        );
+    } finally {
+      if (mounted) setState(() => _isRefreshingProducts = false);
+    }
   }
 
   void _loadItems() {
@@ -124,10 +223,7 @@ class _CheckoutState extends State<Checkout> {
   Map<String, dynamic> _normalizeItem(Map<String, dynamic> item) {
     final copy = Map<String, dynamic>.from(item);
 
-    copy['productId'] =
-        copy['productId'] ??
-        copy['id'] ??
-        DateTime.now().microsecondsSinceEpoch.toString();
+    copy['productId'] = copy['productId'] ?? copy['id'];
 
     copy['title'] = copy['title'] ?? copy['name'] ?? 'EcoLoop Product';
 
@@ -285,56 +381,60 @@ class _CheckoutState extends State<Checkout> {
     return total;
   }
 
-  double get _deliveryFee {
-    if (_selectedDelivery == 'free') {
-      return 0;
+  double get _standardDeliveryFee {
+    final buyerCity = (_selectedAddress?['city'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    var fee = 0.0;
+    for (final item in _items) {
+      final sellerCity =
+          (item['sellerCity'] ??
+                  item['seller_city'] ??
+                  (item['seller'] is Map
+                      ? (item['seller'] as Map)['city']
+                      : null) ??
+                  '')
+              .toString()
+              .trim()
+              .toLowerCase();
+      if (buyerCity.isNotEmpty &&
+          sellerCity.isNotEmpty &&
+          sellerCity != buyerCity) {
+        fee += 40;
+      }
     }
-
-    if (_selectedDelivery == 'express') {
-      return 99;
-    }
-
-    if (_subtotal >= 999) {
-      return 0;
-    }
-
-    return 49;
+    return fee;
   }
 
-  double get _ecoPointDiscount {
-    if (!_useEcoPoints || _ecoPoints <= 0) {
-      return 0;
-    }
+  double get _deliveryFee => _selectedDelivery == 'express'
+      ? 99.0 * _items.length
+      : _standardDeliveryFee;
 
-    final discount = _ecoPoints / 10;
+  double get _platformFee => _items.fold<double>(0, (sum, item) {
+    final lineSubtotal =
+        _toDouble(item['price']) * _toInt(item['quantity'], fallback: 1);
+    return sum + (lineSubtotal * 0.02).roundToDouble();
+  });
 
-    final maximum = _subtotal - _couponDiscount;
+  double get _taxAmount => _items.fold<double>(0, (sum, item) {
+    final lineSubtotal =
+        _toDouble(item['price']) * _toInt(item['quantity'], fallback: 1);
+    final linePlatformFee = (lineSubtotal * 0.02).roundToDouble();
+    return sum + (linePlatformFee * 0.18).roundToDouble();
+  });
 
-    if (maximum <= 0) {
-      return 0;
-    }
+  double get _grandTotal =>
+      _subtotal + _platformFee.roundToDouble() + _taxAmount + _deliveryFee;
 
-    return discount > maximum ? maximum : discount;
-  }
-
-  double get _grandTotal {
-    final total =
-        _subtotal - _couponDiscount - _ecoPointDiscount + _deliveryFee;
-
-    return total < 0 ? 0 : total;
-  }
-
-  double get _totalSavings {
-    return _couponDiscount + _ecoPointDiscount;
-  }
+  double get _totalSavings => 0;
 
   // SELECTED ADDRESS
 
   Map<String, dynamic>? get _selectedAddress {
     for (final address in _addresses) {
-      if (address['id'] == _selectedAddressId) {
-        return address;
-      }
+      final id = (address['addressId'] ?? address['id'])?.toString();
+      if (id != null && id == _selectedAddressId) return address;
     }
 
     return null;
@@ -389,8 +489,11 @@ class _CheckoutState extends State<Checkout> {
                         child: Column(
                           children: [
                             ..._addresses.map((address) {
-                              final selected =
-                                  address['id'] == _selectedAddressId;
+                              final addressId =
+                                  (address['addressId'] ?? address['id'])
+                                      ?.toString() ??
+                                  '';
+                              final selected = addressId == _selectedAddressId;
 
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 10),
@@ -399,8 +502,10 @@ class _CheckoutState extends State<Checkout> {
                                   selected,
                                   () {
                                     setSheetState(() {
-                                      _selectedAddressId = address['id']
-                                          .toString();
+                                      _selectedAddressId =
+                                          (address['addressId'] ??
+                                                  address['id'])
+                                              .toString();
                                     });
 
                                     setState(() {});
@@ -455,7 +560,7 @@ class _CheckoutState extends State<Checkout> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                address['label'] == 'Work'
+                (address['label'] ?? address['type']) == 'Work'
                     ? Icons.work_outline_rounded
                     : Icons.home_outlined,
                 color: ArtistColors.primary,
@@ -471,14 +576,18 @@ class _CheckoutState extends State<Checkout> {
                   Row(
                     children: [
                       Text(
-                        address['label'].toString(),
+                        (address['label'] ?? address['type'] ?? 'Address')
+                            .toString(),
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: ArtistColors.textPrimary,
                         ),
                       ),
-                      if (address['isDefault'] == true) ...[
+                      if (address['isDefault'] == true ||
+                          address['isDefault'].toString().toLowerCase() ==
+                              'true' ||
+                          address['isDefault'].toString() == '1') ...[
                         const SizedBox(width: 7),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -505,7 +614,7 @@ class _CheckoutState extends State<Checkout> {
                   const SizedBox(height: 5),
 
                   Text(
-                    address['name'].toString(),
+                    (address['name'] ?? 'Recipient').toString(),
                     style: ArtistTextStyles.body.copyWith(fontSize: 13),
                   ),
 
@@ -519,7 +628,7 @@ class _CheckoutState extends State<Checkout> {
                   const SizedBox(height: 3),
 
                   Text(
-                    address['phone'].toString(),
+                    (address['phone'] ?? '').toString(),
                     style: ArtistTextStyles.caption,
                   ),
                 ],
@@ -548,49 +657,105 @@ class _CheckoutState extends State<Checkout> {
       MaterialPageRoute(builder: (_) => const AddAddress()),
     );
 
-    if (!mounted || result is! Map) {
-      return;
-    }
+    if (!mounted || result is! Map) return;
+    final returned = Map<String, dynamic>.from(result);
 
-    final newAddress = Map<String, dynamic>.from(result);
-
-    final newId =
-        newAddress['id']?.toString() ??
-        'address_${DateTime.now().millisecondsSinceEpoch}';
-
-    final checkoutAddress = {
-      'id': newId,
-      'label': newAddress['type']?.toString() ?? 'Home',
-      'name': newAddress['name']?.toString() ?? '',
-      'phone': newAddress['phone']?.toString() ?? '',
-      'address': newAddress['house']?.toString() ?? '',
-      'street': newAddress['street']?.toString() ?? '',
-      'area': newAddress['area']?.toString() ?? '',
-      'landmark': newAddress['landmark']?.toString() ?? '',
-      'city': newAddress['city']?.toString() ?? '',
-      'state': newAddress['state']?.toString() ?? '',
-      'pincode': newAddress['pincode']?.toString() ?? '',
-      'isDefault': newAddress['isDefault'] == true,
-    };
-
-    setState(() {
-      if (checkoutAddress['isDefault'] == true) {
-        for (final address in _addresses) {
-          address['isDefault'] = false;
-        }
+    try {
+      // AddAddress may already persist the address. Refresh first to avoid
+      // accidentally creating a duplicate record.
+      await _loadAddresses();
+      if (!mounted) return;
+      final returnedId = (returned['addressId'] ?? returned['id'])?.toString();
+      if (returnedId != null &&
+          _addresses.any(
+            (a) => (a['addressId'] ?? a['id']).toString() == returnedId,
+          )) {
+        setState(() => _selectedAddressId = returnedId);
+        _showMessage('Delivery address selected.');
+        return;
       }
 
-      _addresses.add(checkoutAddress);
-      _selectedAddressId = newId;
-    });
+      final addressLine =
+          (returned['addressLine'] ??
+                  returned['house'] ??
+                  returned['address'] ??
+                  '')
+              .toString()
+              .trim();
+      final phone = (returned['phone'] ?? '').toString().trim();
+      final name = (returned['name'] ?? '').toString().trim();
+      final city = (returned['city'] ?? '').toString().trim();
+      final state = (returned['state'] ?? '').toString().trim();
+      final pincode = (returned['pincode'] ?? returned['postalCode'] ?? '')
+          .toString()
+          .trim();
 
-    _showMessage('New delivery address added.');
+      // If the address screen returned a form result but did not persist it,
+      // save it using the authenticated backend endpoint.
+      final duplicate = _addresses.any(
+        (a) =>
+            (a['phone'] ?? '').toString() == phone &&
+            (a['addressLine'] ?? a['address'] ?? '').toString() ==
+                addressLine &&
+            (a['pincode'] ?? '').toString() == pincode,
+      );
+      if (duplicate) {
+        final match = _addresses.firstWhere(
+          (a) =>
+              (a['phone'] ?? '').toString() == phone &&
+              (a['addressLine'] ?? a['address'] ?? '').toString() ==
+                  addressLine &&
+              (a['pincode'] ?? '').toString() == pincode,
+        );
+        setState(
+          () => _selectedAddressId = (match['addressId'] ?? match['id'])
+              .toString(),
+        );
+        return;
+      }
+      if (name.isEmpty ||
+          phone.isEmpty ||
+          addressLine.isEmpty ||
+          city.isEmpty ||
+          state.isEmpty ||
+          pincode.isEmpty) {
+        _showMessage('The address was not saved. Please add it again.');
+        return;
+      }
+
+      final saved = await EcoLoopApi.instance.post('/addresses', {
+        'label': (returned['label'] ?? returned['type'] ?? 'Home').toString(),
+        'name': name,
+        'phone': phone,
+        'addressLine': addressLine,
+        'area': (returned['area'] ?? returned['landmark'] ?? '').toString(),
+        'city': city,
+        'state': state,
+        'pincode': pincode,
+        'isDefault': returned['isDefault'] == true,
+      });
+      await _loadAddresses();
+      if (saved is Map &&
+          (saved['addressId'] ?? saved['id']) != null &&
+          mounted) {
+        setState(
+          () => _selectedAddressId = (saved['addressId'] ?? saved['id'])
+              .toString(),
+        );
+      }
+    } catch (error) {
+      if (mounted) _showMessage('Could not load/save address: $error');
+    }
   }
 
   String _formatCheckoutAddress(Map<String, dynamic> address) {
     final parts = <String>[];
 
-    final house = address['address']?.toString().trim() ?? '';
+    final house =
+        (address['addressLine'] ?? address['address'] ?? address['house'])
+            ?.toString()
+            .trim() ??
+        '';
     final street = address['street']?.toString().trim() ?? '';
     final area = address['area']?.toString().trim() ?? '';
     final landmark = address['landmark']?.toString().trim() ?? '';
@@ -649,7 +814,9 @@ class _CheckoutState extends State<Checkout> {
                   id: 'standard',
                   title: 'Standard Delivery',
                   subtitle: 'Delivery in 3–5 business days',
-                  price: _subtotal >= 999 ? 'FREE' : '₹49',
+                  price: _standardDeliveryFee == 0
+                      ? 'FREE'
+                      : _formatPrice(_standardDeliveryFee),
                   icon: Icons.local_shipping_outlined,
                 ),
 
@@ -660,7 +827,9 @@ class _CheckoutState extends State<Checkout> {
                   id: 'express',
                   title: 'Express Delivery',
                   subtitle: 'Delivery in 1–2 business days',
-                  price: '₹99',
+                  price: _formatPrice(
+                    99.0 * (_items.isEmpty ? 1 : _items.length),
+                  ),
                   icon: Icons.speed_outlined,
                 ),
               ],
@@ -918,27 +1087,9 @@ class _CheckoutState extends State<Checkout> {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             onPressed: () {
-              if (_subtotal < minimumOrder) {
-                _showMessage('Minimum order is ${_formatPrice(minimumOrder)}.');
-                return;
-              }
-
-              var calculated = 0.0;
-
-              if (discount != null) {
-                calculated = discount;
-              } else if (percentage != null) {
-                calculated = _subtotal * percentage;
-              }
-
-              setState(() {
-                _couponCode = code;
-                _couponDiscount = calculated;
-              });
-
-              Navigator.pop(sheetContext);
-
-              _showMessage('$code applied successfully.');
+              _showMessage(
+                'Coupon redemption is not connected yet. No discount has been applied.',
+              );
             },
             child: Text(applied ? 'Applied' : 'Apply'),
           ),
@@ -954,19 +1105,6 @@ class _CheckoutState extends State<Checkout> {
     });
 
     _showMessage('Coupon removed.');
-  }
-
-  // ECO POINTS
-
-  void _toggleEcoPoints() {
-    if (_ecoPoints <= 0) {
-      _showMessage('You do not have enough Eco Points.');
-      return;
-    }
-
-    setState(() {
-      _useEcoPoints = !_useEcoPoints;
-    });
   }
 
   // ITEM QUANTITY
@@ -1947,65 +2085,6 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
-  // ECO POINTS SECTION
-
-  Widget _buildEcoPointsSection() {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: ArtistColors.light,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: ArtistColors.accent.withOpacity(0.7)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(
-              color: ArtistColors.surface,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.eco_rounded, color: ArtistColors.primary),
-          ),
-
-          const SizedBox(width: 11),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Use Eco Points',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: ArtistColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '$_ecoPoints points available${_ecoPointDiscount > 0 ? ' • Save ${_formatPrice(_ecoPointDiscount)}' : ''}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: ArtistTextStyles.caption,
-                ),
-              ],
-            ),
-          ),
-
-          Switch.adaptive(
-            value: _useEcoPoints,
-            activeColor: ArtistColors.primary,
-            onChanged: (_) {
-              _toggleEcoPoints();
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   // PRICE DETAILS
 
   Widget _buildPriceDetails() {
@@ -2034,21 +2113,14 @@ class _CheckoutState extends State<Checkout> {
             ),
           ],
 
-          if (_ecoPointDiscount > 0) ...[
-            const SizedBox(height: 10),
-            _priceRow(
-              'Eco Points',
-              '- ${_formatPrice(_ecoPointDiscount)}',
-              valueColor: ArtistColors.success,
-            ),
-          ],
-
           const SizedBox(height: 10),
 
           _priceRow(
-            'Delivery Fee',
-            _deliveryFee == 0 ? 'FREE' : _formatPrice(_deliveryFee),
-            valueColor: _deliveryFee == 0 ? ArtistColors.success : null,
+            'Fees & Delivery',
+            _formatPrice(
+              _platformFee.roundToDouble() + _taxAmount + _deliveryFee,
+            ),
+            valueColor: _deliveryFee == 0 ? null : ArtistColors.textPrimary,
           ),
 
           const SizedBox(height: 14),
@@ -2187,14 +2259,34 @@ class _CheckoutState extends State<Checkout> {
 
   // CONTINUE TO PAYMENT
 
-  void _continueToPayment() {
+  Future<void> _continueToPayment() async {
+    if (_isLoadingAddresses) {
+      _showMessage('Please wait while saved addresses load.');
+      return;
+    }
+    if (_addressError != null) {
+      _showMessage('Could not load saved addresses. Please retry.');
+      return;
+    }
     if (_items.isEmpty) {
       _showMessage('There are no products to checkout.');
       return;
     }
-
     if (_selectedAddress == null) {
-      _showMessage('Please select a delivery address.');
+      _showMessage('Please add and select a delivery address.');
+      return;
+    }
+    if (_couponDiscount > 0 || _couponCode != null) {
+      _showMessage(
+        'Remove the coupon for now; coupon redemption is not available yet.',
+      );
+      return;
+    }
+
+    await _refreshProducts();
+    if (!mounted) return;
+    if (_productError != null) {
+      _showMessage(_productError!);
       return;
     }
 
@@ -2210,7 +2302,7 @@ class _CheckoutState extends State<Checkout> {
           items: List<Map<String, dynamic>>.from(_items),
           address: _selectedAddress,
           deliveryMethod: deliveryLabel,
-          savings: _totalSavings,
+          savings: 0,
         ),
       ),
     );
@@ -2340,6 +2432,33 @@ class _CheckoutState extends State<Checkout> {
                 _buildStepIndicator(),
 
                 const SizedBox(height: 14),
+                if (_isLoadingAddresses)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 10),
+                    child: LinearProgressIndicator(),
+                  ),
+                if (_addressError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: TextButton.icon(
+                      onPressed: _loadAddresses,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry loading addresses'),
+                    ),
+                  ),
+                if (_isRefreshingProducts)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 10),
+                    child: LinearProgressIndicator(),
+                  ),
+                if (_productError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(
+                      _productError!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
                 _buildAddressSection(),
                 const SizedBox(height: 14),
                 _buildDeliverySection(),
@@ -2347,8 +2466,6 @@ class _CheckoutState extends State<Checkout> {
                 _buildProductSection(),
                 const SizedBox(height: 14),
                 _buildCouponSection(),
-                const SizedBox(height: 14),
-                _buildEcoPointsSection(),
                 const SizedBox(height: 14),
                 _buildPriceDetails(),
                 const SizedBox(height: 16),
@@ -2517,7 +2634,7 @@ class _CheckoutState extends State<Checkout> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              address['label'] == 'Work'
+              (address['label'] ?? address['type']) == 'Work'
                   ? Icons.work_outline_rounded
                   : Icons.home_outlined,
               size: 19,
@@ -2534,7 +2651,8 @@ class _CheckoutState extends State<Checkout> {
                 Row(
                   children: [
                     Text(
-                      address['label'].toString(),
+                      (address['label'] ?? address['type'] ?? 'Address')
+                          .toString(),
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -2569,7 +2687,7 @@ class _CheckoutState extends State<Checkout> {
                 const SizedBox(height: 5),
 
                 Text(
-                  address['name'].toString(),
+                  (address['name'] ?? 'Recipient').toString(),
                   style: ArtistTextStyles.body.copyWith(fontSize: 12),
                 ),
 
@@ -2583,7 +2701,7 @@ class _CheckoutState extends State<Checkout> {
                 const SizedBox(height: 3),
 
                 Text(
-                  address['phone'].toString(),
+                  (address['phone'] ?? '').toString(),
                   style: ArtistTextStyles.caption,
                 ),
               ],

@@ -75,7 +75,7 @@ class _OrderSuccessState extends State<OrderSuccess>
       return widget.orderId!;
     }
 
-    return 'ECO-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+    return 'Order confirmation pending';
   }
 
   String _formatPrice(double value) {
@@ -102,12 +102,12 @@ class _OrderSuccessState extends State<OrderSuccess>
     }
 
     addValue(address['name']);
-    addValue(address['address']);
+    addValue(address['addressLine'] ?? address['address'] ?? address['house']);
     addValue(address['addressLine']);
     addValue(address['area']);
     addValue(address['city']);
     addValue(address['state']);
-    addValue(address['pincode']);
+    addValue(address['pincode'] ?? address['postalCode']);
     addValue(address['postalCode']);
 
     if (parts.isEmpty) {

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
-import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
 
 class SellingOrderStatus extends StatefulWidget {
@@ -14,779 +13,494 @@ class SellingOrderStatus extends StatefulWidget {
 }
 
 class _SellingOrderStatusState extends State<SellingOrderStatus> {
-  // STATUS DATA
-
-  final List<Map<String, dynamic>> _statuses = [
+  static const List<Map<String, dynamic>> _statuses = [
     {
-      'status': 'pending',
-      'title': 'New Order Received',
-      'description': 'You have received a new order from the buyer.',
+      'status': 'new_order',
+      'label': 'New Order',
+      'title': 'Order Received',
+      'description': 'A buyer placed this order.',
       'icon': Icons.shopping_bag_outlined,
     },
     {
       'status': 'confirmed',
+      'label': 'Confirmed',
       'title': 'Order Confirmed',
-      'description': 'You have confirmed the buyer\'s order.',
+      'description': 'You have confirmed the order.',
       'icon': Icons.check_circle_outline_rounded,
     },
     {
       'status': 'packed',
+      'label': 'Packed',
       'title': 'Item Packed',
-      'description': 'The item has been packed and is ready for pickup.',
+      'description': 'The item is ready for pickup.',
       'icon': Icons.inventory_2_outlined,
     },
     {
       'status': 'shipped',
+      'label': 'Shipped',
       'title': 'Order Shipped',
-      'description': 'The package has been handed over for delivery.',
+      'description': 'The item has been handed over for delivery.',
       'icon': Icons.local_shipping_outlined,
     },
     {
       'status': 'out_for_delivery',
+      'label': 'Out for Delivery',
       'title': 'Out for Delivery',
       'description': 'The package is on its way to the buyer.',
       'icon': Icons.delivery_dining_outlined,
     },
     {
       'status': 'delivered',
+      'label': 'Delivered',
       'title': 'Order Delivered',
       'description': 'The buyer has received the order.',
       'icon': Icons.home_outlined,
     },
+    {
+      'status': 'cancelled',
+      'label': 'Cancelled',
+      'title': 'Order Cancelled',
+      'description': 'This order has been cancelled.',
+      'icon': Icons.cancel_outlined,
+    },
   ];
-
   late String _currentStatus;
-
   String? _selectedStatus;
-
-  // INIT
+  bool _saving = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
+    _currentStatus = _normalize('${widget.order['status'] ?? 'new_order'}');
+    _selectedStatus = _currentStatus;
+  }
 
-    _currentStatus =
-        widget.order['status']?.toString().toLowerCase() ?? 'pending';
+  int _index(String status) {
+    final i = _statuses.indexWhere((x) => x['status'] == status);
+    return i < 0 ? 0 : i;
+  }
 
-    // Backend uses cancelled separately.
-    // It is not part of the normal forward-progress timeline.
-    if (_currentStatus == 'cancelled') {
-      _selectedStatus = null;
-    } else {
-      _selectedStatus = _currentStatus;
+  String _normalize(String value) {
+    final s = value.trim().toLowerCase().replaceAll(' ', '_');
+    if (s == 'completed') return 'delivered';
+    if (s == 'pending' || s == 'processing' || s == 'new') return 'new_order';
+    return s;
+  }
+
+  int get _id =>
+      int.tryParse('${widget.order['orderId'] ?? widget.order['id'] ?? ''}') ??
+      0;
+
+  String get _product {
+    final candidates = [
+      widget.order['productName'],
+      widget.order['productTitle'],
+      widget.order['title'],
+      widget.order['product'],
+      widget.order['name'],
+    ];
+    for (final value in candidates) {
+      final text = value?.toString().trim() ?? '';
+      if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
     }
+    final productId = widget.order['productId'];
+    return productId == null
+        ? 'Product name unavailable'
+        : 'Product #$productId';
   }
 
-  // GETTERS
-
-  String get productName {
-    return widget.order['productTitle']?.toString() ??
-        widget.order['product']?.toString() ??
-        'Product';
-  }
-
-  String get orderId {
-    return widget.order['orderId']?.toString() ?? '-';
-  }
-
-  String get buyerName {
-    if (widget.order['buyerName'] != null) {
-      return widget.order['buyerName'].toString();
+  String get _buyer {
+    final candidates = [widget.order['buyerName'], widget.order['buyer']];
+    for (final value in candidates) {
+      final text = value?.toString().trim() ?? '';
+      if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
     }
-
-    if (widget.order['buyer'] != null) {
-      return widget.order['buyer'].toString();
-    }
-
-    final dynamic buyerId = widget.order['buyerId'];
-
-    return buyerId != null ? 'Buyer #$buyerId' : 'Buyer';
+    final buyerId = widget.order['buyerId'];
+    return buyerId == null ? 'Buyer details unavailable' : 'Buyer #$buyerId';
   }
 
-  String get quantity {
-    return widget.order['quantity']?.toString() ?? '1';
+  String get _price {
+    final value =
+        widget.order['totalAmount'] ??
+        widget.order['unitPrice'] ??
+        widget.order['price'];
+    if (value == null) return 'Price unavailable';
+    final amount = value is num ? value : num.tryParse(value.toString());
+    if (amount == null) return value.toString();
+    return '₹${amount.toStringAsFixed(amount % 1 == 0 ? 0 : 2)}';
   }
-
-  String get price {
-    final dynamic total = widget.order['totalAmount'];
-
-    if (total == null) {
-      final dynamic oldPrice = widget.order['price'];
-
-      return oldPrice?.toString() ?? '₹0';
-    }
-
-    return '₹${_formatPrice(total)}';
-  }
-
-  IconData get productIcon {
-    return widget.order['icon'] as IconData? ?? Icons.inventory_2_outlined;
-  }
-
-  // STATUS INDEX
-
-  int _statusIndex(String status) {
-    final int index = _statuses.indexWhere((item) => item['status'] == status);
-
-    return index == -1 ? 0 : index;
-  }
-
-  bool _isCompleted(String status) {
-    if (_currentStatus == 'cancelled') {
-      return false;
-    }
-
-    return _statusIndex(_currentStatus) >= _statusIndex(status);
-  }
-
-  bool _isCurrent(String status) {
-    return _currentStatus == status;
-  }
-
-  // BUILD
 
   @override
   Widget build(BuildContext context) {
+    final currentLabel =
+        _statuses.firstWhere(
+              (s) => s['status'] == _currentStatus,
+              orElse: () => _statuses.first,
+            )['label']
+            as String;
     return Scaffold(
       backgroundColor: ArtistColors.background,
-
-      appBar: _buildAppBar(),
-
+      appBar: AppBar(
+        backgroundColor: ArtistColors.surface,
+        foregroundColor: ArtistColors.textPrimary,
+        elevation: 0,
+        title: const Text(
+          'Update Order Status',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
-              child: SingleChildScrollView(
+              child: ListView(
                 padding: const EdgeInsets.only(bottom: 25),
-                child: Column(
-                  children: [
-                    _buildOrderHeader(),
-
-                    if (_currentStatus == 'cancelled') _buildCancelledCard(),
-
-                    _buildCurrentStatusCard(),
-
-                    _buildStatusTimeline(),
-
-                    if (_currentStatus != 'cancelled' &&
-                        _currentStatus != 'delivered')
-                      _buildSelectStatusSection(),
-
-                    _buildSellerNote(),
-                  ],
+                children: [
+                  Container(
+                    color: ArtistColors.surface,
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                    child: Row(
+                      children: [
+                        Container(
+                          height: 60,
+                          width: 60,
+                          decoration: BoxDecoration(
+                            color: ArtistColors.light,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(
+                            Icons.inventory_2_outlined,
+                            size: 29,
+                            color: ArtistColors.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 13),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _product,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: ArtistColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                'Order #$_id',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: ArtistColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Buyer: $_buyer',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: ArtistColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: ArtistColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: ArtistColors.accent.withOpacity(.4),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Current Status',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: ArtistColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          currentLabel,
+                          style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                            color: ArtistColors.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Choose the next status to update the order for the buyer.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: ArtistColors.textSecondary,
+                            height: 1.45,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: ArtistColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: ArtistColors.accent.withOpacity(.35),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Order Progress',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: ArtistColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ..._statuses
+                            .where((s) => s['status'] != 'cancelled')
+                            .map(_timeline),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: ArtistColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: ArtistColors.accent.withOpacity(.35),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Select New Status',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: ArtistColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Statuses cannot be moved backwards.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: ArtistColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        ..._statuses
+                            .where((s) => s['status'] != 'new_order')
+                            .map(_option),
+                      ],
+                    ),
+                  ),
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(color: ArtistColors.error),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+              decoration: BoxDecoration(
+                color: ArtistColors.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(.06),
+                    blurRadius: 15,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed:
+                        _saving ||
+                            _selectedStatus == null ||
+                            _selectedStatus == _currentStatus
+                        ? null
+                        : _save,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ArtistColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: _saving
+                        ? const SizedBox(
+                            height: 19,
+                            width: 19,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Save Status Update'),
+                  ),
                 ),
               ),
             ),
-
-            if (_currentStatus != 'cancelled' && _currentStatus != 'delivered')
-              _buildBottomButton(),
           ],
         ),
       ),
     );
   }
 
-  // APP BAR
-
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: ArtistColors.surface,
-      foregroundColor: ArtistColors.textPrimary,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      surfaceTintColor: Colors.transparent,
-
-      leading: IconButton(
-        onPressed: () {
-          Navigator.pop(context);
-        },
-        icon: const Icon(Icons.arrow_back_rounded),
-      ),
-
-      title: Text(
-        'Update Order Status',
-        style: ArtistTextStyles.title.copyWith(
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-
-      centerTitle: true,
-    );
-  }
-
-  // ORDER HEADER
-
-  Widget _buildOrderHeader() {
-    return Container(
-      width: double.infinity,
-      color: ArtistColors.surface,
-
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-
+  Widget _timeline(Map<String, dynamic> item) {
+    final s = '${item['status']}';
+    final i = _index(s);
+    final current = _index(_currentStatus);
+    final done = i <= current;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
-        children: [
-          Container(
-            height: 64,
-            width: 64,
-
-            decoration: BoxDecoration(
-              color: ArtistColors.light,
-              borderRadius: BorderRadius.circular(16),
-            ),
-
-            child: Icon(productIcon, size: 30, color: ArtistColors.primary),
-          ),
-
-          const SizedBox(width: 13),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  productName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: ArtistTextStyles.bodyMedium.copyWith(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-
-                const SizedBox(height: 5),
-
-                Text(
-                  'Order #$orderId',
-                  style: ArtistTextStyles.small.copyWith(fontSize: 10.5),
-                ),
-
-                const SizedBox(height: 3),
-
-                Text(
-                  'Buyer: $buyerName',
-                  style: ArtistTextStyles.small.copyWith(fontSize: 10.5),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          Text(
-            price,
-            style: ArtistTextStyles.bodyMedium.copyWith(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: ArtistColors.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // CANCELLED CARD
-
-  Widget _buildCancelledCard() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-
-      padding: const EdgeInsets.all(16),
-
-      decoration: BoxDecoration(
-        color: ArtistColors.error.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: ArtistColors.error.withValues(alpha: 0.25)),
-      ),
-
-      child: Row(
-        children: [
-          Container(
-            height: 44,
-            width: 44,
-
-            decoration: BoxDecoration(
-              color: ArtistColors.error.withValues(alpha: 0.10),
-              shape: BoxShape.circle,
-            ),
-
-            child: const Icon(Icons.cancel_outlined, color: ArtistColors.error),
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Order Cancelled',
-                  style: ArtistTextStyles.bodyMedium.copyWith(
-                    color: ArtistColors.error,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-
-                const SizedBox(height: 3),
-
-                Text(
-                  'This order has been cancelled and cannot be updated.',
-                  style: ArtistTextStyles.small,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // CURRENT STATUS
-
-  Widget _buildCurrentStatusCard() {
-    final Map<String, dynamic> current = _statuses.firstWhere(
-      (item) => item['status'] == _currentStatus,
-      orElse: () => {
-        'status': 'cancelled',
-        'title': 'Order Cancelled',
-        'description': 'This order has been cancelled.',
-        'icon': Icons.cancel_outlined,
-      },
-    );
-
-    final bool cancelled = _currentStatus == 'cancelled';
-
-    final Color statusColor = cancelled
-        ? ArtistColors.error
-        : ArtistColors.primary;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-
-      padding: const EdgeInsets.all(18),
-
-      decoration: BoxDecoration(
-        color: ArtistColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: statusColor.withValues(alpha: 0.35)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.025),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-
-      child: Row(
-        children: [
-          Container(
-            height: 50,
-            width: 50,
-
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.10),
-              shape: BoxShape.circle,
-            ),
-
-            child: Icon(current['icon'], color: statusColor, size: 25),
-          ),
-
-          const SizedBox(width: 13),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Current Status',
-                  style: ArtistTextStyles.small.copyWith(fontSize: 10),
-                ),
-
-                const SizedBox(height: 4),
-
-                Text(
-                  current['title'],
-                  style: ArtistTextStyles.bodyMedium.copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-
-                const SizedBox(height: 3),
-
-                Text(
-                  current['description'],
-                  style: ArtistTextStyles.small.copyWith(fontSize: 10.5),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // STATUS TIMELINE
-
-  Widget _buildStatusTimeline() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-
-      padding: const EdgeInsets.all(20),
-
-      decoration: BoxDecoration(
-        color: ArtistColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: ArtistColors.accent.withValues(alpha: 0.35)),
-      ),
-
-      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Order Progress',
-            style: ArtistTextStyles.title.copyWith(fontSize: 18),
-          ),
-
-          const SizedBox(height: 20),
-
-          ...List.generate(_statuses.length, (index) {
-            final Map<String, dynamic> item = _statuses[index];
-
-            return _buildTimelineItem(
-              item: item,
-              index: index,
-              isLast: index == _statuses.length - 1,
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimelineItem({
-    required Map<String, dynamic> item,
-    required int index,
-    required bool isLast,
-  }) {
-    final String status = item['status'].toString();
-
-    final bool completed = _isCompleted(status);
-
-    final bool current = _isCurrent(status);
-
-    final Color iconColor = completed
-        ? ArtistColors.success
-        : ArtistColors.textSecondary.withValues(alpha: 0.45);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 35,
-          child: Column(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-
-                height: 32,
-                width: 32,
-
-                decoration: BoxDecoration(
-                  color: current
-                      ? ArtistColors.primary
-                      : completed
-                      ? ArtistColors.light
-                      : ArtistColors.background,
-
-                  shape: BoxShape.circle,
-
-                  border: Border.all(
-                    color: current
-                        ? ArtistColors.primary
-                        : completed
-                        ? ArtistColors.success
-                        : ArtistColors.accent,
-                    width: current ? 2 : 1,
-                  ),
-                ),
-
-                child: Icon(
-                  current
-                      ? Icons.radio_button_checked_rounded
-                      : completed
-                      ? Icons.check_rounded
-                      : item['icon'],
-                  size: current ? 17 : 16,
-                  color: current ? Colors.white : iconColor,
-                ),
+          Container(
+            height: 30,
+            width: 30,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: done ? ArtistColors.light : ArtistColors.background,
+              border: Border.all(
+                color: done ? ArtistColors.success : ArtistColors.accent,
               ),
-
-              if (!isLast)
-                Container(
-                  height: 45,
-                  width: 2,
-                  color: completed
-                      ? ArtistColors.success.withValues(alpha: 0.35)
-                      : ArtistColors.accent.withValues(alpha: 0.35),
-                ),
-            ],
+            ),
+            child: Icon(
+              done ? Icons.check_rounded : item['icon'] as IconData,
+              size: 16,
+              color: done ? ArtistColors.success : ArtistColors.textSecondary,
+            ),
           ),
-        ),
-
-        const SizedBox(width: 12),
-
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 18),
-
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item['title'],
-                        style: ArtistTextStyles.bodyMedium.copyWith(
-                          fontSize: 13,
-                          fontWeight: current || completed
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: current || completed
-                              ? ArtistColors.textPrimary
-                              : ArtistColors.textSecondary,
-                        ),
-                      ),
-                    ),
-
-                    if (current)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
-                        ),
-
-                        decoration: BoxDecoration(
-                          color: ArtistColors.primary.withValues(alpha: 0.09),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-
-                        child: Text(
-                          'CURRENT',
-                          style: ArtistTextStyles.small.copyWith(
-                            fontSize: 7,
-                            fontWeight: FontWeight.w800,
-                            color: ArtistColors.primary,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-
-                const SizedBox(height: 4),
-
                 Text(
-                  item['description'],
-                  style: ArtistTextStyles.small.copyWith(
-                    fontSize: 10,
-                    height: 1.4,
+                  '${item['title']}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: done ? FontWeight.w700 : FontWeight.w500,
+                    color: done
+                        ? ArtistColors.textPrimary
+                        : ArtistColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${item['description']}',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: ArtistColors.textSecondary,
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  // SELECT STATUS
-
-  Widget _buildSelectStatusSection() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-
-      padding: const EdgeInsets.all(20),
-
-      decoration: BoxDecoration(
-        color: ArtistColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: ArtistColors.accent.withValues(alpha: 0.35)),
-      ),
-
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Update Status',
-            style: ArtistTextStyles.title.copyWith(fontSize: 18),
-          ),
-
-          const SizedBox(height: 5),
-
-          Text(
-            'Select the latest status of this order.',
-            style: ArtistTextStyles.small.copyWith(fontSize: 11),
-          ),
-
-          const SizedBox(height: 16),
-
-          ..._statuses.map((item) => _buildStatusOption(item)),
         ],
       ),
     );
   }
 
-  // STATUS OPTION
-
-  Widget _buildStatusOption(Map<String, dynamic> item) {
-    final String status = item['status'].toString();
-
-    final bool selected = _selectedStatus == status;
-
-    final bool isCurrent = _currentStatus == status;
-
-    final int optionIndex = _statusIndex(status);
-
-    final int currentIndex = _statusIndex(_currentStatus);
-
-    final bool isPrevious = optionIndex < currentIndex;
-
-    // Statuses should move forward only.
-    final bool canSelect = !isPrevious && !isCurrent;
-
+  Widget _option(Map<String, dynamic> item) {
+    final s = '${item['status']}';
+    final selected = _selectedStatus == s;
+    final terminal =
+        _currentStatus == 'delivered' || _currentStatus == 'cancelled';
+    final isCancel = s == 'cancelled';
+    final allowed = isCancel
+        ? _currentStatus != 'delivered' && !terminal
+        : s == 'delivered' ||
+              s == 'out_for_delivery' ||
+              s == 'shipped' ||
+              s == 'packed' ||
+              s == 'confirmed'
+        ? (_index(s) > _index(_currentStatus) && !terminal)
+        : false;
     return Opacity(
-      opacity: isPrevious ? 0.55 : 1,
-
+      opacity: allowed || selected ? 1 : .5,
       child: InkWell(
-        borderRadius: BorderRadius.circular(15),
-
-        onTap: canSelect
-            ? () {
-                setState(() {
-                  _selectedStatus = status;
-                });
-              }
-            : null,
-
+        onTap: allowed ? () => setState(() => _selectedStatus = s) : null,
+        borderRadius: BorderRadius.circular(14),
         child: Container(
           margin: const EdgeInsets.only(bottom: 9),
-
           padding: const EdgeInsets.all(12),
-
           decoration: BoxDecoration(
             color: selected ? ArtistColors.light : ArtistColors.background,
-
-            borderRadius: BorderRadius.circular(15),
-
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
                   ? ArtistColors.primary
-                  : ArtistColors.accent.withValues(alpha: 0.30),
+                  : ArtistColors.accent.withOpacity(.3),
               width: selected ? 1.5 : 1,
             ),
           ),
-
           child: Row(
             children: [
-              Container(
-                height: 38,
-                width: 38,
-
-                decoration: BoxDecoration(
-                  color: selected ? ArtistColors.primary : ArtistColors.surface,
-                  borderRadius: BorderRadius.circular(11),
-                ),
-
-                child: Icon(
-                  item['icon'],
-                  size: 19,
-                  color: selected ? Colors.white : ArtistColors.primary,
-                ),
+              Icon(
+                item['icon'] as IconData,
+                color: selected
+                    ? ArtistColors.primary
+                    : ArtistColors.textSecondary,
               ),
-
               const SizedBox(width: 11),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item['title'],
-                      style: ArtistTextStyles.bodyMedium.copyWith(
+                      '${item['label']}',
+                      style: const TextStyle(
                         fontSize: 12.5,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w600,
+                        fontWeight: FontWeight.w700,
+                        color: ArtistColors.textPrimary,
                       ),
                     ),
-
                     const SizedBox(height: 3),
-
                     Text(
-                      item['description'],
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: ArtistTextStyles.small.copyWith(fontSize: 9.5),
+                      '${item['description']}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: ArtistColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
               ),
-
-              const SizedBox(width: 8),
-
-              if (isCurrent)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 5,
-                  ),
-
-                  decoration: BoxDecoration(
-                    color: ArtistColors.success.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-
-                  child: Text(
-                    'Current',
-                    style: ArtistTextStyles.small.copyWith(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      color: ArtistColors.success,
-                    ),
-                  ),
-                )
-              else if (isPrevious)
+              if (selected)
                 const Icon(
                   Icons.check_circle_rounded,
-                  size: 19,
-                  color: ArtistColors.success,
-                )
-              else
-                Container(
-                  height: 21,
-                  width: 21,
-
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: selected
-                          ? ArtistColors.primary
-                          : ArtistColors.textSecondary.withValues(alpha: 0.35),
-                      width: 1.5,
-                    ),
-                  ),
-
-                  child: selected
-                      ? const Icon(
-                          Icons.check_rounded,
-                          size: 14,
-                          color: ArtistColors.primary,
-                        )
-                      : null,
+                  color: ArtistColors.primary,
                 ),
             ],
           ),
@@ -795,390 +509,92 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
     );
   }
 
-  // SELLER NOTE
-
-  Widget _buildSellerNote() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-
-      padding: const EdgeInsets.all(15),
-
-      decoration: BoxDecoration(
-        color: ArtistColors.light.withValues(alpha: 0.75),
-        borderRadius: BorderRadius.circular(16),
-      ),
-
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 36,
-            width: 36,
-
-            decoration: BoxDecoration(
-              color: ArtistColors.surface,
-              borderRadius: BorderRadius.circular(11),
-            ),
-
-            child: const Icon(
-              Icons.eco_outlined,
-              size: 20,
-              color: ArtistColors.primary,
-            ),
-          ),
-
-          const SizedBox(width: 10),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'EcoLoop Seller Tip',
-                  style: ArtistTextStyles.bodyMedium.copyWith(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-
-                const SizedBox(height: 4),
-
-                Text(
-                  'Keep your buyer updated by changing '
-                  'the order status as soon as the item '
-                  'moves to the next stage.',
-                  style: ArtistTextStyles.small.copyWith(
-                    fontSize: 10,
-                    height: 1.45,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  dynamic _unwrapApiData(dynamic value) {
+    dynamic result = value;
+    // EcoLoopApi versions may return either the decoded data directly or
+    // the Apps Script {success:true, data:...} envelope.
+    for (var i = 0; i < 3; i++) {
+      if (result is Map && result.containsKey('data')) {
+        result = result['data'];
+      } else {
+        break;
+      }
+    }
+    return result;
   }
 
-  // BOTTOM BUTTON
-
-  Widget _buildBottomButton() {
-    final bool hasChange =
-        _selectedStatus != null && _selectedStatus != _currentStatus;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-
-      decoration: BoxDecoration(
-        color: ArtistColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 15,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-
-      child: SafeArea(
-        top: false,
-
-        child: SizedBox(
-          width: double.infinity,
-          height: 50,
-
-          child: ElevatedButton(
-            onPressed: hasChange ? _confirmStatusChange : null,
-
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ArtistColors.primary,
-
-              disabledBackgroundColor: ArtistColors.accent.withValues(
-                alpha: 0.45,
-              ),
-
-              foregroundColor: Colors.white,
-
-              disabledForegroundColor: Colors.white.withValues(alpha: 0.75),
-
-              elevation: 0,
-
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-            ),
-
-            child: Text(
-              hasChange
-                  ? 'Update to ${_formatStatus(_selectedStatus!)}'
-                  : 'No Status Change',
-              style: ArtistTextStyles.button.copyWith(fontSize: 14),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // CONFIRM STATUS CHANGE
-
-  void _confirmStatusChange() {
-    if (_selectedStatus == null || _selectedStatus == _currentStatus) {
+  Future<void> _save() async {
+    if (_id <= 0) {
+      setState(
+        () => _error =
+            'This order has no valid order ID. Please reopen it from Selling Orders.',
+      );
       return;
     }
+    final nextStatus = _selectedStatus;
+    if (nextStatus == null || nextStatus == _currentStatus) return;
 
-    final String newStatus = _selectedStatus!;
-
-    final Map<String, dynamic> selectedData = _statuses.firstWhere(
-      (item) => item['status'] == newStatus,
-    );
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ArtistColors.surface,
-
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(22, 12, 22, 22),
-
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-
-              children: [
-                Container(
-                  height: 4,
-                  width: 42,
-
-                  decoration: BoxDecoration(
-                    color: ArtistColors.border,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                Container(
-                  height: 58,
-                  width: 58,
-
-                  decoration: const BoxDecoration(
-                    color: ArtistColors.light,
-                    shape: BoxShape.circle,
-                  ),
-
-                  child: Icon(
-                    selectedData['icon'],
-                    color: ArtistColors.primary,
-                    size: 28,
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                Text(
-                  'Update Order Status?',
-                  style: ArtistTextStyles.title.copyWith(fontSize: 19),
-                ),
-
-                const SizedBox(height: 7),
-
-                Text(
-                  'Change order #$orderId to '
-                  '"${_formatStatus(newStatus)}".',
-                  textAlign: TextAlign.center,
-                  style: ArtistTextStyles.body.copyWith(fontSize: 11.5),
-                ),
-
-                const SizedBox(height: 20),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.pop(sheetContext);
-                        },
-
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: ArtistColors.primary,
-
-                          side: const BorderSide(color: ArtistColors.primary),
-
-                          minimumSize: const Size.fromHeight(48),
-
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(13),
-                          ),
-                        ),
-
-                        child: Text(
-                          'Cancel',
-                          style: ArtistTextStyles.bodyMedium.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(width: 12),
-
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isSavingStatus
-                            ? null
-                            : () {
-                                Navigator.pop(sheetContext);
-                                _updateStatus(newStatus);
-                              },
-
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ArtistColors.primary,
-
-                          foregroundColor: Colors.white,
-
-                          elevation: 0,
-
-                          minimumSize: const Size.fromHeight(48),
-
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(13),
-                          ),
-                        ),
-
-                        child: Text(
-                          'Confirm',
-                          style: ArtistTextStyles.button.copyWith(fontSize: 14),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // UPDATE STATUS
-
-  bool _isSavingStatus = false;
-
-  Future<void> _updateStatus(String newStatus) async {
-    if (_isSavingStatus) return;
-    setState(() => _isSavingStatus = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
 
     try {
-      final dynamic response = await EcoLoopApi.instance.post(
-        '/artist/orders/${widget.order['orderId']}/status',
-        <String, dynamic>{'status': newStatus},
-      );
-      final Map<String, dynamic> updated = response is Map
-          ? Map<String, dynamic>.from(response)
-          : <String, dynamic>{};
+      final raw = await EcoLoopApi.instance.post('/artist/orders/$_id/status', {
+        'status': nextStatus,
+      });
+      final response = _unwrapApiData(raw);
+      String? savedStatus;
+      if (response is Map) {
+        final value = response['status'];
+        if (value != null) savedStatus = _normalize(value.toString());
+      }
+
+      // Some API wrapper versions don't unwrap the response. Verify against
+      // the persisted list before showing success so we never fake a save.
+      if (savedStatus != nextStatus) {
+        final listRaw = await EcoLoopApi.instance.get('/artist/orders');
+        final orders = _unwrapApiData(listRaw);
+        if (orders is List) {
+          for (final item in orders) {
+            if (item is Map &&
+                int.tryParse('${item['orderId'] ?? item['id'] ?? ''}') == _id) {
+              final value = item['status'];
+              if (value != null) savedStatus = _normalize(value.toString());
+              break;
+            }
+          }
+        }
+      }
+
+      if (savedStatus != nextStatus) {
+        throw Exception(
+          'The server did not confirm this status update. Refresh Selling Orders and try again. '
+          'If it continues, check that the latest Code.gs deployment is active.',
+        );
+      }
 
       if (!mounted) return;
       setState(() {
-        _currentStatus = (updated['status'] ?? newStatus)
-            .toString()
-            .toLowerCase();
-        _selectedStatus = _currentStatus;
-        widget.order.addAll(updated);
-        widget.order['status'] = _currentStatus;
-        widget.order['updatedAt'] =
-            updated['updatedAt'] ?? DateTime.now().toIso8601String();
-        _isSavingStatus = false;
+        _currentStatus = savedStatus!;
+        _selectedStatus = savedStatus;
+        widget.order['status'] = savedStatus;
       });
 
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: ArtistColors.primary,
-            margin: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(11),
-            ),
-            content: Row(
-              children: [
-                const Icon(
-                  Icons.check_circle_outline_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Text(
-                    'Order updated to ${_formatStatus(_currentStatus)}',
-                    style: ArtistTextStyles.body.copyWith(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SnackBar(content: Text('Order status saved successfully.')),
         );
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _isSavingStatus = false);
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: ArtistColors.error,
-            content: Text(
-              'Could not update order: ${error.toString().replaceFirst('Exception: ', '')}',
-            ),
-          ),
-        );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-  }
-
-  // FORMAT STATUS
-
-  String _formatStatus(String status) {
-    if (status.trim().isEmpty) {
-      return '-';
-    }
-
-    return status
-        .split('_')
-        .map((part) {
-          if (part.isEmpty) {
-            return '';
-          }
-
-          return part[0].toUpperCase() + part.substring(1);
-        })
-        .join(' ');
-  }
-
-  // PRICE FORMAT
-
-  String _formatPrice(dynamic value) {
-    double amount = 0;
-
-    if (value is num) {
-      amount = value.toDouble();
-    } else {
-      amount = double.tryParse('${value ?? ''}') ?? 0;
-    }
-
-    if (amount == amount.roundToDouble()) {
-      return amount.toInt().toString();
-    }
-
-    return amount.toStringAsFixed(2);
   }
 }

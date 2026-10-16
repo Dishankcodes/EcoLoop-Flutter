@@ -1,12 +1,11 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+
 import 'package:ecoloop/services/ecoloop_api.dart';
-import '../../../widgets/cart_popup.dart';
+import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
-
 import '../../../app_theme/user/app_text_styles.dart';
-
+import '../../../widgets/cart_popup_user.dart';
 import 'order_success.dart';
 
 /// Screen managing checkout payment method selection, card/UPI input fields, and payment confirmation.

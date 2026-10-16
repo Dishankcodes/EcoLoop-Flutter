@@ -5,7 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
-import '../../../widgets/cart_popup.dart';
+import '../../../widgets/cart_popup_artist.dart';
 import '../../artist/profile/artist_profile.dart';
 import '../../artist/reviews/product_reviews.dart';
 import '../../artist/reviews/write_review.dart';

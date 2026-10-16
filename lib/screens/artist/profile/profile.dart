@@ -8,6 +8,7 @@ import '../../../widgets/artist_more_menu.dart';
 import '../../common/artist/contact_us.dart';
 import '../../welcome_screen.dart';
 import '../buy_products/buying_orders.dart';
+import '../buy_products/cart.dart';
 import '../buy_products/wishlist.dart';
 import '../my_products/add_product.dart';
 import '../my_products/my_product.dart';
@@ -590,7 +591,10 @@ class _ProfileState extends State<Profile> {
           icon: Icons.shopping_cart_outlined,
           title: 'My Cart',
           subtitle: 'View products added to your shopping cart',
-          onTap: () => _showComingSoon(context, 'My Cart'),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const Cart()),
+          ),
         ),
         const _ProfileDivider(),
         _ProfileTile(

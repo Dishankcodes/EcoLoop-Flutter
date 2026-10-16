@@ -4,7 +4,7 @@ import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
 import '../../../shared_preferences_util.dart';
-import '../../../widgets/cart_popup.dart';
+import '../../../widgets/cart_popup_user.dart';
 import '../../../widgets/user_more_menu.dart';
 import '../../common/help_support.dart';
 import '../../welcome_screen.dart';

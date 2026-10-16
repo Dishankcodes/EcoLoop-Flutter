@@ -1,7 +1,11 @@
+import 'dart:convert';
+
+import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../widgets/cart_popup_artist.dart';
 import 'order_success.dart';
 
 /// Screen managing checkout payment method selection, card/UPI input fields, and payment confirmation.
@@ -26,10 +30,13 @@ class Payment extends StatefulWidget {
 }
 
 class _PaymentState extends State<Payment> {
-  String _selectedMethod = 'upi';
+  String _selectedMethod = 'cod';
   String? _selectedUpiApp;
   String? _selectedBank;
   bool _isProcessing = false;
+  String? _createdOrderId;
+  double? _createdServerTotal;
+  int? _createdItemCount;
 
   final TextEditingController _upiController = TextEditingController();
   final TextEditingController _cardNumberController = TextEditingController();
@@ -127,54 +134,117 @@ class _PaymentState extends State<Payment> {
     });
   }
 
-  /// Validates selected payment option inputs and initiates processing simulation.
+  /// Creates the complete order batch in Google Sheets for COD.
+  /// Online methods remain visible, but cannot report success until Razorpay is integrated.
   Future<void> _payNow() async {
     if (_isProcessing) return;
 
-    if (_selectedMethod == 'upi') {
-      if (_selectedUpiApp == null && _upiController.text.trim().isEmpty) {
-        _showMessage('Select a UPI app or enter your UPI ID.');
-        return;
-      }
-    }
-
-    if (_selectedMethod == 'card') {
-      if (_cardNumberController.text.replaceAll(' ', '').length < 12) {
-        _showMessage('Please enter a valid card number.');
-        return;
-      }
-      if (_cardNameController.text.trim().isEmpty) {
-        _showMessage('Please enter the name on your card.');
-        return;
-      }
-      if (_expiryController.text.trim().isEmpty) {
-        _showMessage('Please enter card expiry.');
-        return;
-      }
-      if (_cvvController.text.trim().length < 3) {
-        _showMessage('Please enter a valid CVV.');
-        return;
-      }
-    }
-
-    if (_selectedMethod == 'netbanking' && _selectedBank == null) {
-      _showMessage('Please select your bank.');
+    if (_selectedMethod != 'cod') {
+      _showMessage(
+        'UPI, cards, wallets and net banking will be available after Razorpay is connected. Please choose Cash on Delivery.',
+      );
       return;
     }
 
-    setState(() {
-      _isProcessing = true;
-    });
+    final items = widget.items ?? const <Map<String, dynamic>>[];
+    if (items.isEmpty) {
+      _showMessage('No items to order. Please return to checkout.');
+      return;
+    }
+    final address = widget.address;
+    if (address == null || address.isEmpty) {
+      _showMessage('Delivery address is missing. Go back to checkout.');
+      return;
+    }
 
-    await Future.delayed(const Duration(milliseconds: 1200));
+    final orderItems = <Map<String, dynamic>>[];
+    for (final item in items) {
+      final id = int.tryParse(
+        (item['productId'] ?? item['id'] ?? '').toString(),
+      );
+      final quantity = _productQuantity(item);
+      if (id == null || id <= 0) {
+        _showMessage(
+          'A product has an invalid ID. Remove it and add it again from the marketplace.',
+        );
+        return;
+      }
+      if (quantity < 1) {
+        _showMessage('Invalid quantity for ${_productTitle(item)}.');
+        return;
+      }
+      orderItems.add({'productId': id, 'quantity': quantity});
+    }
 
-    if (!mounted) return;
+    setState(() => _isProcessing = true);
+    try {
+      final response = await EcoLoopApi.instance.post('/orders/batch', {
+        'items': orderItems,
+        'shippingAddress': jsonEncode(address),
+        'paymentMethod': 'cod',
+        'deliveryMethod': widget.deliveryMethod,
+      });
 
-    setState(() {
-      _isProcessing = false;
-    });
+      if (response is! Map || response['orders'] is! List) {
+        throw const EcoLoopApiException(
+          'The server did not confirm the complete order. No success was shown.',
+        );
+      }
 
-    _showPaymentSuccess();
+      final orders = (response['orders'] as List)
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+
+      if (orders.isEmpty ||
+          orders.any(
+            (order) =>
+                (order['orderId'] ?? order['id']) == null ||
+                (order['orderId'] ?? order['id']).toString().trim().isEmpty,
+          )) {
+        throw const EcoLoopApiException(
+          'The server returned an incomplete order confirmation.',
+        );
+      }
+
+      final orderIds = orders
+          .map((order) => (order['orderId'] ?? order['id']).toString())
+          .join(', ');
+      final rawTotal = response['totalAmount'];
+      final serverTotal = rawTotal is num
+          ? rawTotal.toDouble()
+          : double.tryParse('$rawTotal') ??
+                orders.fold<double>(0, (sum, order) {
+                  final amount = order['totalAmount'] ?? order['total'];
+                  return sum +
+                      (amount is num
+                          ? amount.toDouble()
+                          : double.tryParse('$amount') ?? 0);
+                });
+      final rawCount = response['itemCount'];
+      final itemCount = rawCount is num
+          ? rawCount.toInt()
+          : items.fold<int>(0, (sum, item) => sum + _productQuantity(item));
+
+      if (!mounted) return;
+      setState(() {
+        _createdOrderId = orderIds;
+        _createdServerTotal = serverTotal;
+        _createdItemCount = itemCount;
+        _isProcessing = false;
+      });
+      // Clear the shared artist cart only after the backend confirms the order.
+      CartPopup.clear();
+      _showPaymentSuccess();
+    } catch (error) {
+      if (mounted) {
+        _showMessage(
+          'Order could not be completed: ${error.toString().replaceFirst('Exception: ', '')}',
+        );
+      }
+    } finally {
+      if (mounted && _isProcessing) setState(() => _isProcessing = false);
+    }
   }
 
   /// Displays payment confirmation modal sheet upon success.
@@ -209,12 +279,12 @@ class _PaymentState extends State<Payment> {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  'Payment Successful',
+                  'Order Placed Successfully',
                   style: ArtistTextStyles.title.copyWith(fontSize: 21),
                 ),
                 const SizedBox(height: 7),
                 Text(
-                  'Your payment of ${_formatIndianPrice(widget.totalAmount)} has been received.',
+                  'Your COD order for ${_formatIndianPrice(_createdServerTotal ?? widget.totalAmount)} has been placed. Pay when it is delivered.',
                   textAlign: TextAlign.center,
                   style: ArtistTextStyles.body,
                 ),
@@ -246,7 +316,7 @@ class _PaymentState extends State<Payment> {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              'EcoLoop order • Payment completed',
+                              'Order ${_createdOrderId ?? ''} • Cash on Delivery',
                               style: ArtistTextStyles.caption,
                             ),
                           ],
@@ -266,17 +336,18 @@ class _PaymentState extends State<Payment> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => OrderSuccess(
-                            totalAmount: widget.totalAmount,
-                            itemCount: widget.items?.length ?? 1,
-                            paymentMethod: _selectedMethod == 'upi'
-                                ? 'UPI'
-                                : _selectedMethod == 'card'
-                                ? 'Credit / Debit Card'
-                                : _selectedMethod == 'netbanking'
-                                ? 'Net Banking'
-                                : _selectedMethod == 'wallet'
-                                ? 'Wallet'
-                                : 'Cash on Delivery',
+                            orderId: _createdOrderId,
+                            totalAmount:
+                                _createdServerTotal ?? widget.totalAmount,
+                            itemCount:
+                                _createdItemCount ??
+                                (widget.items?.fold<int>(
+                                      0,
+                                      (sum, item) =>
+                                          sum + _productQuantity(item),
+                                    ) ??
+                                    1),
+                            paymentMethod: 'Cash on Delivery',
                             address: widget.address,
                             deliveryMethod: widget.deliveryMethod,
                           ),
