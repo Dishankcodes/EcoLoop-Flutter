@@ -85,9 +85,8 @@ class _FollowingListState extends State<FollowingList> {
 
     try {
       final response = _asMap(await _api.get('/my/following'));
-      dynamic rows = response['artists'] ??
-          response['following'] ??
-          response['data'];
+      dynamic rows =
+          response['artists'] ?? response['following'] ?? response['data'];
 
       if (rows is Map) {
         rows = rows['artists'] ?? rows['following'] ?? rows['items'];
@@ -95,10 +94,10 @@ class _FollowingListState extends State<FollowingList> {
 
       final artists = rows is List
           ? rows
-              .whereType<Map>()
-              .map((item) => _asMap(item))
-              .where((item) => item.isNotEmpty)
-              .toList()
+                .whereType<Map>()
+                .map((item) => _asMap(item))
+                .where((item) => item.isNotEmpty)
+                .toList()
           : <Map<String, dynamic>>[];
 
       if (!mounted) return;

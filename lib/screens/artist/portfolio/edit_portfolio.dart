@@ -43,25 +43,98 @@ class _PortfolioEditorPageState extends State<PortfolioEditorPage> {
 
   bool get _isEditing => _item != null;
 
+  // Accept current API fields as well as legacy/snake_case aliases.
+  String _firstText(Map<String, dynamic> item, List<String> keys) {
+    for (final key in keys) {
+      final value = item[key];
+      if (value != null &&
+          value.toString().trim().isNotEmpty &&
+          value.toString().toLowerCase() != 'null') {
+        return value.toString();
+      }
+    }
+    return '';
+  }
+
+  String _existingImageUrl(bool before) {
+    final item = _item ?? <String, dynamic>{};
+    final keys = before
+        ? <String>[
+            'beforeImageUrl',
+            'before_image_url',
+            'beforeImage',
+            'before_image',
+            'originalImageUrl',
+            'originalImage',
+          ]
+        : <String>[
+            'afterImageUrl',
+            'after_image_url',
+            'imageUrl',
+            'image_url',
+            'image',
+            'afterImage',
+            'after_image',
+            'resultImageUrl',
+          ];
+    return _firstText(item, keys).trim();
+  }
+
   @override
   void initState() {
     super.initState();
-    final item = _item ?? {};
-    _title = TextEditingController(text: '${item['title'] ?? ''}');
-    _caption = TextEditingController(text: '${item['caption'] ?? ''}');
-    _description = TextEditingController(text: '${item['description'] ?? ''}');
-    _category = TextEditingController(text: '${item['category'] ?? ''}');
-    _materials = TextEditingController(text: '${item['materialsUsed'] ?? ''}');
+    final raw = _item ?? <String, dynamic>{};
+    final nested = raw['portfolio'] ?? raw['data'] ?? raw['item'];
+    final item = nested is Map
+        ? <String, dynamic>{...raw, ...Map<String, dynamic>.from(nested)}
+        : raw;
+
+    _title = TextEditingController(
+      text: _firstText(item, ['title', 'projectName', 'project_name', 'name']),
+    );
+    _caption = TextEditingController(
+      text: _firstText(item, [
+        'caption',
+        'shortCaption',
+        'short_caption',
+        'subtitle',
+      ]),
+    );
+    _description = TextEditingController(
+      text: _firstText(item, [
+        'description',
+        'projectStory',
+        'project_story',
+        'story',
+      ]),
+    );
+    _category = TextEditingController(
+      text: _firstText(item, ['category', 'categoryName', 'category_name']),
+    );
+    _materials = TextEditingController(
+      text: _firstText(item, ['materialsUsed', 'materials_used', 'materials']),
+    );
     _process = TextEditingController(
-      text: '${item['processDescription'] ?? ''}',
+      text: _firstText(item, [
+        'processDescription',
+        'process_description',
+        'process',
+      ]),
     );
     _impact = TextEditingController(
-      text: '${item['environmentalImpact'] ?? ''}',
+      text: _firstText(item, [
+        'environmentalImpact',
+        'environmental_impact',
+        'impact',
+        'ecoImpact',
+      ]),
     );
-    _productId = TextEditingController(text: '${item['productId'] ?? ''}');
-    _featured =
-        item['featured'] == true ||
-        '${item['featured']}'.toLowerCase() == 'true';
+    _productId = TextEditingController(
+      text: _firstText(item, ['productId', 'product_id', 'linkedProductId']),
+    );
+    final featured =
+        item['featured'] ?? item['isFeatured'] ?? item['is_featured'];
+    _featured = featured == true || '$featured'.toLowerCase() == 'true';
   }
 
   @override
@@ -136,10 +209,8 @@ class _PortfolioEditorPageState extends State<PortfolioEditorPage> {
       return;
     }
     if (_isEditing) {
-      final oldBefore = '${_item?['beforeImageUrl'] ?? ''}'.trim();
-      final oldAfter =
-          '${_item?['afterImageUrl'] ?? _item?['imageUrl'] ?? _item?['image'] ?? ''}'
-              .trim();
+      final oldBefore = _existingImageUrl(true);
+      final oldAfter = _existingImageUrl(false);
       if (_beforeFile == null && oldBefore.isEmpty) {
         _message('Please add the before image.', error: true);
         return;
@@ -425,10 +496,7 @@ class _PortfolioEditorPageState extends State<PortfolioEditorPage> {
 
   Widget _imagePicker({required bool before}) {
     final file = before ? _beforeFile : _afterFile;
-    final item = _item ?? {};
-    final existing = before
-        ? '${item['beforeImageUrl'] ?? ''}'
-        : '${item['afterImageUrl'] ?? item['imageUrl'] ?? item['image'] ?? ''}';
+    final existing = _existingImageUrl(before);
     final label = before ? 'BEFORE IMAGE' : 'AFTER IMAGE';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

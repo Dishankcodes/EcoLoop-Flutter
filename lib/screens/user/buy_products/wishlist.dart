@@ -4,7 +4,8 @@ import '../../../app_theme/user/app_colors.dart';
 import '../../../services/ecoloop_api.dart';
 import 'product_details.dart';
 
-/// Persisted wishlist backed by GET/POST/DELETE /wishlist.
+/// Persistent wishlist for the signed-in account.
+/// The backend scopes wishlist records by account type (user or artist).
 class Wishlist extends StatefulWidget {
   const Wishlist({super.key});
 
@@ -14,116 +15,223 @@ class Wishlist extends StatefulWidget {
 
 class _WishlistState extends State<Wishlist> {
   final EcoLoopApi _api = EcoLoopApi.instance;
+
   bool _loading = true;
+  bool _refreshing = false;
   String? _error;
-  List<Map<String, dynamic>> _items = [];
+  final Set<String> _removingIds = <String>{};
+  List<Map<String, dynamic>> _items = <Map<String, dynamic>>[];
 
   Map<String, dynamic> _map(dynamic value) {
     if (value is Map<String, dynamic>) return value;
-    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), v));
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    }
     return <String, dynamic>{};
   }
 
   List<Map<String, dynamic>> _rows(dynamic response) {
-    if (response is List)
-      return response.map(_map).where((e) => e.isNotEmpty).toList();
+    if (response is List) {
+      return response.map(_map).where((row) => row.isNotEmpty).toList();
+    }
     final root = _map(response);
     final data = _map(root['data']);
-    for (final key in ['items', 'products', 'wishlist', 'results']) {
+    for (final key in <String>['items', 'products', 'wishlist', 'results']) {
       final value = root[key] ?? data[key];
-      if (value is List)
-        return value.map(_map).where((e) => e.isNotEmpty).toList();
+      if (value is List) {
+        return value.map(_map).where((row) => row.isNotEmpty).toList();
+      }
     }
-    return [];
+    return <Map<String, dynamic>>[];
   }
 
-  String _id(Map<String, dynamic> p) {
-    final nested = _map(p['product']);
-    return (p['productId'] ??
-            p['product_id'] ??
-            p['id'] ??
-            nested['productId'] ??
-            nested['product_id'] ??
-            nested['id'] ??
-            '')
-        .toString();
+  String _productId(Map<String, dynamic> product) {
+    final nested = _map(product['product']);
+    final value =
+        product['productId'] ??
+        product['product_id'] ??
+        product['id'] ??
+        nested['productId'] ??
+        nested['product_id'] ??
+        nested['id'];
+    return value?.toString().trim() ?? '';
   }
 
-  Future<void> _load() async {
-    if (mounted)
-      setState(() {
+  String _text(
+    Map<String, dynamic> product,
+    List<String> keys, {
+    String fallback = '',
+  }) {
+    for (final key in keys) {
+      final value = product[key];
+      if (value != null &&
+          value.toString().trim().isNotEmpty &&
+          value.toString().toLowerCase() != 'null') {
+        return value.toString().trim();
+      }
+    }
+    return fallback;
+  }
+
+  double? _price(Map<String, dynamic> product) {
+    final raw =
+        product['price'] ?? product['sellingPrice'] ?? product['selling_price'];
+    if (raw is num) return raw.toDouble();
+    final cleaned = (raw ?? '').toString().replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(cleaned);
+  }
+
+  String _formatPrice(double? value) {
+    if (value == null) return 'Price unavailable';
+    final whole = value == value.roundToDouble();
+    return '₹${whole ? value.toStringAsFixed(0) : value.toStringAsFixed(2)}';
+  }
+
+  List<String> _images(Map<String, dynamic> product) {
+    dynamic raw =
+        product['imageUrls'] ??
+        product['images'] ??
+        product['imageUrl'] ??
+        product['image_url'] ??
+        product['image'];
+    if (raw is List) {
+      return raw
+          .map((entry) => entry.toString().trim())
+          .where(_isHttpUrl)
+          .toList();
+    }
+    if (raw is String && raw.trim().isNotEmpty) {
+      final value = raw.trim();
+      // Handles JSON-encoded arrays as well as comma-separated legacy fields.
+      final normalized = value
+          .replaceAll('[', '')
+          .replaceAll(']', '')
+          .replaceAll('"', '')
+          .replaceAll("'", '');
+      return normalized
+          .split(RegExp(r'[,;\n]'))
+          .map((entry) => entry.trim())
+          .where(_isHttpUrl)
+          .toSet()
+          .toList();
+    }
+    return <String>[];
+  }
+
+  bool _isHttpUrl(String value) =>
+      value.startsWith('https://') || value.startsWith('http://');
+
+  String _sellerType(Map<String, dynamic> product) {
+    final value = _text(product, [
+      'sellerType',
+      'seller_type',
+      'sellerRole',
+      'seller_role',
+      'role',
+    ], fallback: 'user').toLowerCase();
+    return <String>{'artist', 'remaker', 're-maker', 're_maker'}.contains(value)
+        ? 'ReMaker'
+        : 'User seller';
+  }
+
+  Future<void> _load({bool refresh = false}) async {
+    if (!mounted) return;
+    setState(() {
+      if (refresh) {
+        _refreshing = true;
+      } else {
         _loading = true;
-        _error = null;
-      });
+      }
+      _error = null;
+    });
+
     try {
       final rows = _rows(await _api.get('/wishlist'));
       final cleaned = <Map<String, dynamic>>[];
+      final seen = <String>{};
+
       for (final row in rows) {
         final nested = _map(row['product']);
         final item = nested.isNotEmpty
-            ? <String, dynamic>{...nested}
+            ? <String, dynamic>{...row, ...nested}
             : <String, dynamic>{...row};
-        final id = _id(row).isNotEmpty ? _id(row) : _id(item);
-        if (id.isNotEmpty) item['productId'] = id;
-        if (item['title'] != null || item['name'] != null) cleaned.add(item);
+        final id = _productId(item).isNotEmpty
+            ? _productId(item)
+            : _productId(row);
+        if (id.isEmpty || !seen.add(id)) continue;
+        item['productId'] = id;
+        // Keep records with a usable title even if the listing is missing optional fields.
+        final title = _text(item, [
+          'title',
+          'name',
+          'productName',
+          'product_name',
+        ]);
+        if (title.isEmpty) continue;
+        item['title'] = title;
+        cleaned.add(item);
       }
-      if (mounted)
-        setState(() {
-          _items = cleaned;
-          _loading = false;
-        });
-    } catch (e) {
-      if (mounted)
-        setState(() {
-          _error = e.toString();
-          _loading = false;
-        });
+
+      if (!mounted) return;
+      setState(() {
+        _items = cleaned;
+        _loading = false;
+        _refreshing = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+        _refreshing = false;
+      });
     }
   }
 
-  Future<void> _remove(Map<String, dynamic> item) async {
-    final id = _id(item);
-    if (id.isEmpty) return;
+  Future<void> _remove(Map<String, dynamic> product) async {
+    final id = _productId(product);
+    if (id.isEmpty || _removingIds.contains(id)) return;
+
     final previous = List<Map<String, dynamic>>.from(_items);
-    setState(() => _items.removeWhere((p) => _id(p) == id));
+    setState(() {
+      _removingIds.add(id);
+      _items.removeWhere((item) => _productId(item) == id);
+    });
+
     try {
       await _api.delete('/wishlist/$id');
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Removed from wishlist')));
-    } catch (e) {
-      if (mounted) setState(() => _items = previous);
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update wishlist: $e')),
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Removed from your wishlist')),
         );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _items = previous);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not remove item: ${error.toString().replaceFirst('Exception: ', '')}',
+            ),
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => _removingIds.remove(id));
     }
   }
 
-  List<String> _images(Map<String, dynamic> p) {
-    final raw = p['imageUrls'] ?? p['images'] ?? p['imageUrl'] ?? p['image'];
-    if (raw is List)
-      return raw
-          .map((e) => e.toString())
-          .where((e) => e.startsWith('http'))
-          .toList();
-    if (raw is String && raw.trim().isNotEmpty) {
-      final t = raw.trim();
-      if (t.startsWith('[') && t.endsWith(']'))
-        return t
-            .substring(1, t.length - 1)
-            .split(',')
-            .map((e) => e.trim().replaceAll('"', '').replaceAll("'", ''))
-            .where((e) => e.startsWith('http'))
-            .toList();
-      return t
-          .split(',')
-          .map((e) => e.trim())
-          .where((e) => e.startsWith('http'))
-          .toList();
-    }
-    return [];
+  Future<void> _openProduct(Map<String, dynamic> product) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ProductDetails(product: Map<String, dynamic>.from(product)),
+      ),
+    );
+    // Product details can change wishlist state; resync when returning.
+    if (mounted) _load(refresh: true);
   }
 
   @override
@@ -133,116 +241,375 @@ class _WishlistState extends State<Wishlist> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
-    appBar: AppBar(
-      title: const Text('My Wishlist'),
+  Widget build(BuildContext context) {
+    final primary = AppColors.primary;
+    return Scaffold(
       backgroundColor: AppColors.background,
-      actions: [
-        IconButton(
-          tooltip: 'Refresh',
-          onPressed: _load,
-          icon: const Icon(Icons.refresh_rounded),
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        foregroundColor: primary,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        titleSpacing: 20,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'My Wishlist',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              '${_items.length} saved ${_items.length == 1 ? 'item' : 'items'}',
+              style: TextStyle(
+                color: primary.withValues(alpha: 0.7),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
-      ],
-    ),
-    body: _loading
-        ? const Center(child: CircularProgressIndicator())
-        : _error != null
-        ? Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.cloud_off_outlined, size: 42),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Could not load your wishlist',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(_error!, textAlign: TextAlign.center),
-                  TextButton(onPressed: _load, child: const Text('Try again')),
-                ],
+        actions: [
+          IconButton(
+            tooltip: 'Refresh wishlist',
+            onPressed: _refreshing ? null : () => _load(refresh: true),
+            icon: _refreshing
+                ? const SizedBox(
+                    width: 19,
+                    height: 19,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded),
+          ),
+          const SizedBox(width: 6),
+        ],
+      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return _stateMessage(
+        icon: Icons.cloud_off_outlined,
+        title: 'Could not load your wishlist',
+        message: _error!,
+        actionLabel: 'Try again',
+        onAction: () => _load(),
+      );
+    }
+    if (_items.isEmpty) {
+      return _stateMessage(
+        icon: Icons.favorite_border_rounded,
+        title: 'Your wishlist is waiting',
+        message:
+            'Save items you love from the marketplace. They’ll be kept here for you.',
+        actionLabel: 'Refresh',
+        onAction: () => _load(refresh: true),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => _load(refresh: true),
+      color: AppColors.primary,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        itemCount: _items.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 14),
+        itemBuilder: (context, index) => _wishlistCard(_items[index]),
+      ),
+    );
+  }
+
+  Widget _stateMessage({
+    required IconData icon,
+    required String title,
+    required String message,
+    required String actionLabel,
+    required VoidCallback onAction,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.09),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 42, color: AppColors.primary),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                height: 1.45,
+                fontSize: 13,
               ),
             ),
-          )
-        : _items.isEmpty
-        ? Center(
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.favorite_border_rounded,
-                    size: 54,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Your wishlist is empty',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Tap the heart on any marketplace item to save it.',
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+            const SizedBox(height: 18),
+            OutlinedButton.icon(
+              onPressed: onAction,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: Text(actionLabel),
             ),
-          )
-        : RefreshIndicator(
-            onRefresh: _load,
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: _items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final p = _items[index];
-                final imgs = _images(p);
-                return Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(10),
-                    leading: SizedBox(
-                      width: 76,
-                      height: 76,
-                      child: imgs.isEmpty
-                          ? const Icon(Icons.image_outlined, size: 34)
-                          : Image.network(
-                              imgs.first,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  const Icon(Icons.broken_image_outlined),
-                            ),
-                    ),
-                    title: Text(
-                      (p['title'] ?? p['name'] ?? 'Product').toString(),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text('₹${p['price'] ?? '—'}'),
-                    ),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ProductDetails(product: p),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _wishlistCard(Map<String, dynamic> product) {
+    final images = _images(product);
+    final id = _productId(product);
+    final title = _text(product, ['title', 'name'], fallback: 'Product');
+    final seller = _text(
+      product,
+      ['sellerName', 'seller_name', 'seller', 'artistName', 'userName'],
+      fallback: _sellerType(product) == 'ReMaker'
+          ? 'ReMaker'
+          : 'EcoLoop seller',
+    );
+    final category = _text(product, [
+      'category',
+      'categoryName',
+      'category_name',
+    ]);
+    final removing = _removingIds.contains(id);
+    final price = _formatPrice(_price(product));
+
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: () => _openProduct(product),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.success.withValues(alpha: 0.75),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.035),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  AspectRatio(
+                    aspectRatio: 1.72,
+                    child: images.isEmpty
+                        ? _imageFallback()
+                        : Image.network(
+                            images.first,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  _imageFallback(),
+                                  Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary,
+                                      value: progress.expectedTotalBytes == null
+                                          ? null
+                                          : progress.cumulativeBytesLoaded /
+                                                progress.expectedTotalBytes!,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => _imageFallback(),
+                          ),
+                  ),
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Material(
+                      color: Colors.white.withValues(alpha: 0.96),
+                      shape: const CircleBorder(),
+                      elevation: 2,
+                      child: IconButton(
+                        tooltip: 'Remove from wishlist',
+                        onPressed: removing ? null : () => _remove(product),
+                        icon: removing
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.primary,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.favorite_rounded,
+                                color: Colors.redAccent,
+                              ),
                       ),
                     ),
-                    trailing: IconButton(
-                      tooltip: 'Remove from wishlist',
-                      onPressed: () => _remove(p),
-                      icon: const Icon(Icons.favorite, color: Colors.redAccent),
-                    ),
                   ),
-                );
-              },
-            ),
+                  if (images.length > 1)
+                    Positioned(
+                      left: 12,
+                      bottom: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.58),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${images.length} photos',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(15, 13, 12, 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (category.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.08,
+                                ),
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              child: Text(
+                                category,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          if (category.isNotEmpty) const SizedBox(height: 8),
+                          Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              height: 1.25,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                _sellerType(product) == 'ReMaker'
+                                    ? Icons.brush_outlined
+                                    : Icons.storefront_outlined,
+                                size: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  seller,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            price,
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 15,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-  );
+        ),
+      ),
+    );
+  }
+
+  Widget _imageFallback() {
+    return Container(
+      color: AppColors.primary.withValues(alpha: 0.07),
+      child: Center(
+        child: Icon(
+          Icons.image_not_supported_outlined,
+          size: 42,
+          color: AppColors.primary.withValues(alpha: 0.7),
+        ),
+      ),
+    );
+  }
 }

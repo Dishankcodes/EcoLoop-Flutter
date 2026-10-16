@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../app_theme/artist/artist_colors.dart';
 import '../../../services/ecoloop_api.dart';
 import 'product_details.dart';
 
-/// Account-scoped wishlist for both regular users and artists.
-/// Uses the signed-in role's token through EcoLoopApi.
 class Wishlist extends StatefulWidget {
   const Wishlist({super.key});
 
@@ -21,13 +20,13 @@ class _WishlistState extends State<Wishlist> {
   String? _error;
   String _query = '';
 
-  Color get _primary => Theme.of(context).colorScheme.primary;
+  Color get _primary => ArtistColors.primary;
 
-  Color get _surface => Theme.of(context).colorScheme.surface;
+  Color get _surface => ArtistColors.surface;
 
-  Color get _background => Theme.of(context).scaffoldBackgroundColor;
+  Color get _background => ArtistColors.background;
 
-  Color get _text => Theme.of(context).colorScheme.onSurface;
+  Color get _text => ArtistColors.textPrimary;
 
   Map<String, dynamic> _map(dynamic value) {
     if (value is Map<String, dynamic>) return value;
@@ -240,7 +239,9 @@ class _WishlistState extends State<Wishlist> {
                     decoration: BoxDecoration(
                       color: _surface,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: _primary.withOpacity(.15)),
+                      border: Border.all(
+                        color: _primary.withValues(alpha: .15),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -248,7 +249,7 @@ class _WishlistState extends State<Wishlist> {
                           width: 46,
                           height: 46,
                           decoration: BoxDecoration(
-                            color: _primary.withOpacity(.09),
+                            color: _primary.withValues(alpha: .09),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Icon(Icons.favorite_rounded, color: _primary),
@@ -271,7 +272,7 @@ class _WishlistState extends State<Wishlist> {
                                 'Products you want to keep for later',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: _text.withOpacity(.65),
+                                  color: _text.withValues(alpha: .65),
                                 ),
                               ),
                             ],
@@ -305,7 +306,7 @@ class _WishlistState extends State<Wishlist> {
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(
-                          color: _primary.withOpacity(.12),
+                          color: _primary.withValues(alpha: .12),
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
@@ -321,7 +322,7 @@ class _WishlistState extends State<Wishlist> {
                       child: Center(
                         child: Text(
                           'No saved products match your search.',
-                          style: TextStyle(color: _text.withOpacity(.65)),
+                          style: TextStyle(color: _text.withValues(alpha: .65)),
                         ),
                       ),
                     )
@@ -353,7 +354,7 @@ class _WishlistState extends State<Wishlist> {
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(17),
-              border: Border.all(color: _primary.withOpacity(.13)),
+              border: Border.all(color: _primary.withValues(alpha: .13)),
             ),
             child: Row(
               children: [
@@ -418,7 +419,7 @@ class _WishlistState extends State<Wishlist> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 11,
-                              color: _text.withOpacity(.6),
+                              color: _text.withValues(alpha: .6),
                             ),
                           ),
                         const SizedBox(height: 7),
@@ -437,7 +438,7 @@ class _WishlistState extends State<Wishlist> {
                           'Tap to view details',
                           style: TextStyle(
                             fontSize: 10,
-                            color: _text.withOpacity(.55),
+                            color: _text.withValues(alpha: .55),
                           ),
                         ),
                       ],
@@ -486,7 +487,7 @@ class _WishlistState extends State<Wishlist> {
             style: TextStyle(
               fontSize: 14,
               height: 1.4,
-              color: _text.withOpacity(.65),
+              color: _text.withValues(alpha: .65),
             ),
           ),
           const SizedBox(height: 22),
@@ -498,7 +499,7 @@ class _WishlistState extends State<Wishlist> {
               label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -521,7 +522,7 @@ class _WishlistState extends State<Wishlist> {
             width: 88,
             height: 88,
             decoration: BoxDecoration(
-              color: _primary.withOpacity(.09),
+              color: _primary.withValues(alpha: .09),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -546,7 +547,7 @@ class _WishlistState extends State<Wishlist> {
             style: TextStyle(
               fontSize: 14,
               height: 1.45,
-              color: _text.withOpacity(.65),
+              color: _text.withValues(alpha: .65),
             ),
           ),
         ],

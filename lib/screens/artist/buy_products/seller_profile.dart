@@ -19,9 +19,7 @@ class _SellerProfileState extends State<SellerProfile> {
 
   late final List<Map<String, dynamic>> _listings;
 
-  // ==========================================================
   // SELLER TYPE
-  // ==========================================================
 
   String get sellerType {
     final value =
@@ -43,9 +41,7 @@ class _SellerProfileState extends State<SellerProfile> {
     return isArtist ? 'EcoLoop ReMaker' : 'EcoLoop User';
   }
 
-  // ==========================================================
   // INIT
-  // ==========================================================
 
   @override
   void initState() {
@@ -54,9 +50,7 @@ class _SellerProfileState extends State<SellerProfile> {
     _listings = _createListings();
   }
 
-  // ==========================================================
   // CREATE LISTINGS DATA
-  // ==========================================================
 
   List<Map<String, dynamic>> _createListings() {
     final sellerName =
@@ -155,9 +149,7 @@ class _SellerProfileState extends State<SellerProfile> {
     ];
   }
 
-  // ==========================================================
   // BUILD
-  // ==========================================================
 
   @override
   Widget build(BuildContext context) {
@@ -255,9 +247,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // SELLER IMAGE
-  // ==========================================================
 
   String? _getSellerImage() {
     final image =
@@ -275,9 +265,7 @@ class _SellerProfileState extends State<SellerProfile> {
     return value.isEmpty ? null : value;
   }
 
-  // ==========================================================
   // LOCATION
-  // ==========================================================
 
   String _buildLocation() {
     final city = widget.seller['city']?.toString() ?? '';
@@ -299,9 +287,7 @@ class _SellerProfileState extends State<SellerProfile> {
     return 'Ahmedabad, Gujarat';
   }
 
-  // ==========================================================
   // SELLER HEADER
-  // ==========================================================
 
   Widget _buildSellerHeader({
     required String sellerName,
@@ -466,9 +452,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // SELLER INITIAL
-  // ==========================================================
 
   Widget _buildSellerInitial(String sellerName) {
     return Center(
@@ -482,9 +466,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // ACTION BUTTONS
-  // ==========================================================
 
   Widget _buildActionButtons() {
     return Row(
@@ -549,9 +531,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // STATS
-  // ==========================================================
 
   Widget _buildStats({
     required String listings,
@@ -619,9 +599,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // ABOUT SELLER
-  // ==========================================================
 
   Widget _buildAboutSeller() {
     final bio = widget.seller['bio']?.toString();
@@ -713,9 +691,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // REVIEWS
-  // ==========================================================
 
   Widget _buildReviewsSection({
     required String sellerName,
@@ -815,9 +791,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // SELLER REVIEWS
-  // ==========================================================
 
   void _openSellerReviews({
     required String sellerName,
@@ -845,9 +819,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // LISTINGS HEADER
-  // ==========================================================
 
   Widget _buildListingsHeader() {
     return Row(
@@ -890,9 +862,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // LISTINGS GRID
-  // ==========================================================
 
   Widget _buildListingsGrid() {
     if (_listings.isEmpty) {
@@ -927,9 +897,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // EMPTY LISTINGS
-  // ==========================================================
 
   Widget _buildEmptyListings() {
     return Container(
@@ -966,9 +934,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // CONTACT SELLER
-  // ==========================================================
 
   void _contactSeller() {
     final sellerName =
@@ -979,9 +945,7 @@ class _SellerProfileState extends State<SellerProfile> {
     _showMessage('Chat with $sellerName will be connected later.');
   }
 
-  // ==========================================================
   // MORE OPTIONS
-  // ==========================================================
 
   void _showMoreOptions() {
     showModalBottomSheet(
@@ -1033,9 +997,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // SELLER OPTION
-  // ==========================================================
 
   Widget _sellerOption({
     required IconData icon,
@@ -1088,9 +1050,7 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // ==========================================================
   // MESSAGE
-  // ==========================================================
 
   void _showMessage(String message) {
     if (!mounted) return;
@@ -1108,9 +1068,7 @@ class _SellerProfileState extends State<SellerProfile> {
   }
 }
 
-// ============================================================
 // SELLER PRODUCT CARD
-// ============================================================
 
 class _SellerProductCard extends StatelessWidget {
   const _SellerProductCard({required this.product, required this.onTap});

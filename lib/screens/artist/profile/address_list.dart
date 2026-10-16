@@ -1,21 +1,36 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
-import '../../../services/ecoloop_api.dart';
+import '../../../shared_preferences_util.dart';
 import 'add_address.dart';
 
 class AddressList extends StatefulWidget {
   const AddressList({super.key});
 
   @override
-  State<AddressList> createState() => MyAddresses();
+  State<AddressList> createState() => _AddressListState();
 }
 
-class MyAddresses extends State<AddressList> {
-  final List<AddressItem> _addresses = [];
+class _AddressListState extends State<AddressList> {
+  static const String _baseUrl =
+      'https://script.google.com/macros/s/AKfycbzvHq06GwL_I8qH2IPyQP36dRlESN62PYF4Ak5WkRE2VjHL5a-tr0Yk_KEtSvU_ZL6IbQ/exec';
+
+  List<AddressItem> _addresses = [];
   bool _isLoading = true;
-  String? _loadError;
+  bool _isMutating = false;
+  String? _error;
+
+  String get _token {
+    final role = Prefs.getString('userRole').toLowerCase().trim();
+    return (role == 'artist'
+            ? Prefs.getString('artistToken')
+            : Prefs.getString('authToken'))
+        .trim();
+  }
 
   @override
   void initState() {
@@ -23,175 +38,273 @@ class MyAddresses extends State<AddressList> {
     _loadAddresses();
   }
 
+  Dio _dio() => Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 20),
+      sendTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 30),
+      headers: const {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      validateStatus: (status) =>
+          status != null && status >= 200 && status < 400,
+    ),
+  );
+
+  Uri _uri(String path, [Map<String, String>? query]) =>
+      Uri.parse(_baseUrl).replace(queryParameters: {'path': path, ...?query});
+
+  Map<String, dynamic> _map(dynamic value) {
+    if (value is Map) return Map<String, dynamic>.from(value);
+    if (value is String) {
+      try {
+        final decoded = jsonDecode(value);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      } catch (_) {}
+    }
+    return {};
+  }
+
+  List<dynamic> _list(dynamic value) {
+    if (value is List) return value;
+    if (value is String) {
+      try {
+        final decoded = jsonDecode(value);
+        if (decoded is List) return decoded;
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  Future<dynamic> _unwrapRedirect(Dio dio, Response<dynamic> response) async {
+    final status = response.statusCode;
+    if (status == 301 ||
+        status == 302 ||
+        status == 303 ||
+        status == 307 ||
+        status == 308) {
+      final location = response.headers.value('location');
+      if (location == null || location.isEmpty) {
+        throw Exception('The API redirected without a response URL.');
+      }
+      final redirected = await dio.get<dynamic>(
+        location,
+        options: Options(followRedirects: false, maxRedirects: 0),
+      );
+      if (redirected.statusCode != 200) {
+        throw Exception('Server returned HTTP ${redirected.statusCode}.');
+      }
+      return redirected.data;
+    }
+    return response.data;
+  }
+
+  String _errorMessage(Object error) {
+    if (error is DioException) {
+      final body = _map(error.response?.data);
+      if (body.isNotEmpty) {
+        final message = body['message'] ?? body['error'];
+        if (message != null && message.toString().isNotEmpty) {
+          return message.toString();
+        }
+      }
+      if (error.response?.statusCode == 404) {
+        return 'Address API is not deployed yet. Add the /addresses routes in Code.gs.';
+      }
+      if (error.response?.statusCode == 401 ||
+          error.response?.statusCode == 403) {
+        return 'Your session has expired. Please sign in again.';
+      }
+      return error.message ?? 'Unable to connect to the server.';
+    }
+    return error.toString().replaceFirst('Exception: ', '');
+  }
+
   Future<void> _loadAddresses() async {
-    if (mounted) {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    if (_token.isEmpty) {
       setState(() {
-        _isLoading = true;
-        _loadError = null;
+        _isLoading = false;
+        _error = 'Please sign in to view your saved addresses.';
       });
+      return;
     }
 
+    final dio = _dio();
     try {
-      final response = await EcoLoopApi.instance.get('/addresses');
-      if (response is! List) {
-        throw const EcoLoopApiException(
-          'The addresses API returned an unexpected response.',
+      final response = await dio.get<dynamic>(
+        _uri('/addresses', {'token': _token}).toString(),
+        options: Options(followRedirects: false, maxRedirects: 0),
+      );
+      final raw = await _unwrapRedirect(dio, response);
+      final outer = _map(raw);
+
+      if (outer['success'] == false) {
+        throw Exception(
+          outer['message'] ?? outer['error'] ?? 'Unable to load addresses.',
         );
       }
 
-      final loaded = response
-          .whereType<Map>()
-          .map((row) => AddressItem.fromMap(Map<String, dynamic>.from(row)))
-          .toList();
+      dynamic data = outer.containsKey('data') ? outer['data'] : raw;
+      if (data is Map) {
+        data = data['addresses'] ?? data['items'] ?? data['results'] ?? [];
+      }
+
+      final parsed = <AddressItem>[];
+      for (final item in _list(data)) {
+        final map = _map(item);
+        if (map.isNotEmpty) parsed.add(AddressItem.fromMap(map));
+      }
 
       if (!mounted) return;
       setState(() {
-        _addresses
-          ..clear()
-          ..addAll(loaded);
+        _addresses = parsed;
         _isLoading = false;
-        _loadError = null;
+        _error = null;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _loadError = error is EcoLoopApiException
-            ? error.message
-            : 'Could not load saved addresses. Check your connection and try again.';
+        _error = _errorMessage(error);
       });
+    } finally {
+      dio.close(force: true);
     }
   }
 
-  // ADD ADDRESS
-  Future<void> _addAddress() async {
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => const AddAddress()),
-    );
-    if (!mounted) return;
-    if (result == true) await _loadAddresses();
-  }
+  Future<Map<String, dynamic>> _sendMutation(
+    String path, {
+    required String method,
+    Map<String, dynamic> body = const {},
+  }) async {
+    if (_token.isEmpty) throw Exception('Please sign in again.');
 
-  // EDIT ADDRESS
-  Future<void> _editAddress(AddressItem address) async {
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => AddAddress(address: address.toMap())),
-    );
-    if (!mounted) return;
-    if (result == true) await _loadAddresses();
-  }
-
-  // DELETE ADDRESS
-  Future<void> _deleteAddress(AddressItem address) async {
-    final shouldDelete = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: ArtistColors.surface,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Text(
-            'Delete Address?',
-            style: ArtistTextStyles.title.copyWith(
-              color: ArtistColors.textPrimary,
-            ),
-          ),
-          content: Text(
-            'Are you sure you want to remove this saved address?',
-            style: ArtistTextStyles.body.copyWith(
-              color: ArtistColors.textSecondary,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(
-                'Cancel',
-                style: ArtistTextStyles.body.copyWith(
-                  color: ArtistColors.textSecondary,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(
-                'Delete',
-                style: ArtistTextStyles.body.copyWith(
-                  color: ArtistColors.error,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
+    final dio = _dio();
+    try {
+      final response = await dio.post<dynamic>(
+        _uri(path).toString(),
+        data: {...body, 'token': _token, '_method': method},
+        options: Options(followRedirects: false, maxRedirects: 0),
+      );
+      final raw = await _unwrapRedirect(dio, response);
+      final result = _map(raw);
+      if (result['success'] == false) {
+        throw Exception(
+          result['message'] ?? result['error'] ?? 'Request failed.',
         );
-      },
+      }
+      return result['data'] is Map
+          ? Map<String, dynamic>.from(result['data'])
+          : result;
+    } finally {
+      dio.close(force: true);
+    }
+  }
+
+  Future<void> _openAddressForm({AddressItem? address}) async {
+    final result = await Navigator.push<dynamic>(
+      context,
+      MaterialPageRoute(builder: (_) => AddAddress(address: address?.toMap())),
+    );
+    if (!mounted || result == null) return;
+    // The AddAddress page saves to the backend before returning.
+    await _loadAddresses();
+  }
+
+  Future<void> _deleteAddress(AddressItem address) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: ArtistColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Delete Address?',
+          style: ArtistTextStyles.title.copyWith(
+            color: ArtistColors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to remove this saved address?',
+          style: ArtistTextStyles.body.copyWith(
+            color: ArtistColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              'Delete',
+              style: ArtistTextStyles.body.copyWith(
+                color: ArtistColors.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
 
-    if (shouldDelete != true) return;
+    if (confirmed != true || !mounted || _isMutating) return;
 
+    setState(() => _isMutating = true);
     try {
-      await EcoLoopApi.instance.delete('/addresses/${address.id}');
-      if (!mounted) return;
-      setState(() => _addresses.removeWhere((item) => item.id == address.id));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Address deleted successfully'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: ArtistColors.success,
-        ),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      final message = error is EcoLoopApiException
-          ? error.message
-          : 'Could not delete address. Please try again.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: ArtistColors.error,
-        ),
-      );
-    }
-  }
-
-  // SET DEFAULT USING THE EXISTING UPDATE ROUTE.
-  Future<void> _setDefaultAddress(AddressItem address) async {
-    try {
-      await EcoLoopApi.instance.put(
-        '/addresses/${address.id}',
-        <String, dynamic>{'isDefault': true},
+      await _sendMutation(
+        '/addresses/${Uri.encodeComponent(address.id)}',
+        method: 'DELETE',
       );
       if (!mounted) return;
+      _showMessage('Address deleted.');
       await _loadAddresses();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Default address updated'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: ArtistColors.success,
-        ),
-      );
     } catch (error) {
-      if (!mounted) return;
-      final message = error is EcoLoopApiException
-          ? error.message
-          : 'Could not update the default address. Please try again.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: ArtistColors.error,
-        ),
-      );
+      if (mounted) _showMessage(_errorMessage(error), error: true);
+    } finally {
+      if (mounted) setState(() => _isMutating = false);
     }
   }
 
-  // BUILD
+  Future<void> _setDefaultAddress(AddressItem address) async {
+    if (address.isDefault || _isMutating) return;
+    setState(() => _isMutating = true);
+    try {
+      await _sendMutation(
+        '/addresses/${Uri.encodeComponent(address.id)}',
+        method: 'PUT',
+        body: {'isDefault': true},
+      );
+      if (!mounted) return;
+      _showMessage('Default address updated.');
+      await _loadAddresses();
+    } catch (error) {
+      if (mounted) _showMessage(_errorMessage(error), error: true);
+    } finally {
+      if (mounted) setState(() => _isMutating = false);
+    }
+  }
+
+  void _showMessage(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: error ? ArtistColors.error : ArtistColors.success,
+        ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -199,122 +312,45 @@ class MyAddresses extends State<AddressList> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: ArtistColors.background,
-        surfaceTintColor: Colors.transparent,
         foregroundColor: ArtistColors.textPrimary,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
         title: Text(
           'My Addresses',
           style: ArtistTextStyles.title.copyWith(
             color: ArtistColors.textPrimary,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _isLoading ? null : _loadAddresses,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
       ),
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: ArtistColors.primary),
-              )
-            : _loadError != null
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(28),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.cloud_off_rounded,
-                        size: 42,
-                        color: ArtistColors.textSecondary,
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        _loadError!,
-                        textAlign: TextAlign.center,
-                        style: ArtistTextStyles.body.copyWith(
-                          color: ArtistColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: _loadAddresses,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Retry'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ArtistColors.primary,
-                          foregroundColor: ArtistColors.background,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : _addresses.isEmpty
-            ? _EmptyAddressState(onAddAddress: _addAddress)
-            : RefreshIndicator(
-                color: ArtistColors.primary,
-                onRefresh: _loadAddresses,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Saved addresses',
-                        style: ArtistTextStyles.title.copyWith(
-                          color: ArtistColors.textPrimary,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        'Manage your studio and workshop addresses for faster checkout.',
-                        style: ArtistTextStyles.caption.copyWith(
-                          color: ArtistColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      ..._addresses.map(
-                        (address) => Padding(
-                          padding: const EdgeInsets.only(bottom: 14),
-                          child: _AddressCard(
-                            address: address,
-                            onEdit: () => _editAddress(address),
-                            onDelete: () => _deleteAddress(address),
-                            onSetDefault: () => _setDefaultAddress(address),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-      ),
+      body: SafeArea(child: _buildBody()),
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
           decoration: BoxDecoration(
             color: ArtistColors.background,
-            border: Border(top: BorderSide(color: ArtistColors.border)),
+            border: Border(top: BorderSide(color: ArtistColors.light)),
           ),
           child: SizedBox(
             height: 54,
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _addAddress,
+              onPressed: _isMutating ? null : () => _openAddressForm(),
               icon: const Icon(Icons.add_rounded, size: 22),
               label: Text(
                 'Add New Address',
                 style: ArtistTextStyles.body.copyWith(
-                  color: ArtistColors.background,
+                  color: ArtistColors.surface,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: ArtistColors.primary,
-                foregroundColor: ArtistColors.background,
+                foregroundColor: ArtistColors.surface,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -326,9 +362,96 @@ class MyAddresses extends State<AddressList> {
       ),
     );
   }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: ArtistColors.primary),
+      );
+    }
+
+    if (_error != null && _addresses.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.cloud_off_outlined,
+                size: 56,
+                color: ArtistColors.error,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Could not load addresses',
+                style: ArtistTextStyles.title,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: ArtistTextStyles.body.copyWith(
+                  color: ArtistColors.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 18),
+              ElevatedButton.icon(
+                onPressed: _loadAddresses,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Try Again'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_addresses.isEmpty) {
+      return _EmptyAddressState(onAddAddress: () => _openAddressForm());
+    }
+
+    return RefreshIndicator(
+      color: ArtistColors.primary,
+      onRefresh: _loadAddresses,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        children: [
+          Text(
+            'Saved addresses',
+            style: ArtistTextStyles.title.copyWith(
+              color: ArtistColors.textPrimary,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Manage your delivery addresses for a faster checkout.',
+            style: ArtistTextStyles.caption.copyWith(
+              color: ArtistColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ..._addresses.map(
+            (address) => Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: _AddressCard(
+                address: address,
+                onEdit: () => _openAddressForm(address: address),
+                onDelete: () => _deleteAddress(address),
+                onSetDefault: () => _setDefaultAddress(address),
+                enabled: !_isMutating,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// ADDRESS ITEM MODEL
 class AddressItem {
   final String id;
   final String name;
@@ -341,9 +464,9 @@ class AddressItem {
   final String state;
   final String pincode;
   final String type;
-  bool isDefault;
+  final bool isDefault;
 
-  AddressItem({
+  const AddressItem({
     required this.id,
     required this.name,
     required this.phone,
@@ -359,78 +482,59 @@ class AddressItem {
   });
 
   factory AddressItem.fromMap(Map<String, dynamic> map) {
-    final line = (map['addressLine'] ?? '').toString();
-    final parts = _decodeStoredAddressLine(line);
+    String read(String key) => map[key]?.toString() ?? '';
+    final id = read('addressId').isNotEmpty ? read('addressId') : read('id');
+    final defaultValue = map['isDefault'];
     return AddressItem(
-      id: (map['addressId'] ?? map['id'] ?? '').toString(),
-      name: (map['name'] ?? '').toString(),
-      phone: (map['phone'] ?? '').toString(),
-      house: (map['house'] ?? parts['house'] ?? line).toString(),
-      street: (map['street'] ?? parts['street'] ?? '').toString(),
-      area: (map['area'] ?? '').toString(),
-      landmark: (map['landmark'] ?? parts['landmark'] ?? '').toString(),
-      city: (map['city'] ?? '').toString(),
-      state: (map['state'] ?? '').toString(),
-      pincode: (map['pincode'] ?? '').toString(),
-      type: (map['label'] ?? map['type'] ?? 'Other').toString(),
+      id: id,
+      name: read('name'),
+      phone: read('phone'),
+      house: read('house'),
+      street: read('street'),
+      area: read('area'),
+      landmark: read('landmark'),
+      city: read('city'),
+      state: read('state'),
+      pincode: read('pincode'),
+      type: read('type').isEmpty ? 'Studio' : read('type'),
       isDefault:
-          map['isDefault'] == true ||
-          map['isDefault'].toString().toLowerCase() == 'true' ||
-          map['isDefault'].toString() == '1',
+          defaultValue == true ||
+          defaultValue?.toString().toLowerCase() == 'true' ||
+          defaultValue?.toString() == '1',
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'addressId': int.tryParse(id) ?? id,
-      'name': name,
-      'phone': phone,
-      'house': house,
-      'street': street,
-      'area': area,
-      'landmark': landmark,
-      'city': city,
-      'state': state,
-      'pincode': pincode,
-      'type': type,
-      'label': type,
-      'isDefault': isDefault,
-    };
-  }
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'addressId': id,
+    'name': name,
+    'phone': phone,
+    'house': house,
+    'street': street,
+    'area': area,
+    'landmark': landmark,
+    'city': city,
+    'state': state,
+    'pincode': pincode,
+    'type': type,
+    'isDefault': isDefault,
+  };
 }
 
-// The current Code.gs stores these parts in its existing addressLine field.
-// This keeps the saved line human-readable for checkout and editable here.
-Map<String, String> _decodeStoredAddressLine(String value) {
-  final result = <String, String>{};
-  if (value.trim().isEmpty) return result;
-  final labelled = RegExp(
-    r'(?:^| • )House: (.*?)(?= • (?:Street|Landmark): |$)|'
-    r'(?:^| • )Street: (.*?)(?= • (?:House|Landmark): |$)|'
-    r'(?:^| • )Landmark: (.*?)(?= • (?:House|Street): |$)',
-  );
-  for (final match in labelled.allMatches(value)) {
-    if (match.group(1) != null) result['house'] = match.group(1)!.trim();
-    if (match.group(2) != null) result['street'] = match.group(2)!.trim();
-    if (match.group(3) != null) result['landmark'] = match.group(3)!.trim();
-  }
-  return result;
-}
-
-// ADDRESS CARD
 class _AddressCard extends StatelessWidget {
-  final AddressItem address;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-  final VoidCallback onSetDefault;
-
   const _AddressCard({
     required this.address,
     required this.onEdit,
     required this.onDelete,
     required this.onSetDefault,
+    required this.enabled,
   });
+
+  final AddressItem address;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onSetDefault;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -441,14 +545,13 @@ class _AddressCard extends StatelessWidget {
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: address.isDefault ? ArtistColors.primary : ArtistColors.border,
+          color: address.isDefault ? ArtistColors.primary : ArtistColors.light,
           width: address.isDefault ? 1.4 : 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // TOP ROW
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -460,7 +563,7 @@ class _AddressCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Icon(
-                  _getAddressIcon(address.type),
+                  _addressIcon(address.type),
                   color: ArtistColors.primary,
                   size: 22,
                 ),
@@ -470,20 +573,18 @@ class _AddressCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 5,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Flexible(
-                          child: Text(
-                            address.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: ArtistTextStyles.body.copyWith(
-                              color: ArtistColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        Text(
+                          address.name,
+                          style: ArtistTextStyles.body.copyWith(
+                            color: ArtistColors.textPrimary,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         _AddressTypeBadge(type: address.type),
                       ],
                     ),
@@ -498,87 +599,63 @@ class _AddressCard extends StatelessWidget {
                 ),
               ),
               PopupMenuButton<String>(
+                enabled: enabled,
                 color: ArtistColors.surface,
                 icon: const Icon(
                   Icons.more_vert_rounded,
                   color: ArtistColors.textSecondary,
                   size: 21,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
                 onSelected: (value) {
                   if (value == 'edit') onEdit();
                   if (value == 'delete') onDelete();
                   if (value == 'default') onSetDefault();
                 },
-                itemBuilder: (context) {
-                  return [
-                    PopupMenuItem(
-                      value: 'edit',
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 20),
+                        SizedBox(width: 10),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  if (!address.isDefault)
+                    const PopupMenuItem(
+                      value: 'default',
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.edit_outlined,
-                            color: ArtistColors.textPrimary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Edit',
-                            style: ArtistTextStyles.body.copyWith(
-                              color: ArtistColors.textPrimary,
-                            ),
-                          ),
+                          Icon(Icons.star_outline_rounded, size: 20),
+                          SizedBox(width: 10),
+                          Text('Set as Default'),
                         ],
                       ),
                     ),
-                    if (!address.isDefault)
-                      PopupMenuItem(
-                        value: 'default',
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.star_outline_rounded,
-                              color: ArtistColors.textPrimary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Set as Default',
-                              style: ArtistTextStyles.body.copyWith(
-                                color: ArtistColors.textPrimary,
-                              ),
-                            ),
-                          ],
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.delete_outline_rounded,
+                          color: ArtistColors.error,
+                          size: 20,
                         ),
-                      ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.delete_outline_rounded,
-                            color: ArtistColors.error,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Delete',
-                            style: ArtistTextStyles.body.copyWith(
-                              color: ArtistColors.error,
-                            ),
-                          ),
-                        ],
-                      ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Delete',
+                          style: TextStyle(color: ArtistColors.error),
+                        ),
+                      ],
                     ),
-                  ];
-                },
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Container(height: 1, color: ArtistColors.border),
+          Container(height: 1, color: ArtistColors.light),
           const SizedBox(height: 15),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,7 +668,7 @@ class _AddressCard extends StatelessWidget {
               const SizedBox(width: 9),
               Expanded(
                 child: Text(
-                  _buildFullAddress(),
+                  _fullAddress(),
                   style: ArtistTextStyles.body.copyWith(
                     color: ArtistColors.textSecondary,
                     height: 1.45,
@@ -625,9 +702,8 @@ class _AddressCard extends StatelessWidget {
     );
   }
 
-  // FULL ADDRESS
-  String _buildFullAddress() {
-    final parts = <String>[
+  String _fullAddress() {
+    final parts = [
       address.house,
       address.street,
       address.area,
@@ -635,33 +711,26 @@ class _AddressCard extends StatelessWidget {
       address.city,
       address.state,
       address.pincode,
-    ];
+    ].where((part) => part.trim().isNotEmpty).toList();
     return parts.join(', ');
   }
 
-  // ADDRESS ICON
-  IconData _getAddressIcon(String type) {
+  IconData _addressIcon(String type) {
     switch (type.toLowerCase()) {
-      case 'workshop':
-        return Icons.handyman_outlined;
-      case 'studio':
-        return Icons.palette_outlined;
       case 'work':
         return Icons.work_outline_rounded;
       case 'other':
         return Icons.location_on_outlined;
-      case 'home':
       default:
         return Icons.home_outlined;
     }
   }
 }
 
-// ADDRESS TYPE BADGE
 class _AddressTypeBadge extends StatelessWidget {
-  final String type;
-
   const _AddressTypeBadge({required this.type});
+
+  final String type;
 
   @override
   Widget build(BuildContext context) {
@@ -682,11 +751,10 @@ class _AddressTypeBadge extends StatelessWidget {
   }
 }
 
-// EMPTY STATE
 class _EmptyAddressState extends StatelessWidget {
-  final VoidCallback onAddAddress;
-
   const _EmptyAddressState({required this.onAddAddress});
+
+  final VoidCallback onAddAddress;
 
   @override
   Widget build(BuildContext context) {
@@ -694,7 +762,7 @@ class _EmptyAddressState extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(30),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 82,
@@ -719,8 +787,7 @@ class _EmptyAddressState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Add your studio or workshop address to make '
-              'product management and checkout easier.',
+              'Add your first delivery address to make checkout faster and easier.',
               textAlign: TextAlign.center,
               style: ArtistTextStyles.body.copyWith(
                 color: ArtistColors.textSecondary,
@@ -728,28 +795,10 @@ class _EmptyAddressState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: onAddAddress,
-                icon: const Icon(Icons.add_rounded),
-                label: Text(
-                  'Add Address',
-                  style: ArtistTextStyles.body.copyWith(
-                    color: ArtistColors.background,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: ArtistColors.primary,
-                  foregroundColor: ArtistColors.background,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 22),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
+            ElevatedButton.icon(
+              onPressed: onAddAddress,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add Address'),
             ),
           ],
         ),
