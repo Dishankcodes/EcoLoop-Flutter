@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../api/api_manager.dart';
 import '../shared_preferences_util.dart';
+import 'eco_image_url.dart';
 
 class EcoLoopApiException implements Exception {
   final String message;
@@ -88,7 +89,9 @@ class EcoLoopApi {
         (message == null || message.isEmpty) ? 'Request failed.' : message,
       );
     }
-    return raw['data'];
+    // Normalize every Drive image URL once at the API boundary so screens
+    // using Image.network/NetworkImage receive the same display URL.
+    return EcoImageUrl.normalizePayload(raw['data']);
   }
 
   static int categoryId(String? label) {

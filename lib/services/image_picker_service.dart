@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../shared_preferences_util.dart';
+import 'eco_image_url.dart';
 
 class ImagePickerServiceException implements Exception {
   final String message;
@@ -266,7 +267,7 @@ class ImagePickerService {
 
     final dynamic urlValue = dataValue['profilePhotoUrl'];
 
-    final String profilePhotoUrl = urlValue?.toString().trim() ?? '';
+    final String profilePhotoUrl = EcoImageUrl.normalize(urlValue?.toString());
 
     if (profilePhotoUrl.isEmpty) {
       throw const ImagePickerServiceException(
