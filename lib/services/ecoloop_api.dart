@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 
 import '../api/api_manager.dart';
 import '../shared_preferences_util.dart';
-import 'eco_image_url.dart';
 
 class EcoLoopApiException implements Exception {
   final String message;
@@ -63,7 +62,11 @@ class EcoLoopApi {
       queryParameters: {
         'path': path,
         ...query,
-        if (method == 'GET' && _token.isNotEmpty) 'token': _token,
+        if ((method == 'GET' || method == 'DELETE') && _token.isNotEmpty)
+          'token': _token,
+        // Apps Script receives DELETE via doPost; pass method override in query
+        // because DELETE requests intentionally have no request body here.
+        if (method == 'DELETE') '_method': 'DELETE',
       },
       data: method == 'GET' || method == 'DELETE' ? null : payload,
       options: Options(method: method == 'GET' ? 'GET' : 'POST'),
@@ -89,9 +92,7 @@ class EcoLoopApi {
         (message == null || message.isEmpty) ? 'Request failed.' : message,
       );
     }
-    // Normalize every Drive image URL once at the API boundary so screens
-    // using Image.network/NetworkImage receive the same display URL.
-    return EcoImageUrl.normalizePayload(raw['data']);
+    return raw['data'];
   }
 
   static int categoryId(String? label) {

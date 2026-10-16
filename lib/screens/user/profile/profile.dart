@@ -19,6 +19,7 @@ import '../sell_products/selling_orders.dart';
 import 'address_list.dart';
 import 'eco_impact.dart';
 import 'edit_profile.dart';
+import 'following_list.dart';
 import 'notifications.dart';
 import 'rewards.dart';
 import 'sellers_earning.dart';
@@ -474,6 +475,21 @@ class _ProfileState extends State<Profile> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const Wishlist()),
+            );
+          },
+        ),
+
+        _ProfileDivider(),
+
+        // FOLLOWING ARTISTS / REMAKERS
+        _ProfileTile(
+          icon: Icons.person_add_alt_1_outlined,
+          title: 'My Following',
+          subtitle: 'Artists and ReMakers you follow',
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FollowingList()),
             );
           },
         ),
