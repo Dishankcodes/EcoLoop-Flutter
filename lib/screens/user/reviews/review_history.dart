@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../services/ecoloop_api.dart';
+import 'write_review.dart';
+import 'write_seller_review.dart';
 
 class ReviewHistory extends StatefulWidget {
   const ReviewHistory({super.key});
@@ -17,6 +19,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _reviews = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _orders = <Map<String, dynamic>>[];
   final Set<String> _deletingIds = <String>{};
 
   int _int(dynamic value) {
@@ -26,18 +29,126 @@ class _ReviewHistoryState extends State<ReviewHistory> {
 
   String _string(dynamic value) => (value ?? '').toString().trim();
 
+  String _first(
+    Map<String, dynamic> row,
+    List<String> keys, {
+    String fallback = '',
+  }) {
+    for (final key in keys) {
+      final value = _string(row[key]);
+      if (value.isNotEmpty && value.toLowerCase() != 'null') return value;
+    }
+    return fallback;
+  }
+
   String _reviewId(Map<String, dynamic> review) =>
-      _string(review['reviewId'] ?? review['review_id'] ?? review['id']);
+      _first(review, ['reviewId', 'review_id', 'id']);
+
+  String _productId(Map<String, dynamic> row) =>
+      _first(row, ['productId', 'product_id']);
+
+  String _sellerId(Map<String, dynamic> row) =>
+      _first(row, ['sellerId', 'seller_id', 'artistId', 'artist_id']);
+
+  String _sellerType(Map<String, dynamic> row) {
+    final type = _first(row, [
+      'sellerType',
+      'seller_type',
+    ], fallback: 'user').toLowerCase();
+    return type == 'artist' || type == 'remaker' ? 'artist' : 'user';
+  }
 
   bool _isSellerReview(Map<String, dynamic> review) {
-    final type = _string(
-      review['reviewType'] ?? review['review_type'],
-    ).toLowerCase();
+    final type = _first(review, ['reviewType', 'review_type']).toLowerCase();
     if (type == 'seller' || type == 'artist') return true;
-    final sellerId = _string(review['sellerId'] ?? review['seller_id']);
-    final artistId = _string(review['artistId'] ?? review['artist_id']);
-    final productId = _string(review['productId'] ?? review['product_id']);
+    final sellerId = _first(review, ['sellerId', 'seller_id']);
+    final artistId = _first(review, ['artistId', 'artist_id']);
+    final productId = _first(review, ['productId', 'product_id']);
     return (sellerId.isNotEmpty || artistId.isNotEmpty) && productId.isEmpty;
+  }
+
+  bool _isArtistReview(Map<String, dynamic> review) {
+    final type = _first(review, ['reviewType', 'review_type']).toLowerCase();
+    return type == 'artist' ||
+        _first(review, ['artistId', 'artist_id']).isNotEmpty;
+  }
+
+  bool _isEligibleOrder(Map<String, dynamic> order) {
+    final status = _first(order, [
+      'status',
+      'orderStatus',
+      'order_status',
+    ]).toLowerCase().replaceAll('_', ' ').trim();
+    final payment = _first(order, [
+      'paymentStatus',
+      'payment_status',
+      'payment',
+    ]).toLowerCase().replaceAll('_', ' ').trim();
+    const allowedStatuses = {'confirmed', 'delivered'};
+    const paidStatuses = {
+      'paid',
+      'completed',
+      'success',
+      'successful',
+      'captured',
+      'cod paid',
+    };
+    return allowedStatuses.contains(status) && paidStatuses.contains(payment);
+  }
+
+  bool _hasProductReview(Map<String, dynamic> order) {
+    final productId = _productId(order);
+    if (productId.isEmpty) return true;
+    return _reviews.any(
+      (review) =>
+          !_isSellerReview(review) &&
+          _first(review, ['productId', 'product_id']) == productId,
+    );
+  }
+
+  bool _hasSellerReview(Map<String, dynamic> order) {
+    final sellerId = _sellerId(order);
+    if (sellerId.isEmpty) return true;
+    final artist = _sellerType(order) == 'artist';
+    return _reviews.any((review) {
+      if (!_isSellerReview(review)) return false;
+      if (artist) {
+        return _isArtistReview(review) &&
+            _first(review, ['artistId', 'artist_id']) == sellerId;
+      }
+      return !_isArtistReview(review) &&
+          _first(review, ['sellerId', 'seller_id']) == sellerId &&
+          _first(review, ['orderId', 'order_id']) ==
+              _first(order, ['orderId', 'order_id', 'id']);
+    });
+  }
+
+  List<Map<String, dynamic>> get _pendingOrders {
+    final eligible = _orders.where(_isEligibleOrder).toList();
+    final filtered = eligible
+        .where(
+          (order) =>
+              _tab == 0 ? !_hasProductReview(order) : !_hasSellerReview(order),
+        )
+        .toList();
+    filtered.sort((a, b) {
+      final da = DateTime.tryParse(_first(a, ['createdAt', 'created_at']));
+      final db = DateTime.tryParse(_first(b, ['createdAt', 'created_at']));
+      return (db ?? DateTime.fromMillisecondsSinceEpoch(0)).compareTo(
+        da ?? DateTime.fromMillisecondsSinceEpoch(0),
+      );
+    });
+    // Avoid repeating the same product/seller card when there are multiple qualifying orders.
+    final seen = <String>{};
+    return filtered.where((order) {
+      final key = _tab == 0
+          ? 'p:${_productId(order)}'
+          : 's:${_sellerType(order)}:${_sellerId(order)}';
+      return key != 'p:' &&
+          key != 's:user:' &&
+          key != 's:artist:' &&
+          seen.add(key);
+    }).toList();
   }
 
   List<Map<String, dynamic>> get _visibleReviews {
@@ -48,12 +159,8 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         )
         .toList();
     result.sort((a, b) {
-      final dateA = DateTime.tryParse(
-        _string(a['createdAt'] ?? a['created_at']),
-      );
-      final dateB = DateTime.tryParse(
-        _string(b['createdAt'] ?? b['created_at']),
-      );
+      final dateA = DateTime.tryParse(_first(a, ['createdAt', 'created_at']));
+      final dateB = DateTime.tryParse(_first(b, ['createdAt', 'created_at']));
       return (dateB ?? DateTime.fromMillisecondsSinceEpoch(0)).compareTo(
         dateA ?? DateTime.fromMillisecondsSinceEpoch(0),
       );
@@ -67,6 +174,33 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     _load();
   }
 
+  Future<List<Map<String, dynamic>>> _getRows(String path) async {
+    final dynamic response = await _api.get(path);
+    dynamic rows = response;
+    if (response is Map) {
+      rows =
+          response['reviews'] ??
+          response['orders'] ??
+          response['items'] ??
+          response['results'] ??
+          response['data'] ??
+          const <dynamic>[];
+      if (rows is Map) {
+        rows =
+            rows['reviews'] ??
+            rows['orders'] ??
+            rows['items'] ??
+            rows['results'] ??
+            const <dynamic>[];
+      }
+    }
+    if (rows is! List) return <Map<String, dynamic>>[];
+    return rows
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
+  }
+
   Future<void> _load() async {
     if (mounted) {
       setState(() {
@@ -75,23 +209,14 @@ class _ReviewHistoryState extends State<ReviewHistory> {
       });
     }
     try {
-      final dynamic data = await _api.get('/my/reviews');
-      final dynamic rows = data is List
-          ? data
-          : data is Map
-          ? (data['reviews'] ??
-                data['items'] ??
-                data['data'] ??
-                const <dynamic>[])
-          : const <dynamic>[];
+      final results = await Future.wait<dynamic>([
+        _getRows('/my/reviews'),
+        _getRows('/orders'),
+      ]);
       if (!mounted) return;
       setState(() {
-        _reviews = rows is List
-            ? rows
-                  .whereType<Map>()
-                  .map((row) => Map<String, dynamic>.from(row))
-                  .toList()
-            : <Map<String, dynamic>>[];
+        _reviews = results[0] as List<Map<String, dynamic>>;
+        _orders = results[1] as List<Map<String, dynamic>>;
         _loading = false;
       });
     } catch (error) {
@@ -103,10 +228,91 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     }
   }
 
+  Future<void> _writeProductReview(Map<String, dynamic> order) async {
+    final productId = _productId(order);
+    final orderId = _first(order, ['orderId', 'order_id', 'id']);
+    if (productId.isEmpty || orderId.isEmpty) {
+      _message('Product or order information is missing.');
+      return;
+    }
+    final product = <String, dynamic>{
+      'productId': _int(productId),
+      'title': _first(order, [
+        'productName',
+        'productTitle',
+        'title',
+      ], fallback: 'Product'),
+      'name': _first(order, [
+        'productName',
+        'productTitle',
+        'title',
+      ], fallback: 'Product'),
+      'imageUrl': _first(order, ['productImage', 'imageUrl', 'image']),
+      'imageUrls': <String>[
+        _first(order, ['productImage', 'imageUrl', 'image']),
+      ],
+    };
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(
+        builder: (_) => WriteReview(product: product, orderId: orderId),
+      ),
+    );
+    if (result == true && mounted) {
+      _message('Product review submitted successfully.');
+      await _load();
+    }
+  }
+
+  Future<void> _writeSellerReview(Map<String, dynamic> order) async {
+    final sellerId = _sellerId(order);
+    final orderId = _first(order, ['orderId', 'order_id', 'id']);
+    if (sellerId.isEmpty || orderId.isEmpty) {
+      _message('Seller or order information is missing.');
+      return;
+    }
+    final type = _sellerType(order);
+    final name = _first(order, [
+      'sellerName',
+      'artistName',
+      'remakerName',
+    ], fallback: type == 'artist' ? 'ReMaker' : 'Seller');
+    final image = _first(order, [
+      'sellerImage',
+      'artistImage',
+      'profileImage',
+      'avatar',
+    ]);
+    final result = await Navigator.push<SellerReviewResult>(
+      context,
+      MaterialPageRoute<SellerReviewResult>(
+        builder: (_) => WriteSellerReview(
+          sellerName: name,
+          sellerImage: image.isEmpty ? null : image,
+          sellerId: sellerId,
+          sellerType: type,
+          orderId: orderId,
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      _message('Seller review submitted successfully.');
+      await _load();
+    }
+  }
+
+  void _message(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      );
+  }
+
   Future<void> _confirmDelete(Map<String, dynamic> review) async {
     final id = _reviewId(review);
     if (id.isEmpty || _deletingIds.contains(id)) return;
-
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -131,7 +337,6 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         ],
       ),
     );
-
     if (confirmed != true || !mounted) return;
     setState(() => _deletingIds.add(id));
     try {
@@ -141,21 +346,11 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         _reviews.removeWhere((item) => _reviewId(item) == id);
         _deletingIds.remove(id);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Review deleted successfully.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _message('Review deleted successfully.');
     } catch (error) {
       if (!mounted) return;
       setState(() => _deletingIds.remove(id));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _message(error.toString().replaceFirst('Exception: ', ''));
     }
   }
 
@@ -183,6 +378,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
   @override
   Widget build(BuildContext context) {
     final reviews = _visibleReviews;
+    final pending = _pendingOrders;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -196,7 +392,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 22, 18, 16),
+            padding: const EdgeInsets.fromLTRB(18, 20, 18, 14),
             child: Container(
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
@@ -206,7 +402,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
               child: Row(
                 children: [
                   _tabButton(label: 'Products', index: 0),
-                  _tabButton(label: 'Sellers', index: 1),
+                  _tabButton(label: 'Sellers & Artists', index: 1),
                 ],
               ),
             ),
@@ -251,43 +447,101 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                         ),
                       ],
                     )
-                  : reviews.isEmpty
-                  ? ListView(
+                  : ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(24, 100, 24, 24),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
                       children: [
-                        const Icon(
-                          Icons.rate_review_outlined,
-                          size: 44,
-                          color: AppColors.textSecondary,
+                        _sectionHeader(
+                          title: 'Waiting for your review',
+                          subtitle: _tab == 0
+                              ? 'Share feedback about products from eligible orders.'
+                              : 'Review the seller or ReMaker behind your purchase.',
+                          count: pending.length,
                         ),
-                        const SizedBox(height: 14),
-                        Text(
-                          _tab == 0
-                              ? 'You haven’t written any product reviews yet.'
-                              : 'You haven’t written any seller reviews yet.',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 15,
-                          ),
+                        if (pending.isEmpty)
+                          _emptyPanel(
+                            icon: Icons.task_alt_rounded,
+                            title: _tab == 0
+                                ? 'No product reviews pending'
+                                : 'No seller reviews pending',
+                            message:
+                                'Eligible paid orders that have not been reviewed will appear here.',
+                          )
+                        else
+                          ...pending.map(_pendingCard),
+                        const SizedBox(height: 22),
+                        _sectionHeader(
+                          title: _tab == 0
+                              ? 'Your product reviews'
+                              : 'Your seller & artist reviews',
+                          subtitle: 'Reviews you have already submitted.',
+                          count: reviews.length,
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Reviews you submit will appear here.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
+                        if (reviews.isEmpty)
+                          _emptyPanel(
+                            icon: Icons.rate_review_outlined,
+                            title: _tab == 0
+                                ? 'No product reviews yet'
+                                : 'No seller reviews yet',
+                            message: 'Reviews you submit will appear here.',
+                          )
+                        else
+                          ...reviews.map(_reviewCard),
                       ],
-                    )
-                  : ListView.separated(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 2, 16, 28),
-                      itemCount: reviews.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) =>
-                          _reviewCard(reviews[index]),
                     ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionHeader({
+    required String title,
+    required String subtitle,
+    required int count,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 8, 2, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.light,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '$count',
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -303,7 +557,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         onTap: () => setState(() => _tab = index),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 5),
           decoration: BoxDecoration(
             color: selected ? AppColors.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(24),
@@ -312,14 +566,18 @@ class _ReviewHistoryState extends State<ReviewHistory> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (selected) ...[
-                const Icon(Icons.check, size: 18, color: Colors.white),
-                const SizedBox(width: 7),
+                const Icon(Icons.check, size: 17, color: Colors.white),
+                const SizedBox(width: 5),
               ],
-              Text(
-                label,
-                style: TextStyle(
-                  color: selected ? Colors.white : AppColors.textPrimary,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected ? Colors.white : AppColors.textPrimary,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
@@ -329,30 +587,220 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     );
   }
 
+  Widget _emptyPanel({
+    required IconData icon,
+    required String title,
+    required String message,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 32, color: AppColors.primary),
+          const SizedBox(height: 9),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pendingCard(Map<String, dynamic> order) {
+    final artist = _sellerType(order) == 'artist';
+    final productName = _first(order, [
+      'productName',
+      'productTitle',
+      'title',
+    ], fallback: 'Product');
+    final sellerName = _first(order, [
+      'sellerName',
+      'artistName',
+      'remakerName',
+    ], fallback: artist ? 'ReMaker' : 'Seller');
+    final image = _first(order, ['productImage', 'imageUrl', 'image']);
+    final orderId = _first(order, ['orderId', 'order_id', 'id']);
+    final isProductTab = _tab == 0;
+    final title = isProductTab ? productName : sellerName;
+    final subtitle = isProductTab
+        ? 'Order #$orderId • Product review'
+        : 'Order #$orderId • ${artist ? 'ReMaker / artist' : 'Seller'} review';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.22)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 62,
+                  height: 62,
+                  child: image.isEmpty
+                      ? Container(
+                          color: AppColors.light,
+                          child: Icon(
+                            isProductTab
+                                ? Icons.inventory_2_outlined
+                                : Icons.storefront_outlined,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : Image.network(
+                          image,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                color: AppColors.light,
+                                child: const Icon(
+                                  Icons.image_not_supported_outlined,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.verified_outlined,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Eligible order',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton.icon(
+              onPressed: () => isProductTab
+                  ? _writeProductReview(order)
+                  : _writeSellerReview(order),
+              icon: const Icon(Icons.rate_review_outlined, size: 18),
+              label: Text(
+                isProductTab
+                    ? 'Write Product Review'
+                    : artist
+                    ? 'Review ReMaker / Artist'
+                    : 'Write Seller Review',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _reviewCard(Map<String, dynamic> review) {
     final sellerReview = _isSellerReview(review);
     final title = sellerReview
-        ? (_string(review['sellerName']).isNotEmpty
-              ? _string(review['sellerName'])
-              : 'Seller')
-        : (_string(review['productTitle']).isNotEmpty
-              ? _string(review['productTitle'])
-              : 'Product');
+        ? _first(review, [
+            'sellerName',
+            'artistName',
+            'remakerName',
+          ], fallback: 'Seller / ReMaker')
+        : _first(review, [
+            'productTitle',
+            'productName',
+            'title',
+          ], fallback: 'Product');
     final comment = _string(review['comment']);
     final id = _reviewId(review);
     final deleting = _deletingIds.contains(id);
-
     return Container(
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 11),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.accent.withOpacity(0.45)),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.035),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+            color: AppColors.primary.withValues(alpha: 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -388,13 +836,13 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      '${sellerReview ? 'Seller review' : 'Product review'} • ${_dateLabel(review['createdAt'] ?? review['created_at'])}',
+                      '${sellerReview ? 'Seller / artist review' : 'Product review'} • ${_dateLabel(review['createdAt'] ?? review['created_at'])}',
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 11,
@@ -403,7 +851,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 7),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
                 decoration: BoxDecoration(
@@ -417,7 +865,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                       _int(review['rating']).toString(),
                       style: const TextStyle(
                         color: Color(0xFF855B00),
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(width: 3),
@@ -432,7 +880,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
             ],
           ),
           if (comment.isNotEmpty) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 13),
             Text(
               comment,
               style: const TextStyle(
@@ -442,9 +890,8 @@ class _ReviewHistoryState extends State<ReviewHistory> {
               ),
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           const Divider(height: 1, color: Color(0xFFE7EAE5)),
-          const SizedBox(height: 6),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(

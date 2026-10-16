@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import 'selling_order_details.dart';
 
 class SellingOrders extends StatefulWidget {
@@ -33,113 +34,103 @@ class _SellingOrdersState extends State<SellingOrders> {
     'Amount: High to Low',
   ];
 
-  // DEMO ORDERS
+  // Live orders from the artist's account in Google Sheets.
+  final List<Map<String, dynamic>> _orders = [];
+  bool _isLoading = true;
+  String? _loadError;
 
-  //
-  // These fields match the structure returned by the Artist Orders backend.
-  // productTitle is kept here for the current UI because the order response
-  // itself only guarantees productId.
-  //
-  // Later, replace this list with the GET /artist/orders API response.
+  @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
 
-  final List<Map<String, dynamic>> _orders = [
-    {
-      'orderId': 1001,
-      'buyerId': 201,
-      'sellerId': 101,
-      'sellerType': 'artist',
-      'productId': 1,
-      'productTitle': 'Handcrafted Wooden Table',
-      'quantity': 1,
-      'unitPrice': 4500.0,
-      'totalAmount': 4500.0,
-      'shippingAddress': 'Ahmedabad, Gujarat',
-      'status': 'pending',
-      'paymentStatus': 'paid',
-      'createdAt': '2026-09-26',
-      'updatedAt': '2026-09-26',
-    },
-    {
-      'orderId': 1002,
-      'buyerId': 205,
-      'sellerId': 101,
-      'sellerType': 'artist',
-      'productId': 2,
-      'productTitle': 'Upcycled Glass Vase',
-      'quantity': 2,
-      'unitPrice': 850.0,
-      'totalAmount': 1700.0,
-      'shippingAddress': 'Surat, Gujarat',
-      'status': 'confirmed',
-      'paymentStatus': 'paid',
-      'createdAt': '2026-09-25',
-      'updatedAt': '2026-09-25',
-    },
-    {
-      'orderId': 1003,
-      'buyerId': 209,
-      'sellerId': 101,
-      'sellerType': 'artist',
-      'productId': 3,
-      'productTitle': 'Recycled Fabric Tote Bag',
-      'quantity': 3,
-      'unitPrice': 550.0,
-      'totalAmount': 1650.0,
-      'shippingAddress': 'Vadodara, Gujarat',
-      'status': 'packed',
-      'paymentStatus': 'paid',
-      'createdAt': '2026-09-23',
-      'updatedAt': '2026-09-24',
-    },
-    {
-      'orderId': 1004,
-      'buyerId': 213,
-      'sellerId': 101,
-      'sellerType': 'artist',
-      'productId': 4,
-      'productTitle': 'Reclaimed Wood Wall Decor',
-      'quantity': 1,
-      'unitPrice': 1250.0,
-      'totalAmount': 1250.0,
-      'shippingAddress': 'Rajkot, Gujarat',
-      'status': 'shipped',
-      'paymentStatus': 'paid',
-      'createdAt': '2026-09-20',
-      'updatedAt': '2026-09-22',
-    },
-    {
-      'orderId': 1005,
-      'buyerId': 219,
-      'sellerId': 101,
-      'sellerType': 'artist',
-      'productId': 5,
-      'productTitle': 'Recycled Metal Planter',
-      'quantity': 2,
-      'unitPrice': 950.0,
-      'totalAmount': 1900.0,
-      'shippingAddress': 'Gandhinagar, Gujarat',
-      'status': 'delivered',
-      'paymentStatus': 'paid',
-      'createdAt': '2026-09-15',
-      'updatedAt': '2026-09-18',
-    },
-    {
-      'orderId': 1006,
-      'buyerId': 222,
-      'sellerId': 101,
-      'sellerType': 'artist',
-      'productId': 2,
-      'productTitle': 'Upcycled Glass Vase',
-      'quantity': 1,
-      'unitPrice': 850.0,
-      'totalAmount': 850.0,
-      'shippingAddress': 'Ahmedabad, Gujarat',
-      'status': 'cancelled',
-      'paymentStatus': 'refunded',
-      'createdAt': '2026-09-12',
-      'updatedAt': '2026-09-13',
-    },
-  ];
+  Future<void> _loadOrders() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+    try {
+      final dynamic response = await EcoLoopApi.instance.get('/artist/orders');
+      final List<dynamic> rows = response is List
+          ? response
+          : response is Map && response['orders'] is List
+          ? response['orders'] as List
+          : <dynamic>[];
+      final List<Map<String, dynamic>> loaded = rows.whereType<Map>().map((
+        raw,
+      ) {
+        final order = Map<String, dynamic>.from(raw);
+        order['productTitle'] =
+            order['productTitle'] ??
+            order['productName'] ??
+            order['title'] ??
+            'Product';
+        order['createdAt'] = order['createdAt'] ?? '';
+        order['updatedAt'] = order['updatedAt'] ?? '';
+        order['totalAmount'] =
+            order['totalAmount'] ??
+            order['subtotal'] ??
+            (_toDouble(order['unitPrice']) * _toDouble(order['quantity']));
+        return order;
+      }).toList();
+      if (!mounted) return;
+      setState(() {
+        _orders
+          ..clear()
+          ..addAll(loaded);
+        _isLoading = false;
+        _loadError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Widget _buildLoadError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: 42,
+              color: ArtistColors.textSecondary,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Could not load selling orders',
+              style: ArtistTextStyles.title.copyWith(fontSize: 17),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _loadError ?? 'Please try again.',
+              textAlign: TextAlign.center,
+              style: ArtistTextStyles.small,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadOrders,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ArtistColors.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   // FILTERED + SORTED ORDERS
 
@@ -148,11 +139,10 @@ class _SellingOrdersState extends State<SellingOrders> {
       _orders,
     );
 
-    final String query = (_searchQuery is String ? _searchQuery : '')
-        .trim()
-        .toLowerCase();
+    final String query = _searchQuery.trim().toLowerCase();
 
     // -------------------------------------------------------------------------
+
     // SEARCH
     // -------------------------------------------------------------------------
 
@@ -294,7 +284,11 @@ class _SellingOrdersState extends State<SellingOrders> {
           const SizedBox(height: 4),
 
           Expanded(
-            child: orders.isEmpty
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _loadError != null
+                ? _buildLoadError()
+                : orders.isEmpty
                 ? _buildEmptyState()
                 : RefreshIndicator(
                     color: ArtistColors.primary,
@@ -305,7 +299,8 @@ class _SellingOrdersState extends State<SellingOrders> {
                       ),
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
                       itemCount: orders.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 14),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 14),
                       itemBuilder: (context, index) {
                         return _buildOrderCard(orders[index]);
                       },
@@ -526,7 +521,7 @@ class _SellingOrdersState extends State<SellingOrders> {
         physics: const BouncingScrollPhysics(),
         itemCount: _filters.length,
 
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
 
         itemBuilder: (context, index) {
           final String filter = _filters[index];
@@ -578,7 +573,7 @@ class _SellingOrdersState extends State<SellingOrders> {
         border: Border.all(color: ArtistColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.035),
+            color: Colors.black.withValues(alpha: 0.035),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -637,7 +632,9 @@ class _SellingOrdersState extends State<SellingOrders> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => SellingOrderDetails(order: order)),
-    );
+    ).then((_) {
+      if (mounted) _loadOrders();
+    });
   }
 
   // ORDER ICON
@@ -651,7 +648,7 @@ class _SellingOrdersState extends State<SellingOrders> {
       width: 54,
       height: 54,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(15),
       ),
       child: Icon(_statusIcon(status), color: color, size: 26),
@@ -840,7 +837,7 @@ class _SellingOrdersState extends State<SellingOrders> {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
 
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(7),
       ),
 
@@ -871,7 +868,7 @@ class _SellingOrdersState extends State<SellingOrders> {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
 
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(7),
       ),
 
@@ -1048,11 +1045,7 @@ class _SellingOrdersState extends State<SellingOrders> {
   // REFRESH
 
   Future<void> _refreshOrders() async {
-    await Future.delayed(const Duration(milliseconds: 700));
-
-    if (!mounted) return;
-
-    setState(() {});
+    await _loadOrders();
   }
 
   // STATUS COLOR

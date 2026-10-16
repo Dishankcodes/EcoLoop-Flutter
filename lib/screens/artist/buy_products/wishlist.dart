@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../../app_theme/artist/artist_colors.dart';
-import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
-import '../buy_products/product_details.dart';
+import 'product_details.dart';
 
+/// Account-scoped wishlist for both regular users and artists.
+/// Uses the signed-in role's token through EcoLoopApi.
 class Wishlist extends StatefulWidget {
   const Wishlist({super.key});
 
@@ -13,163 +13,183 @@ class Wishlist extends StatefulWidget {
 }
 
 class _WishlistState extends State<Wishlist> {
+  final EcoLoopApi _api = EcoLoopApi.instance;
   final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _items = <Map<String, dynamic>>[];
+  bool _loading = true;
+  bool _busy = false;
+  String? _error;
+  String _query = '';
 
-  String searchQuery = '';
+  Color get _primary => Theme.of(context).colorScheme.primary;
 
-  // Wishlist items are loaded from the authenticated backend.
-  final List<Map<String, dynamic>> _wishlistItems = [];
-  bool _isLoading = true;
-  bool _hasLoadError = false;
-  String _loadError = '';
-  final Set<int> _removingProductIds = <int>{};
+  Color get _surface => Theme.of(context).colorScheme.surface;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadWishlist();
-  }
+  Color get _background => Theme.of(context).scaffoldBackgroundColor;
 
-  int _toInt(dynamic value, [int fallback = 0]) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    return int.tryParse(value?.toString() ?? '') ?? fallback;
-  }
+  Color get _text => Theme.of(context).colorScheme.onSurface;
 
-  double _toDouble(dynamic value, [double fallback = 0]) {
-    if (value is num) return value.toDouble();
-    return double.tryParse(value?.toString() ?? '') ?? fallback;
-  }
-
-  String _text(dynamic value, [String fallback = '']) {
-    final text = value?.toString().trim() ?? '';
-    return text.isEmpty || text.toLowerCase() == 'null' ? fallback : text;
-  }
-
-  Future<void> _loadWishlist() async {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _hasLoadError = false;
-        _loadError = '';
-      });
+  Map<String, dynamic> _map(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
     }
-    try {
-      final results = await Future.wait<dynamic>([
-        EcoLoopApi.instance.get('/wishlist'),
-        EcoLoopApi.instance.get('/categories'),
-      ]);
-      final rawWishlist = results[0];
-      final rawCategories = results[1];
-      final categories = <int, String>{};
-      if (rawCategories is List) {
-        for (final item in rawCategories) {
-          if (item is Map) {
-            categories[_toInt(item['categoryId'] ?? item['id'])] = _text(
-              item['name'] ?? item['categoryName'],
-              'Other',
-            );
-          }
-        }
+    return <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _rows(dynamic response) {
+    if (response is List) {
+      return response.map(_map).where((row) => row.isNotEmpty).toList();
+    }
+    final root = _map(response);
+    final data = root['data'];
+    final dataMap = _map(data);
+    for (final key in <String>['items', 'products', 'wishlist', 'results']) {
+      final value = root[key] ?? dataMap[key] ?? (key == 'items' ? data : null);
+      if (value is List) {
+        return value.map(_map).where((row) => row.isNotEmpty).toList();
       }
-      final loaded = <Map<String, dynamic>>[];
-      if (rawWishlist is List) {
-        for (final entry in rawWishlist) {
-          if (entry is! Map) continue;
-          final product = Map<String, dynamic>.from(entry);
-          final id = _toInt(product['productId'] ?? product['id']);
-          if (id <= 0) continue;
-          final imageValues = product['imageUrls'] ?? product['images'];
-          final images = <String>[];
-          if (imageValues is List) {
-            for (final value in imageValues) {
-              final url = _text(value);
-              if (url.startsWith('http')) images.add(url);
-            }
-          } else {
-            final single = _text(product['imageUrl'] ?? product['image']);
-            if (single.startsWith('http')) images.add(single);
-          }
-          final city = _text(product['sellerCity'] ?? product['city']);
-          final state = _text(product['sellerState'] ?? product['state']);
-          final location = [
-            city,
-            state,
-          ].where((part) => part.isNotEmpty).toSet().join(', ');
-          final categoryId = _toInt(product['categoryId']);
-          product['productId'] = id;
-          product['price'] = _toDouble(product['price']);
-          product['quantity'] = _toInt(product['quantity']);
-          product['availableQuantity'] = _toInt(product['availableQuantity']);
-          product['views'] = _toInt(product['views']);
-          product['wishlistCount'] = _toInt(product['wishlistCount']);
-          product['title'] = _text(product['title'], 'Untitled product');
-          product['description'] = _text(product['description']);
-          product['condition'] = _text(product['condition'], 'Not specified');
-          product['seller'] = _text(
-            product['sellerName'] ?? product['seller'],
-            'EcoLoop seller',
-          );
-          product['category'] = _text(
-            product['categoryName'],
-            categories[categoryId] ?? 'Other',
-          );
-          product['location'] = location.isEmpty
-              ? 'Location not provided'
-              : location;
-          product['images'] = images;
-          product['image'] = images.isNotEmpty ? images.first : '';
-          loaded.add(product);
-        }
-      } else {
-        throw const EcoLoopApiException('Wishlist response was not a list.');
+    }
+    return <Map<String, dynamic>>[];
+  }
+
+  String _id(Map<String, dynamic> product) {
+    final nested = _map(product['product']);
+    return (product['productId'] ??
+            product['product_id'] ??
+            product['id'] ??
+            nested['productId'] ??
+            nested['product_id'] ??
+            nested['id'] ??
+            '')
+        .toString()
+        .trim();
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final response = await _api.get('/wishlist');
+      final rows = _rows(response);
+      final cleaned = <Map<String, dynamic>>[];
+      final seen = <String>{};
+      for (final row in rows) {
+        final nested = _map(row['product']);
+        final item = nested.isNotEmpty
+            ? <String, dynamic>{...nested}
+            : <String, dynamic>{...row};
+        final id = _id(row).isNotEmpty ? _id(row) : _id(item);
+        if (id.isEmpty || !seen.add(id)) continue;
+        item['productId'] = id;
+        if (item['title'] != null || item['name'] != null) cleaned.add(item);
       }
       if (!mounted) return;
       setState(() {
-        _wishlistItems
-          ..clear()
-          ..addAll(loaded);
-        _isLoading = false;
-        _hasLoadError = false;
+        _items = cleaned;
+        _loading = false;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _isLoading = false;
-        _hasLoadError = true;
-        _loadError = error is EcoLoopApiException
-            ? error.message
-            : 'Could not load your wishlist. Please check your connection and try again.';
+        _error = error.toString().replaceFirst('Exception: ', '');
+        _loading = false;
       });
     }
   }
 
-  // FILTERED ITEMS
+  Future<void> _remove(Map<String, dynamic> item) async {
+    if (_busy) return;
+    final id = _id(item);
+    if (id.isEmpty) {
+      _message('Could not identify this product. Refresh and try again.');
+      return;
+    }
+    final previous = List<Map<String, dynamic>>.from(_items);
+    setState(() {
+      _busy = true;
+      _items.removeWhere((product) => _id(product) == id);
+    });
+    try {
+      await _api.delete('/wishlist/$id');
+      if (mounted) _message('Removed from wishlist');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _items = previous);
+      _message(
+        'Could not remove product: ${error.toString().replaceFirst('Exception: ', '')}',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  List<String> _images(Map<String, dynamic> product) {
+    final raw =
+        product['imageUrls'] ??
+        product['images'] ??
+        product['imageUrl'] ??
+        product['image'];
+    if (raw is List) {
+      return raw
+          .map((value) => value.toString().trim())
+          .where((value) => value.startsWith('http'))
+          .toList();
+    }
+    if (raw is String && raw.trim().isNotEmpty) {
+      final value = raw.trim();
+      if (value.startsWith('[') && value.endsWith(']')) {
+        return value
+            .substring(1, value.length - 1)
+            .split(',')
+            .map((part) => part.trim().replaceAll('"', '').replaceAll("'", ''))
+            .where((part) => part.startsWith('http'))
+            .toList();
+      }
+      return value
+          .split(',')
+          .map((part) => part.trim())
+          .where((part) => part.startsWith('http'))
+          .toList();
+    }
+    return <String>[];
+  }
 
   List<Map<String, dynamic>> get _filteredItems {
-    if (searchQuery.trim().isEmpty) {
-      return _wishlistItems;
-    }
-
-    final query = searchQuery.toLowerCase().trim();
-
-    return _wishlistItems.where((product) {
-      final title = product['title'].toString().toLowerCase();
-
-      final category = product['category'].toString().toLowerCase();
-
-      final seller = product['seller'].toString().toLowerCase();
-
-      final condition = product['condition'].toString().toLowerCase();
-
-      return title.contains(query) ||
-          category.contains(query) ||
-          seller.contains(query) ||
-          condition.contains(query);
+    final query = _query.trim().toLowerCase();
+    if (query.isEmpty) return _items;
+    return _items.where((product) {
+      final title = (product['title'] ?? product['name'] ?? '')
+          .toString()
+          .toLowerCase();
+      final category = (product['category'] ?? product['categoryName'] ?? '')
+          .toString()
+          .toLowerCase();
+      return title.contains(query) || category.contains(query);
     }).toList();
   }
 
-  // DISPOSE
+  void _message(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(14),
+        ),
+      );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
@@ -177,898 +197,360 @@ class _WishlistState extends State<Wishlist> {
     super.dispose();
   }
 
-  // BUILD
-
   @override
   Widget build(BuildContext context) {
+    final items = _filteredItems;
     return Scaffold(
-      backgroundColor: ArtistColors.background,
-
-      // APP BAR
+      backgroundColor: _background,
       appBar: AppBar(
-        backgroundColor: ArtistColors.background,
+        title: const Text(
+          'Wishlist',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        centerTitle: true,
+        backgroundColor: _background,
+        foregroundColor: _text,
         elevation: 0,
         scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        foregroundColor: ArtistColors.textPrimary,
-
-        title: Text(
-          'Wishlist',
-          style: ArtistTextStyles.title.copyWith(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-
         actions: [
-          if (_wishlistItems.isNotEmpty)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert_rounded),
-              color: ArtistColors.surface,
-              onSelected: (value) {
-                if (value == 'clear') {
-                  _confirmClearWishlist();
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem<String>(
-                  value: 'clear',
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.delete_sweep_outlined,
-                        color: ArtistColors.error,
-                        size: 20,
+          IconButton(
+            tooltip: 'Refresh wishlist',
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
+      body: _loading
+          ? Center(child: CircularProgressIndicator(color: _primary))
+          : _error != null
+          ? _errorView()
+          : _items.isEmpty
+          ? _emptyView()
+          : RefreshIndicator(
+              color: _primary,
+              onRefresh: _load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _surface,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: _primary.withOpacity(.15)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: _primary.withOpacity(.09),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(Icons.favorite_rounded, color: _primary),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_items.length} saved ${_items.length == 1 ? 'item' : 'items'}',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: _text,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Products you want to keep for later',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _text.withOpacity(.65),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() => _query = value),
+                    decoration: InputDecoration(
+                      hintText: 'Search saved products',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _query = '');
+                              },
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                      filled: true,
+                      fillColor: _surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
                       ),
-                      const SizedBox(width: 12),
-                      Text('Clear Wishlist', style: ArtistTextStyles.body),
-                    ],
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: _primary.withOpacity(.12),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(color: _primary, width: 1.3),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (items.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 44),
+                      child: Center(
+                        child: Text(
+                          'No saved products match your search.',
+                          style: TextStyle(color: _text.withOpacity(.65)),
+                        ),
+                      ),
+                    )
+                  else
+                    ...items.map(_productCard),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _productCard(Map<String, dynamic> product) {
+    final images = _images(product);
+    final title = (product['title'] ?? product['name'] ?? 'Product').toString();
+    final price = product['price'];
+    final id = _id(product);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: _surface,
+        borderRadius: BorderRadius.circular(17),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(17),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => ProductDetails(product: product)),
+          ).then((_) => _load()),
+          child: Container(
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(color: _primary.withOpacity(.13)),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 94,
+                    height: 104,
+                    child: images.isEmpty
+                        ? Container(
+                            color: _primary.withOpacity(.07),
+                            child: Icon(
+                              Icons.image_outlined,
+                              color: _primary,
+                              size: 32,
+                            ),
+                          )
+                        : Image.network(
+                            images.first,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: _primary.withOpacity(.07),
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: _primary,
+                                size: 30,
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: SizedBox(
+                    height: 104,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.25,
+                            fontWeight: FontWeight.w700,
+                            color: _text,
+                          ),
+                        ),
+                        const SizedBox(height: 7),
+                        if ((product['category'] ??
+                                product['categoryName'] ??
+                                '')
+                            .toString()
+                            .trim()
+                            .isNotEmpty)
+                          Text(
+                            (product['category'] ?? product['categoryName'])
+                                .toString(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _text.withOpacity(.6),
+                            ),
+                          ),
+                        const SizedBox(height: 7),
+                        Text(
+                          price == null
+                              ? 'Price unavailable'
+                              : '₹${price.toString()}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: _primary,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Tap to view details',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: _text.withOpacity(.55),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Remove from wishlist',
+                  onPressed: _busy || id.isEmpty
+                      ? null
+                      : () => _remove(product),
+                  icon: const Icon(
+                    Icons.favorite_rounded,
+                    color: Colors.redAccent,
                   ),
                 ),
               ],
             ),
-        ],
-      ),
-
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: ArtistColors.primary),
-            )
-          : _hasLoadError
-          ? _buildLoadError()
-          : _wishlistItems.isEmpty
-          ? _buildEmptyState()
-          : Column(
-              children: [
-                _buildHeader(),
-
-                _buildSearch(),
-
-                _buildResultInfo(),
-
-                Expanded(
-                  child: _filteredItems.isEmpty
-                      ? _buildNoSearchResult()
-                      : _buildGrid(),
-                ),
-              ],
-            ),
-    );
-  }
-
-  // HEADER
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Saved Products',
-                  style: ArtistTextStyles.title.copyWith(fontSize: 17),
-                ),
-
-                const SizedBox(height: 3),
-
-                Text(
-                  'Keep products you love in one place.',
-                  style: ArtistTextStyles.caption,
-                ),
-              ],
-            ),
-          ),
-
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: ArtistColors.light,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(
-              Icons.favorite_rounded,
-              size: 22,
-              color: ArtistColors.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // SEARCH
-
-  Widget _buildSearch() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: ArtistColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: ArtistColors.border),
-        ),
-        child: TextField(
-          controller: _searchController,
-
-          onChanged: (value) {
-            setState(() {
-              searchQuery = value;
-            });
-          },
-
-          style: ArtistTextStyles.body.copyWith(fontSize: 13),
-
-          decoration: InputDecoration(
-            hintText: 'Search saved products...',
-            hintStyle: ArtistTextStyles.caption.copyWith(
-              color: ArtistColors.textMuted,
-            ),
-
-            prefixIcon: const Icon(
-              Icons.search_rounded,
-              color: ArtistColors.primary,
-            ),
-
-            suffixIcon: searchQuery.isNotEmpty
-                ? IconButton(
-                    onPressed: () {
-                      _searchController.clear();
-
-                      setState(() {
-                        searchQuery = '';
-                      });
-                    },
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      size: 19,
-                      color: ArtistColors.textSecondary,
-                    ),
-                  )
-                : null,
-
-            border: InputBorder.none,
-
-            contentPadding: const EdgeInsets.symmetric(vertical: 14),
           ),
         ),
       ),
     );
   }
 
-  // RESULT INFO
-
-  Widget _buildResultInfo() {
-    final count = _filteredItems.length;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-      child: Row(
+  Widget _errorView() => Center(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
+          Icon(Icons.cloud_off_rounded, size: 58, color: _text.withOpacity(.5)),
+          const SizedBox(height: 18),
           Text(
-            '$count ${count == 1 ? 'saved product' : 'saved products'}',
-            style: ArtistTextStyles.caption,
-          ),
-
-          const Spacer(),
-
-          if (searchQuery.isNotEmpty)
-            Text(
-              'Search results',
-              style: ArtistTextStyles.caption.copyWith(
-                color: ArtistColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // GRID
-
-  Widget _buildGrid() {
-    final items = _filteredItems;
-
-    return RefreshIndicator(
-      onRefresh: _loadWishlist,
-      color: ArtistColors.primary,
-      child: GridView.builder(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
-
-        padding: const EdgeInsets.fromLTRB(20, 5, 20, 30),
-
-        itemCount: items.length,
-
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 14,
-          childAspectRatio: 0.61,
-        ),
-
-        itemBuilder: (context, index) {
-          final product = items[index];
-
-          return _WishlistProductCard(
-            product: product,
-
-            onTap: () {
-              _openProductDetails(product);
-            },
-
-            onRemove: () {
-              _removeProduct(product);
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  // OPEN PRODUCT DETAILS
-
-  void _openProductDetails(Map<String, dynamic> product) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ProductDetails(product: product)),
-    );
-  }
-
-  // Remove from the server first; only update the UI after success.
-  Future<void> _removeProduct(Map<String, dynamic> product) async {
-    final id = _toInt(product['productId']);
-    if (id <= 0 || _removingProductIds.contains(id)) return;
-    setState(() => _removingProductIds.add(id));
-    try {
-      await EcoLoopApi.instance.delete('/wishlist/$id');
-      if (!mounted) return;
-      setState(() {
-        _wishlistItems.removeWhere((item) => _toInt(item['productId']) == id);
-        _removingProductIds.remove(id);
-      });
-      _showMessage(
-        '${_text(product['title'], 'Product')} removed from wishlist.',
-      );
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _removingProductIds.remove(id));
-      _showMessage(
-        error is EcoLoopApiException
-            ? error.message
-            : 'Could not remove this product. Please try again.',
-      );
-    }
-  }
-
-  // CLEAR WISHLIST
-
-  void _confirmClearWishlist() {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: ArtistColors.surface,
-          surfaceTintColor: Colors.transparent,
-
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-
-          icon: Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: ArtistColors.light,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.delete_outline_rounded,
-              color: ArtistColors.error,
-              size: 27,
-            ),
-          ),
-
-          title: Text(
-            'Clear Wishlist?',
+            'Could not load wishlist',
             textAlign: TextAlign.center,
-            style: ArtistTextStyles.title.copyWith(fontSize: 19),
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+              color: _text,
+            ),
           ),
-
-          content: Text(
-            'All your saved products will be removed from the wishlist.',
+          const SizedBox(height: 9),
+          Text(
+            _error ?? 'Something went wrong.',
             textAlign: TextAlign.center,
-            style: ArtistTextStyles.body,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              color: _text.withOpacity(.65),
+            ),
           ),
-
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-              child: Text(
-                'Cancel',
-                style: ArtistTextStyles.bodyMedium.copyWith(
-                  color: ArtistColors.textSecondary,
-                ),
-              ),
-            ),
-
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-
-                _clearWishlist();
-              },
-
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ArtistColors.error,
-                foregroundColor: Colors.white,
-                elevation: 0,
-
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9),
-                ),
-              ),
-
-              child: const Text(
-                'Clear',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _clearWishlist() async {
-    final ids = _wishlistItems
-        .map((item) => _toInt(item['productId']))
-        .where((id) => id > 0)
-        .toList();
-    try {
-      for (final id in ids) {
-        await EcoLoopApi.instance.delete('/wishlist/$id');
-      }
-      if (!mounted) return;
-      setState(() => _wishlistItems.clear());
-      _showMessage('Wishlist cleared.');
-    } catch (error) {
-      if (!mounted) return;
-      await _loadWishlist();
-      if (mounted) {
-        _showMessage(
-          error is EcoLoopApiException
-              ? error.message
-              : 'Some products could not be removed. Wishlist refreshed.',
-        );
-      }
-    }
-  }
-
-  Widget _buildLoadError() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.cloud_off_outlined,
-              size: 48,
-              color: ArtistColors.textSecondary,
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Could not load wishlist',
-              style: ArtistTextStyles.title.copyWith(fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _loadError,
-              textAlign: TextAlign.center,
-              style: ArtistTextStyles.body,
-            ),
-            const SizedBox(height: 18),
-            ElevatedButton.icon(
-              onPressed: _loadWishlist,
+          const SizedBox(height: 22),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _load,
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: ArtistColors.primary,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // NO SEARCH RESULT
-
-  Widget _buildNoSearchResult() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(35),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: ArtistColors.light,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.search_off_rounded,
-                size: 37,
-                color: ArtistColors.primary,
-              ),
-            ),
-
-            const SizedBox(height: 18),
-
-            Text(
-              'No saved products found',
-              style: ArtistTextStyles.title.copyWith(fontSize: 18),
-            ),
-
-            const SizedBox(height: 7),
-
-            Text(
-              'Try searching with another product name, '
-              'category, seller or condition.',
-              textAlign: TextAlign.center,
-              style: ArtistTextStyles.body,
-            ),
-
-            const SizedBox(height: 18),
-
-            OutlinedButton.icon(
-              onPressed: () {
-                _searchController.clear();
-
-                setState(() {
-                  searchQuery = '';
-                });
-              },
-
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-
-              label: const Text('Clear Search'),
-
-              style: OutlinedButton.styleFrom(
-                foregroundColor: ArtistColors.primary,
-                side: const BorderSide(color: ArtistColors.primary),
+                backgroundColor: _primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // EMPTY WISHLIST
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(35),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 105,
-              height: 105,
-              decoration: BoxDecoration(
-                color: ArtistColors.light,
-                borderRadius: BorderRadius.circular(32),
-              ),
-              child: const Icon(
-                Icons.favorite_border_rounded,
-                size: 50,
-                color: ArtistColors.primary,
-              ),
-            ),
-
-            const SizedBox(height: 23),
-
-            Text(
-              'Your wishlist is empty',
-              textAlign: TextAlign.center,
-              style: ArtistTextStyles.title.copyWith(fontSize: 20),
-            ),
-
-            const SizedBox(height: 9),
-
-            Text(
-              'Save products you like while exploring '
-              'the marketplace. You can come back and '
-              'view them anytime.',
-              textAlign: TextAlign.center,
-              style: ArtistTextStyles.body,
-            ),
-
-            const SizedBox(height: 24),
-
-            SizedBox(
-              width: 220,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-
-                icon: const Icon(Icons.storefront_outlined, size: 18),
-
-                label: const Text('Explore Marketplace'),
-
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: ArtistColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // MESSAGE
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: const TextStyle(color: Colors.white, fontSize: 13),
           ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: ArtistColors.accent,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(11),
-          ),
-        ),
-      );
-  }
-}
-
-// WISHLIST PRODUCT CARD
-
-class _WishlistProductCard extends StatelessWidget {
-  const _WishlistProductCard({
-    required this.product,
-    required this.onTap,
-    required this.onRemove,
-  });
-
-  final Map<String, dynamic> product;
-
-  final VoidCallback onTap;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final int price = product['price'] is num
-        ? (product['price'] as num).round()
-        : int.tryParse(product['price']?.toString() ?? '') ?? 0;
-
-    final String image = product['image']?.toString() ?? '';
-
-    return GestureDetector(
-      onTap: onTap,
-
-      child: Container(
-        decoration: BoxDecoration(
-          color: ArtistColors.surface,
-
-          borderRadius: BorderRadius.circular(17),
-
-          border: Border.all(color: ArtistColors.border),
-
-          boxShadow: [
-            BoxShadow(
-              color: ArtistColors.primary.withOpacity(0.045),
-              blurRadius: 9,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-
-        clipBehavior: Clip.antiAlias,
-
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // IMAGE
-            Expanded(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Image.network(
-                      image,
-                      fit: BoxFit.cover,
-
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) {
-                          return child;
-                        }
-
-                        return Container(
-                          color: ArtistColors.light,
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: ArtistColors.primary,
-                            ),
-                          ),
-                        );
-                      },
-
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: ArtistColors.light,
-                          child: const Center(
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 40,
-                              color: ArtistColors.secondary,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // CONDITION
-                  Positioned(
-                    left: 9,
-                    top: 9,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.94),
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-
-                      child: Text(
-                        product['condition']?.toString() ?? 'Used',
-
-                        style: const TextStyle(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w700,
-                          color: ArtistColors.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // REMOVE
-                  Positioned(
-                    right: 9,
-                    top: 9,
-                    child: Material(
-                      color: Colors.white.withOpacity(0.94),
-                      shape: const CircleBorder(),
-
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: onRemove,
-
-                        child: const Padding(
-                          padding: EdgeInsets.all(8),
-
-                          child: Icon(
-                            Icons.favorite_rounded,
-                            size: 18,
-                            color: ArtistColors.error,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // CATEGORY
-                  Positioned(
-                    left: 9,
-                    bottom: 9,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 4,
-                      ),
-
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.55),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-
-                      child: Text(
-                        product['category']?.toString() ?? 'Product',
-
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // DETAILS
-            Padding(
-              padding: const EdgeInsets.fromLTRB(11, 10, 11, 11),
-
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product['title']?.toString() ?? 'Untitled Product',
-
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-
-                    style: ArtistTextStyles.body.copyWith(
-                      color: ArtistColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  Text(
-                    '₹$price',
-
-                    style: ArtistTextStyles.title.copyWith(
-                      fontSize: 17,
-                      color: ArtistColors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-
-                  const SizedBox(height: 5),
-
-                  // SELLER
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.person_outline_rounded,
-                        size: 12,
-                        color: ArtistColors.textSecondary,
-                      ),
-
-                      const SizedBox(width: 3),
-
-                      Expanded(
-                        child: Text(
-                          product['seller']?.toString() ?? 'Artist',
-
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-
-                          style: ArtistTextStyles.caption.copyWith(
-                            fontSize: 9.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  // LOCATION
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 11,
-                        color: ArtistColors.textSecondary,
-                      ),
-
-                      const SizedBox(width: 3),
-
-                      Expanded(
-                        child: Text(
-                          product['location']?.toString() ?? 'Gujarat',
-
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-
-                          style: ArtistTextStyles.caption.copyWith(
-                            fontSize: 8.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // VIEW PRODUCT
-                  SizedBox(
-                    width: double.infinity,
-                    height: 32,
-
-                    child: OutlinedButton(
-                      onPressed: onTap,
-
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: ArtistColors.primary,
-
-                        side: const BorderSide(color: ArtistColors.primary),
-
-                        padding: EdgeInsets.zero,
-
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                      ),
-
-                      child: const Text(
-                        'View Product',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+
+  Widget _emptyView() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              color: _primary.withOpacity(.09),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.favorite_border_rounded,
+              size: 44,
+              color: _primary,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Your wishlist is empty',
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+              color: _text,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Open any product and tap the heart to save it here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.45,
+              color: _text.withOpacity(.65),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

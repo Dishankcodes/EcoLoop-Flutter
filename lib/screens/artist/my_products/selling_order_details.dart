@@ -20,6 +20,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
 
   String get productName {
     return widget.order['productTitle']?.toString() ??
+        widget.order['productName']?.toString() ??
         widget.order['product']?.toString() ??
         'Product';
   }
@@ -37,7 +38,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   }
 
   String get buyerId {
-    return widget.order['buyerId']?.toString() ?? '-';
+    return widget.order['buyerName']?.toString().trim().isNotEmpty == true
+        ? widget.order['buyerName'].toString()
+        : (widget.order['buyerId']?.toString() ?? '-');
   }
 
   String get quantity {
@@ -268,9 +271,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
       margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: ArtistColors.error.withOpacity(0.07),
+        color: ArtistColors.error.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: ArtistColors.error.withOpacity(0.18)),
+        border: Border.all(color: ArtistColors.error.withValues(alpha: 0.18)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,7 +397,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: ArtistColors.light.withOpacity(0.65),
+              color: ArtistColors.light.withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(13),
             ),
             child: Row(
@@ -487,7 +490,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                 height: 30,
                 width: 30,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.10),
+                  color: color.withValues(alpha: 0.10),
                   shape: BoxShape.circle,
                   border: active
                       ? Border.all(color: ArtistColors.primary, width: 1.5)
@@ -509,8 +512,8 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                   height: 37,
                   width: 2,
                   color: completed
-                      ? ArtistColors.success.withOpacity(0.38)
-                      : ArtistColors.accent.withOpacity(0.55),
+                      ? ArtistColors.success.withValues(alpha: 0.38)
+                      : ArtistColors.accent.withValues(alpha: 0.55),
                 ),
             ],
           ),
@@ -548,7 +551,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: ArtistColors.primary.withOpacity(0.09),
+                          color: ArtistColors.primary.withValues(alpha: 0.09),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -587,7 +590,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -834,7 +837,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: ArtistColors.light.withOpacity(0.60),
+              color: ArtistColors.light.withValues(alpha: 0.60),
               borderRadius: BorderRadius.circular(15),
             ),
             child: Row(
@@ -1232,7 +1235,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
         color: ArtistColors.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),

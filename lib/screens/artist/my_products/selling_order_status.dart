@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 
 class SellingOrderStatus extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -294,9 +295,9 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
       padding: const EdgeInsets.all(16),
 
       decoration: BoxDecoration(
-        color: ArtistColors.error.withOpacity(0.08),
+        color: ArtistColors.error.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: ArtistColors.error.withOpacity(0.25)),
+        border: Border.all(color: ArtistColors.error.withValues(alpha: 0.25)),
       ),
 
       child: Row(
@@ -306,7 +307,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
             width: 44,
 
             decoration: BoxDecoration(
-              color: ArtistColors.error.withOpacity(0.10),
+              color: ArtistColors.error.withValues(alpha: 0.10),
               shape: BoxShape.circle,
             ),
 
@@ -368,10 +369,10 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
       decoration: BoxDecoration(
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: statusColor.withOpacity(0.35)),
+        border: Border.all(color: statusColor.withValues(alpha: 0.35)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.025),
+            color: Colors.black.withValues(alpha: 0.025),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -385,7 +386,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
             width: 50,
 
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.10),
+              color: statusColor.withValues(alpha: 0.10),
               shape: BoxShape.circle,
             ),
 
@@ -438,7 +439,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
       decoration: BoxDecoration(
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: ArtistColors.accent.withOpacity(0.35)),
+        border: Border.all(color: ArtistColors.accent.withValues(alpha: 0.35)),
       ),
 
       child: Column(
@@ -478,7 +479,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
 
     final Color iconColor = completed
         ? ArtistColors.success
-        : ArtistColors.textSecondary.withOpacity(0.45);
+        : ArtistColors.textSecondary.withValues(alpha: 0.45);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -528,8 +529,8 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
                   height: 45,
                   width: 2,
                   color: completed
-                      ? ArtistColors.success.withOpacity(0.35)
-                      : ArtistColors.accent.withOpacity(0.35),
+                      ? ArtistColors.success.withValues(alpha: 0.35)
+                      : ArtistColors.accent.withValues(alpha: 0.35),
                 ),
             ],
           ),
@@ -569,7 +570,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
                         ),
 
                         decoration: BoxDecoration(
-                          color: ArtistColors.primary.withOpacity(0.09),
+                          color: ArtistColors.primary.withValues(alpha: 0.09),
                           borderRadius: BorderRadius.circular(8),
                         ),
 
@@ -613,7 +614,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
       decoration: BoxDecoration(
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: ArtistColors.accent.withOpacity(0.35)),
+        border: Border.all(color: ArtistColors.accent.withValues(alpha: 0.35)),
       ),
 
       child: Column(
@@ -684,7 +685,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
             border: Border.all(
               color: selected
                   ? ArtistColors.primary
-                  : ArtistColors.accent.withOpacity(0.30),
+                  : ArtistColors.accent.withValues(alpha: 0.30),
               width: selected ? 1.5 : 1,
             ),
           ),
@@ -745,7 +746,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
                   ),
 
                   decoration: BoxDecoration(
-                    color: ArtistColors.success.withOpacity(0.10),
+                    color: ArtistColors.success.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(9),
                   ),
 
@@ -774,7 +775,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
                     border: Border.all(
                       color: selected
                           ? ArtistColors.primary
-                          : ArtistColors.textSecondary.withOpacity(0.35),
+                          : ArtistColors.textSecondary.withValues(alpha: 0.35),
                       width: 1.5,
                     ),
                   ),
@@ -803,7 +804,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
       padding: const EdgeInsets.all(15),
 
       decoration: BoxDecoration(
-        color: ArtistColors.light.withOpacity(0.75),
+        color: ArtistColors.light.withValues(alpha: 0.75),
         borderRadius: BorderRadius.circular(16),
       ),
 
@@ -872,7 +873,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
         color: ArtistColors.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 15,
             offset: const Offset(0, -4),
           ),
@@ -892,11 +893,13 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
             style: ElevatedButton.styleFrom(
               backgroundColor: ArtistColors.primary,
 
-              disabledBackgroundColor: ArtistColors.accent.withOpacity(0.45),
+              disabledBackgroundColor: ArtistColors.accent.withValues(
+                alpha: 0.45,
+              ),
 
               foregroundColor: Colors.white,
 
-              disabledForegroundColor: Colors.white.withOpacity(0.75),
+              disabledForegroundColor: Colors.white.withValues(alpha: 0.75),
 
               elevation: 0,
 
@@ -1026,11 +1029,12 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
 
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(sheetContext);
-
-                          _updateStatus(newStatus);
-                        },
+                        onPressed: _isSavingStatus
+                            ? null
+                            : () {
+                                Navigator.pop(sheetContext);
+                                _updateStatus(newStatus);
+                              },
 
                         style: ElevatedButton.styleFrom(
                           backgroundColor: ArtistColors.primary,
@@ -1064,57 +1068,81 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
 
   // UPDATE STATUS
 
-  void _updateStatus(String newStatus) {
-    setState(() {
-      _currentStatus = newStatus;
-      _selectedStatus = newStatus;
+  bool _isSavingStatus = false;
 
-      // Keep local order data synchronized
-      // until API integration is added.
-      widget.order['status'] = newStatus;
+  Future<void> _updateStatus(String newStatus) async {
+    if (_isSavingStatus) return;
+    setState(() => _isSavingStatus = true);
 
-      widget.order['updatedAt'] = DateTime.now().toIso8601String();
-    });
+    try {
+      final dynamic response = await EcoLoopApi.instance.post(
+        '/artist/orders/${widget.order['orderId']}/status',
+        <String, dynamic>{'status': newStatus},
+      );
+      final Map<String, dynamic> updated = response is Map
+          ? Map<String, dynamic>.from(response)
+          : <String, dynamic>{};
 
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
+      if (!mounted) return;
+      setState(() {
+        _currentStatus = (updated['status'] ?? newStatus)
+            .toString()
+            .toLowerCase();
+        _selectedStatus = _currentStatus;
+        widget.order.addAll(updated);
+        widget.order['status'] = _currentStatus;
+        widget.order['updatedAt'] =
+            updated['updatedAt'] ?? DateTime.now().toIso8601String();
+        _isSavingStatus = false;
+      });
 
-          backgroundColor: ArtistColors.primary,
-
-          margin: const EdgeInsets.all(16),
-
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(11),
-          ),
-
-          content: Row(
-            children: [
-              const Icon(
-                Icons.check_circle_outline_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-
-              const SizedBox(width: 9),
-
-              Expanded(
-                child: Text(
-                  'Order updated to '
-                  '${_formatStatus(newStatus)}',
-                  style: ArtistTextStyles.body.copyWith(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: ArtistColors.primary,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(11),
+            ),
+            content: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_outline_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    'Order updated to ${_formatStatus(_currentStatus)}',
+                    style: ArtistTextStyles.body.copyWith(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      );
+        );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isSavingStatus = false);
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: ArtistColors.error,
+            content: Text(
+              'Could not update order: ${error.toString().replaceFirst('Exception: ', '')}',
+            ),
+          ),
+        );
+    }
   }
 
   // FORMAT STATUS

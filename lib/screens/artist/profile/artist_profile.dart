@@ -1592,9 +1592,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
   }
 }
 
-// ==================================================================
 // PROFILE SECTION
-// ==================================================================
 
 class _ProfileSection extends StatelessWidget {
   const _ProfileSection({
@@ -1666,9 +1664,7 @@ class _ProfileSection extends StatelessWidget {
   }
 }
 
-// ==================================================================
 // PROFILE STAT
-// ==================================================================
 
 class _ProfileStat extends StatelessWidget {
   const _ProfileStat({
@@ -1705,9 +1701,7 @@ class _ProfileStat extends StatelessWidget {
   }
 }
 
-// ==================================================================
 // BEFORE / AFTER IMAGE
-// ==================================================================
 
 class _BeforeAfterImage extends StatelessWidget {
   const _BeforeAfterImage({
@@ -1776,9 +1770,7 @@ class _BeforeAfterImage extends StatelessWidget {
   }
 }
 
-// ==================================================================
 // MORE OPTION
-// ==================================================================
 
 class _MoreOption extends StatelessWidget {
   const _MoreOption({
@@ -1838,13 +1830,11 @@ class _MoreOption extends StatelessWidget {
   }
 }
 
-// ==================================================================
 // PUBLIC PORTFOLIO PAGE
-// ==================================================================
+
 //
 // This is READ-ONLY.
 // The artist's own Portfolio page handles CRUD.
-// ==================================================================
 
 class ArtistPublicPortfolio extends StatelessWidget {
   const ArtistPublicPortfolio({
@@ -2049,9 +2039,7 @@ class ArtistPublicPortfolio extends StatelessWidget {
   }
 }
 
-// ==================================================================
 // PORTFOLIO WORK SHEET
-// ==================================================================
 
 class _PortfolioWorkSheet extends StatelessWidget {
   const _PortfolioWorkSheet({required this.item});
@@ -2258,9 +2246,7 @@ class _PortfolioWorkSheet extends StatelessWidget {
   }
 }
 
-// ==================================================================
 // PRODUCT PREVIEW SHEET
-// ==================================================================
 
 class _ProductPreviewSheet extends StatelessWidget {
   const _ProductPreviewSheet({required this.product});
