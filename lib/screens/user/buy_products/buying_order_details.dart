@@ -45,7 +45,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   }
 
   String get orderId {
-    final value = widget.order['orderId'] ?? widget.order['id'];
+    final value = widget.order['displayOrderId'] ??
+        widget.order['orderId'] ??
+        widget.order['id'];
     return value == null ? 'Order ID unavailable' : value.toString();
   }
 
@@ -113,8 +115,30 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         : value.toString();
   }
 
-  IconData get productIcon =>
-      widget.order['icon'] as IconData? ?? Icons.inventory_2_outlined;
+  IconData get productIcon {
+    // Orders arrive from the API as JSON, so `icon` may be a String.
+    // Never cast an API value directly to IconData.
+    final dynamic value = widget.order['icon'];
+    if (value is IconData) return value;
+
+    // Keep a stable fallback for API-backed orders that have no local icon.
+    switch (value?.toString().trim().toLowerCase()) {
+      case 'chair':
+      case 'chair_outlined':
+        return Icons.chair_outlined;
+      case 'book':
+      case 'menu_book':
+        return Icons.menu_book_outlined;
+      case 'clothing':
+      case 'checkroom':
+        return Icons.checkroom_outlined;
+      case 'electronics':
+      case 'devices':
+        return Icons.devices_outlined;
+      default:
+        return Icons.inventory_2_outlined;
+    }
+  }
 
   bool get isCancelled => _status.trim().toLowerCase() == 'cancelled';
 

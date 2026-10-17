@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
+import 'product_details.dart';
 
 /// Public profile shown when a user opens an artist/ReMaker from a listing.
 /// Profile details are taken from the selected backend artist record; portfolio,
@@ -888,7 +889,21 @@ class _ArtistProfileState extends State<ArtistProfile> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeading('Products', 'Available creations from this ReMaker'),
+        _sectionHeading(
+          'Products',
+          'Available creations from this ReMaker',
+          onViewAll: _products.isEmpty
+              ? null
+              : () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          _ArtistProductsPage(name: _name, products: _products),
+                    ),
+                  );
+                },
+        ),
         const SizedBox(height: 10),
         if (_products.isEmpty)
           _emptyCard(
@@ -1043,6 +1058,41 @@ class _ArtistProfileState extends State<ArtistProfile> {
     );
   }
 
+  String _friendlyDate(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return '';
+    DateTime? parsed = DateTime.tryParse(value);
+    if (parsed == null) {
+      // Also accept common Google Sheets timestamp forms.
+      parsed = DateTime.tryParse(value.replaceFirst(' ', 'T'));
+    }
+    if (parsed == null) return value;
+
+    final date = parsed.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    final days = today.difference(target).inDays;
+    if (days == 0) return 'Today';
+    if (days == 1) return 'Yesterday';
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final shortDate = '${date.day} ${months[date.month - 1]}';
+    return date.year == now.year ? shortDate : '$shortDate ${date.year}';
+  }
+
   Widget _reviewTile(Map<String, dynamic> review) {
     final name = _value(review, [
       'reviewerName',
@@ -1058,7 +1108,9 @@ class _ArtistProfileState extends State<ArtistProfile> {
       'message',
     ]);
     final rating = _value(review, ['rating', 'stars']);
-    final date = _value(review, ['createdAt', 'created_at', 'date']);
+    final date = _friendlyDate(
+      _value(review, ['createdAt', 'created_at', 'date']),
+    );
     return Container(
       margin: const EdgeInsets.only(top: 9),
       padding: const EdgeInsets.all(12),
@@ -1155,90 +1207,21 @@ class _ArtistProfileState extends State<ArtistProfile> {
     );
   }
 
-  void _showProduct(Map<String, dynamic> product) {
-    final title = _value(product, ['title', 'name']);
-    final price = _value(product, ['price', 'sellingPrice', 'selling_price']);
-    final description = _value(product, ['description', 'details']);
-    final image = _value(product, [
-      'imageUrl',
-      'image_url',
-      'image',
-      'thumbnail',
-    ]);
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        constraints: const BoxConstraints(maxHeight: 620),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (image.isNotEmpty)
-                Image.network(
-                  image,
-                  width: double.infinity,
-                  height: 230,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox(
-                    height: 150,
-                    child: Center(
-                      child: Icon(Icons.image_not_supported_outlined),
-                    ),
-                  ),
-                )
-              else
-                const SizedBox(
-                  height: 150,
-                  child: Center(child: Icon(Icons.image_outlined, size: 42)),
-                ),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title.isEmpty ? 'Product' : title,
-                      style: AppTextStyles.title.copyWith(fontSize: 20),
-                    ),
-                    if (price.isNotEmpty) ...[
-                      const SizedBox(height: 7),
-                      Text(
-                        '₹$price',
-                        style: AppTextStyles.title.copyWith(
-                          color: AppColors.primary,
-                          fontSize: 22,
-                        ),
-                      ),
-                    ],
-                    if (description.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        description,
-                        style: AppTextStyles.body.copyWith(height: 1.5),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Close'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+  Future<void> _showProduct(Map<String, dynamic> product) async {
+    final id = _value(product, ['productId', 'product_id', 'id']);
+    if (id.isEmpty) {
+      _message('Product details are unavailable for this item.');
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ProductDetails(product: Map<String, dynamic>.from(product)),
       ),
     );
+    if (mounted) {
+      await _loadProfileData(refresh: true);
+    }
   }
 }
 
@@ -1485,11 +1468,81 @@ class _PortfolioCard extends StatelessWidget {
   );
 }
 
+class _ArtistProductsPage extends StatelessWidget {
+  const _ArtistProductsPage({required this.name, required this.products});
+
+  final String name;
+  final List<Map<String, dynamic>> products;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: Text('$name Products', style: AppTextStyles.title),
+      ),
+      body: products.isEmpty
+          ? Center(
+              child: Text(
+                'No available products yet.',
+                style: AppTextStyles.caption,
+              ),
+            )
+          : GridView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              itemCount: products.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: .66,
+              ),
+              itemBuilder: (context, index) {
+                final product = products[index];
+                return _ProductCard(
+                  product: product,
+                  width: double.infinity,
+                  onTap: () {
+                    final id =
+                        product['productId'] ??
+                        product['product_id'] ??
+                        product['id'];
+                    if (id == null || id.toString().trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Product details are unavailable.'),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => ProductDetails(
+                          product: Map<String, dynamic>.from(product),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+    );
+  }
+}
+
 class _ProductCard extends StatelessWidget {
-  const _ProductCard({required this.product, required this.onTap});
+  const _ProductCard({
+    required this.product,
+    required this.onTap,
+    this.width = 185,
+  });
 
   final Map<String, dynamic> product;
   final VoidCallback onTap;
+  final double width;
 
   String _value(List<String> keys) {
     for (final key in keys) {
@@ -1515,7 +1568,7 @@ class _ProductCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 185,
+        width: width,
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),

@@ -199,7 +199,10 @@ class _OrdersState extends State<Orders> {
       'product': order['productName'] ?? 'Product',
       'price': _money(order['totalAmount']),
       'date': _date(order['createdAt']),
-      'orderId': '#ECO-${order['orderId'] ?? ''}',
+      // Keep the original orderId intact: review requests need its numeric ID.
+      // Use displayOrderId only for presentation.
+      'orderId': order['orderId'] ?? order['id'],
+      'displayOrderId': '#ECO-${order['orderId'] ?? order['id'] ?? ''}',
       'status': _status(order['status']?.toString()),
       'address': address,
     };

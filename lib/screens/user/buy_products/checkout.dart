@@ -1145,20 +1145,33 @@ class _CheckoutState extends State<Checkout> {
                 const SizedBox(height: 3),
                 Text(
                   (item['seller'] ?? 'EcoLoop Seller').toString(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.caption,
                 ),
                 const SizedBox(height: 9),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     _quantityControl(
                       quantity: quantity,
                       onMinus: () => _decrease(index),
                       onPlus: stock > quantity ? () => _increase(index) : null,
                     ),
-                    const Spacer(),
-                    Text(
-                      _money(lineTotal),
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            _money(lineTotal),
+                            maxLines: 1,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),

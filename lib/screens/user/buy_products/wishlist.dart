@@ -20,7 +20,50 @@ class _WishlistState extends State<Wishlist> {
   bool _refreshing = false;
   String? _error;
   final Set<String> _removingIds = <String>{};
+  final TextEditingController _searchController = TextEditingController();
+  String _sortBy = 'Recently saved';
   List<Map<String, dynamic>> _items = <Map<String, dynamic>>[];
+
+  List<Map<String, dynamic>> get _visibleItems {
+    final query = _searchController.text.trim().toLowerCase();
+    final result = _items.where((item) {
+      if (query.isEmpty) return true;
+      final title = _text(item, ['title', 'name']).toLowerCase();
+      final category = _text(item, [
+        'category',
+        'categoryName',
+        'category_name',
+      ]).toLowerCase();
+      final seller = _text(item, [
+        'sellerName',
+        'seller_name',
+        'seller',
+        'artistName',
+        'userName',
+      ]).toLowerCase();
+      return title.contains(query) ||
+          category.contains(query) ||
+          seller.contains(query);
+    }).toList();
+
+    if (_sortBy == 'Price: low to high') {
+      result.sort(
+        (a, b) => (_price(a) ?? double.infinity).compareTo(
+          _price(b) ?? double.infinity,
+        ),
+      );
+    } else if (_sortBy == 'Price: high to low') {
+      result.sort((a, b) => (_price(b) ?? -1).compareTo(_price(a) ?? -1));
+    } else if (_sortBy == 'Name: A–Z') {
+      result.sort(
+        (a, b) => _text(a, [
+          'title',
+          'name',
+        ]).toLowerCase().compareTo(_text(b, ['title', 'name']).toLowerCase()),
+      );
+    }
+    return result;
+  }
 
   Map<String, dynamic> _map(dynamic value) {
     if (value is Map<String, dynamic>) return value;
@@ -241,6 +284,12 @@ class _WishlistState extends State<Wishlist> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final primary = AppColors.primary;
     return Scaffold(
@@ -301,27 +350,316 @@ class _WishlistState extends State<Wishlist> {
       );
     }
     if (_items.isEmpty) {
-      return _stateMessage(
-        icon: Icons.favorite_border_rounded,
-        title: 'Your wishlist is waiting',
-        message:
-            'Save items you love from the marketplace. They’ll be kept here for you.',
-        actionLabel: 'Refresh',
-        onAction: () => _load(refresh: true),
+      return RefreshIndicator(
+        onRefresh: () => _load(refresh: true),
+        color: AppColors.primary,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            const SizedBox(height: 70),
+            _stateMessage(
+              icon: Icons.favorite_border_rounded,
+              title: 'Your wishlist is waiting',
+              message:
+                  'Save items you love from the marketplace. They’ll be kept here for you.',
+              actionLabel: 'Refresh',
+              onAction: () => _load(refresh: true),
+            ),
+          ],
+        ),
       );
     }
 
+    final visible = _visibleItems;
     return RefreshIndicator(
       onRefresh: () => _load(refresh: true),
       color: AppColors.primary,
-      child: ListView.separated(
+      child: ListView(
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
         ),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-        itemCount: _items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 14),
-        itemBuilder: (context, index) => _wishlistCard(_items[index]),
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
+        children: [
+          _wishlistHero(),
+          const SizedBox(height: 18),
+          TextField(
+            controller: _searchController,
+            onChanged: (_) => setState(() {}),
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'Search saved items, sellers...',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: _searchController.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+              filled: true,
+              fillColor: AppColors.surface,
+              contentPadding: const EdgeInsets.symmetric(vertical: 15),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: AppColors.primary.withValues(alpha: .10),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: AppColors.primary, width: 1.3),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Your saved finds',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${visible.length} ${visible.length == 1 ? 'item' : 'items'}${_searchController.text.trim().isNotEmpty ? ' found' : ' saved for later'}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'Sort wishlist',
+                initialValue: _sortBy,
+                onSelected: (value) => setState(() => _sortBy = value),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'Recently saved',
+                    child: Text('Recently saved'),
+                  ),
+                  PopupMenuItem(
+                    value: 'Price: low to high',
+                    child: Text('Price: low to high'),
+                  ),
+                  PopupMenuItem(
+                    value: 'Price: high to low',
+                    child: Text('Price: high to low'),
+                  ),
+                  PopupMenuItem(value: 'Name: A–Z', child: Text('Name: A–Z')),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: .12),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.swap_vert_rounded,
+                        size: 17,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Sort',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          if (visible.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 44),
+              child: _stateMessage(
+                icon: Icons.search_off_rounded,
+                title: 'No matching items',
+                message: 'Try another product, category, or seller name.',
+                actionLabel: 'Clear search',
+                onAction: () {
+                  _searchController.clear();
+                  setState(() {});
+                },
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 620 ? 3 : 2;
+                final ratio = constraints.maxWidth < 360 ? .57 : .62;
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: visible.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: ratio,
+                  ),
+                  itemBuilder: (context, index) =>
+                      _wishlistCard(visible[index]),
+                );
+              },
+            ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: .06),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.eco_outlined, color: AppColors.primary, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Good finds deserve a second life. Keep your favourites close until you’re ready.',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _wishlistHero() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(19, 20, 16, 19),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primary, AppColors.primary.withValues(alpha: .86)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: .16),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .14),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: const Text(
+                    'YOUR PERSONAL COLLECTION',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      letterSpacing: 1.0,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Loved it?\nSave it here.',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 25,
+                    height: 1.12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'A little place for things you love.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: .82),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.favorite_rounded,
+                      color: Color(0xFFFFD4D8),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${_items.length} saved ${_items.length == 1 ? 'item' : 'items'}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .12),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: .24)),
+            ),
+            child: const Icon(
+              Icons.favorite_rounded,
+              size: 38,
+              color: Color(0xFFFFD4D8),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -422,7 +760,7 @@ class _WishlistState extends State<Wishlist> {
               Stack(
                 children: [
                   AspectRatio(
-                    aspectRatio: 1.72,
+                    aspectRatio: 1.15,
                     child: images.isEmpty
                         ? _imageFallback()
                         : Image.network(
@@ -459,6 +797,11 @@ class _WishlistState extends State<Wishlist> {
                       shape: const CircleBorder(),
                       elevation: 2,
                       child: IconButton(
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints(
+                          minWidth: 38,
+                          minHeight: 38,
+                        ),
                         tooltip: 'Remove from wishlist',
                         onPressed: removing ? null : () => _remove(product),
                         icon: removing
@@ -503,7 +846,7 @@ class _WishlistState extends State<Wishlist> {
                 ],
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(15, 13, 12, 14),
+                padding: const EdgeInsets.fromLTRB(11, 10, 9, 11),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -540,8 +883,8 @@ class _WishlistState extends State<Wishlist> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 16,
-                              height: 1.25,
+                              fontSize: 14,
+                              height: 1.2,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -574,7 +917,7 @@ class _WishlistState extends State<Wishlist> {
                             price,
                             style: TextStyle(
                               color: AppColors.primary,
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.w900,
                             ),
                           ),

@@ -62,8 +62,7 @@ class EcoLoopApi {
       queryParameters: {
         'path': path,
         ...query,
-        if ((method == 'GET' || method == 'DELETE') && _token.isNotEmpty)
-          'token': _token,
+        if ((method == 'GET' || method == 'DELETE') && _token.isNotEmpty) 'token': _token,
         // Apps Script receives DELETE via doPost; pass method override in query
         // because DELETE requests intentionally have no request body here.
         if (method == 'DELETE') '_method': 'DELETE',

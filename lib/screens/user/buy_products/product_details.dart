@@ -857,7 +857,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           _infoRow(
             Icons.calendar_today_outlined,
             'Listed',
-            _product['createdAt']?.toString() ?? 'Not available',
+            _formatFriendlyDate(_product['createdAt']),
           ),
           _infoRow(
             Icons.local_shipping_outlined,
@@ -1095,15 +1095,49 @@ class _ProductDetailsState extends State<ProductDetails> {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
-  String _displayReviewDate(dynamic value) {
-    if (value == null || value.toString().trim().isEmpty)
+  /// Converts backend ISO timestamps into short, readable dates without
+  /// changing the timestamp stored in Google Sheets.
+  ///
+  /// Examples: Today, Yesterday, 10 Oct, 8 Oct 2025.
+  /// ISO timestamps containing Z/UTC offsets are converted to device-local time
+  /// before comparing calendar dates. Date-only/local timestamps remain valid.
+  String _formatFriendlyDate(dynamic value) {
+    if (value == null || value.toString().trim().isEmpty) {
       return 'Date unavailable';
-    final date = DateTime.tryParse(value.toString());
-    if (date == null) return value.toString();
-    final local = date.toLocal();
-    return '${local.day.toString().padLeft(2, '0')}/'
-        '${local.month.toString().padLeft(2, '0')}/${local.year}';
+    }
+
+    final raw = value.toString().trim();
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+
+    final date = parsed.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final listedDay = DateTime(date.year, date.month, date.day);
+    final difference = today.difference(listedDay).inDays;
+
+    if (difference == 0) return 'Today';
+    if (difference == 1) return 'Yesterday';
+
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final dayMonth = '${date.day} ${months[date.month - 1]}';
+    return date.year == now.year ? dayMonth : '$dayMonth ${date.year}';
   }
+
+  String _displayReviewDate(dynamic value) => _formatFriendlyDate(value);
 
   /// Summary bar showing average score and distribution chart for star ratings.
   Widget _buildRatingSummary() {

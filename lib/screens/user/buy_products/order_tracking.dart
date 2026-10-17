@@ -21,7 +21,10 @@ class _OrderTrackingState extends State<OrderTracking> {
       widget.order['productName']?.toString() ??
       'Product';
 
-  String get orderId => widget.order['orderId']?.toString() ?? '—';
+  String get orderId =>
+      widget.order['displayOrderId']?.toString() ??
+      widget.order['orderId']?.toString() ??
+      '—';
 
   String get orderDate =>
       widget.order['date']?.toString() ??
@@ -50,8 +53,28 @@ class _OrderTrackingState extends State<OrderTracking> {
         .join(' ');
   }
 
-  IconData get productIcon =>
-      widget.order['icon'] as IconData? ?? Icons.inventory_2_outlined;
+  IconData get productIcon {
+    // API/JSON values cannot be assumed to be Flutter IconData instances.
+    final dynamic value = widget.order['icon'];
+    if (value is IconData) return value;
+
+    switch (value?.toString().trim().toLowerCase()) {
+      case 'chair':
+      case 'chair_outlined':
+        return Icons.chair_outlined;
+      case 'book':
+      case 'menu_book':
+        return Icons.menu_book_outlined;
+      case 'clothing':
+      case 'checkroom':
+        return Icons.checkroom_outlined;
+      case 'electronics':
+      case 'devices':
+        return Icons.devices_outlined;
+      default:
+        return Icons.inventory_2_outlined;
+    }
+  }
 
   Map<String, dynamic> get _address {
     final raw = widget.order['address'] ?? widget.order['shippingAddress'];
