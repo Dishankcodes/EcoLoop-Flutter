@@ -2,6 +2,8 @@ import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
+import '../reviews/write_review.dart';
+import '../reviews/write_seller_review.dart';
 import 'order_tracking.dart';
 
 /// Screen displaying comprehensive details and status tracking for a purchased order.
@@ -18,6 +20,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   late String _status;
   bool _productReviewSubmitted = false;
   bool _sellerReviewSubmitted = false;
+  bool _checkingReviewStatus = true;
   bool _cancellingOrder = false;
   bool _refundExpected = false;
 
@@ -28,6 +31,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     _refundExpected = _isPaidPaymentStatus(
       widget.order['paymentStatus'] ?? widget.order['payment'],
     );
+    _loadExistingReviewStatus();
   }
 
   String get productName =>
@@ -198,6 +202,86 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   int _safeId(dynamic value) =>
       value is num ? value.toInt() : int.tryParse('$value') ?? 0;
 
+  int _reviewId(dynamic value) =>
+      value is num ? value.toInt() : int.tryParse('${value ?? ''}') ?? 0;
+
+  String _reviewText(dynamic value) =>
+      (value ?? '').toString().trim().toLowerCase().replaceAll('_', ' ');
+
+  Future<bool> _loadExistingReviewStatus({bool showError = false}) async {
+    if (mounted) setState(() => _checkingReviewStatus = true);
+    try {
+      final dynamic response = await EcoLoopApi.instance.get('/my/reviews');
+      dynamic rows = response;
+      if (response is Map) {
+        rows =
+            response['reviews'] ??
+            response['data'] ??
+            response['items'] ??
+            response['results'] ??
+            response['result'] ??
+            const <dynamic>[];
+      }
+      final reviews = rows is List ? rows : const <dynamic>[];
+      final productId = _safeId(widget.order['productId']);
+      final sellerId = _safeId(widget.order['sellerId']);
+      final sellerType = _reviewText(widget.order['sellerType'] ?? 'user');
+      var productReviewed = false;
+      var sellerReviewed = false;
+
+      for (final item in reviews) {
+        if (item is! Map) continue;
+        final review = Map<String, dynamic>.from(item);
+        final status = _reviewText(review['status']);
+        if (status.isNotEmpty && status != 'active') continue;
+        final type = _reviewText(review['reviewType'] ?? review['type']);
+        final reviewedProductId = _reviewId(review['productId']);
+        final reviewedArtistId = _reviewId(review['artistId']);
+        final reviewedSellerId = _reviewId(review['sellerId']);
+        final reviewedSellerType = _reviewText(review['sellerType']);
+
+        if (productId > 0 &&
+            reviewedProductId == productId &&
+            (type == 'product' || type.isEmpty)) {
+          productReviewed = true;
+        }
+
+        if (sellerId <= 0 || reviewedProductId > 0) continue;
+        if (sellerType == 'artist' || sellerType == 'remaker') {
+          if (reviewedArtistId == sellerId ||
+              (reviewedSellerId == sellerId &&
+                  reviewedSellerType == 'artist') ||
+              (reviewedSellerId == sellerId &&
+                  type == 'seller' &&
+                  reviewedSellerType.isEmpty)) {
+            sellerReviewed = true;
+          }
+        } else if (reviewedSellerId == sellerId &&
+            (reviewedSellerType.isEmpty || reviewedSellerType == 'user') &&
+            (type == 'seller' || type.isEmpty)) {
+          sellerReviewed = true;
+        }
+      }
+
+      if (!mounted) return true;
+      setState(() {
+        _productReviewSubmitted = productReviewed;
+        _sellerReviewSubmitted = sellerReviewed;
+        _checkingReviewStatus = false;
+      });
+      return true;
+    } catch (_) {
+      if (!mounted) return false;
+      setState(() => _checkingReviewStatus = false);
+      if (showError) {
+        _showMessage(
+          'Could not verify your review status. Please check your connection and try again.',
+        );
+      }
+      return false;
+    }
+  }
+
   Widget _buildReviewActions() {
     final productId = _safeId(widget.order['productId']);
     final sellerId = _safeId(widget.order['sellerId']);
@@ -224,7 +308,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed:
-                  productId > 0 &&
+                  !_checkingReviewStatus &&
+                      productId > 0 &&
                       orderNumericId > 0 &&
                       !_productReviewSubmitted
                   ? () => _writeReview(
@@ -238,7 +323,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   : null,
               icon: const Icon(Icons.inventory_2_outlined),
               label: Text(
-                _productReviewSubmitted
+                _checkingReviewStatus
+                    ? 'Checking review status…'
+                    : _productReviewSubmitted
                     ? 'Product Reviewed'
                     : 'Write Product Review',
               ),
@@ -254,7 +341,10 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed:
-                  sellerId > 0 && orderNumericId > 0 && !_sellerReviewSubmitted
+                  !_checkingReviewStatus &&
+                      sellerId > 0 &&
+                      orderNumericId > 0 &&
+                      !_sellerReviewSubmitted
                   ? () => _writeReview(
                       title: sellerType == 'artist' || sellerType == 'remaker'
                           ? 'Review ReMaker'
@@ -275,9 +365,15 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   : null,
               icon: const Icon(Icons.storefront_outlined),
               label: Text(
-                _sellerReviewSubmitted
-                    ? 'Seller Reviewed'
-                    : 'Write Seller Review',
+                _checkingReviewStatus
+                    ? 'Checking review status…'
+                    : _sellerReviewSubmitted
+                    ? (sellerType == 'artist' || sellerType == 'remaker'
+                          ? 'Artist Reviewed'
+                          : 'Seller Reviewed')
+                    : (sellerType == 'artist' || sellerType == 'remaker'
+                          ? 'Write Artist Review'
+                          : 'Write Seller Review'),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -296,92 +392,86 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     required String endpoint,
     required Map<String, dynamic> payloadIds,
   }) async {
-    final commentController = TextEditingController();
-    int rating = 5;
-    final submitted = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(title),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Your rating'),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 4,
-                  children: List.generate(5, (index) {
-                    final star = index + 1;
-                    return IconButton(
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => setDialogState(() => rating = star),
-                      icon: Icon(
-                        star <= rating
-                            ? Icons.star_rounded
-                            : Icons.star_border_rounded,
-                        color: Colors.orange,
-                      ),
-                    );
-                  }),
-                ),
-                TextField(
-                  controller: commentController,
-                  minLines: 3,
-                  maxLines: 5,
-                  maxLength: 500,
-                  decoration: const InputDecoration(
-                    hintText: 'Share your experience (at least 5 characters)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (commentController.text.trim().length < 5) return;
-                Navigator.pop(dialogContext, true);
-              },
-              child: const Text('Submit'),
-            ),
-          ],
+    final verified = await _loadExistingReviewStatus(showError: true);
+    if (!verified || !mounted) return;
+
+    if (endpoint == '/reviews/product' && _productReviewSubmitted) {
+      _showMessage('You have already reviewed this product.');
+      return;
+    }
+    if ((endpoint == '/reviews/artist' || endpoint == '/reviews/seller') &&
+        _sellerReviewSubmitted) {
+      _showMessage('You have already reviewed this seller/artist.');
+      return;
+    }
+
+    final productId = _safeId(widget.order['productId']);
+    final orderNumericId = _safeId(widget.order['orderId']);
+    if (orderNumericId <= 0) {
+      _showMessage('Order information is missing. Please reopen this order.');
+      return;
+    }
+
+    if (endpoint == '/reviews/product') {
+      if (productId <= 0) {
+        _showMessage('Product information is missing for this order.');
+        return;
+      }
+      final product = <String, dynamic>{
+        ...widget.order,
+        'productId': productId,
+        'id': productId,
+        'title': productName,
+        'name': productName,
+        'imageUrls':
+            widget.order['imageUrls'] ?? widget.order['productImageUrls'],
+        'imageUrl': widget.order['productImageUrl'] ?? widget.order['imageUrl'],
+      };
+      final submitted = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              WriteReview(product: product, orderId: orderNumericId.toString()),
+        ),
+      );
+      if (submitted == true && mounted) {
+        setState(() => _productReviewSubmitted = true);
+        await _loadExistingReviewStatus();
+        _showMessage('Product review submitted successfully.');
+      }
+      return;
+    }
+
+    final sellerId = _safeId(widget.order['sellerId']);
+    if (sellerId <= 0) {
+      _showMessage('Seller information is missing for this order.');
+      return;
+    }
+
+    final sellerType = (widget.order['sellerType'] ?? 'user')
+        .toString()
+        .trim()
+        .toLowerCase();
+    final submitted = await Navigator.push<dynamic>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WriteSellerReview(
+          sellerName: sellerName,
+          sellerImage:
+              (widget.order['sellerImage'] ??
+                      widget.order['sellerPhotoUrl'] ??
+                      widget.order['profilePhotoUrl'])
+                  ?.toString(),
+          sellerId: sellerId.toString(),
+          sellerType: sellerType,
+          orderId: orderNumericId.toString(),
         ),
       ),
     );
-    if (submitted != true || !mounted) {
-      commentController.dispose();
-      return;
-    }
-    try {
-      final payload = <String, dynamic>{
-        ...payloadIds,
-        'rating': rating,
-        'comment': commentController.text.trim(),
-      };
-      await EcoLoopApi.instance.post(endpoint, payload);
-      if (mounted) {
-        setState(() {
-          if (endpoint == '/reviews/product') {
-            _productReviewSubmitted = true;
-          } else {
-            _sellerReviewSubmitted = true;
-          }
-        });
-        _showMessage('Review submitted successfully.');
-      }
-    } catch (error) {
-      if (mounted) {
-        _showMessage('Could not submit review: $error');
-      }
-    } finally {
-      commentController.dispose();
+    if (submitted != null && mounted) {
+      setState(() => _sellerReviewSubmitted = true);
+      await _loadExistingReviewStatus();
+      _showMessage('Seller/artist review submitted successfully.');
     }
   }
 

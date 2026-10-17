@@ -1,7 +1,11 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 
-import '../../../services/ecoloop_api.dart';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../../../app_theme/user/app_colors.dart';
+import '../../../services/ecoloop_api.dart';
 
 class EditListing extends StatefulWidget {
   final Map<String, dynamic> listing;
@@ -22,7 +26,14 @@ class _EditListingState extends State<EditListing> {
   bool _available = true;
   List<Map<String, dynamic>> _categories = [];
   String? _categoryId;
+  String? _originalCategoryId;
+  String _originalCategoryName = 'Current category';
   String _condition = 'good';
+  final ImagePicker _imagePicker = ImagePicker();
+  final List<String> _existingImageUrls = [];
+  final List<XFile> _newImages = [];
+  int _originalTotalQuantity = 0;
+  int _originalAvailableQuantity = 0;
 
   final List<Map<String, String>> _conditions = const [
     {'label': 'New', 'value': 'new'},
@@ -49,13 +60,25 @@ class _EditListingState extends State<EditListing> {
           .replaceAll('₹', '')
           .replaceAll(',', ''),
     );
-    _quantityController = TextEditingController(
-      text:
-          '${widget.listing['quantity'] ?? widget.listing['availableQuantity'] ?? 1}',
+    _originalTotalQuantity = _intValue(widget.listing['quantity']);
+    _originalAvailableQuantity = _intValue(
+      widget.listing['availableQuantity'],
+      fallback: _originalTotalQuantity,
     );
+    if (_originalTotalQuantity < _originalAvailableQuantity) {
+      _originalTotalQuantity = _originalAvailableQuantity;
+    }
+    // This field edits remaining stock, not lifetime/listed quantity.
+    _quantityController = TextEditingController(
+      text: '$_originalAvailableQuantity',
+    );
+    _existingImageUrls.addAll(_readImageUrls(widget.listing['imageUrls']));
     _descriptionController = TextEditingController(
       text: '${widget.listing['description'] ?? ''}',
     );
+    _originalCategoryId = _readOriginalCategoryId();
+    _originalCategoryName = _readOriginalCategoryName();
+    _categoryId = _originalCategoryId;
     _condition = _normalizeCondition(
       widget.listing['condition']?.toString() ?? 'good',
     );
@@ -63,6 +86,59 @@ class _EditListingState extends State<EditListing> {
       widget.listing['status']?.toString() ?? 'published',
     );
     _loadCategories();
+  }
+
+  int _intValue(dynamic value, {int fallback = 0}) {
+    if (value == null || '$value'.trim().isEmpty) return fallback;
+    return int.tryParse('$value') ?? fallback;
+  }
+
+  List<String> _readImageUrls(dynamic value) {
+    dynamic parsed = value;
+    if (parsed is String) {
+      try {
+        parsed = jsonDecode(parsed);
+      } catch (_) {
+        return parsed.trim().isEmpty ? [] : [parsed.trim()];
+      }
+    }
+    if (parsed is List) {
+      return parsed
+          .map((item) => item.toString().trim())
+          .where((url) => url.isNotEmpty)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<void> _pickImages() async {
+    try {
+      final remaining = 5 - _existingImageUrls.length - _newImages.length;
+      if (remaining <= 0) {
+        _message('You can keep up to 5 product images.');
+        return;
+      }
+      final picked = await _imagePicker.pickMultiImage(imageQuality: 85);
+      if (!mounted || picked.isEmpty) return;
+      setState(() {
+        _newImages.addAll(picked.take(remaining));
+      });
+      if (picked.length > remaining) {
+        _message('Only $remaining more image(s) were added (maximum 5).');
+      }
+    } catch (e) {
+      _message(
+        'Could not select images: ${e.toString().replaceFirst('Exception: ', '')}',
+      );
+    }
+  }
+
+  void _removeExistingImage(int index) {
+    setState(() => _existingImageUrls.removeAt(index));
+  }
+
+  void _removeNewImage(int index) {
+    setState(() => _newImages.removeAt(index));
   }
 
   String _normalizeCondition(String value) {
@@ -75,6 +151,21 @@ class _EditListingState extends State<EditListing> {
   bool _isUnavailable(String status) =>
       ['sold', 'archived', 'out_of_stock'].contains(status.toLowerCase());
 
+  String? _readOriginalCategoryId() {
+    final value = widget.listing['categoryId'] ?? widget.listing['category_id'];
+    if (value == null || '$value'.trim().isEmpty) return null;
+    return '$value'.trim();
+  }
+
+  String _readOriginalCategoryName() {
+    final value =
+        widget.listing['categoryName'] ??
+        widget.listing['category_name'] ??
+        widget.listing['category'];
+    final name = value?.toString().trim() ?? '';
+    return name.isEmpty ? 'Current category' : name;
+  }
+
   Future<void> _loadCategories() async {
     try {
       final response = await EcoLoopApi.instance.get('/categories');
@@ -85,20 +176,56 @@ class _EditListingState extends State<EditListing> {
                 : []);
       final list = <Map<String, dynamic>>[];
       for (final row in rows) {
-        if (row is Map) list.add(Map<String, dynamic>.from(row));
+        if (row is Map) {
+          final category = Map<String, dynamic>.from(row);
+          // Some API responses use `id` instead of `categoryId`.
+          category['categoryId'] ??= category['id'];
+          if (category['categoryId'] != null) list.add(category);
+        }
       }
       if (!mounted) return;
-      final currentId = '${widget.listing['categoryId'] ?? ''}';
+      final currentId = _originalCategoryId;
       setState(() {
-        _categories = list;
-        if (list.any((c) => '${c['categoryId']}' == currentId)) {
-          _categoryId = currentId;
-        } else if (list.isNotEmpty) {
-          _categoryId = '${list.first['categoryId']}';
+        // Never silently replace the listing's category with the first active
+        // category. If the original category is missing from the endpoint,
+        // keep it as a clearly labelled option until the seller chooses another.
+        if (currentId != null &&
+            currentId.isNotEmpty &&
+            !list.any((c) => '${c['categoryId']}' == currentId)) {
+          list.insert(0, {
+            'categoryId': currentId,
+            'name':
+                '$_originalCategoryName (current; not in active categories)',
+            '_preservedInactiveCategory': true,
+          });
         }
+        _categories = list;
+        _categoryId =
+            currentId != null &&
+                list.any((c) => '${c['categoryId']}' == currentId)
+            ? currentId
+            : null;
       });
     } catch (_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      setState(() {
+        // If categories cannot be loaded, keep the existing category selectable
+        // rather than leaving a dropdown value that has no matching item.
+        if (_originalCategoryId != null && _originalCategoryId!.isNotEmpty) {
+          _categories = [
+            {
+              'categoryId': _originalCategoryId,
+              'name':
+                  '$_originalCategoryName (current; categories unavailable)',
+              '_preservedInactiveCategory': true,
+            },
+          ];
+          _categoryId = _originalCategoryId;
+        } else {
+          _categories = [];
+          _categoryId = null;
+        }
+      });
     }
   }
 
@@ -119,21 +246,48 @@ class _EditListingState extends State<EditListing> {
       );
       return;
     }
-    if (_categoryId == null) {
-      _message('No active category is available.');
+    if (_categoryId == null || _categoryId!.trim().isEmpty) {
+      _message('Please select a category before saving this listing.');
       return;
     }
     setState(() => _saving = true);
     try {
+      final newAvailableQuantity = int.parse(_quantityController.text.trim());
+      final soldQuantity = (_originalTotalQuantity - _originalAvailableQuantity)
+          .clamp(0, 1 << 30)
+          .toInt();
+      final newTotalQuantity = soldQuantity + newAvailableQuantity;
+      final encodedImages = <Map<String, dynamic>>[];
+      for (final image in _newImages) {
+        final bytes = await image.readAsBytes();
+        final pathParts = image.name.split('.');
+        final extension = pathParts.length > 1
+            ? pathParts.last.toLowerCase()
+            : 'jpg';
+        final mimeType = extension == 'png'
+            ? 'image/png'
+            : (extension == 'webp' ? 'image/webp' : 'image/jpeg');
+        encodedImages.add({
+          'base64': base64Encode(bytes),
+          'fileName': image.name,
+          'mimeType': mimeType,
+        });
+      }
+
       await EcoLoopApi.instance.put('/products/$_id', {
         'title': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
         'categoryId': int.parse(_categoryId!),
         'condition': _condition,
         'price': double.parse(_priceController.text.trim()),
-        'quantity': int.parse(_quantityController.text.trim()),
-        'availableQuantity': int.parse(_quantityController.text.trim()),
-        'status': _available ? 'published' : 'out_of_stock',
+        // Keep sold quantity intact; editing price/details cannot restore sold stock.
+        'quantity': newTotalQuantity,
+        'availableQuantity': newAvailableQuantity,
+        'imageUrls': _existingImageUrls,
+        'imageBase64': encodedImages,
+        'status': _available && newAvailableQuantity > 0
+            ? 'published'
+            : 'out_of_stock',
       });
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -240,15 +394,34 @@ class _EditListingState extends State<EditListing> {
               hint: const Text('Select category'),
               items: _categories
                   .map(
-                    (c) => DropdownMenuItem(
+                    (c) => DropdownMenuItem<String>(
                       value: '${c['categoryId']}',
-                      child: Text('${c['name'] ?? 'Category'}'),
+                      child: Text(
+                        '${c['name'] ?? c['categoryName'] ?? 'Category'}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   )
                   .toList(),
               onChanged: (v) => setState(() => _categoryId = v),
               decoration: const InputDecoration(),
             ),
+            if (_originalCategoryId != null &&
+                !_categories.any(
+                  (c) =>
+                      '${c['categoryId']}' == _originalCategoryId &&
+                      c['_preservedInactiveCategory'] != true,
+                ))
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text(
+                  'The current category is not in the active category list. It is preserved unless you explicitly choose another category.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
             const SizedBox(height: 16),
             _label('Condition'),
             DropdownButtonFormField<String>(
@@ -294,13 +467,13 @@ class _EditListingState extends State<EditListing> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _label('Quantity'),
+                      _label('Available Stock'),
                       TextFormField(
                         controller: _quantityController,
                         keyboardType: TextInputType.number,
                         validator: (v) {
                           final n = int.tryParse((v ?? '').trim());
-                          return n == null || n < 1 ? 'Min. 1' : null;
+                          return n == null || n < 0 ? 'Enter 0 or more' : null;
                         },
                         decoration: const InputDecoration(hintText: '1'),
                       ),
@@ -320,6 +493,84 @@ class _EditListingState extends State<EditListing> {
               decoration: const InputDecoration(
                 hintText: 'Describe the item...',
               ),
+            ),
+            const SizedBox(height: 18),
+            _label('Product Images'),
+            const Text(
+              'Remove images with ×, or add replacement images. Up to 5 images total.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                ..._existingImageUrls.asMap().entries.map((entry) {
+                  return _imageTile(
+                    image: Image.network(
+                      entry.value,
+                      width: 94,
+                      height: 94,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox(
+                        width: 94,
+                        height: 94,
+                        child: Icon(Icons.broken_image_outlined),
+                      ),
+                    ),
+                    onRemove: () => _removeExistingImage(entry.key),
+                  );
+                }),
+                ..._newImages.asMap().entries.map((entry) {
+                  return _imageTile(
+                    image: FutureBuilder<Uint8List>(
+                      future: entry.value.readAsBytes(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const SizedBox(
+                            width: 94,
+                            height: 94,
+                            child: Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        }
+                        return Image.memory(
+                          snapshot.data!,
+                          width: 94,
+                          height: 94,
+                          fit: BoxFit.cover,
+                        );
+                      },
+                    ),
+                    onRemove: () => _removeNewImage(entry.key),
+                  );
+                }),
+                if (_existingImageUrls.length + _newImages.length < 5)
+                  InkWell(
+                    onTap: _saving ? null : _pickImages,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 94,
+                      height: 94,
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: AppColors.primary,
+                          width: 1.2,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_photo_alternate_outlined, size: 28),
+                          SizedBox(height: 5),
+                          Text('Add image', style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 18),
             SwitchListTile(
@@ -347,6 +598,34 @@ class _EditListingState extends State<EditListing> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _imageTile({required Widget image, required VoidCallback onRemove}) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(width: 94, height: 94, child: image),
+        ),
+        Positioned(
+          top: -7,
+          right: -7,
+          child: Material(
+            color: AppColors.error,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onRemove,
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(Icons.close, color: Colors.white, size: 16),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
