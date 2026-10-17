@@ -37,13 +37,15 @@ class _FollowingListState extends State<FollowingList> {
   List<Map<String, dynamic>> _rowsFrom(dynamic value) {
     dynamic rows = value;
     if (rows is Map) {
-      rows = rows['following'] ??
+      rows =
+          rows['following'] ??
           rows['artists'] ??
           rows['results'] ??
           rows['data'] ??
           rows['items'];
       if (rows is Map) {
-        rows = rows['following'] ??
+        rows =
+            rows['following'] ??
             rows['artists'] ??
             rows['results'] ??
             rows['items'];
@@ -70,14 +72,19 @@ class _FollowingListState extends State<FollowingList> {
   String _artistId(Map<String, dynamic> row) =>
       _firstValue(row, ['artistId', 'artist_id', 'id']);
 
-  String _artistName(Map<String, dynamic> row) =>
-      _firstValue(row, ['name', 'userName', 'username', 'artistName'])
-          .ifEmpty('ReMaker');
+  String _artistName(Map<String, dynamic> row) => _firstValue(row, [
+    'name',
+    'userName',
+    'username',
+    'artistName',
+  ]).ifEmpty('ReMaker');
 
-  String _avatar(Map<String, dynamic> row) => _firstValue(
-        row,
-        ['profilePhotoUrl', 'image', 'profileImageUrl', 'avatarUrl'],
-      );
+  String _avatar(Map<String, dynamic> row) => _firstValue(row, [
+    'profilePhotoUrl',
+    'image',
+    'profileImageUrl',
+    'avatarUrl',
+  ]);
 
   String _location(Map<String, dynamic> row) {
     final direct = _firstValue(row, ['location', 'address']);
@@ -91,10 +98,11 @@ class _FollowingListState extends State<FollowingList> {
   String _normaliseImageUrl(String raw) {
     final url = raw.trim();
     if (url.isEmpty) return '';
-    final match = RegExp(
-      r'(?:drive\.google\.com|docs\.google\.com)/(?:file/d/|open\?id=|uc\?[^#]*?id=)([A-Za-z0-9_-]+)',
-      caseSensitive: false,
-    ).firstMatch(url) ??
+    final match =
+        RegExp(
+          r'(?:drive\.google\.com|docs\.google\.com)/(?:file/d/|open\?id=|uc\?[^#]*?id=)([A-Za-z0-9_-]+)',
+          caseSensitive: false,
+        ).firstMatch(url) ??
         RegExp(r'[?&]id=([A-Za-z0-9_-]+)').firstMatch(url);
     if (match != null &&
         (url.contains('drive.google.com') || url.contains('docs.google.com'))) {
@@ -152,7 +160,10 @@ class _FollowingListState extends State<FollowingList> {
         backgroundColor: AppColors.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text('Unfollow ${_artistName(artist)}?', style: AppTextStyles.title),
+        title: Text(
+          'Unfollow ${_artistName(artist)}?',
+          style: AppTextStyles.title,
+        ),
         content: Text(
           'Their profile will be removed from your following list. You can follow them again anytime.',
           style: AppTextStyles.body,
@@ -246,7 +257,10 @@ class _FollowingListState extends State<FollowingList> {
                   decoration: InputDecoration(
                     hintText: 'Search artists or locations...',
                     hintStyle: AppTextStyles.caption,
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary),
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: AppColors.primary,
+                    ),
                     suffixIcon: _searchController.text.isEmpty
                         ? null
                         : IconButton(
@@ -274,14 +288,22 @@ class _FollowingListState extends State<FollowingList> {
                       color: AppColors.light,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.people_alt_outlined, color: AppColors.primary),
+                    child: const Icon(
+                      Icons.people_alt_outlined,
+                      color: AppColors.primary,
+                    ),
                   ),
                   const SizedBox(width: 11),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Artists & ReMakers', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700)),
+                        Text(
+                          'Artists & ReMakers',
+                          style: AppTextStyles.body.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         Text(
                           '${_following.length} ${_following.length == 1 ? 'artist' : 'artists'} followed',
                           style: AppTextStyles.caption,
@@ -296,43 +318,47 @@ class _FollowingListState extends State<FollowingList> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null && _following.isEmpty
-                      ? _stateMessage(
-                          icon: Icons.cloud_off_outlined,
-                          title: 'Could not load your following list',
-                          message: _error!,
-                          actionLabel: 'Try again',
-                          onAction: () => _loadFollowing(),
-                        )
-                      : _following.isEmpty
-                          ? _stateMessage(
-                              icon: Icons.person_add_alt_1_outlined,
-                              title: 'No artists followed yet',
-                              message: 'When you follow an artist or ReMaker, they will appear here.',
-                              actionLabel: 'Explore marketplace',
-                              onAction: () => Navigator.pop(context),
-                            )
-                          : visible.isEmpty
-                              ? _stateMessage(
-                                  icon: Icons.search_off_rounded,
-                                  title: 'No matching artists',
-                                  message: 'Try another name, skill, or location.',
-                                  actionLabel: 'Clear search',
-                                  onAction: () {
-                                    _searchController.clear();
-                                    setState(() {});
-                                  },
-                                )
-                              : RefreshIndicator(
-                                  onRefresh: () => _loadFollowing(showLoader: false),
-                                  color: AppColors.primary,
-                                  child: ListView.separated(
-                                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-                                    itemCount: visible.length,
-                                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                                    itemBuilder: (context, index) => _followingCard(visible[index]),
-                                  ),
-                                ),
+                  ? _stateMessage(
+                      icon: Icons.cloud_off_outlined,
+                      title: 'Could not load your following list',
+                      message: _error!,
+                      actionLabel: 'Try again',
+                      onAction: () => _loadFollowing(),
+                    )
+                  : _following.isEmpty
+                  ? _stateMessage(
+                      icon: Icons.person_add_alt_1_outlined,
+                      title: 'No artists followed yet',
+                      message:
+                          'When you follow an artist or ReMaker, they will appear here.',
+                      actionLabel: 'Explore marketplace',
+                      onAction: () => Navigator.pop(context),
+                    )
+                  : visible.isEmpty
+                  ? _stateMessage(
+                      icon: Icons.search_off_rounded,
+                      title: 'No matching artists',
+                      message: 'Try another name, skill, or location.',
+                      actionLabel: 'Clear search',
+                      onAction: () {
+                        _searchController.clear();
+                        setState(() {});
+                      },
+                    )
+                  : RefreshIndicator(
+                      onRefresh: () => _loadFollowing(showLoader: false),
+                      color: AppColors.primary,
+                      child: ListView.separated(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+                        itemCount: visible.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) =>
+                            _followingCard(visible[index]),
+                      ),
+                    ),
             ),
           ],
         ),
@@ -376,7 +402,11 @@ class _FollowingListState extends State<FollowingList> {
                   height: 66,
                   color: AppColors.light,
                   child: imageUrl.isEmpty
-                      ? const Icon(Icons.person_rounded, size: 34, color: AppColors.primary)
+                      ? const Icon(
+                          Icons.person_rounded,
+                          size: 34,
+                          color: AppColors.primary,
+                        )
                       : Image.network(
                           imageUrl,
                           key: ValueKey(imageUrl),
@@ -394,28 +424,58 @@ class _FollowingListState extends State<FollowingList> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                     if (location.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textSecondary),
+                          const Icon(
+                            Icons.location_on_outlined,
+                            size: 14,
+                            color: AppColors.textSecondary,
+                          ),
                           const SizedBox(width: 3),
-                          Expanded(child: Text(location, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.caption)),
+                          Expanded(
+                            child: Text(
+                              location,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.caption,
+                            ),
+                          ),
                         ],
                       ),
                     ],
                     if (skills.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text(skills, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.caption),
+                      Text(
+                        skills,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption,
+                      ),
                     ],
                     const SizedBox(height: 5),
                     Row(
                       children: [
-                        const Icon(Icons.people_outline_rounded, size: 14, color: AppColors.primary),
+                        const Icon(
+                          Icons.people_outline_rounded,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 4),
-                        Text('${_firstValue(artist, ['followerCount', 'followers']).ifEmpty('0')} followers', style: AppTextStyles.caption),
+                        Text(
+                          '${_firstValue(artist, ['followerCount', 'followers']).ifEmpty('0')} followers',
+                          style: AppTextStyles.caption,
+                        ),
                       ],
                     ),
                   ],
@@ -431,17 +491,35 @@ class _FollowingListState extends State<FollowingList> {
                       onPressed: busy ? null : () => _unfollow(artist),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
-                        side: BorderSide(color: AppColors.primary.withOpacity(0.6)),
+                        side: BorderSide(
+                          color: AppColors.primary.withOpacity(0.6),
+                        ),
                         padding: const EdgeInsets.symmetric(horizontal: 11),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       child: busy
-                          ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('Unfollow', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                          ? const SizedBox(
+                              width: 15,
+                              height: 15,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Unfollow',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 20),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
                 ],
               ),
             ],
@@ -467,20 +545,35 @@ class _FollowingListState extends State<FollowingList> {
             Container(
               width: 76,
               height: 76,
-              decoration: BoxDecoration(color: AppColors.light, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: AppColors.light,
+                shape: BoxShape.circle,
+              ),
               child: Icon(icon, size: 35, color: AppColors.primary),
             ),
             const SizedBox(height: 16),
-            Text(title, textAlign: TextAlign.center, style: AppTextStyles.title.copyWith(fontSize: 18)),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.title.copyWith(fontSize: 18),
+            ),
             const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center, style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 18),
             OutlinedButton(
               onPressed: onAction,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
+                ),
               ),
               child: Text(actionLabel),
             ),

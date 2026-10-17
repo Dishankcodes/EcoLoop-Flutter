@@ -18,11 +18,16 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   late String _status;
   bool _productReviewSubmitted = false;
   bool _sellerReviewSubmitted = false;
+  bool _cancellingOrder = false;
+  bool _refundExpected = false;
 
   @override
   void initState() {
     super.initState();
     _status = widget.order['status']?.toString() ?? 'Status unavailable';
+    _refundExpected = _isPaidPaymentStatus(
+      widget.order['paymentStatus'] ?? widget.order['payment'],
+    );
   }
 
   String get productName =>
@@ -45,7 +50,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   }
 
   String get orderId {
-    final value = widget.order['displayOrderId'] ??
+    final value =
+        widget.order['displayOrderId'] ??
         widget.order['orderId'] ??
         widget.order['id'];
     return value == null ? 'Order ID unavailable' : value.toString();
@@ -140,9 +146,32 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     }
   }
 
-  bool get isCancelled => _status.trim().toLowerCase() == 'cancelled';
+  bool get isCancelled => _normalizedOrderStatus == 'cancelled';
 
-  bool get isDelivered => _status.toLowerCase() == 'delivered';
+  bool get isDelivered => _normalizedOrderStatus == 'delivered';
+
+  /// Cancellation is allowed only through Packed. The backend validates this too.
+  bool get _canCancelOrder =>
+      const {'pending', 'confirmed', 'packed'}.contains(_normalizedOrderStatus);
+
+  bool _isPaidPaymentStatus(dynamic raw) {
+    final value = (raw ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ');
+    return const {
+      'paid',
+      'completed',
+      'success',
+      'successful',
+      'captured',
+      'cod paid',
+      'refund required',
+      'refunded',
+    }.contains(value);
+  }
 
   String get _normalizedOrderStatus =>
       _status.trim().toLowerCase().replaceAll('_', ' ');
@@ -479,7 +508,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  /// Banner displayed when an order has been cancelled.
+  /// Banner shown after cancellation, including refund guidance when applicable.
   Widget _buildCancelledBanner() {
     return Container(
       width: double.infinity,
@@ -490,35 +519,73 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         borderRadius: BorderRadius.circular(17),
         border: Border.all(color: AppColors.error.withOpacity(0.18)),
       ),
-      child: const Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.cancel_outlined, color: AppColors.error, size: 23),
-          SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Order Cancelled',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.error,
-                  ),
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.cancel_outlined, color: AppColors.error, size: 23),
+              SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Order Cancelled by You',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.error,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      'You cancelled this order. It is no longer active.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.4,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(height: 5),
-                Text(
-                  'This order is no longer active.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    height: 1.4,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+          if (_refundExpected) ...[
+            const SizedBox(height: 13),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Your payment refund should arrive within 5–7 days. If you have not received it after 7 days, contact EcoLoop about the payment issue.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _contactEcoLoop,
+                icon: const Icon(Icons.support_agent_rounded),
+                label: const Text('Contact EcoLoop'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  minimumSize: const Size.fromHeight(44),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1168,7 +1235,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           const SizedBox(height: 13),
           InkWell(
             onTap: () {
-              _showMessage('Order support will be connected later.');
+              _contactEcoLoop();
             },
             borderRadius: BorderRadius.circular(15),
             child: Container(
@@ -1294,8 +1361,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  /// Persistent bottom action bar providing order cancellation or live tracking.
+  /// Bottom action bar: cancellation is available only until Packed.
   Widget _buildBottomBar() {
+    final bool showCancel = _canCancelOrder && !isCancelled;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
       decoration: BoxDecoration(
@@ -1312,41 +1380,49 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         top: false,
         child: Row(
           children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: isPaymentPending
-                    ? _showPaymentNotReady
-                    : (isDelivered ? _buyAgain : _cancelOrder),
-                icon: Icon(
-                  isPaymentPending
-                      ? Icons.payment_rounded
-                      : (isDelivered
-                            ? Icons.refresh_rounded
-                            : Icons.cancel_outlined),
-                  size: 17,
-                ),
-                label: Text(
-                  isPaymentPending
-                      ? 'Complete Payment'
-                      : (isDelivered ? 'Buy Again' : 'Cancel Order'),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: isPaymentPending
-                      ? AppColors.primary
-                      : (isDelivered ? AppColors.primary : AppColors.error),
-                  side: BorderSide(
-                    color: isPaymentPending
-                        ? AppColors.primary
-                        : (isDelivered ? AppColors.primary : AppColors.error),
+            if (showCancel) ...[
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _cancellingOrder ? null : _cancelOrder,
+                  icon: _cancellingOrder
+                      ? const SizedBox(
+                          width: 17,
+                          height: 17,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cancel_outlined, size: 17),
+                  label: Text(
+                    _cancellingOrder ? 'Cancelling…' : 'Cancel Order',
                   ),
-                  minimumSize: const Size(0, 48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(13),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error),
+                    minimumSize: const Size(0, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
+              const SizedBox(width: 10),
+            ] else if (isDelivered) ...[
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _buyAgain,
+                  icon: const Icon(Icons.refresh_rounded, size: 17),
+                  label: const Text('Buy Again'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    minimumSize: const Size(0, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+            ],
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: _trackOrder,
@@ -1377,48 +1453,113 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  /// Prompts a confirmation dialog to cancel the active order.
-  void _cancelOrder() {
-    showDialog(
+  /// Confirms with the buyer, then cancels the order through the authenticated API.
+  Future<void> _cancelOrder() async {
+    if (!_canCancelOrder || isCancelled || _cancellingOrder) return;
+
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppColors.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Cancel Order?',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          _isPaidPaymentStatus(
+                widget.order['paymentStatus'] ?? widget.order['payment'],
+              )
+              ? 'Are you sure you want to cancel this order? Your payment refund should arrive within 5–7 days. If it has not arrived after 7 days, contact EcoLoop.'
+              : 'Are you sure you want to cancel this order? This action cannot be undone.',
+          style: const TextStyle(color: AppColors.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep Order'),
           ),
-          title: const Text(
-            'Cancel Order?',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-          content: const Text(
-            'Are you sure you want to cancel this order?',
-            style: TextStyle(color: AppColors.textSecondary, height: 1.5),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Keep Order'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                setState(() {
-                  _status = 'Cancelled';
-                });
-                _showMessage('Order cancelled.');
-              },
-              child: const Text(
-                'Cancel Order',
-                style: TextStyle(
-                  color: AppColors.error,
-                  fontWeight: FontWeight.w600,
-                ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Yes, Cancel Order',
+              style: TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final id = _safeId(widget.order['orderId'] ?? widget.order['id']);
+    if (id <= 0) {
+      _showMessage(
+        'Could not cancel this order because its order ID is missing.',
+      );
+      return;
+    }
+
+    setState(() => _cancellingOrder = true);
+    try {
+      final dynamic response = await EcoLoopApi.instance.post(
+        '/orders/$id/cancel',
+        <String, dynamic>{},
+      );
+      if (!mounted) return;
+
+      final Map<String, dynamic> result = response is Map
+          ? Map<String, dynamic>.from(response)
+          : <String, dynamic>{};
+
+      final returnedStatus = (result['status'] ?? 'cancelled').toString();
+      final returnedPaymentStatus = (result['paymentStatus'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase();
+
+      setState(() {
+        _status = returnedStatus;
+        _refundExpected =
+            _refundExpected ||
+            _isPaidPaymentStatus(
+              widget.order['paymentStatus'] ?? widget.order['payment'],
+            ) ||
+            returnedPaymentStatus == 'refund_required';
+        _cancellingOrder = false;
+      });
+
+      _showMessage('Order cancelled by you.');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _cancellingOrder = false);
+      _showMessage(
+        'Could not cancel this order. It may have already moved beyond Packed. Please refresh your orders and try again.',
+      );
+    }
+  }
+
+  /// Shows payment-support guidance without inventing an email or phone number.
+  void _contactEcoLoop() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Contact EcoLoop'),
+        content: Text(
+          'If your refund has not arrived after 7 days, contact EcoLoop support and provide order ID $orderId. Please use the official EcoLoop support contact provided by the app or its administrator.',
+          style: const TextStyle(height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1461,7 +1602,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                 title: 'Get Help',
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  _showMessage('Order support will be connected later.');
+                  _contactEcoLoop();
                 },
               ),
               const SizedBox(height: 12),

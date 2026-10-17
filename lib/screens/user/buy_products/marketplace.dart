@@ -64,6 +64,13 @@ class _MarketplaceState extends State<Marketplace> {
   String? _productsError;
   List<Map<String, dynamic>> products = [];
 
+  // IDs are loaded from the authenticated account's own listings and wishlist.
+  String? _currentAccountId;
+  String _currentAccountType = 'user';
+  final Set<String> _ownProductIds = <String>{};
+  final Set<String> _wishlistProductIds = <String>{};
+  final Set<String> _wishlistBusyIds = <String>{};
+
   // INIT
 
   @override
@@ -92,7 +99,9 @@ class _MarketplaceState extends State<Marketplace> {
   List<dynamic> _extractRows(dynamic response, List<String> keys) {
     if (response is List) return response;
     final root = _asMap(response);
-    final data = _asMap(root['data']);
+    final rawData = root['data'];
+    if (rawData is List) return rawData;
+    final data = _asMap(rawData);
     for (final key in keys) {
       final value = root[key] ?? data[key];
       if (value is List) return value;
@@ -103,7 +112,198 @@ class _MarketplaceState extends State<Marketplace> {
     return <dynamic>[];
   }
 
+  String _idOf(Map<String, dynamic> row) {
+    final nested = _asMap(row['product']);
+    final value =
+        row['productId'] ??
+        row['product_id'] ??
+        row['id'] ??
+        nested['productId'] ??
+        nested['product_id'] ??
+        nested['id'];
+    return value?.toString().trim() ?? '';
+  }
+
+  Future<void> _loadAccountAndWishlist() async {
+    // These are separate optional requests so a failure in either one does not
+    // prevent the public marketplace from loading.
+    try {
+      final response = _asMap(await _api.get('/auth/me'));
+      final data = _asMap(response['data']);
+      final account = _asMap(
+        response['account'] ??
+            response['user'] ??
+            response['artist'] ??
+            data['account'] ??
+            data['user'] ??
+            data['artist'] ??
+            data,
+      );
+      final id =
+          account['accountId'] ??
+          account['userId'] ??
+          account['artistId'] ??
+          account['id'];
+      final type =
+          (account['accountType'] ??
+                  account['ownerType'] ??
+                  account['role'] ??
+                  response['accountType'] ??
+                  data['accountType'] ??
+                  'user')
+              .toString()
+              .trim()
+              .toLowerCase();
+      if (id != null && id.toString().trim().isNotEmpty && mounted) {
+        setState(() {
+          _currentAccountId = id.toString().trim();
+          _currentAccountType =
+              <String>{
+                'artist',
+                'remaker',
+                're-maker',
+                're_maker',
+              }.contains(type)
+              ? 'artist'
+              : 'user';
+        });
+      }
+    } catch (_) {
+      // /my/products below remains the primary owner-filter source.
+    }
+
+    try {
+      final rows = _extractRows(await _api.get('/my/products'), [
+        'products',
+        'items',
+        'data',
+        'results',
+      ]);
+      final ids = rows
+          .map(_asMap)
+          .map(_idOf)
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      if (mounted) {
+        setState(() {
+          _ownProductIds
+            ..clear()
+            ..addAll(ids);
+        });
+      }
+    } catch (_) {
+      // Some deployments may not expose /my/products. We still filter by
+      // sellerId and account type below.
+    }
+
+    try {
+      final rows = _extractRows(await _api.get('/wishlist'), [
+        'wishlist',
+        'items',
+        'products',
+        'results',
+        'data',
+      ]);
+      final ids = rows
+          .map(_asMap)
+          .map(_idOf)
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      if (mounted) {
+        setState(() {
+          _wishlistProductIds
+            ..clear()
+            ..addAll(ids);
+        });
+      }
+    } catch (_) {
+      // Keep browsing available if wishlist data cannot be loaded.
+    }
+  }
+
+  bool _isOwnProduct(Map<String, dynamic> product) {
+    final id = _idOf(product);
+    if (id.isNotEmpty && _ownProductIds.contains(id)) return true;
+
+    final sellerId = (product['sellerId'] ?? product['seller_id'] ?? '')
+        .toString()
+        .trim();
+    if (sellerId.isEmpty || _currentAccountId == null) return false;
+    if (sellerId != _currentAccountId) return false;
+
+    final sellerType =
+        (product['sellerType'] ??
+                product['seller_type'] ??
+                product['sellerRole'] ??
+                product['seller_role'] ??
+                'user')
+            .toString()
+            .trim()
+            .toLowerCase();
+    final isArtist = <String>{
+      'artist',
+      'remaker',
+      're-maker',
+      're_maker',
+    }.contains(sellerType);
+    return isArtist == (_currentAccountType == 'artist');
+  }
+
+  Future<bool> _toggleWishlist(Map<String, dynamic> product) async {
+    final id = _idOf(product);
+    if (id.isEmpty || _wishlistBusyIds.contains(id)) return false;
+
+    final wasSaved = _wishlistProductIds.contains(id);
+    setState(() => _wishlistBusyIds.add(id));
+    try {
+      if (wasSaved) {
+        await _api.delete('/wishlist/$id');
+        if (mounted) setState(() => _wishlistProductIds.remove(id));
+      } else {
+        final numericId = int.tryParse(id);
+        if (numericId == null) {
+          throw Exception('This product has an invalid ID.');
+        }
+        await _api.post('/wishlist', <String, dynamic>{'productId': numericId});
+        if (mounted) setState(() => _wishlistProductIds.add(id));
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                wasSaved ? 'Removed from wishlist' : 'Added to wishlist',
+              ),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(milliseconds: 900),
+            ),
+          );
+      }
+      return true;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                'Wishlist update failed: ${error.toString().replaceFirst('Exception: ', '')}',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      }
+      return false;
+    } finally {
+      if (mounted) setState(() => _wishlistBusyIds.remove(id));
+    }
+  }
+
   Future<void> _loadProducts() async {
+    // Load the signed-in account's listings and wishlist first so own products
+    // are excluded before the marketplace grid is populated.
+    await _loadAccountAndWishlist();
     if (mounted) {
       setState(() {
         _loadingProducts = true;
@@ -201,6 +401,9 @@ class _MarketplaceState extends State<Marketplace> {
           'createdAt': row['createdAt'] ?? row['created_at'],
         });
       }
+      // Exclude this signed-in account's own listings from marketplace results.
+      mapped.removeWhere(_isOwnProduct);
+
       mapped.sort((a, b) {
         final aDate =
             DateTime.tryParse((a['createdAt'] ?? '').toString()) ??
@@ -683,10 +886,16 @@ class _MarketplaceState extends State<Marketplace> {
         childAspectRatio: 0.64,
       ),
       itemBuilder: (context, index) {
+        final product = items[index];
+        final productId = _idOf(product);
         return _ProductCard(
-          product: items[index],
+          key: ValueKey('marketplace-product-$productId'),
+          product: product,
+          isWishlisted: _wishlistProductIds.contains(productId),
+          wishlistBusy: _wishlistBusyIds.contains(productId),
+          onWishlistTap: () => _toggleWishlist(product),
           onTap: () {
-            _openProductDetails(items[index]);
+            _openProductDetails(product);
           },
           onSellerTap: (product) {
             _openSellerProfile(product);
@@ -1166,12 +1375,19 @@ class _MarketplaceState extends State<Marketplace> {
 
 class _ProductCard extends StatefulWidget {
   const _ProductCard({
+    super.key,
     required this.product,
+    required this.isWishlisted,
+    required this.wishlistBusy,
+    required this.onWishlistTap,
     required this.onTap,
     required this.onSellerTap,
   });
 
   final Map<String, dynamic> product;
+  final bool isWishlisted;
+  final bool wishlistBusy;
+  final Future<bool> Function() onWishlistTap;
   final VoidCallback onTap;
   final ValueChanged<Map<String, dynamic>> onSellerTap;
 
@@ -1180,7 +1396,36 @@ class _ProductCard extends StatefulWidget {
 }
 
 class _ProductCardState extends State<_ProductCard> {
-  bool isWishlisted = false;
+  late bool isWishlisted;
+  bool _wishlistTapBusy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    isWishlisted = widget.isWishlisted;
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProductCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isWishlisted != widget.isWishlisted) {
+      isWishlisted = widget.isWishlisted;
+    }
+  }
+
+  Future<void> _toggleWishlist() async {
+    if (_wishlistTapBusy || widget.wishlistBusy) return;
+    setState(() => _wishlistTapBusy = true);
+    final previous = isWishlisted;
+    setState(() => isWishlisted = !previous);
+    final success = await widget.onWishlistTap();
+    if (mounted) {
+      setState(() {
+        if (!success) isWishlisted = previous;
+        _wishlistTapBusy = false;
+      });
+    }
+  }
 
   String _sellerType(Map<String, dynamic> product) {
     final value =
@@ -1310,23 +1555,7 @@ class _ProductCardState extends State<_ProductCard> {
                     right: 9,
                     top: 9,
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          isWishlisted = !isWishlisted;
-                        });
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isWishlisted
-                                  ? 'Added to wishlist'
-                                  : 'Removed from wishlist',
-                            ),
-                            behavior: SnackBarBehavior.floating,
-                            duration: const Duration(milliseconds: 900),
-                          ),
-                        );
-                      },
+                      onTap: _toggleWishlist,
                       child: Container(
                         width: 34,
                         height: 34,
@@ -1334,15 +1563,24 @@ class _ProductCardState extends State<_ProductCard> {
                           color: Colors.white.withValues(alpha: 0.94),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          isWishlisted
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          size: 18,
-                          color: isWishlisted
-                              ? AppColors.error
-                              : AppColors.textPrimary,
-                        ),
+                        child: (widget.wishlistBusy || _wishlistTapBusy)
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.primary,
+                                ),
+                              )
+                            : Icon(
+                                isWishlisted
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                                size: 18,
+                                color: isWishlisted
+                                    ? AppColors.error
+                                    : AppColors.textPrimary,
+                              ),
                       ),
                     ),
                   ),

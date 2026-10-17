@@ -1785,46 +1785,113 @@ class _ProductDetailsState extends State<ProductDetails> {
     return <String, dynamic>{};
   }
 
+  String _normaliseWishlistId(dynamic value) {
+    if (value == null) return '';
+    final raw = value.toString().trim();
+    // Google Sheets IDs may arrive as numbers (e.g. 12) or numeric strings
+    // (e.g. "12.0"). Normalize both to the same key for reliable matching.
+    final numeric = num.tryParse(raw);
+    if (numeric != null && numeric == numeric.roundToDouble()) {
+      return numeric.toInt().toString();
+    }
+    return raw;
+  }
+
+  List<dynamic> _wishlistRowsFromResponse(dynamic response) {
+    if (response is List) return response;
+
+    final root = _asMap(response);
+    // Apps Script endpoints commonly return {data: [...]}.
+    final directCandidates = <dynamic>[
+      root['items'],
+      root['products'],
+      root['wishlist'],
+      root['wishlistItems'],
+      root['rows'],
+      root['data'],
+    ];
+    for (final candidate in directCandidates) {
+      if (candidate is List) return candidate;
+    }
+
+    // Other versions wrap the list inside data/result/payload objects.
+    for (final key in const ['data', 'result', 'payload']) {
+      final nested = _asMap(root[key]);
+      for (final childKey in const [
+        'items',
+        'products',
+        'wishlist',
+        'wishlistItems',
+        'rows',
+        'data',
+      ]) {
+        final candidate = nested[childKey];
+        if (candidate is List) return candidate;
+      }
+    }
+    return const <dynamic>[];
+  }
+
+  String _wishlistRowProductId(dynamic row) {
+    final item = _asMap(row);
+    final nestedProduct = _asMap(item['product']);
+    final nestedDetails = _asMap(item['productDetails']);
+    final nestedItem = _asMap(item['item']);
+
+    final candidates = <dynamic>[
+      item['productId'],
+      item['product_id'],
+      item['productID'],
+      item['itemId'],
+      item['item_id'],
+      nestedProduct['productId'],
+      nestedProduct['product_id'],
+      nestedProduct['productID'],
+      nestedProduct['id'],
+      nestedDetails['productId'],
+      nestedDetails['product_id'],
+      nestedDetails['id'],
+      nestedItem['productId'],
+      nestedItem['product_id'],
+      nestedItem['id'],
+      // A plain `id` is only a fallback: wishlist rows may use it as their
+      // own row ID, so prefer all product-specific fields first.
+      item['id'],
+    ];
+
+    for (final candidate in candidates) {
+      final id = _normaliseWishlistId(candidate);
+      if (id.isNotEmpty) return id;
+    }
+    return '';
+  }
+
   Future<void> _syncWishlistState() async {
-    final id = _currentProductId;
+    final id = _normaliseWishlistId(_currentProductId);
     if (id.isEmpty) return;
+
     try {
       final response = await _api.get('/wishlist');
-      final root = _asMap(response);
-      final data = _asMap(root['data']);
-      final rows = response is List
-          ? response
-          : (root['items'] ??
-                root['products'] ??
-                root['wishlist'] ??
-                data['items'] ??
-                data['products'] ??
-                data['wishlist'] ??
-                const []);
-      if (rows is! List) return;
-      final saved = rows.any((row) {
-        final item = _asMap(row);
-        final nested = _asMap(item['product']);
-        final productId =
-            (item['productId'] ??
-                    item['product_id'] ??
-                    item['id'] ??
-                    nested['productId'] ??
-                    nested['product_id'] ??
-                    nested['id'] ??
-                    '')
-                .toString();
-        return productId == id;
+      final rows = _wishlistRowsFromResponse(response);
+      final saved = rows.any((row) => _wishlistRowProductId(row) == id);
+
+      if (!mounted) return;
+      setState(() {
+        _isWishlisted = saved;
+        // Keep the product map in sync as well, so reopening/navigating with
+        // this product map retains the latest state until the next API refresh.
+        _product['isWishlisted'] = saved;
+        _product['wishlisted'] = saved;
       });
-      if (mounted) setState(() => _isWishlisted = saved);
     } catch (_) {
-      // Keep the state passed from the marketplace if wishlist is temporarily unavailable.
+      // If the wishlist request temporarily fails, retain the value supplied
+      // by Marketplace instead of resetting the heart to the unsaved state.
     }
   }
 
   /// Saves/removes the product through the backend and rolls back on failure.
   Future<void> _toggleWishlist() async {
-    final id = _currentProductId;
+    final id = _normaliseWishlistId(_currentProductId);
     if (id.isEmpty) {
       _showMessage('This item has no product ID and cannot be saved.');
       return;
@@ -1839,12 +1906,23 @@ class _ProductDetailsState extends State<ProductDetails> {
       if (wasSaved) {
         await _api.delete('/wishlist/$id');
       } else {
-        await _api.post('/wishlist', <String, dynamic>{'productId': id});
+        final numericId = num.tryParse(id);
+        await _api.post('/wishlist', <String, dynamic>{
+          'productId':
+              numericId != null && numericId == numericId.roundToDouble()
+              ? numericId.toInt()
+              : id,
+        });
       }
-      if (mounted)
+      if (mounted) {
+        setState(() {
+          _product['isWishlisted'] = !wasSaved;
+          _product['wishlisted'] = !wasSaved;
+        });
         _showMessage(
           wasSaved ? 'Removed from your wishlist.' : 'Added to your wishlist.',
         );
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isWishlisted = wasSaved);

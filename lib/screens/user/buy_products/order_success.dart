@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../widgets/bottom_navigation.dart';
-import '../profile/profile.dart';
 import '../sell_products/add_product.dart';
-import '../user_home.dart';
-import 'marketplace.dart';
-import 'orders.dart';
+import '../user_main.dart';
 
 class OrderSuccess extends StatefulWidget {
   final String? orderId;
@@ -124,68 +121,37 @@ class _OrderSuccessState extends State<OrderSuccess>
   // NAVIGATION
   // ---------------------------------------------------------------------------
 
-  void _goToHome() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const UserHome()),
+  /// Return to the persistent user navigation shell and select the requested tab.
+  /// Clearing the purchase stack prevents Back from returning to checkout/payment.
+  void _goToUserMain({int initialIndex = 0}) {
+    final safeIndex = initialIndex < 0
+        ? 0
+        : (initialIndex > 3 ? 3 : initialIndex);
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => UserMain(initialIndex: safeIndex),
+      ),
       (route) => false,
     );
   }
 
-  void _viewOrder() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const Orders()),
-    );
-  }
+  void _goToHome() => _goToUserMain(initialIndex: 0);
 
-  void _continueShopping() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const Marketplace()),
-    );
-  }
+  void _viewOrder() => _goToUserMain(initialIndex: 2);
+
+  void _continueShopping() => _goToUserMain(initialIndex: 1);
 
   void _onNavigationSelected(int index) {
-    if (index == 0) {
-      _goToHome();
-      return;
+    if (index >= 0 && index <= 3) {
+      _goToUserMain(initialIndex: index);
     }
-
-    if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const Marketplace()),
-      );
-      return;
-    }
-
-    if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const Orders()),
-      );
-      return;
-    }
-
-    if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const Profile()),
-      );
-      return;
-    }
-
-    setState(() {
-      _currentIndex = index;
-    });
   }
 
   void _onAddProduct() {
-    Navigator.push(
+    Navigator.of(
       context,
-      MaterialPageRoute(builder: (_) => const AddProduct()),
-    );
+    ).push(MaterialPageRoute<void>(builder: (_) => const AddProduct()));
   }
 
   // ---------------------------------------------------------------------------
@@ -194,45 +160,53 @@ class _OrderSuccessState extends State<OrderSuccess>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: Column(
-            children: [
-              _buildTopBar(),
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 20),
-                      _buildSuccessAnimation(),
-                      const SizedBox(height: 24),
-                      _buildSuccessMessage(),
-                      const SizedBox(height: 22),
-                      _buildOrderCard(),
-                      const SizedBox(height: 14),
-                      _buildDeliveryCard(),
-                      const SizedBox(height: 14),
-                      _buildEcoMessage(),
-                      const SizedBox(height: 24),
-                      _buildActionButtons(),
-                    ],
+    return WillPopScope(
+      // Android/system Back after order success should open Orders, not
+      // return to checkout/payment and risk repeating the purchase.
+      onWillPop: () async {
+        _viewOrder();
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          bottom: false,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: Column(
+              children: [
+                _buildTopBar(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 20),
+                        _buildSuccessAnimation(),
+                        const SizedBox(height: 24),
+                        _buildSuccessMessage(),
+                        const SizedBox(height: 22),
+                        _buildOrderCard(),
+                        const SizedBox(height: 14),
+                        _buildDeliveryCard(),
+                        const SizedBox(height: 14),
+                        _buildEcoMessage(),
+                        const SizedBox(height: 24),
+                        _buildActionButtons(),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
-      bottomNavigationBar: UserBottomNavigation(
-        currentIndex: _currentIndex,
-        onItemSelected: _onNavigationSelected,
-        onAddProduct: _onAddProduct,
+        bottomNavigationBar: UserBottomNavigation(
+          currentIndex: _currentIndex,
+          onItemSelected: _onNavigationSelected,
+          onAddProduct: _onAddProduct,
+        ),
       ),
     );
   }

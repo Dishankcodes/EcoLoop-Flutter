@@ -516,7 +516,7 @@ class _WishlistState extends State<Wishlist> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final columns = constraints.maxWidth >= 620 ? 3 : 2;
-                final ratio = constraints.maxWidth < 360 ? .57 : .62;
+                final ratio = constraints.maxWidth < 360 ? .52 : .58;
                 return GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),

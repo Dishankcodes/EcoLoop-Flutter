@@ -16,12 +16,15 @@ class SellingOrderDetails extends StatefulWidget {
 class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   late Map<String, dynamic> _order;
   bool _loading = false;
+  bool _cancelling = false;
+  bool _refundExpected = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _order = Map<String, dynamic>.from(widget.order);
+    _refundExpected = _isPaid('${_order['paymentStatus'] ?? ''}');
   }
 
   int get _id =>
@@ -44,8 +47,32 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   String get _buyer =>
       '${_order['buyerName'] ?? _order['buyer'] ?? (_order['buyerId'] == null ? 'Buyer details unavailable' : 'Buyer #${_order['buyerId']}')}';
 
+  String get _normalizedStatus => '${_order['status'] ?? 'new_order'}'
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[ -]+'), '_');
+
   bool get _terminal =>
-      ['Delivered', 'Completed', 'Cancelled'].contains(_status);
+      ['delivered', 'completed', 'cancelled'].contains(_normalizedStatus);
+
+  // A seller can cancel only while the order is Pending, Confirmed, or Packed.
+  bool get _canCancel =>
+      !_cancelling &&
+      !_loading &&
+      const {
+        'new_order',
+        'pending',
+        'confirmed',
+        'packed',
+      }.contains(_normalizedStatus);
+
+  bool _isPaid(String value) => const {
+    'paid',
+    'completed',
+    'success',
+    'successful',
+    'captured',
+  }.contains(value.trim().toLowerCase());
 
   double get _subtotal => _num(
     _order['subtotal'] ??
@@ -63,6 +90,163 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   double get _net => _subtotal - _platformFee;
 
   String _money(dynamic amount) => '₹${_num(amount).toStringAsFixed(2)}';
+
+  String _formatOrderDate(dynamic raw) {
+    final value = '${raw ?? ''}'.trim();
+    if (value.isEmpty || value.toLowerCase() == 'null') {
+      return 'Date unavailable';
+    }
+
+    // Apps Script stores timestamps as IST: yyyy-MM-dd HH:mm:ss.
+    // Parse this format as wall-clock IST and do not shift it by device timezone.
+    final ist = RegExp(
+      r'^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$',
+    ).firstMatch(value);
+    if (ist != null) {
+      final dt = DateTime(
+        int.parse(ist.group(1)!),
+        int.parse(ist.group(2)!),
+        int.parse(ist.group(3)!),
+        int.parse(ist.group(4)!),
+        int.parse(ist.group(5)!),
+        int.parse(ist.group(6) ?? '0'),
+      );
+      return _formatDateTime(dt);
+    }
+
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return value;
+    // Explicit timezone timestamps are converted to the device's local timezone;
+    // date-only/naive values are displayed as entered.
+    final hasTimezone = RegExp(
+      r'(Z|[+-]\d{2}:?\d{2})$',
+      caseSensitive: false,
+    ).hasMatch(value);
+    return _formatDateTime(hasTimezone ? parsed.toLocal() : parsed);
+  }
+
+  String _formatDateTime(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final hour24 = date.hour;
+    final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+    final minute = date.minute.toString().padLeft(2, '0');
+    final period = hour24 >= 12 ? 'PM' : 'AM';
+    return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} '
+        '${date.year}, ${hour12.toString().padLeft(2, '0')}:$minute $period';
+  }
+
+  Future<void> _cancelOrder() async {
+    if (!_canCancel || _id <= 0) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel this order?'),
+        content: const Text(
+          'Are you sure you want to cancel this sale? The buyer will be notified. '
+          'Orders can only be cancelled before they move beyond Packed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep Order'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel Order'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _cancelling = true;
+      _error = null;
+    });
+
+    try {
+      final result = await EcoLoopApi.instance.post(
+        '/selling/orders/$_id/status',
+        <String, dynamic>{'status': 'cancelled'},
+      );
+
+      if (!mounted) return;
+      if (result is Map) {
+        final response = Map<String, dynamic>.from(result);
+        final nestedOrder = response['order'];
+        if (nestedOrder is Map) {
+          _order = {..._order, ...Map<String, dynamic>.from(nestedOrder)};
+        } else {
+          _order = {..._order, ...response};
+        }
+      }
+      _order['status'] = 'cancelled';
+      _refundExpected =
+          _isPaid('${_order['paymentStatus'] ?? ''}') ||
+          _refundExpected ||
+          '${_order['paymentStatus'] ?? ''}'.toLowerCase() == 'refund_required';
+
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Order cancelled successfully. The buyer will be notified.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _error ?? 'Could not cancel this order. Please try again.',
+          ),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
+  void _contactEcoLoop() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Contact EcoLoop'),
+        content: Text(
+          'For help with the cancellation or refund, contact EcoLoop support '
+          'through the official support channel in the app.\n\nOrder ID: #$_id\n'
+          'If payment was completed, refunds generally take 5–7 days after processing. '
+          'If the refund has not arrived after 7 days, contact support and include this order ID.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _refresh() async {
     if (_id <= 0) return;
@@ -84,8 +268,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   @override
   Widget build(BuildContext context) {
     final image = '${_order['productImage'] ?? ''}'.trim();
-    final date =
-        '${_order['createdAt'] ?? _order['date'] ?? 'Date unavailable'}';
+    final date = _formatOrderDate(_order['createdAt'] ?? _order['date']);
     final statusColor = _status == 'Delivered' || _status == 'Completed'
         ? AppColors.success
         : _status == 'Cancelled'
@@ -217,16 +400,33 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                         ),
                       ),
                     if (_loading) const LinearProgressIndicator(minHeight: 2),
-                    if (_status == 'Cancelled')
-                      _section('Sale Cancelled', Icons.cancel_outlined, [
+                    if (_normalizedStatus == 'cancelled')
+                      _section('Order Cancelled', Icons.cancel_outlined, [
                         const Text(
-                          'This sale is no longer active. Any applicable payment or inventory reversal is handled by the backend.',
+                          'This order has been cancelled and the buyer will be notified.',
                           style: TextStyle(
                             fontSize: 12,
                             height: 1.5,
                             color: AppColors.textSecondary,
                           ),
                         ),
+                        if (_refundExpected) ...[
+                          const SizedBox(height: 10),
+                          const Text(
+                            'If the buyer has already paid, the refund may take 5–7 days after processing. If it has not arrived after 7 days, contact EcoLoop support.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.5,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            onPressed: _contactEcoLoop,
+                            icon: const Icon(Icons.support_agent_rounded),
+                            label: const Text('Contact EcoLoop'),
+                          ),
+                        ],
                       ]),
                     _section('Sale Status', Icons.local_shipping_outlined, [
                       Row(
@@ -427,7 +627,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                 ),
               ),
             ),
-            if (!_terminal && _status != 'Cancelled')
+            if (!_terminal)
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
                 decoration: BoxDecoration(
@@ -442,35 +642,68 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                 ),
                 child: SafeArea(
                   top: false,
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _id <= 0
-                          ? null
-                          : () async {
-                              final changed = await Navigator.push<bool>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      SellingOrderStatus(order: _order),
-                                ),
-                              );
-                              if (changed == true) {
-                                await _refresh();
-                                if (mounted) Navigator.pop(context, true);
-                              }
-                            },
-                      icon: const Icon(Icons.update_rounded),
-                      label: const Text('Update Order Status'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(13),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_canCancel)
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _cancelling ? null : _cancelOrder,
+                            icon: _cancelling
+                                ? const SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.cancel_outlined),
+                            label: Text(
+                              _cancelling ? 'Cancelling…' : 'Cancel Order',
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.error,
+                              side: const BorderSide(color: AppColors.error),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(13),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (_canCancel) const SizedBox(height: 9),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _loading || _cancelling || _id <= 0
+                              ? null
+                              : () async {
+                                  final changed = await Navigator.push<bool>(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          SellingOrderStatus(order: _order),
+                                    ),
+                                  );
+                                  if (changed == true) {
+                                    await _refresh();
+                                    if (mounted) Navigator.pop(context, true);
+                                  }
+                                },
+                          icon: const Icon(Icons.update_rounded),
+                          label: const Text('Update Order Status'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
