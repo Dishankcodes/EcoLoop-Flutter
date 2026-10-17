@@ -886,7 +886,9 @@ class _RewardsState extends State<Rewards> {
           donationStatuses[id] = (donation['status'] ?? '')
               .toString()
               .trim()
-              .toLowerCase();
+              .toLowerCase()
+              .replaceAll('_', ' ')
+              .replaceAll(RegExp(r'\s+'), ' ');
         }
       }
 
@@ -902,7 +904,8 @@ class _RewardsState extends State<Rewards> {
             (row['referenceType'] ?? row['reference_type'] ?? '')
                 .toString()
                 .trim()
-                .toLowerCase();
+                .toLowerCase()
+                .replaceAll('_', ' ');
         final referenceId = (row['referenceId'] ?? row['reference_id'] ?? '')
             .toString();
         final reason = (row['reason'] ?? 'EcoLoop reward').toString();
@@ -914,7 +917,7 @@ class _RewardsState extends State<Rewards> {
               status == 'accepted' ||
               status == 'approved' ||
               status == 'completed';
-          final creditedReason = reason.toLowerCase().startsWith(
+          final creditedReason = reason.trim().toLowerCase().startsWith(
             'accepted donation reward',
           );
 

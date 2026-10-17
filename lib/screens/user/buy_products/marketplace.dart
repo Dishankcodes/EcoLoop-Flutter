@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
@@ -189,6 +191,9 @@ class _MarketplaceState extends State<Marketplace> {
           _ownProductIds
             ..clear()
             ..addAll(ids);
+          // If the public products request finished first, remove owned
+          // listings as soon as the account's own-product IDs arrive.
+          products.removeWhere(_isOwnProduct);
         });
       }
     } catch (_) {
@@ -301,9 +306,9 @@ class _MarketplaceState extends State<Marketplace> {
   }
 
   Future<void> _loadProducts() async {
-    // Load the signed-in account's listings and wishlist first so own products
-    // are excluded before the marketplace grid is populated.
-    await _loadAccountAndWishlist();
+    // The public catalogue is the critical request. Identity, own-listings,
+    // and wishlist are optional and must never hold the marketplace spinner.
+    unawaited(_loadAccountAndWishlist());
     if (mounted) {
       setState(() {
         _loadingProducts = true;
@@ -445,7 +450,10 @@ class _MarketplaceState extends State<Marketplace> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _productsError = error.toString();
+        _productsError = error
+            .toString()
+            .replaceFirst('Exception: ', '')
+            .replaceFirst('DioException [bad response]: ', '');
         _loadingProducts = false;
       });
     }
