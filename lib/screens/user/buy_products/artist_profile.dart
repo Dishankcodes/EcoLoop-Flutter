@@ -1,10 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
-import '../reviews/write_seller_review.dart';
 import 'product_details.dart';
+import '../reviews/write_seller_review.dart';
 
 /// Public profile shown when a user opens an artist/ReMaker from a listing.
 /// Profile details are taken from the selected backend artist record; portfolio,
@@ -83,6 +85,8 @@ class _ArtistProfileState extends State<ArtistProfile> {
     'profile_image',
     'profileImageUrl',
     'profile_image_url',
+    'profilePhotoUrl',
+    'profile_photo_url',
     'image',
     'avatarUrl',
     'avatar_url',
@@ -128,6 +132,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
       _safeGet('/my/following', fallback: <dynamic>[]),
       _safeGet('/orders', fallback: <dynamic>[]),
       _safeGet('/my/reviews', fallback: <dynamic>[]),
+      _safeGet('/artists/$_artistId/followers', fallback: <String, dynamic>{}),
     ]);
 
     if (!mounted) return;
@@ -138,6 +143,8 @@ class _ArtistProfileState extends State<ArtistProfile> {
     final following = _asList(results[3]);
     final orders = _asList(results[4]);
     final myReviews = _asList(results[5]);
+    final followerResponse = results[6];
+    final serverFollowerCount = _readFollowerCount(followerResponse);
 
     final artistProducts = allProducts.where((product) {
       final owner = _value(product, [
@@ -148,7 +155,17 @@ class _ArtistProfileState extends State<ArtistProfile> {
         'ownerId',
         'owner_id',
       ]);
-      return owner.isNotEmpty && owner == _artistId && !_isUnavailable(product);
+      final sellerType = _value(product, [
+        'sellerType',
+        'seller_type',
+      ]).toLowerCase();
+      return owner.isNotEmpty &&
+          owner == _artistId &&
+          (sellerType.isEmpty ||
+              sellerType == 'artist' ||
+              sellerType == 'remaker' ||
+              sellerType == 're_maker') &&
+          !_isUnavailable(product);
     }).toList();
 
     final followsArtist = following.any((item) {
@@ -218,12 +235,19 @@ class _ArtistProfileState extends State<ArtistProfile> {
       _reviews = reviews;
       _orders = orders;
       _following = followsArtist;
-      _followerCount ??= _number(
-        _artist['followersCount'] ??
-            _artist['followers'] ??
-            _artist['followerCount'] ??
-            _artist['follower_count'],
-      );
+      if (serverFollowerCount != null) {
+        _followerCount = serverFollowerCount;
+        _artist['followersCount'] = serverFollowerCount;
+        _artist['followerCount'] = serverFollowerCount;
+        _artist['followers'] = serverFollowerCount;
+      } else {
+        _followerCount ??= _number(
+          _artist['followersCount'] ??
+              _artist['followers'] ??
+              _artist['followerCount'] ??
+              _artist['follower_count'],
+        );
+      }
       _alreadyReviewed = alreadyReviewed;
       _eligibleOrderId = eligibleOrder;
       _canReview = eligibleOrder != null && !alreadyReviewed;
@@ -392,11 +416,32 @@ class _ArtistProfileState extends State<ArtistProfile> {
     }
   }
 
+  int? _readFollowerCount(dynamic response) {
+    if (response is! Map) return null;
+    final raw =
+        response['count'] ??
+        response['followerCount'] ??
+        response['follower_count'] ??
+        response['followersCount'] ??
+        response['followers_count'];
+    if (raw is num) return raw.toInt().clamp(0, 1 << 30).toInt();
+    if (raw != null) {
+      final parsed = int.tryParse(raw.toString());
+      if (parsed != null) return parsed.clamp(0, 1 << 30).toInt();
+    }
+    final list = response['followers'];
+    if (list is List) return list.length;
+    return null;
+  }
+
   Future<void> _refreshFollowState() async {
     try {
-      final raw = await _api.get('/my/following');
+      final responses = await Future.wait<dynamic>([
+        _api.get('/my/following'),
+        _api.get('/artists/$_artistId/followers'),
+      ]);
       if (!mounted) return;
-      final followingRows = _asList(raw);
+      final followingRows = _asList(responses[0]);
       final isFollowing = followingRows.any((item) {
         final id = _value(item, [
           'artistId',
@@ -408,20 +453,18 @@ class _ArtistProfileState extends State<ArtistProfile> {
           'targetArtistId',
           'target_artist_id',
         ]);
-        final type = _value(item, [
-          'targetType',
-          'target_type',
-          'followingType',
-          'following_type',
-          'type',
-        ]).toLowerCase();
-        return id == _artistId &&
-            (type.isEmpty ||
-                type == 'artist' ||
-                type == 'remaker' ||
-                type == 're_maker');
+        return id == _artistId;
       });
-      setState(() => _following = isFollowing);
+      final count = _readFollowerCount(responses[1]);
+      setState(() {
+        _following = isFollowing;
+        if (count != null) {
+          _followerCount = count;
+          _artist['followersCount'] = count;
+          _artist['followerCount'] = count;
+          _artist['followers'] = count;
+        }
+      });
     } catch (_) {
       // Keep the successful local update if this optional refresh fails.
     }
@@ -1544,25 +1587,64 @@ String _productImageUrl(Map<String, dynamic> product) {
       product['thumbnail'] ??
       product['primaryImage'] ??
       product['primary_image'];
+
+  List<dynamic> candidates = [];
   if (raw is List) {
-    for (final value in raw) {
-      final url = value.toString().trim();
-      if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    candidates = raw;
+  } else if (raw is Map) {
+    candidates = [
+      raw['url'] ?? raw['imageUrl'] ?? raw['image_url'] ?? raw['src'],
+    ];
+  } else if (raw != null) {
+    final value = raw.toString().trim();
+    if (value.isEmpty) return '';
+    try {
+      final decoded = jsonDecode(value);
+      if (decoded is List) {
+        candidates = decoded;
+      } else if (decoded is Map) {
+        candidates = [
+          decoded['url'] ??
+              decoded['imageUrl'] ??
+              decoded['image_url'] ??
+              decoded['src'],
+        ];
+      } else {
+        candidates = [value];
+      }
+    } catch (_) {
+      candidates = value.split(',');
     }
-    return '';
   }
-  if (raw == null) return '';
-  var value = raw.toString().trim();
-  if (value.isEmpty) return '';
-  if (value.startsWith('[') && value.endsWith(']')) {
-    value = value.substring(1, value.length - 1);
-  }
-  final candidates = value
-      .split(',')
-      .map((part) => part.trim().replaceAll('"', '').replaceAll("'", ''))
-      .toList();
-  for (final url in candidates) {
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+
+  for (final candidate in candidates) {
+    String url;
+    if (candidate is Map) {
+      url =
+          (candidate['url'] ??
+                  candidate['imageUrl'] ??
+                  candidate['image_url'] ??
+                  candidate['src'] ??
+                  '')
+              .toString()
+              .trim();
+    } else {
+      url = (candidate ?? '')
+          .toString()
+          .trim()
+          .replaceAll('\"', '')
+          .replaceAll("'", '');
+    }
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      // Normalize common Google Drive share links into a direct-view URL.
+      final driveId = RegExp(
+        r'(?:/file/d/|[?&]id=)([A-Za-z0-9_-]+)',
+      ).firstMatch(url)?.group(1);
+      if (driveId != null && url.contains('drive.google.com')) {
+        return 'https://drive.google.com/uc?export=view&id=$driveId';
+      }
+      return url;
+    }
   }
   return '';
 }

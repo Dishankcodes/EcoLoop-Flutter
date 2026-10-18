@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
@@ -112,6 +114,98 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   double get _net => _subtotal - _sellerDeliveryCost;
 
   String _money(dynamic amount) => '₹${_num(amount).toStringAsFixed(2)}';
+
+  /// Turns the saved shippingAddress value into a readable address.
+  /// The API may return a JSON string or an already-decoded map, so handle
+  /// both without requiring any backend changes.
+  String _formatShippingAddress(dynamic raw) {
+    if (raw == null) return 'Shipping address is not available.';
+
+    dynamic value = raw;
+    if (value is String) {
+      final text = value.trim();
+      if (text.isEmpty || text.toLowerCase() == 'null') {
+        return 'Shipping address is not available.';
+      }
+      // Older order records store the address object as JSON text.
+      if ((text.startsWith('{') && text.endsWith('}')) ||
+          (text.startsWith('[') && text.endsWith(']'))) {
+        try {
+          value = jsonDecode(text);
+        } catch (_) {
+          return text;
+        }
+      } else {
+        // If this is already a human-readable address, tidy its separators.
+        return text
+            .replaceAll(RegExp(r'\s*,\s*'), ', ')
+            .replaceAll(RegExp(r'(,\s*){2,}'), ', ')
+            .replaceAll(RegExp(r'^,\s*|,\s*$'), '');
+      }
+    }
+
+    if (value is Map) {
+      final address = Map<String, dynamic>.from(value);
+      String pick(List<String> keys) {
+        for (final key in keys) {
+          final candidate = address[key];
+          if (candidate == null) continue;
+          final text = '$candidate'.trim();
+          if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+        }
+        return '';
+      }
+
+      final label = pick(['label', 'addressLabel']);
+      final name = pick(['name', 'recipientName', 'fullName']);
+      final phone = pick(['phone', 'mobile', 'phoneNumber']);
+      final line = pick(['addressLine', 'address', 'street', 'line1']);
+      final line2 = pick(['addressLine2', 'line2']);
+      final area = pick(['area', 'locality', 'landmark']);
+      final city = pick(['city', 'cityName']);
+      final state = pick(['state', 'stateName']);
+      final pincode = pick([
+        'pincode',
+        'pinCode',
+        'postalCode',
+        'zipCode',
+        'zip',
+      ]);
+
+      final parts = <String>[
+        if (label.isNotEmpty) label,
+        if (name.isNotEmpty && name.toLowerCase() != label.toLowerCase()) name,
+        if (phone.isNotEmpty) phone,
+        if (line.isNotEmpty) line,
+        if (line2.isNotEmpty) line2,
+        if (area.isNotEmpty) area,
+        if (city.isNotEmpty) city,
+        if (state.isNotEmpty) state,
+        if (pincode.isNotEmpty) pincode,
+      ];
+      final uniqueParts = <String>[];
+      for (final part in parts) {
+        final cleaned = part.replaceAll(RegExp(r'\s+'), ' ').trim();
+        if (cleaned.isNotEmpty &&
+            (uniqueParts.isEmpty ||
+                uniqueParts.last.toLowerCase() != cleaned.toLowerCase())) {
+          uniqueParts.add(cleaned);
+        }
+      }
+      return uniqueParts.isEmpty
+          ? 'Shipping address is not available.'
+          : uniqueParts.join(', ');
+    }
+
+    if (value is List) {
+      return value
+          .map((item) => '$item'.trim())
+          .where((item) => item.isNotEmpty && item.toLowerCase() != 'null')
+          .join(', ');
+    }
+
+    return '$value';
+  }
 
   String _formatOrderDate(dynamic raw) {
     final value = '${raw ?? ''}'.trim();
@@ -642,15 +736,39 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                       ],
                     ),
                     _section('Delivery Details', Icons.location_on_outlined, [
-                      Text(
-                        '${_order['shippingAddress'] ?? 'Shipping address is not available in this response.'}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textPrimary,
-                          height: 1.5,
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.light.withOpacity(.45),
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.location_on_outlined,
+                              size: 18,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _formatShippingAddress(
+                                  _order['shippingAddress'],
+                                ),
+                                softWrap: true,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.55,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       _info(
                         'Delivery method',
                         '${_order['deliveryMethod'] ?? 'EcoLoop delivery'}',

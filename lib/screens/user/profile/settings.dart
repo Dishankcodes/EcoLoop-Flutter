@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
 import '../../common/about_ecoloop.dart';
 import '../../common/help_support.dart';
 import '../../common/terms_conditions.dart';
+import 'change_password.dart';
 import 'edit_profile.dart';
 
-/// Screen managing user preferences, account actions, privacy options, and support links.
+/// Settings for account preferences, privacy, security, and support.
 class Settings extends StatefulWidget {
   const Settings({super.key});
 
@@ -19,9 +21,6 @@ class _SettingsState extends State<Settings> {
   bool notificationsEnabled = true;
   bool emailUpdatesEnabled = true;
   bool locationEnabled = true;
-  bool darkModeEnabled = false;
-
-  String selectedLanguage = 'English';
 
   @override
   Widget build(BuildContext context) {
@@ -44,23 +43,6 @@ class _SettingsState extends State<Settings> {
           _buildSectionTitle('Preferences'),
           _buildSettingsCard(
             children: [
-              _buildSwitchTile(
-                icon: Icons.dark_mode_outlined,
-                title: 'Dark Mode',
-                subtitle: darkModeEnabled
-                    ? 'Dark appearance enabled'
-                    : 'Use dark appearance for EcoLoop',
-                value: darkModeEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    darkModeEnabled = value;
-                  });
-                  _showMessage(
-                    value ? 'Dark Mode enabled' : 'Dark Mode disabled',
-                  );
-                },
-              ),
-              _buildDivider(),
               _buildSwitchTile(
                 icon: Icons.notifications_none_rounded,
                 title: 'Notifications',
@@ -87,13 +69,6 @@ class _SettingsState extends State<Settings> {
                     emailUpdatesEnabled = value;
                   });
                 },
-              ),
-              _buildDivider(),
-              _buildSettingsTile(
-                icon: Icons.language_rounded,
-                title: 'Language',
-                subtitle: selectedLanguage,
-                onTap: _showLanguageSheet,
               ),
               _buildDivider(),
               _buildSettingsTile(
@@ -139,7 +114,14 @@ class _SettingsState extends State<Settings> {
                 icon: Icons.lock_outline_rounded,
                 title: 'Change Password',
                 subtitle: 'Update your account password',
-                onTap: _showChangePasswordSheet,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChangePasswordPage(),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -310,7 +292,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  /// Toggle switch tile item.
+  /// Toggle switch tile item for notification and email preferences.
   Widget _buildSwitchTile({
     required IconData icon,
     required String title,
@@ -342,7 +324,7 @@ class _SettingsState extends State<Settings> {
                     const SizedBox(height: 3),
                     Text(
                       subtitle,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.caption,
                     ),
@@ -382,237 +364,6 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  /// Displays the modal sheet for language selection.
-  void _showLanguageSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    height: 4,
-                    width: 42,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text('Choose Language', style: AppTextStyles.title),
-                const SizedBox(height: 5),
-                const Text(
-                  'Select your preferred language.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 15),
-                _languageOption('English'),
-                _languageOption('Hindi'),
-                _languageOption('Gujarati'),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// Option tile rendered inside the language selection sheet.
-  Widget _languageOption(String language) {
-    final selected = selectedLanguage == language;
-
-    return Material(
-      color: Colors.transparent,
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(
-          selected
-              ? Icons.radio_button_checked_rounded
-              : Icons.radio_button_off_rounded,
-          color: selected ? AppColors.primary : AppColors.textSecondary,
-        ),
-        title: Text(
-          language,
-          style: AppTextStyles.body.copyWith(
-            color: AppColors.textPrimary,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-          ),
-        ),
-        trailing: selected
-            ? const Icon(
-                Icons.check_rounded,
-                color: AppColors.primary,
-                size: 20,
-              )
-            : null,
-        onTap: () {
-          setState(() {
-            selectedLanguage = language;
-          });
-          Navigator.pop(context);
-          _showMessage('Language changed to $language');
-        },
-      ),
-    );
-  }
-
-  /// Displays the modal sheet for changing the account password.
-  void _showChangePasswordSheet() {
-    final currentPasswordController = TextEditingController();
-    final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
-
-    bool obscureCurrent = true;
-    bool obscureNew = true;
-    bool obscureConfirm = true;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return SafeArea(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  12,
-                  20,
-                  MediaQuery.of(context).viewInsets.bottom + 25,
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          height: 4,
-                          width: 42,
-                          decoration: BoxDecoration(
-                            color: AppColors.accent,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text('Change Password', style: AppTextStyles.title),
-                      const SizedBox(height: 5),
-                      const Text(
-                        'Create a new password for your EcoLoop account.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _passwordField(
-                        controller: currentPasswordController,
-                        label: 'Current Password',
-                        obscure: obscureCurrent,
-                        onToggle: () {
-                          setSheetState(() {
-                            obscureCurrent = !obscureCurrent;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _passwordField(
-                        controller: newPasswordController,
-                        label: 'New Password',
-                        obscure: obscureNew,
-                        onToggle: () {
-                          setSheetState(() {
-                            obscureNew = !obscureNew;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _passwordField(
-                        controller: confirmPasswordController,
-                        label: 'Confirm New Password',
-                        obscure: obscureConfirm,
-                        onToggle: () {
-                          setSheetState(() {
-                            obscureConfirm = !obscureConfirm;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (newPasswordController.text.isEmpty ||
-                                confirmPasswordController.text.isEmpty) {
-                              _showMessage('Please enter your new password.');
-                              return;
-                            }
-                            if (newPasswordController.text !=
-                                confirmPasswordController.text) {
-                              _showMessage('Passwords do not match.');
-                              return;
-                            }
-                            Navigator.pop(sheetContext);
-                            _showMessage(
-                              'Password update will be connected later.',
-                            );
-                          },
-                          child: const Text('Update Password'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  /// Custom text input field wrapper for secure password entries.
-  Widget _passwordField({
-    required TextEditingController controller,
-    required String label,
-    required bool obscure,
-    required VoidCallback onToggle,
-  }) {
-    return TextField(
-      controller: controller,
-      obscureText: obscure,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: const Icon(Icons.lock_outline_rounded),
-        suffixIcon: IconButton(
-          onPressed: onToggle,
-          icon: Icon(
-            obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-          ),
-        ),
-      ),
-    );
-  }
-
   /// Displays the modal sheet for managing user privacy controls.
   void _showPrivacySheet() {
     bool profileVisible = true;
@@ -648,11 +399,17 @@ class _SettingsState extends State<Settings> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      Text('Privacy Preferences', style: AppTextStyles.title),
+                      Text('Privacy & Data', style: AppTextStyles.title),
+                      const SizedBox(height: 5),
+                      Text(
+                        'Choose what you are comfortable sharing on EcoLoop.',
+                        style: AppTextStyles.caption,
+                      ),
                       const SizedBox(height: 15),
                       _privacySwitch(
-                        title: 'Public Profile',
-                        subtitle: 'Allow other users to view your profile',
+                        title: 'Profile visibility',
+                        subtitle:
+                            'Let other EcoLoop users view your public profile',
                         value: profileVisible,
                         onChanged: (value) {
                           setSheetState(() {
@@ -661,9 +418,9 @@ class _SettingsState extends State<Settings> {
                         },
                       ),
                       _privacySwitch(
-                        title: 'Activity Visibility',
+                        title: 'Marketplace activity',
                         subtitle:
-                            'Control visibility of your marketplace activity',
+                            'Show activity such as reviews and listings on your profile',
                         value: activityVisible,
                         onChanged: (value) {
                           setSheetState(() {
@@ -672,9 +429,9 @@ class _SettingsState extends State<Settings> {
                         },
                       ),
                       _privacySwitch(
-                        title: 'Location Sharing',
+                        title: 'Use location for recommendations',
                         subtitle:
-                            'Allow location to improve marketplace results',
+                            'Use location to make nearby listings more relevant',
                         value: locationSharing,
                         onChanged: (value) {
                           setSheetState(() {
@@ -700,7 +457,7 @@ class _SettingsState extends State<Settings> {
                             SizedBox(width: 9),
                             Expanded(
                               child: Text(
-                                'Your privacy controls can be connected to your account settings when the backend is integrated.',
+                                'These switches are currently a UI preview. They do not change server-side visibility or location permissions until connected to your account backend.',
                                 style: TextStyle(
                                   fontSize: 10,
                                   height: 1.45,
@@ -796,28 +553,60 @@ class _SettingsState extends State<Settings> {
                   ),
                   const SizedBox(height: 20),
                   Text('Account Security', style: AppTextStyles.title),
+                  const SizedBox(height: 5),
+                  Text(
+                    'Review the key protections for your account.',
+                    style: AppTextStyles.caption,
+                  ),
                   const SizedBox(height: 15),
                   _securityItem(
-                    Icons.lock_outline_rounded,
+                    Icons.password_rounded,
                     'Password',
-                    'Your account password is protected.',
+                    'Use a strong, unique password and update it if you suspect it was exposed.',
                   ),
                   _securityItem(
                     Icons.verified_user_outlined,
-                    'Account Verification',
-                    'Your EcoLoop account verification status.',
+                    'Account details',
+                    'Keep your registered email and phone number accurate so you can be reached.',
+                  ),
+                  _securityItem(
+                    Icons.phonelink_lock_outlined,
+                    'Sign-in safety',
+                    'Never share your password or one-time verification codes with anyone.',
                   ),
                   _securityItem(
                     Icons.devices_outlined,
-                    'Active Sessions',
-                    'Manage devices where your account is signed in.',
+                    'Signed-in devices',
+                    'Device and session management is not available in this screen yet.',
                   ),
-                  _securityItem(
-                    Icons.warning_amber_rounded,
-                    'Security Alerts',
-                    'Important security notifications will appear here.',
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: BorderSide(
+                          color: AppColors.primary.withOpacity(0.5),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                      ),
+                      icon: const Icon(Icons.lock_reset_rounded),
+                      label: const Text('Change Password'),
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ChangePasswordPage(),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(13),
@@ -825,13 +614,26 @@ class _SettingsState extends State<Settings> {
                       color: AppColors.light,
                       borderRadius: BorderRadius.circular(13),
                     ),
-                    child: const Text(
-                      'Security management will be connected to the backend during the authentication phase.',
-                      style: TextStyle(
-                        fontSize: 10,
-                        height: 1.45,
-                        color: AppColors.textSecondary,
-                      ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: AppColors.primary,
+                          size: 19,
+                        ),
+                        SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            'Password updates, verification status and active-session controls need authentication-backend support. This screen does not claim to change them.',
+                            style: TextStyle(
+                              fontSize: 10,
+                              height: 1.45,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
