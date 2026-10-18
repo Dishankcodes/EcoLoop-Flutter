@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
-import '../../user/reviews/seller_reviews.dart';
+import '../../../services/ecoloop_api.dart';
+import '../reviews/seller_reviews.dart';
 import 'product_details.dart';
 
 class SellerProfile extends StatefulWidget {
@@ -15,12 +16,14 @@ class SellerProfile extends StatefulWidget {
 }
 
 class _SellerProfileState extends State<SellerProfile> {
-  bool _isFollowing = false;
-
-  late final List<Map<String, dynamic>> _listings;
+  List<Map<String, dynamic>> _listings = <Map<String, dynamic>>[];
+  bool _loadingListings = true;
+  bool _showAllListings = false;
+  String? _listingError;
+  Map<String, dynamic> _contactDetails = <String, dynamic>{};
+  bool _loadingContact = false;
 
   // SELLER TYPE
-
   String get sellerType {
     final value =
         widget.seller['sellerType'] ??
@@ -42,111 +45,86 @@ class _SellerProfileState extends State<SellerProfile> {
   }
 
   // INIT
-
   @override
   void initState() {
     super.initState();
 
-    _listings = _createListings();
+    _loadSellerListings();
   }
 
-  // CREATE LISTINGS DATA
+  // Load this seller's published listings from the real API.
+  Future<void> _loadSellerListings() async {
+    setState(() {
+      _loadingListings = true;
+      _listingError = null;
+    });
+    try {
+      final raw = await EcoLoopApi.instance.get('/products');
+      final sellerId = _sellerId;
+      final rows = (raw is List ? raw : <dynamic>[])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .where((p) {
+            final id = (p['sellerId'] ?? p['userId'] ?? '').toString();
+            final type = (p['sellerType'] ?? 'user').toString().toLowerCase();
+            final status = (p['status'] ?? '').toString().toLowerCase();
+            return id == sellerId &&
+                type == sellerType &&
+                status == 'published' &&
+                (int.tryParse(
+                          '${p['availableQuantity'] ?? p['quantity'] ?? 0}',
+                        ) ??
+                        0) >
+                    0;
+          })
+          .toList();
+      rows.sort(
+        (a, b) => (b['createdAt'] ?? '').toString().compareTo(
+          (a['createdAt'] ?? '').toString(),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _listings = rows;
+        _loadingListings = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _listingError = e.toString();
+        _loadingListings = false;
+      });
+    }
+  }
 
-  List<Map<String, dynamic>> _createListings() {
-    final sellerName =
-        widget.seller['name']?.toString() ??
-        widget.seller['userName']?.toString() ??
-        widget.seller['username']?.toString() ??
-        'Seller';
+  String get _sellerId =>
+      (widget.seller['userId'] ??
+              widget.seller['id'] ??
+              widget.seller['sellerId'] ??
+              widget.seller['artistId'] ??
+              '')
+          .toString();
 
-    final location = widget.seller['location']?.toString() ?? _buildLocation();
-
-    return [
-      {
-        'id': 101,
-        'title': 'Wooden Study Table',
-        'price': 2500,
-        'seller': sellerName,
-        'sellerType': sellerType,
-        'condition': 'Used',
-        'category': 'Furniture',
-        'location': location,
-        'views': 182,
-        'wishlistCount': 21,
-        'availableQuantity': 1,
-        'quantity': 1,
-        'description':
-            'Solid wooden study table in good condition. Suitable for home offices, study rooms and creative spaces.',
-        'image':
-            'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?auto=format&fit=crop&w=1000&q=85',
-        'images': [
-          'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?auto=format&fit=crop&w=1200&q=85',
-        ],
-      },
-      {
-        'id': 102,
-        'title': 'Wooden Side Chair',
-        'price': 1200,
-        'seller': sellerName,
-        'sellerType': sellerType,
-        'condition': 'Good',
-        'category': 'Furniture',
-        'location': location,
-        'views': 94,
-        'wishlistCount': 12,
-        'availableQuantity': 2,
-        'quantity': 2,
-        'description':
-            'Comfortable wooden chair that can be reused at home, in a workspace or for creative projects.',
-        'image':
-            'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=1000&q=85',
-        'images': [
-          'https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=1200&q=85',
-        ],
-      },
-      {
-        'id': 103,
-        'title': 'Reclaimed Wood Pieces',
-        'price': 450,
-        'seller': sellerName,
-        'sellerType': sellerType,
-        'condition': 'Recycled',
-        'category': 'Materials',
-        'location': location,
-        'views': 71,
-        'wishlistCount': 8,
-        'availableQuantity': 5,
-        'quantity': 5,
-        'description':
-            'Collection of reclaimed wood pieces for DIY, crafting and upcycling projects.',
-        'image':
-            'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=1000&q=85',
-        'images': [
-          'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=1200&q=85',
-        ],
-      },
-      {
-        'id': 104,
-        'title': 'Vintage Storage Cabinet',
-        'price': 2200,
-        'seller': sellerName,
-        'sellerType': sellerType,
-        'condition': 'Used',
-        'category': 'Furniture',
-        'location': location,
-        'views': 143,
-        'wishlistCount': 16,
-        'availableQuantity': 1,
-        'quantity': 1,
-        'description':
-            'Vintage storage cabinet with plenty of room for books, decor and household items.',
-        'image':
-            'https://images.unsplash.com/photo-1558997519-83ea9252edf8?auto=format&fit=crop&w=1000&q=85',
-        'images': [
-          'https://images.unsplash.com/photo-1558997519-83ea9252edf8?auto=format&fit=crop&w=1200&q=85',
-        ],
-      },
-    ];
+  Future<void> _loadContactDetails() async {
+    if (_loadingContact) return;
+    setState(() => _loadingContact = true);
+    try {
+      final raw = await EcoLoopApi.instance.get(
+        '/sellers/user/$_sellerId/contact',
+      );
+      if (!mounted) return;
+      setState(() {
+        if (raw is Map) _contactDetails = Map<String, dynamic>.from(raw);
+        _loadingContact = false;
+      });
+      _showContactCard();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingContact = false);
+      // Use any contact fields already supplied by the caller if API route is not deployed.
+      _contactDetails = Map<String, dynamic>.from(widget.seller);
+      _showContactCard();
+    }
   }
 
   // BUILD
@@ -160,20 +138,12 @@ class _SellerProfileState extends State<SellerProfile> {
         'Seller';
 
     final sellerImage = _getSellerImage();
-
     final location = widget.seller['location']?.toString() ?? _buildLocation();
-
     final rating = widget.seller['rating']?.toString() ?? '4.8';
-
     final reviews = widget.seller['reviews']?.toString() ?? '42';
-
-    final listings =
-        widget.seller['listings']?.toString() ?? '${_listings.length}';
-
+    final listings = _listings.length.toString();
     final sold = widget.seller['sold']?.toString() ?? '42';
-
     final positive = widget.seller['positive']?.toString() ?? '98%';
-
     final memberSince =
         widget.seller['memberSince']?.toString() ?? 'January 2025';
 
@@ -196,16 +166,6 @@ class _SellerProfileState extends State<SellerProfile> {
           'Seller Profile',
           style: ArtistTextStyles.title.copyWith(fontSize: 20),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'More',
-            onPressed: _showMoreOptions,
-            icon: const Icon(
-              Icons.more_vert_rounded,
-              color: ArtistColors.textPrimary,
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -227,8 +187,6 @@ class _SellerProfileState extends State<SellerProfile> {
               const SizedBox(height: 22),
               _buildStats(listings: listings, sold: sold, positive: positive),
               const SizedBox(height: 24),
-              _buildAboutSeller(),
-              const SizedBox(height: 18),
               _buildReviewsSection(
                 sellerName: sellerName,
                 sellerImage: sellerImage,
@@ -248,7 +206,6 @@ class _SellerProfileState extends State<SellerProfile> {
   }
 
   // SELLER IMAGE
-
   String? _getSellerImage() {
     final image =
         widget.seller['image'] ??
@@ -261,17 +218,13 @@ class _SellerProfileState extends State<SellerProfile> {
     }
 
     final value = image.toString().trim();
-
     return value.isEmpty ? null : value;
   }
 
   // LOCATION
-
   String _buildLocation() {
     final city = widget.seller['city']?.toString() ?? '';
-
     final state = widget.seller['state']?.toString() ?? '';
-
     if (city.isNotEmpty && state.isNotEmpty) {
       return '$city, $state';
     }
@@ -283,7 +236,6 @@ class _SellerProfileState extends State<SellerProfile> {
     if (state.isNotEmpty) {
       return state;
     }
-
     return 'Ahmedabad, Gujarat';
   }
 
@@ -469,65 +421,25 @@ class _SellerProfileState extends State<SellerProfile> {
   // ACTION BUTTONS
 
   Widget _buildActionButtons() {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () {
-              setState(() {
-                _isFollowing = !_isFollowing;
-              });
-
-              _showMessage(
-                _isFollowing
-                    ? 'You are now following this seller.'
-                    : 'Seller removed from following.',
-              );
-            },
-            icon: Icon(
-              _isFollowing
-                  ? Icons.check_rounded
-                  : Icons.person_add_alt_1_outlined,
-              size: 17,
-            ),
-            label: Text(
-              _isFollowing ? 'Following' : 'Follow',
-              style: ArtistTextStyles.bodyMedium.copyWith(
-                color: ArtistColors.primary,
-                fontSize: 12.5,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: ArtistColors.primary,
-              side: const BorderSide(color: ArtistColors.primary),
-              minimumSize: const Size(0, 46),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _contactSeller,
+        icon: const Icon(Icons.contact_phone_outlined, size: 18),
+        label: Text(
+          'Contact Seller',
+          style: ArtistTextStyles.button.copyWith(fontSize: 13),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: ArtistColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          minimumSize: const Size(0, 46),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: _contactSeller,
-            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 17),
-            label: Text(
-              'Contact Seller',
-              style: ArtistTextStyles.button.copyWith(fontSize: 12.5),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ArtistColors.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              minimumSize: const Size(0, 46),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -596,98 +508,6 @@ class _SellerProfileState extends State<SellerProfile> {
       width: 1,
       height: 42,
       color: ArtistColors.accent.withValues(alpha: 0.55),
-    );
-  }
-
-  // ABOUT SELLER
-
-  Widget _buildAboutSeller() {
-    final bio = widget.seller['bio']?.toString();
-
-    final skills = widget.seller['skills']?.toString();
-
-    final defaultBio = isArtist
-        ? 'I create meaningful products by giving materials and everyday objects a second life through creative design and sustainable craftsmanship.'
-        : 'I believe useful things should not be thrown away. I enjoy giving furniture, materials and household items a second life.';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          isArtist ? 'About ReMaker' : 'About Seller',
-          style: ArtistTextStyles.title.copyWith(fontSize: 16),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: ArtistColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: ArtistColors.accent.withValues(alpha: 0.45),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                bio != null && bio.trim().isNotEmpty ? bio : defaultBio,
-                style: ArtistTextStyles.body.copyWith(
-                  fontSize: 12,
-                  height: 1.55,
-                ),
-              ),
-              const SizedBox(height: 13),
-              if (skills != null && skills.trim().isNotEmpty)
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: _buildSkillTags(skills),
-                )
-              else
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: [
-                    _interestTag('Sustainability'),
-                    _interestTag('Upcycling'),
-                    _interestTag('DIY'),
-                  ],
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  List<Widget> _buildSkillTags(String skills) {
-    final values = skills
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .take(5)
-        .toList();
-
-    return values.map((skill) => _interestTag(skill)).toList();
-  }
-
-  Widget _interestTag(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: ArtistColors.light,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        text,
-        style: ArtistTextStyles.small.copyWith(
-          fontSize: 9,
-          color: ArtistColors.primary,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
     );
   }
 
@@ -836,7 +656,7 @@ class _SellerProfileState extends State<SellerProfile> {
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            '${_listings.length}',
+            '$_listingsCount',
             style: ArtistTextStyles.small.copyWith(
               color: ArtistColors.primary,
               fontSize: 9,
@@ -845,34 +665,53 @@ class _SellerProfileState extends State<SellerProfile> {
           ),
         ),
         const Spacer(),
-        Text(
-          'Newest',
-          style: ArtistTextStyles.caption.copyWith(
-            color: ArtistColors.primary,
-            fontWeight: FontWeight.w600,
+        if (_listings.length > 4)
+          TextButton(
+            onPressed: () =>
+                setState(() => _showAllListings = !_showAllListings),
+            child: Text(
+              _showAllListings ? 'Show Less' : 'View All',
+              style: ArtistTextStyles.bodyMedium.copyWith(
+                color: ArtistColors.primary,
+                fontSize: 12,
+              ),
+            ),
           ),
-        ),
-        const SizedBox(width: 3),
-        const Icon(
-          Icons.keyboard_arrow_down_rounded,
-          size: 16,
-          color: ArtistColors.primary,
-        ),
       ],
     );
   }
 
+  int get _listingsCount => _listings.length;
+
   // LISTINGS GRID
 
   Widget _buildListingsGrid() {
-    if (_listings.isEmpty) {
-      return _buildEmptyListings();
+    if (_loadingListings)
+      return const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    if (_listingError != null) {
+      return Column(
+        children: [
+          Text(
+            'Could not load active listings',
+            style: ArtistTextStyles.bodyMedium,
+          ),
+          TextButton.icon(
+            onPressed: _loadSellerListings,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try Again'),
+          ),
+        ],
+      );
     }
-
+    if (_listings.isEmpty) return _buildEmptyListings();
+    final visible = _showAllListings ? _listings : _listings.take(4).toList();
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: _listings.length,
+      itemCount: visible.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 12,
@@ -880,18 +719,34 @@ class _SellerProfileState extends State<SellerProfile> {
         childAspectRatio: 0.67,
       ),
       itemBuilder: (context, index) {
-        final product = _listings[index];
-
+        final product = visible[index];
+        final images = product['imageUrls'] is List
+            ? (product['imageUrls'] as List)
+            : <dynamic>[];
+        final mapped = <String, dynamic>{
+          ...product,
+          'id': product['productId'] ?? product['id'],
+          'seller':
+              product['sellerName'] ??
+              widget.seller['name'] ??
+              widget.seller['userName'] ??
+              'Seller',
+          'location':
+              [
+                    product['sellerCity'] ?? product['city'],
+                    product['sellerState'] ?? product['state'],
+                  ]
+                  .where((e) => e != null && e.toString().trim().isNotEmpty)
+                  .join(', '),
+          'image': images.isNotEmpty ? images.first : '',
+          'images': images,
+        };
         return _SellerProductCard(
-          product: product,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProductDetails(product: product),
-              ),
-            );
-          },
+          product: mapped,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => ProductDetails(product: mapped)),
+          ),
         );
       },
     );
@@ -934,34 +789,43 @@ class _SellerProfileState extends State<SellerProfile> {
     );
   }
 
-  // CONTACT SELLER
+  // Contact details are loaded from the seller-contact endpoint backed by Sheets.
+  void _contactSeller() => _loadContactDetails();
 
-  void _contactSeller() {
-    final sellerName =
-        widget.seller['name']?.toString() ??
-        widget.seller['userName']?.toString() ??
-        'Seller';
-
-    _showMessage('Chat with $sellerName will be connected later.');
-  }
-
-  // MORE OPTIONS
-
-  void _showMoreOptions() {
-    showModalBottomSheet(
+  void _showContactCard() {
+    final name =
+        (_contactDetails['name'] ??
+                _contactDetails['sellerName'] ??
+                widget.seller['name'] ??
+                widget.seller['userName'] ??
+                'Seller')
+            .toString();
+    final phone = (_contactDetails['phone'] ?? _contactDetails['mobile'] ?? '')
+        .toString();
+    final email = (_contactDetails['email'] ?? '').toString();
+    final address =
+        (_contactDetails['address'] ?? _contactDetails['addressLine'] ?? '')
+            .toString();
+    final city = (_contactDetails['city'] ?? widget.seller['city'] ?? '')
+        .toString();
+    final state = (_contactDetails['state'] ?? widget.seller['state'] ?? '')
+        .toString();
+    showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: ArtistColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
                   width: 42,
                   height: 4,
                   decoration: BoxDecoration(
@@ -969,83 +833,73 @@ class _SellerProfileState extends State<SellerProfile> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                const SizedBox(height: 18),
-                _sellerOption(
-                  icon: Icons.flag_outlined,
-                  title: 'Report Seller',
-                  destructive: true,
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showMessage('Report seller option selected.');
-                  },
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Seller Contact Details',
+                style: ArtistTextStyles.title.copyWith(fontSize: 18),
+              ),
+              const SizedBox(height: 4),
+              Text(name, style: ArtistTextStyles.bodyMedium),
+              const SizedBox(height: 16),
+              _contactRow(Icons.phone_outlined, 'Mobile number', phone),
+              _contactRow(Icons.email_outlined, 'Email', email),
+              _contactRow(
+                Icons.location_on_outlined,
+                'Address',
+                [address, city, state, _contactDetails['pincode']]
+                    .where((e) => e != null && e.toString().trim().isNotEmpty)
+                    .join(', '),
+              ),
+              if ([
+                phone,
+                email,
+                address,
+                city,
+                state,
+              ].every((e) => e.toString().trim().isEmpty))
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'Contact details are not available yet.',
+                    style: ArtistTextStyles.caption,
+                  ),
                 ),
-                const SizedBox(height: 9),
-                _sellerOption(
-                  icon: Icons.block_outlined,
-                  title: 'Block Seller',
-                  destructive: true,
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showMessage('Block seller option selected.');
-                  },
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _contactRow(IconData icon, String label, String value) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: ArtistColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ArtistColors.accent.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: ArtistColors.primary, size: 19),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: ArtistTextStyles.caption),
+                const SizedBox(height: 3),
+                Text(
+                  value.trim().isEmpty ? 'Not provided' : value,
+                  style: ArtistTextStyles.bodyMedium,
                 ),
               ],
             ),
           ),
-        );
-      },
-    );
-  }
-
-  // SELLER OPTION
-
-  Widget _sellerOption({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    bool destructive = false,
-  }) {
-    final optionColor = destructive ? ArtistColors.error : ArtistColors.primary;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(13),
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          color: destructive
-              ? ArtistColors.error.withValues(alpha: 0.05)
-              : ArtistColors.background,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(
-            color: destructive
-                ? ArtistColors.error.withValues(alpha: 0.20)
-                : ArtistColors.accent.withValues(alpha: 0.40),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: optionColor),
-            const SizedBox(width: 10),
-            Text(
-              title,
-              style: ArtistTextStyles.bodyMedium.copyWith(
-                color: optionColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const Spacer(),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 19,
-              color: destructive
-                  ? ArtistColors.error
-                  : ArtistColors.textSecondary,
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -1232,10 +1086,8 @@ class _SellerProductCard extends StatelessWidget {
       if (value % 1 == 0) {
         return value.toInt().toString();
       }
-
       return value.toStringAsFixed(2);
     }
-
     return value?.toString() ?? '0';
   }
 }

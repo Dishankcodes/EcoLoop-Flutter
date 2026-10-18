@@ -50,6 +50,11 @@ class _CheckoutState extends State<Checkout> {
   final List<Map<String, dynamic>> _addresses = [];
   bool _isLoadingAddresses = false;
   bool _isRefreshingProducts = false;
+  bool _isLoadingMoreItems = false;
+  String? _moreItemsError;
+  final List<Map<String, dynamic>> _moreItems = [];
+  int? _currentAccountId;
+  String _currentAccountType = 'artist';
   String? _addressError;
   String? _productError;
 
@@ -81,6 +86,8 @@ class _CheckoutState extends State<Checkout> {
     _couponDiscount = 0;
     _loadAddresses();
     _refreshProducts();
+    _loadMoreItems();
+    _loadCurrentAccount();
   }
 
   Future<void> _loadAddresses() async {
@@ -201,6 +208,134 @@ class _CheckoutState extends State<Checkout> {
     } finally {
       if (mounted) setState(() => _isRefreshingProducts = false);
     }
+  }
+
+  Future<void> _loadCurrentAccount() async {
+    try {
+      final response = await EcoLoopApi.instance.get('/auth/me');
+      if (!mounted || response is! Map) return;
+      final data = Map<String, dynamic>.from(response);
+      setState(() {
+        _currentAccountId = _toInt(
+          data['accountId'] ?? data['artistId'] ?? data['userId'] ?? data['id'],
+          fallback: -1,
+        );
+        _currentAccountType = (data['accountType'] ?? data['role'] ?? 'artist')
+            .toString()
+            .toLowerCase();
+      });
+      await _loadMoreItems();
+    } catch (_) {
+      // Product discovery remains available if the API's profile response varies.
+    }
+  }
+
+  Future<void> _loadMoreItems() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingMoreItems = true;
+      _moreItemsError = null;
+    });
+    try {
+      final response = await EcoLoopApi.instance.get('/products');
+      final raw = response is List
+          ? response
+          : response is Map && response['products'] is List
+          ? response['products'] as List
+          : response is Map && response['data'] is List
+          ? response['data'] as List
+          : const <dynamic>[];
+      final products = raw
+          .whereType<Map>()
+          .map((row) {
+            final item = Map<String, dynamic>.from(row);
+            item['productId'] = item['productId'] ?? item['id'];
+            item['id'] = item['productId'] ?? item['id'];
+            item['title'] = item['title'] ?? item['name'] ?? 'EcoLoop Product';
+            item['price'] = _toDouble(item['price']);
+            item['availableQuantity'] = _toInt(
+              item['availableQuantity'] ?? item['stock'],
+              fallback: 0,
+            );
+            item['seller'] =
+                item['sellerName'] ?? item['seller'] ?? 'EcoLoop Seller';
+            item['image'] = _productImage(item);
+            item['location'] = item['sellerCity'] ?? item['city'] ?? '';
+            return item;
+          })
+          .where((item) {
+            final id = (item['productId'] ?? item['id']).toString();
+            final available = _toInt(item['availableQuantity'], fallback: 0);
+            final status = (item['status'] ?? 'published')
+                .toString()
+                .toLowerCase();
+            final sellerId = _toInt(item['sellerId'], fallback: -2);
+            final sellerType = (item['sellerType'] ?? 'user')
+                .toString()
+                .toLowerCase();
+            final ownProduct =
+                _currentAccountId != null &&
+                sellerId == _currentAccountId &&
+                sellerType == _currentAccountType;
+            return id.isNotEmpty &&
+                available > 0 &&
+                status == 'published' &&
+                !ownProduct &&
+                !_items.any(
+                  (cartItem) =>
+                      (cartItem['productId'] ?? cartItem['id']).toString() ==
+                      id,
+                );
+          })
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _moreItems
+          ..clear()
+          ..addAll(products);
+        _isLoadingMoreItems = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingMoreItems = false;
+        _moreItemsError = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<bool> _confirmAction({
+    required String title,
+    required String message,
+    String confirmLabel = 'Confirm',
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: ArtistColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(title, style: ArtistTextStyles.title),
+        content: Text(message, style: ArtistTextStyles.body),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ArtistColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(11),
+              ),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return result == true;
   }
 
   void _loadItems() {
@@ -425,9 +560,38 @@ class _CheckoutState extends State<Checkout> {
   });
 
   double get _grandTotal =>
-      _subtotal + _platformFee.roundToDouble() + _taxAmount + _deliveryFee;
+      (_subtotal +
+              _platformFee.roundToDouble() +
+              _taxAmount +
+              _deliveryFee -
+              _couponDiscount)
+          .clamp(0, double.infinity)
+          .toDouble();
 
-  double get _totalSavings => 0;
+  double get _totalSavings => _couponDiscount;
+
+  void _recalculateCoupon() {
+    if (_couponCode == null) return;
+    final code = _couponCode!;
+    final eligible = switch (code) {
+      'ECO100' => _subtotal >= 1499,
+      'FIRSTLOOP' => _subtotal >= 500,
+      'RECYCLE20' => _subtotal >= 499,
+      _ => false,
+    };
+    if (!eligible) {
+      _couponCode = null;
+      _couponDiscount = 0;
+      return;
+    }
+    final amount = switch (code) {
+      'ECO100' => 100.0,
+      'FIRSTLOOP' => (_subtotal * 0.10).roundToDouble(),
+      'RECYCLE20' => 20.0,
+      _ => 0.0,
+    };
+    _couponDiscount = amount.clamp(0, _subtotal).toDouble();
+  }
 
   // SELECTED ADDRESS
 
@@ -1086,12 +1250,36 @@ class _CheckoutState extends State<Checkout> {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            onPressed: () {
-              _showMessage(
-                'Coupon redemption is not connected yet. No discount has been applied.',
-              );
-            },
-            child: Text(applied ? 'Applied' : 'Apply'),
+            onPressed: applied
+                ? null
+                : () {
+                    if (_subtotal < minimumOrder) {
+                      _showMessage(
+                        'Add items worth ${_formatPrice(minimumOrder)} to use $code.',
+                      );
+                      return;
+                    }
+                    final amount = discount != null
+                        ? discount
+                        : (_subtotal * (percentage ?? 0)).roundToDouble();
+                    setState(() {
+                      _couponCode = code;
+                      _couponDiscount = amount.clamp(0, _subtotal).toDouble();
+                    });
+                    Navigator.pop(sheetContext);
+                    _showMessage(
+                      '$code applied. You save ${_formatPrice(_couponDiscount)}.',
+                    );
+                  },
+            child: Text(
+              applied
+                  ? 'Applied'
+                  : (_subtotal >= minimumOrder ? 'Apply' : 'Locked'),
+              style: TextStyle(
+                color: applied ? ArtistColors.success : ArtistColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
@@ -1122,14 +1310,16 @@ class _CheckoutState extends State<Checkout> {
 
     if (current >= available) {
       _showMessage(
-        'Only $available item${available == 1 ? '' : 's'} available.',
+        'No more stock available. Maximum available quantity is $available.',
       );
       return;
     }
 
     setState(() {
       item['quantity'] = current + 1;
+      _recalculateCoupon();
     });
+    _refreshMoreItemsAfterCartChange();
   }
 
   void _decreaseItemQuantity(int index) {
@@ -1140,31 +1330,53 @@ class _CheckoutState extends State<Checkout> {
     final current = _toInt(_items[index]['quantity'], fallback: 1);
 
     if (current <= 1) {
-      _removeItem(index);
+      _removeItem(
+        index,
+        message:
+            'This is the last item in your cart. Removing it will clear your cart. Are you sure?',
+      );
       return;
     }
 
     setState(() {
       _items[index]['quantity'] = current - 1;
+      _recalculateCoupon();
     });
+    _refreshMoreItemsAfterCartChange();
   }
 
-  void _removeItem(int index) {
-    if (index < 0 || index >= _items.length) {
-      return;
-    }
-
+  Future<void> _removeItem(
+    int index, {
+    String? message,
+    bool confirm = true,
+  }) async {
+    if (index < 0 || index >= _items.length) return;
     final title = _items[index]['title'].toString();
-
+    final confirmed =
+        !confirm ||
+        await _confirmAction(
+          title: 'Remove item?',
+          message:
+              message ??
+              'Are you sure you want to remove "$title" from your cart?',
+          confirmLabel: 'Remove',
+        );
+    if (!confirmed || !mounted || index >= _items.length) return;
     setState(() {
       _items.removeAt(index);
+      if (_couponCode != null && _couponDiscount > 0) _recalculateCoupon();
     });
+    _refreshMoreItemsAfterCartChange();
+    _showMessage(
+      _items.isNotEmpty
+          ? '$title removed from checkout.'
+          : 'Your cart is now empty.',
+    );
+  }
 
-    if (_items.isNotEmpty) {
-      _showMessage('$title removed from checkout.');
-    } else {
-      _showMessage('All items removed from checkout.');
-    }
+  void _refreshMoreItemsAfterCartChange() {
+    if (!mounted) return;
+    _loadMoreItems();
   }
 
   // EDIT ITEM
@@ -1264,20 +1476,31 @@ class _CheckoutState extends State<Checkout> {
 
                         _quantityControl(
                           quantity: selectedQuantity,
-                          onMinus: selectedQuantity > 1
-                              ? () {
-                                  setSheetState(() {
-                                    selectedQuantity--;
-                                  });
-                                }
-                              : null,
-                          onPlus: selectedQuantity < available
-                              ? () {
-                                  setSheetState(() {
-                                    selectedQuantity++;
-                                  });
-                                }
-                              : null,
+                          onMinus: () async {
+                            if (selectedQuantity <= 1) {
+                              final confirmed = await _confirmAction(
+                                title: 'Remove last item?',
+                                message:
+                                    'Quantity is 1. Removing this item will clear your cart. Are you sure?',
+                                confirmLabel: 'Remove item',
+                              );
+                              if (confirmed && mounted) {
+                                Navigator.pop(sheetContext);
+                                await _removeItem(index, confirm: false);
+                              }
+                              return;
+                            }
+                            setSheetState(() => selectedQuantity--);
+                          },
+                          onPlus: () {
+                            if (selectedQuantity >= available) {
+                              _showMessage(
+                                'No more stock available. Maximum available quantity is $available.',
+                              );
+                              return;
+                            }
+                            setSheetState(() => selectedQuantity++);
+                          },
                         ),
                       ],
                     ),
@@ -1346,6 +1569,7 @@ class _CheckoutState extends State<Checkout> {
                             onPressed: () {
                               setState(() {
                                 _items[index]['quantity'] = selectedQuantity;
+                                _recalculateCoupon();
                               });
 
                               Navigator.pop(sheetContext);
@@ -1443,15 +1667,19 @@ class _CheckoutState extends State<Checkout> {
       );
 
       if (current >= available) {
-        _showMessage('Maximum available quantity already added.');
+        _showMessage(
+          'No more stock available. Maximum available quantity is $available.',
+        );
         return;
       }
 
       setState(() {
         _items[existingIndex]['quantity'] = current + 1;
+        _recalculateCoupon();
       });
 
       _showMessage('Quantity updated.');
+      _refreshMoreItemsAfterCartChange();
 
       return;
     }
@@ -1460,59 +1688,14 @@ class _CheckoutState extends State<Checkout> {
 
     setState(() {
       _items.add(newItem);
+      _recalculateCoupon();
     });
 
     _showMessage('${newItem['title']} added to checkout.');
+    _refreshMoreItemsAfterCartChange();
   }
 
-  // MORE PRODUCTS
-
-  final List<Map<String, dynamic>> _moreItems = [
-    {
-      'id': 'checkout_more_1',
-      'title': 'Wooden Chair',
-      'price': 1200,
-      'seller': 'Amit',
-      'condition': 'Used',
-      'category': 'Furniture',
-      'location': 'Vadodara',
-      'availableQuantity': 4,
-      'image': '',
-    },
-    {
-      'id': 'checkout_more_2',
-      'title': 'Bottle Lamp',
-      'price': 899,
-      'seller': 'Priya',
-      'condition': 'Upcycled',
-      'category': 'Decor',
-      'location': 'Surat',
-      'availableQuantity': 5,
-      'image': '',
-    },
-    {
-      'id': 'checkout_more_3',
-      'title': 'Craft Wood Pieces',
-      'price': 450,
-      'seller': 'EcoCraft',
-      'condition': 'Recycled',
-      'category': 'Materials',
-      'location': 'Ahmedabad',
-      'availableQuantity': 10,
-      'image': '',
-    },
-    {
-      'id': 'checkout_more_4',
-      'title': 'Denim Material Bundle',
-      'price': 700,
-      'seller': 'Mira',
-      'condition': 'Used',
-      'category': 'Fashion',
-      'location': 'Mumbai',
-      'availableQuantity': 6,
-      'image': '',
-    },
-  ];
+  // MORE PRODUCTS: live published listings from the backend.
 
   void _openAddMoreItems() {
     showModalBottomSheet(
@@ -1563,38 +1746,72 @@ class _CheckoutState extends State<Checkout> {
                   const SizedBox(height: 10),
 
                   Expanded(
-                    child: ListView.separated(
-                      itemCount: _moreItems.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final product = _moreItems[index];
+                    child: _isLoadingMoreItems
+                        ? const Center(child: CircularProgressIndicator())
+                        : _moreItemsError != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _moreItemsError!,
+                                    textAlign: TextAlign.center,
+                                    style: ArtistTextStyles.body,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  OutlinedButton.icon(
+                                    onPressed: _loadMoreItems,
+                                    icon: const Icon(Icons.refresh_rounded),
+                                    label: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : _moreItems.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No other in-stock listings available right now.',
+                              style: ArtistTextStyles.body,
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: _moreItems.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final product = _moreItems[index];
 
-                        final productId = product['id'].toString();
+                              final productId = product['id'].toString();
 
-                        final existingIndex = _items.indexWhere(
-                          (item) => item['productId'].toString() == productId,
-                        );
+                              final existingIndex = _items.indexWhere(
+                                (item) =>
+                                    item['productId'].toString() == productId,
+                              );
 
-                        final alreadyAdded = existingIndex != -1;
+                              final alreadyAdded = existingIndex != -1;
 
-                        final existingQuantity = alreadyAdded
-                            ? _toInt(
-                                _items[existingIndex]['quantity'],
-                                fallback: 1,
-                              )
-                            : 0;
+                              final existingQuantity = alreadyAdded
+                                  ? _toInt(
+                                      _items[existingIndex]['quantity'],
+                                      fallback: 1,
+                                    )
+                                  : 0;
 
-                        return _buildAddMoreProductTile(
-                          product,
-                          alreadyAdded,
-                          existingQuantity,
-                          onAdd: () {
-                            _addProductToCheckout(product);
-                            setState(() {});
-                          },
-                        );
-                      },
-                    ),
+                              return _buildAddMoreProductTile(
+                                product,
+                                alreadyAdded,
+                                existingQuantity,
+                                onAdd: () {
+                                  _addProductToCheckout(product);
+                                  setState(() {});
+                                },
+                              );
+                            },
+                          ),
                   ),
 
                   const SizedBox(height: 10),
@@ -1633,6 +1850,10 @@ class _CheckoutState extends State<Checkout> {
     required VoidCallback onAdd,
   }) {
     final price = _toDouble(product['price']);
+    final availableQuantity = _toInt(
+      product['availableQuantity'] ?? product['stock'],
+      fallback: 0,
+    );
 
     return Container(
       padding: const EdgeInsets.all(11),
@@ -1680,6 +1901,17 @@ class _CheckoutState extends State<Checkout> {
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: ArtistColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '$availableQuantity in stock',
+                  style: ArtistTextStyles.caption.copyWith(
+                    color: availableQuantity <= 3
+                        ? ArtistColors.error
+                        : ArtistColors.success,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -2114,13 +2346,21 @@ class _CheckoutState extends State<Checkout> {
           ],
 
           const SizedBox(height: 10),
-
           _priceRow(
-            'Fees & Delivery',
-            _formatPrice(
-              _platformFee.roundToDouble() + _taxAmount + _deliveryFee,
-            ),
-            valueColor: _deliveryFee == 0 ? null : ArtistColors.textPrimary,
+            'Platform fee (2%)',
+            _formatPrice(_platformFee.roundToDouble()),
+          ),
+          const SizedBox(height: 8),
+          _priceRow('GST on platform fee (18%)', _formatPrice(_taxAmount)),
+          const SizedBox(height: 8),
+          _priceRow(
+            _selectedDelivery == 'express'
+                ? 'Express delivery'
+                : 'Standard delivery',
+            _deliveryFee == 0 ? 'FREE' : _formatPrice(_deliveryFee),
+            valueColor: _deliveryFee == 0
+                ? ArtistColors.success
+                : ArtistColors.textPrimary,
           ),
 
           const SizedBox(height: 14),
@@ -2276,13 +2516,6 @@ class _CheckoutState extends State<Checkout> {
       _showMessage('Please add and select a delivery address.');
       return;
     }
-    if (_couponDiscount > 0 || _couponCode != null) {
-      _showMessage(
-        'Remove the coupon for now; coupon redemption is not available yet.',
-      );
-      return;
-    }
-
     await _refreshProducts();
     if (!mounted) return;
     if (_productError != null) {
@@ -2302,7 +2535,8 @@ class _CheckoutState extends State<Checkout> {
           items: List<Map<String, dynamic>>.from(_items),
           address: _selectedAddress,
           deliveryMethod: deliveryLabel,
-          savings: 0,
+          savings: _couponDiscount,
+          couponCode: _couponCode,
         ),
       ),
     );
@@ -2662,7 +2896,10 @@ class _CheckoutState extends State<Checkout> {
 
                     const SizedBox(width: 7),
 
-                    if (address['isDefault'] == true)
+                    if (address['isDefault'] == true ||
+                        address['isDefault'].toString().toLowerCase() ==
+                            'true' ||
+                        address['isDefault'].toString() == '1')
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 6,

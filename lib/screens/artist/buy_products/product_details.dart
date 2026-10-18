@@ -299,7 +299,11 @@ class _ProductDetailsState extends State<ProductDetails> {
       ),
       title: const Text(
         'Product Details',
-        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        style: TextStyle(
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+          color: ArtistColors.textPrimary,
+        ),
       ),
       centerTitle: true,
       actions: [
@@ -640,6 +644,9 @@ class _ProductDetailsState extends State<ProductDetails> {
               const Spacer(),
               TextButton(
                 onPressed: _openSellerProfile,
+                style: TextButton.styleFrom(
+                  foregroundColor: ArtistColors.primary,
+                ),
                 child: const Text(
                   'View Profile',
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
@@ -963,6 +970,9 @@ class _ProductDetailsState extends State<ProductDetails> {
               const Spacer(),
               TextButton(
                 onPressed: _openAllReviews,
+                style: TextButton.styleFrom(
+                  foregroundColor: ArtistColors.primary,
+                ),
                 child: const Text('See all'),
               ),
             ],
@@ -1438,6 +1448,9 @@ class _ProductDetailsState extends State<ProductDetails> {
                 ),
                 TextButton(
                   onPressed: _loadRelatedProducts,
+                  style: TextButton.styleFrom(
+                    foregroundColor: ArtistColors.primary,
+                  ),
                   child: const Text(
                     'See All',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),

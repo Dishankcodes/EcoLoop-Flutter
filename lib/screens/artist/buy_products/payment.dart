@@ -17,6 +17,7 @@ class Payment extends StatefulWidget {
     this.address,
     this.deliveryMethod = 'Standard Delivery',
     this.savings = 0,
+    this.couponCode,
   });
 
   final double totalAmount;
@@ -24,6 +25,7 @@ class Payment extends StatefulWidget {
   final Map<String, dynamic>? address;
   final String deliveryMethod;
   final double savings;
+  final String? couponCode;
 
   @override
   State<Payment> createState() => _PaymentState();
@@ -183,6 +185,8 @@ class _PaymentState extends State<Payment> {
         'shippingAddress': jsonEncode(address),
         'paymentMethod': 'cod',
         'deliveryMethod': widget.deliveryMethod,
+        if (widget.couponCode != null && widget.couponCode!.trim().isNotEmpty)
+          'couponCode': widget.couponCode!.trim().toUpperCase(),
       });
 
       if (response is! Map || response['orders'] is! List) {

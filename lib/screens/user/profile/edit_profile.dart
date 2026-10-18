@@ -25,7 +25,6 @@ class _EditProfileState extends State<EditProfile> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
-  final _bio = TextEditingController();
 
   final _formKey = GlobalKey<FormState>();
 
@@ -57,7 +56,6 @@ class _EditProfileState extends State<EditProfile> {
     _name.text = Prefs.getString('userName');
     _email.text = Prefs.getString('userEmail');
     _phone.text = Prefs.getString('userPhone');
-    _bio.text = Prefs.getString('userBio');
     _savedState = Prefs.getString('userState');
     _savedCity = Prefs.getString('userCity');
     _photoUrl = Prefs.getString('profilePhotoUrl');
@@ -71,7 +69,6 @@ class _EditProfileState extends State<EditProfile> {
     _name.dispose();
     _email.dispose();
     _phone.dispose();
-    _bio.dispose();
     super.dispose();
   }
 
@@ -150,7 +147,6 @@ class _EditProfileState extends State<EditProfile> {
         _phone.text = _str(data['phone']).isNotEmpty
             ? _str(data['phone'])
             : _str(data['mobile']);
-        _bio.text = _str(data['bio']);
 
         _savedState = _str(data['state']);
         _savedCity = _str(data['city']);
@@ -163,7 +159,6 @@ class _EditProfileState extends State<EditProfile> {
         Prefs.setString('userName', fullName),
         Prefs.setString('userEmail', _email.text),
         Prefs.setString('userPhone', _phone.text),
-        Prefs.setString('userBio', _bio.text),
         Prefs.setString('userState', _savedState),
         Prefs.setString('userCity', _savedCity),
         Prefs.setString('profilePhotoUrl', _photoUrl),
@@ -369,13 +364,10 @@ class _EditProfileState extends State<EditProfile> {
         phone: _phone.text.trim(),
       );
 
-      // About You needs backend support for persistence.
-      // Do not claim that bio is saved to Sheets unless Code.gs handles it.
       await Future.wait([
         Prefs.setString('userName', name),
         Prefs.setString('userState', state),
         Prefs.setString('userCity', city),
-        Prefs.setString('userBio', _bio.text.trim()),
       ]);
 
       if (!mounted) return;
@@ -698,14 +690,6 @@ class _EditProfileState extends State<EditProfile> {
                   _phone,
                   Icons.phone_outlined,
                   readOnly: true,
-                ),
-
-                _field(
-                  'About You',
-                  _bio,
-                  Icons.edit_note_rounded,
-                  maxLines: 4,
-                  maxLength: 150,
                 ),
 
                 const SizedBox(height: 15),

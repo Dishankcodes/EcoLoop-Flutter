@@ -34,6 +34,42 @@ class _MarketplaceState extends State<Marketplace> {
   bool _loadingProducts = true;
   String? _loadError;
   double _priceCeiling = 1000;
+  int? _currentArtistId;
+
+  /// Reads the authenticated artist ID from the existing /auth/me response.
+  /// The API may return the account directly or wrap it in data/account/user.
+  int? _artistIdFromResponse(dynamic response) {
+    dynamic current = response;
+
+    for (var depth = 0; depth < 4; depth++) {
+      if (current is! Map) return null;
+
+      final map = Map<String, dynamic>.from(current);
+      final role = _cleanString(
+        map['role'] ?? map['accountType'],
+      ).toLowerCase();
+
+      final rawId =
+          map['artistId'] ??
+          (role == 'artist' ? map['accountId'] ?? map['id'] : null);
+      final parsedId = _toInt(rawId, fallback: -1);
+      if (parsedId > 0) return parsedId;
+
+      if (map['account'] is Map) {
+        current = map['account'];
+      } else if (map['artist'] is Map) {
+        current = map['artist'];
+      } else if (map['user'] is Map) {
+        current = map['user'];
+      } else if (map['data'] is Map) {
+        current = map['data'];
+      } else {
+        return null;
+      }
+    }
+
+    return null;
+  }
 
   double _toDouble(dynamic value, {double fallback = 0}) {
     if (value is num) return value.toDouble();
@@ -59,6 +95,17 @@ class _MarketplaceState extends State<Marketplace> {
     }
 
     try {
+      // Identify the signed-in artist first so their own listings can never
+      // appear as purchasable marketplace products.
+      final rawAccount = await EcoLoopApi.instance.get('/auth/me');
+      final artistId = _artistIdFromResponse(rawAccount);
+      if (artistId == null) {
+        throw Exception(
+          'Could not identify the signed-in artist. Please sign in again and retry.',
+        );
+      }
+      _currentArtistId = artistId;
+
       // Product and category data both come from the existing Apps Script API.
       final rawProducts = await EcoLoopApi.instance.get('/products');
 
@@ -154,6 +201,18 @@ class _MarketplaceState extends State<Marketplace> {
             };
           })
           .where((product) => product['status'] == 'published')
+          // Hide only products owned by this artist. Products belonging to
+          // regular users or other artists remain visible.
+          .where((product) {
+            final sellerType = _cleanString(
+              product['sellerType'],
+              fallback: 'user',
+            ).toLowerCase();
+            final sellerId = _toInt(product['sellerId'], fallback: -1);
+            return !(sellerType == 'artist' &&
+                _currentArtistId != null &&
+                sellerId == _currentArtistId);
+          })
           .toList();
 
       rows.sort((a, b) {
