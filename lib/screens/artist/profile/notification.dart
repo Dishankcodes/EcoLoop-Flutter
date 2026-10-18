@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
+import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
 
 /// Account-scoped, sheet-backed EcoLoop notifications.
@@ -181,10 +182,9 @@ class _NotificationsState extends State<Notifications> {
                     Expanded(
                       child: Text(
                         title,
-                        style: const TextStyle(
+                        style: ArtistTextStyles.title.copyWith(
                           color: ArtistColors.textPrimary,
                           fontSize: 17,
-                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -193,7 +193,7 @@ class _NotificationsState extends State<Notifications> {
                 const SizedBox(height: 14),
                 Text(
                   message,
-                  style: const TextStyle(
+                  style: ArtistTextStyles.body.copyWith(
                     color: ArtistColors.textSecondary,
                     fontSize: 14,
                     height: 1.5,
@@ -204,7 +204,7 @@ class _NotificationsState extends State<Notifications> {
                   _formatDate(
                     notification['createdAt'] ?? notification['time'],
                   ),
-                  style: const TextStyle(
+                  style: ArtistTextStyles.caption.copyWith(
                     color: ArtistColors.textSecondary,
                     fontSize: 11,
                   ),
@@ -247,9 +247,12 @@ class _NotificationsState extends State<Notifications> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_rounded),
         ),
-        title: const Text(
+        title: Text(
           'Notifications',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          style: ArtistTextStyles.heading.copyWith(
+            fontSize: 18,
+            color: ArtistColors.textPrimary,
+          ),
         ),
         centerTitle: true,
         actions: [
@@ -366,7 +369,7 @@ class _NotificationsState extends State<Notifications> {
                           Expanded(
                             child: Text(
                               title,
-                              style: TextStyle(
+                              style: ArtistTextStyles.bodyMedium.copyWith(
                                 fontSize: 13,
                                 fontWeight: isRead
                                     ? FontWeight.w600
@@ -390,7 +393,7 @@ class _NotificationsState extends State<Notifications> {
                       const SizedBox(height: 5),
                       Text(
                         message,
-                        style: const TextStyle(
+                        style: ArtistTextStyles.body.copyWith(
                           fontSize: 11.5,
                           height: 1.45,
                           color: ArtistColors.textSecondary,
@@ -401,7 +404,7 @@ class _NotificationsState extends State<Notifications> {
                         _formatDate(
                           notification['createdAt'] ?? notification['time'],
                         ),
-                        style: const TextStyle(
+                        style: ArtistTextStyles.caption.copyWith(
                           fontSize: 9.5,
                           color: ArtistColors.textSecondary,
                         ),
@@ -465,9 +468,8 @@ class _NotificationsState extends State<Notifications> {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: ArtistTextStyles.title.copyWith(
             fontSize: 15,
-            fontWeight: FontWeight.w700,
             color: ArtistColors.textPrimary,
           ),
         ),
@@ -481,9 +483,8 @@ class _NotificationsState extends State<Notifications> {
             ),
             child: Text(
               subtitle,
-              style: const TextStyle(
+              style: ArtistTextStyles.small.copyWith(
                 fontSize: 9,
-                fontWeight: FontWeight.w600,
                 color: ArtistColors.primary,
               ),
             ),

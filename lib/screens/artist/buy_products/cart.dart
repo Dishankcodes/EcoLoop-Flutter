@@ -930,6 +930,15 @@ class _CartState extends State<Cart> {
                 onPressed: () {
                   Navigator.pop(context);
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ArtistColors.primary,
+                  foregroundColor: Colors.white,
+                  textStyle: ArtistTextStyles.button,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
                 icon: const Icon(Icons.storefront_outlined),
                 label: const Text('Continue Shopping'),
               ),

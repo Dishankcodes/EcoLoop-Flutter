@@ -30,11 +30,11 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   }
 
   String get orderDate {
-    return widget.order['createdAt']?.toString() ?? '-';
+    return _formatSheetDateTime(widget.order['createdAt']);
   }
 
   String get updatedDate {
-    return widget.order['updatedAt']?.toString() ?? '-';
+    return _formatSheetDateTime(widget.order['updatedAt']);
   }
 
   String get buyerId {
@@ -1466,6 +1466,74 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
 
   String _formatCurrency(double value) {
     return '₹${value.toStringAsFixed(0)}';
+  }
+
+  /// Formats timestamps returned from Google Sheets as readable Indian time.
+  /// ISO values ending in Z are UTC and are converted to Asia/Kolkata (UTC+5:30).
+  /// Sheet values already stored as 'yyyy-MM-dd HH:mm:ss' are treated as IST.
+  String _formatSheetDateTime(dynamic value) {
+    final raw = (value ?? '').toString().trim();
+    if (raw.isEmpty || raw == '-') return '-';
+
+    DateTime? parsed;
+    final sheetFormat = RegExp(
+      r'^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$',
+    ).firstMatch(raw);
+
+    if (sheetFormat != null) {
+      // Apps Script's yyyy-MM-dd HH:mm:ss format is already in IST.
+      parsed = DateTime(
+        int.parse(sheetFormat.group(1)!),
+        int.parse(sheetFormat.group(2)!),
+        int.parse(sheetFormat.group(3)!),
+        int.parse(sheetFormat.group(4)!),
+        int.parse(sheetFormat.group(5)!),
+        int.parse(sheetFormat.group(6) ?? '0'),
+      );
+    } else {
+      parsed = DateTime.tryParse(raw);
+      if (parsed != null) {
+        if (RegExp(
+          r'(Z|[+-]\d{2}:?\d{2})$',
+          caseSensitive: false,
+        ).hasMatch(raw)) {
+          // Normalize explicit timezone timestamps to UTC, then apply IST.
+          parsed = parsed.toUtc().add(const Duration(hours: 5, minutes: 30));
+        }
+      }
+    }
+
+    if (parsed == null) return raw;
+
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final day = parsed.day.toString().padLeft(2, '0');
+    final hour12 = parsed.hour % 12 == 0 ? 12 : parsed.hour % 12;
+    final minute = parsed.minute.toString().padLeft(2, '0');
+    final period = parsed.hour >= 12 ? 'PM' : 'AM';
+    final time = '$hour12:$minute $period';
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dateOnly = DateTime(parsed.year, parsed.month, parsed.day);
+    final difference = today.difference(dateOnly).inDays;
+
+    if (difference == 0) return 'Today, $time';
+    if (difference == 1) return 'Yesterday, $time';
+
+    return '$day ${months[parsed.month - 1]} ${parsed.year}, $time';
   }
 
   String _formatStatus(String value) {
