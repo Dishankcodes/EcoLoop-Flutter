@@ -206,24 +206,72 @@ class _UserHomeState extends State<UserHome> {
     return _number(_impact['ecoPoints']);
   }
 
+  String _normalizedIdentity(dynamic value) =>
+      (value ?? '').toString().trim().toLowerCase();
+
+  bool _isOwnProduct(Map<String, dynamic> product) {
+    // The dashboard is a discovery preview, so never recommend the signed-in
+    // user's own listing. The marketplace itself remains unchanged.
+    final profileId =
+        _profile['userId'] ??
+        _profile['user_id'] ??
+        _profile['id'] ??
+        _profile['idUser'];
+    final profileEmail = _normalizedIdentity(
+      _profile['email'] ?? _profile['gmail'] ?? _profile['userEmail'],
+    );
+
+    final productSellerId =
+        product['sellerId'] ??
+        product['seller_id'] ??
+        product['userId'] ??
+        product['user_id'] ??
+        product['ownerId'] ??
+        product['owner_id'];
+    final productSellerEmail = _normalizedIdentity(
+      product['sellerEmail'] ??
+          product['seller_email'] ??
+          product['userEmail'] ??
+          product['ownerEmail'],
+    );
+
+    final hasProfileId =
+        profileId != null && profileId.toString().trim().isNotEmpty;
+    final hasSellerId =
+        productSellerId != null && productSellerId.toString().trim().isNotEmpty;
+    if (hasProfileId &&
+        hasSellerId &&
+        profileId.toString().trim() == productSellerId.toString().trim()) {
+      return true;
+    }
+    return profileEmail.isNotEmpty &&
+        productSellerEmail.isNotEmpty &&
+        profileEmail == productSellerEmail;
+  }
+
   List<Map<String, dynamic>> get _visibleProducts {
     final query = _searchQuery.trim().toLowerCase();
-    if (query.isEmpty) return _products.take(8).toList();
-    return _products
-        .where((product) {
-          return [
-            'title',
-            'description',
-            'category',
-            'condition',
-            'seller',
-          ].any(
-            (key) =>
-                (product[key] ?? '').toString().toLowerCase().contains(query),
-          );
-        })
-        .take(8)
-        .toList();
+    final otherSellersProducts = _products.where(
+      (product) => !_isOwnProduct(product),
+    );
+    final matchingProducts = query.isEmpty
+        ? otherSellersProducts
+        : otherSellersProducts.where((product) {
+            return [
+              'title',
+              'description',
+              'category',
+              'condition',
+              'seller',
+            ].any(
+              (key) =>
+                  (product[key] ?? '').toString().toLowerCase().contains(query),
+            );
+          });
+
+    // Keep the home dashboard compact: show at most four available listings.
+    // The See all action still opens the full marketplace.
+    return matchingProducts.take(4).toList();
   }
 
   @override

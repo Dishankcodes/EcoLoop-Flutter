@@ -177,10 +177,75 @@ class _ProductDetailsState extends State<ProductDetails> {
       sellerType == 're_maker' ||
       sellerType == 're-maker';
 
-  String get location => [
+  String _firstNonEmpty(Iterable<dynamic> values, {String fallback = ''}) {
+    for (final value in values) {
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+    }
+    return fallback;
+  }
+
+  String get sellerArea => _firstNonEmpty([
+    _product['sellerArea'],
+    _product['seller_area'],
+    _product['area'],
+    _product['locality'],
+    _product['sellerLocality'],
+    _product['seller_locality'],
+  ]);
+
+  String get sellerLandmark => _firstNonEmpty([
+    _product['sellerLandmark'],
+    _product['seller_landmark'],
+    _product['landmark'],
+  ]);
+
+  String get sellerAddress => _firstNonEmpty([
+    _product['sellerAddress'],
+    _product['seller_address'],
+    _product['sellerAddressLine'],
+    _product['seller_address_line'],
+    _product['addressLine'],
+    _product['address_line'],
+    _product['address'],
+  ]);
+
+  String get sellerCity => _firstNonEmpty([
     _product['sellerCity'],
+    _product['seller_city'],
+    _product['city'],
+  ]);
+
+  String get sellerState => _firstNonEmpty([
     _product['sellerState'],
-  ].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
+    _product['seller_state'],
+    _product['state'],
+  ]);
+
+  String get sellerPincode => _firstNonEmpty([
+    _product['sellerPincode'],
+    _product['seller_pincode'],
+    _product['sellerPinCode'],
+    _product['seller_pin_code'],
+    _product['pincode'],
+    _product['pinCode'],
+    _product['postalCode'],
+    _product['postal_code'],
+    _product['zipCode'],
+  ]);
+
+  String get location => [
+    sellerArea,
+    sellerCity,
+    sellerState,
+  ].where((value) => value.isNotEmpty).join(', ');
+
+  String get _locationSummary => location.isNotEmpty
+      ? location
+      : _firstNonEmpty([
+          sellerAddress,
+        ], fallback: 'Tap to view location details');
 
   String get description =>
       _product['description']?.toString() ??
@@ -768,53 +833,265 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  /// Item location detail row widget.
+  /// Opens a compact in-page address card using the address fields returned
+  /// by the product/seller data from the Google Sheet backend.
   Widget _buildLocationSection() {
     return _section(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () {
-          _showMessage('Location details will be connected later.');
-        },
-        child: Row(
-          children: [
-            Container(
-              height: 43,
-              width: 43,
-              decoration: BoxDecoration(
-                color: AppColors.light,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.location_on_outlined,
-                color: AppColors.primary,
-              ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: _showItemLocationCard,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                Container(
+                  height: 43,
+                  width: 43,
+                  decoration: BoxDecoration(
+                    color: AppColors.light,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.location_on_outlined,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Item Location',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(_locationSummary, style: AppTextStyles.caption),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showItemLocationCard() {
+    final address = sellerAddress;
+    final area = sellerArea;
+    final landmark = sellerLandmark;
+    final city = sellerCity;
+    final state = sellerState;
+    final pin = sellerPincode;
+    final hasAddress = [
+      address,
+      area,
+      landmark,
+      city,
+      state,
+      pin,
+    ].any((value) => value.isNotEmpty);
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppColors.accent.withOpacity(0.45)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
                 children: [
-                  const Text(
-                    'Item Location',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                  Container(
+                    height: 44,
+                    width: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.light,
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: const Icon(
+                      Icons.location_on_rounded,
+                      color: AppColors.primary,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(location, style: AppTextStyles.caption),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Item location',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 3),
+                        Text(
+                          'Listing address details',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
                 ],
               ),
-            ),
-            const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: AppColors.textSecondary,
-            ),
-          ],
+              const SizedBox(height: 18),
+              if (!hasAddress)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: const Text(
+                    'The seller has not provided address details for this listing yet.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.45,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                )
+              else ...[
+                if (address.isNotEmpty)
+                  _addressDetailRow(Icons.home_outlined, 'Address', address),
+                if (area.isNotEmpty)
+                  _addressDetailRow(
+                    Icons.map_outlined,
+                    'Area / Locality',
+                    area,
+                  ),
+                if (landmark.isNotEmpty)
+                  _addressDetailRow(Icons.place_outlined, 'Landmark', landmark),
+                if (city.isNotEmpty)
+                  _addressDetailRow(Icons.location_city_outlined, 'City', city),
+                if (state.isNotEmpty)
+                  _addressDetailRow(
+                    Icons.account_balance_outlined,
+                    'State',
+                    state,
+                  ),
+                if (pin.isNotEmpty)
+                  _addressDetailRow(
+                    Icons.markunread_mailbox_outlined,
+                    'PIN code',
+                    pin,
+                  ),
+              ],
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: AppColors.light.withOpacity(0.65),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.shield_outlined,
+                      size: 17,
+                      color: AppColors.primary,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Use the address only to understand the item location. Coordinate any collection or delivery through EcoLoop.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.4,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _addressDetailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 105,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -908,29 +1185,41 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  /// Helper row widget for individual item specification items.
+  /// Consistent two-column specification row. The label stays aligned on the
+  /// left and the value stays right-aligned, wrapping cleanly on narrow screens.
   Widget _infoRow(IconData icon, String title, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 19, color: AppColors.primary),
+          Icon(icon, size: 18, color: AppColors.primary),
           const SizedBox(width: 10),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
+          Expanded(
+            flex: 5,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ),
           ),
-          const Spacer(),
-          Flexible(
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 6,
             child: Text(
               value,
               textAlign: TextAlign.right,
+              softWrap: true,
               style: const TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                height: 1.35,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
             ),

@@ -21,8 +21,6 @@ class Marketplace extends StatefulWidget {
 
   final String? initialSearch;
   final String? initialCategory;
-
-  /// When launched from checkout, selecting a product returns it to that same checkout route.
   final bool returnToCheckoutOnSelect;
 
   @override
@@ -30,20 +28,23 @@ class Marketplace extends StatefulWidget {
 }
 
 class _MarketplaceState extends State<Marketplace> {
+  // Short-lived in-memory catalogue cache. Returning from product details or
+  // checkout can paint listings immediately while a background refresh runs.
+  static List<Map<String, dynamic>>? _cachedProducts;
+  static List<String>? _cachedCategories;
+  static DateTime? _catalogueCacheTime;
+  static const Duration _catalogueCacheTtl = Duration(minutes: 2);
+  bool _refreshInProgress = false;
+
   // STATE
 
   String selectedCategory = 'All';
-
   String searchQuery = '';
   String selectedCondition = 'All';
   String selectedSort = 'Newest First';
-
   RangeValues priceRange = const RangeValues(0, 10000);
-
   final TextEditingController _searchController = TextEditingController();
-
   List<String> _backendCategories = [];
-
   List<String> get categories => ['All', ..._backendCategories];
 
   List<String> get conditions {
@@ -89,7 +90,6 @@ class _MarketplaceState extends State<Marketplace> {
     _loadProducts();
 
     searchQuery = widget.initialSearch ?? '';
-
     _searchController.text = searchQuery;
 
     if (widget.initialCategory != null &&
@@ -202,6 +202,7 @@ class _MarketplaceState extends State<Marketplace> {
           // If the public products request finished first, remove owned
           // listings as soon as the account's own-product IDs arrive.
           products.removeWhere(_isOwnProduct);
+          _cachedProducts = List<Map<String, dynamic>>.from(products);
         });
       }
     } catch (_) {
@@ -313,39 +314,53 @@ class _MarketplaceState extends State<Marketplace> {
     }
   }
 
-  Future<void> _loadProducts() async {
-    // The public catalogue is the critical request. Identity, own-listings,
-    // and wishlist are optional and must never hold the marketplace spinner.
-    unawaited(_loadAccountAndWishlist());
-    if (mounted) {
+  Future<void> _loadProducts({bool forceRefresh = false}) async {
+    // Use the in-memory snapshot immediately on subsequent visits. The cache is
+    // deliberately short-lived; a background refresh keeps stock/listings fresh.
+    final cached = _cachedProducts;
+    final cacheTime = _catalogueCacheTime;
+    final cacheIsFresh =
+        cached != null &&
+        cacheTime != null &&
+        DateTime.now().difference(cacheTime) < _catalogueCacheTtl;
+
+    if (cached != null && !forceRefresh) {
+      if (mounted) {
+        setState(() {
+          products = List<Map<String, dynamic>>.from(cached);
+          _backendCategories = List<String>.from(_cachedCategories ?? const []);
+          _loadingProducts = false;
+          _productsError = null;
+          _refreshInProgress = !cacheIsFresh;
+        });
+      }
+      // Fresh cached data does not need another slow Apps Script request on
+      // every navigation. Stale data refreshes quietly in the background.
+      if (cacheIsFresh) {
+        unawaited(_loadAccountAndWishlist());
+        return;
+      }
+    } else if (mounted) {
       setState(() {
-        _loadingProducts = true;
+        _loadingProducts = cached == null;
         _productsError = null;
+        _refreshInProgress = true;
       });
     }
+
+    unawaited(_loadAccountAndWishlist());
     try {
-      final results = await Future.wait<dynamic>([
-        _api.get('/products'),
-        _api.get('/categories'),
-      ]);
-      final categoryRows = _extractRows(results[1], [
-        'categories',
-        'items',
-        'data',
-      ]);
-      final categoryMap = <String, String>{};
-      final backendCategoryNames = <String>{};
-      for (final raw in categoryRows) {
-        final row = _asMap(raw);
-        final id = (row['categoryId'] ?? row['category_id'] ?? row['id'] ?? '')
-            .toString();
-        final name = (row['name'] ?? row['categoryName'] ?? row['title'] ?? '')
-            .toString()
-            .trim();
-        if (id.isNotEmpty && name.isNotEmpty) categoryMap[id] = name;
-        if (name.isNotEmpty) backendCategoryNames.add(name);
-      }
-      final rows = _extractRows(results[0], ['products', 'items', 'data']);
+      // Do not wait for categories before rendering the catalogue. Products are
+      // the critical request; category labels are fetched concurrently and can
+      // be applied after products arrive.
+      final productsFuture = _api.get('/products');
+      final categoriesFuture = _api
+          .get('/categories')
+          .then<dynamic>((value) => value)
+          .catchError((_) => <dynamic>[]);
+
+      final rawProducts = await productsFuture;
+      final rows = _extractRows(rawProducts, ['products', 'items', 'data']);
       final mapped = <Map<String, dynamic>>[];
       for (final raw in rows) {
         final row = _asMap(raw);
@@ -373,14 +388,6 @@ class _MarketplaceState extends State<Marketplace> {
             : <String>[];
         final image = (row['image'] ?? (images.isNotEmpty ? images.first : ''))
             .toString();
-        final categoryId = (row['categoryId'] ?? row['category_id'] ?? '')
-            .toString();
-        final sellerType = (row['sellerType'] ?? row['seller_type'] ?? 'user')
-            .toString()
-            .toLowerCase();
-        final sellerName =
-            (row['sellerName'] ?? row['seller'] ?? row['artistName'] ?? '')
-                .toString();
         final city = (row['sellerCity'] ?? row['city'] ?? '').toString();
         final state = (row['sellerState'] ?? row['state'] ?? '').toString();
         mapped.add(<String, dynamic>{
@@ -388,17 +395,19 @@ class _MarketplaceState extends State<Marketplace> {
           'id': id,
           'productId': id,
           'sellerId': row['sellerId'] ?? row['seller_id'],
-          'sellerType': sellerType,
+          'sellerType': (row['sellerType'] ?? row['seller_type'] ?? 'user')
+              .toString()
+              .toLowerCase(),
           'title': (row['title'] ?? row['productName'] ?? '').toString(),
           'price': row['price'] ?? row['unitPrice'] ?? 0,
           'condition': (row['condition'] ?? '').toString(),
-          'category':
-              row['category'] ??
-              row['categoryName'] ??
-              categoryMap[categoryId] ??
-              '',
-          'seller': sellerName,
-          'sellerName': sellerName,
+          'category': row['category'] ?? row['categoryName'] ?? '',
+          'seller':
+              (row['sellerName'] ?? row['seller'] ?? row['artistName'] ?? '')
+                  .toString(),
+          'sellerName':
+              (row['sellerName'] ?? row['seller'] ?? row['artistName'] ?? '')
+                  .toString(),
           'location': [
             city,
             state,
@@ -414,9 +423,9 @@ class _MarketplaceState extends State<Marketplace> {
           'createdAt': row['createdAt'] ?? row['created_at'],
         });
       }
-      // Exclude this signed-in account's own listings from marketplace results.
-      mapped.removeWhere(_isOwnProduct);
 
+      // Apply account-owned listing IDs that have already arrived, then sort.
+      mapped.removeWhere(_isOwnProduct);
       mapped.sort((a, b) {
         final aDate =
             DateTime.tryParse((a['createdAt'] ?? '').toString()) ??
@@ -426,35 +435,76 @@ class _MarketplaceState extends State<Marketplace> {
             DateTime.fromMillisecondsSinceEpoch(0);
         return bDate.compareTo(aDate);
       });
-      if (!mounted) return;
-      setState(() {
-        products = mapped;
-        _backendCategories = backendCategoryNames.toList()
-          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-        if (widget.initialCategory != null &&
-            _backendCategories.contains(widget.initialCategory)) {
-          selectedCategory = widget.initialCategory!;
-        }
-        for (final product in mapped) {
-          final category = (product['category'] ?? '').toString().trim();
-          if (category.isNotEmpty && !_backendCategories.contains(category)) {
-            _backendCategories.add(category);
-          }
-        }
-        final maximumPrice = mapped.fold<double>(0, (current, product) {
-          final raw = product['price'];
-          final value = raw is num
-              ? raw.toDouble()
-              : double.tryParse((raw ?? '').toString()) ?? 0;
-          return value > current ? value : current;
+
+      // Render products now; category endpoint latency must not hold the grid.
+      _cachedProducts = List<Map<String, dynamic>>.from(mapped);
+      _catalogueCacheTime = DateTime.now();
+      if (mounted) {
+        setState(() {
+          products = mapped;
+          _loadingProducts = false;
+          _productsError = null;
+          _refreshInProgress = false;
+          final maxPrice = mapped.fold<double>(0, (current, product) {
+            final raw = product['price'];
+            final value = raw is num
+                ? raw.toDouble()
+                : double.tryParse((raw ?? '').toString()) ?? 0;
+            return value > current ? value : current;
+          });
+          final safeMaximum = maxPrice > 0 ? maxPrice : 100;
+          priceRange = RangeValues(
+            priceRange.start.clamp(0.0, safeMaximum).toDouble(),
+            priceRange.end.clamp(0.0, safeMaximum).toDouble(),
+          );
         });
-        final safeMaximum = maximumPrice > 0 ? maximumPrice : 100;
-        priceRange = RangeValues(
-          priceRange.start.clamp(0.0, safeMaximum).toDouble(),
-          priceRange.end.clamp(0.0, safeMaximum).toDouble(),
-        );
-        _loadingProducts = false;
-      });
+      }
+
+      // Categories finish independently and update labels without blocking the
+      // initial product display.
+      unawaited(() async {
+        final rawCategories = await categoriesFuture;
+        final categoryRows = _extractRows(rawCategories, [
+          'categories',
+          'items',
+          'data',
+        ]);
+        final categoryMap = <String, String>{};
+        final names = <String>{};
+        for (final raw in categoryRows) {
+          final row = _asMap(raw);
+          final id =
+              (row['categoryId'] ?? row['category_id'] ?? row['id'] ?? '')
+                  .toString();
+          final name =
+              (row['name'] ?? row['categoryName'] ?? row['title'] ?? '')
+                  .toString()
+                  .trim();
+          if (id.isNotEmpty && name.isNotEmpty) categoryMap[id] = name;
+          if (name.isNotEmpty) names.add(name);
+        }
+        if (!mounted) return;
+        setState(() {
+          for (final product in products) {
+            final categoryId =
+                (product['categoryId'] ?? product['category_id'] ?? '')
+                    .toString();
+            if ((product['category'] ?? '').toString().trim().isEmpty &&
+                categoryMap.containsKey(categoryId)) {
+              product['category'] = categoryMap[categoryId];
+            }
+            final category = (product['category'] ?? '').toString().trim();
+            if (category.isNotEmpty) names.add(category);
+          }
+          _backendCategories = names.toList()
+            ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+          _cachedCategories = List<String>.from(_backendCategories);
+          if (widget.initialCategory != null &&
+              _backendCategories.contains(widget.initialCategory)) {
+            selectedCategory = widget.initialCategory!;
+          }
+        });
+      }());
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -463,6 +513,7 @@ class _MarketplaceState extends State<Marketplace> {
             .replaceFirst('Exception: ', '')
             .replaceFirst('DioException [bad response]: ', '');
         _loadingProducts = false;
+        _refreshInProgress = false;
       });
     }
   }

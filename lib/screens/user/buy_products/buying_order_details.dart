@@ -213,36 +213,16 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         .toDouble();
   }
 
-  String get _deliveryResponsibility {
-    final raw =
-        (widget.order['deliveryResponsibility'] ??
-                widget.order['deliveryService'] ??
-                widget.order['productDeliveryMethod'] ??
-                widget.order['deliveryType'] ??
-                '')
-            .toString()
-            .trim()
-            .toLowerCase()
-            .replaceAll('_', ' ')
-            .replaceAll('-', ' ');
-    if (raw.contains('free delivery') ||
-        raw == 'seller' ||
-        raw.contains('self'))
-      return 'Free Delivery (seller-managed)';
-    if (raw.contains('ecoloop') || raw.contains('managed'))
-      return 'EcoLoop-Managed Delivery';
-    return raw.isEmpty
-        ? 'Not provided by order'
-        : raw
-              .split(' ')
-              .map(
-                (w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}',
-              )
-              .join(' ');
+  String get deliveryMethod {
+    final raw = (widget.order['deliveryMethod'] ?? 'Standard')
+        .toString()
+        .trim();
+    if (raw.isEmpty) return 'Standard';
+    final normalized = raw.toLowerCase();
+    if (normalized.contains('express')) return 'Express';
+    if (normalized.contains('standard')) return 'Standard';
+    return raw[0].toUpperCase() + raw.substring(1);
   }
-
-  String get deliveryMethod =>
-      widget.order['deliveryMethod']?.toString() ?? 'Standard Delivery';
 
   String get expectedDate {
     final value =
@@ -250,6 +230,40 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     return value == null || value.toString().trim().isEmpty
         ? 'Not available'
         : value.toString();
+  }
+
+  String? get _productImageUrl {
+    dynamic value =
+        widget.order['productImageUrl'] ??
+        widget.order['imageUrl'] ??
+        widget.order['image'] ??
+        widget.order['productImage'] ??
+        widget.order['imageUrls'] ??
+        widget.order['productImageUrls'];
+    if (value is List) {
+      value = value.firstWhere(
+        (item) => item != null && item.toString().trim().isNotEmpty,
+        orElse: () => null,
+      );
+    } else if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.startsWith('[')) {
+        try {
+          final decoded = jsonDecode(trimmed);
+          if (decoded is List && decoded.isNotEmpty) value = decoded.first;
+        } catch (_) {}
+      }
+    }
+    final url = value?.toString().trim() ?? '';
+    return url.startsWith('http://') || url.startsWith('https://') ? url : null;
+  }
+
+  bool get _isArtistSeller {
+    final type = (widget.order['sellerType'] ?? 'user')
+        .toString()
+        .trim()
+        .toLowerCase();
+    return type == 'artist' || type == 'remaker';
   }
 
   IconData get productIcon {
@@ -1046,7 +1060,30 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                     color: AppColors.light,
                     borderRadius: BorderRadius.circular(15),
                   ),
-                  child: Icon(productIcon, size: 38, color: AppColors.primary),
+                  clipBehavior: Clip.antiAlias,
+                  child: _productImageUrl == null
+                      ? Icon(productIcon, size: 38, color: AppColors.primary)
+                      : Image.network(
+                          _productImageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(
+                            productIcon,
+                            size: 38,
+                            color: AppColors.primary,
+                          ),
+                          loadingBuilder: (context, child, progress) =>
+                              progress == null
+                              ? child
+                              : const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                        ),
                 ),
                 const SizedBox(width: 13),
                 Expanded(
@@ -1128,18 +1165,21 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Row(
+                    Row(
                       children: [
-                        Icon(
-                          Icons.star_rounded,
-                          size: 14,
-                          color: Colors.orange,
-                        ),
-                        SizedBox(width: 3),
+                        if (_isArtistSeller) ...[
+                          const Icon(
+                            Icons.verified_rounded,
+                            size: 14,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
                         Text(
-                          '4.8  •  Verified Seller',
-                          style: TextStyle(
+                          _isArtistSeller ? 'Verified Artist' : 'Seller',
+                          style: const TextStyle(
                             fontSize: 10,
+                            fontWeight: FontWeight.w600,
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -1149,9 +1189,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                 ),
               ),
               OutlinedButton(
-                onPressed: () {
-                  _showMessage('Seller contact will be connected later.');
-                },
+                onPressed: _showSellerContact,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primary,
                   side: const BorderSide(color: AppColors.primary),
@@ -1262,12 +1300,6 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             Icons.local_shipping_outlined,
             'Delivery speed',
             deliveryMethod,
-          ),
-          const SizedBox(height: 12),
-          _detailRow(
-            Icons.storefront_outlined,
-            'Delivery responsibility',
-            _deliveryResponsibility,
           ),
           const SizedBox(height: 12),
           _detailRow(
@@ -1841,21 +1873,238 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     }
   }
 
-  /// Shows payment-support guidance without inventing an email or phone number.
+  /// Shows EcoLoop's support email and the current order reference.
   void _contactEcoLoop() {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surface,
         title: const Text('Contact EcoLoop'),
-        content: Text(
-          'If your refund has not arrived after 7 days, contact EcoLoop support and provide order ID $orderId. Please use the official EcoLoop support contact provided by the app or its administrator.',
-          style: const TextStyle(height: 1.5),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'For order or refund support, email us at:',
+              style: TextStyle(height: 1.5),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.light,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const SelectableText(
+                'ecoloopp2026@gmail.com',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Please include Order ID $orderId in your message.',
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showSellerContact() async {
+    final sellerId = _safeId(widget.order['sellerId']);
+    final isArtist = _isArtistSeller;
+    Map<String, dynamic> contact = <String, dynamic>{
+      'name': sellerName,
+      'phone': widget.order['sellerPhone'] ?? widget.order['phone'] ?? '',
+      'email': widget.order['sellerEmail'] ?? widget.order['email'] ?? '',
+      'city': widget.order['sellerCity'] ?? '',
+      'state': widget.order['sellerState'] ?? '',
+    };
+
+    if (sellerId > 0) {
+      try {
+        final response = await EcoLoopApi.instance.get(
+          isArtist
+              ? '/sellers/artist/$sellerId/contact'
+              : '/sellers/user/$sellerId/contact',
+        );
+        if (response is Map)
+          contact = {...contact, ...Map<String, dynamic>.from(response)};
+      } catch (_) {
+        // Keep any seller contact fields already present on the order as a fallback.
+      }
+    }
+    if (!mounted) return;
+
+    final phone = (contact['phone'] ?? '').toString().trim();
+    final email = (contact['email'] ?? '').toString().trim();
+    final location = [contact['city'], contact['state']]
+        .where((value) => value != null && value.toString().trim().isNotEmpty)
+        .map((value) => value.toString().trim())
+        .join(', ');
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.storefront_outlined,
+                    color: AppColors.primary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      isArtist ? 'Verified Artist' : 'Seller Contact',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                (contact['name'] ?? sellerName).toString(),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (phone.isNotEmpty)
+                _contactInfoRow(Icons.phone_outlined, 'Phone', phone),
+              if (email.isNotEmpty)
+                _contactInfoRow(Icons.email_outlined, 'Email', email),
+              if (location.isNotEmpty)
+                _contactInfoRow(
+                  Icons.location_on_outlined,
+                  'Location',
+                  location,
+                ),
+              if (phone.isEmpty && email.isEmpty && location.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Contact details are not available for this seller yet.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+              const SizedBox(height: 14),
+              const Text(
+                'Contact EcoLoop',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Row(
+                children: [
+                  Icon(
+                    Icons.support_agent_outlined,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                  SizedBox(width: 9),
+                  Expanded(
+                    child: SelectableText(
+                      'ecoloopp2026@gmail.com',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _contactInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 19, color: AppColors.primary),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 58,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: SelectableText(
+              value,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
           ),
         ],
       ),
