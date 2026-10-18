@@ -21,6 +21,7 @@ class Payment extends StatefulWidget {
     this.deliveryMethod = 'Standard Delivery',
 
     this.savings = 0,
+    this.couponCode,
     this.clearCartAfterSuccess = false,
   });
 
@@ -33,6 +34,7 @@ class Payment extends StatefulWidget {
   final String deliveryMethod;
 
   final double savings;
+  final String? couponCode;
   final bool clearCartAfterSuccess;
 
   @override
@@ -216,6 +218,8 @@ class _PaymentState extends State<Payment> {
         'shippingAddress': widget.address,
         'paymentMethod': 'cod',
         'deliveryMethod': 'standard',
+        if (widget.couponCode != null && widget.couponCode!.isNotEmpty)
+          'couponCode': widget.couponCode,
         'clearCartAfterSuccess': widget.clearCartAfterSuccess,
         'requestId': _checkoutRequestId,
       });

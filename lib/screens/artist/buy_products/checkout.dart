@@ -80,10 +80,8 @@ class _CheckoutState extends State<Checkout> {
     super.initState();
 
     _loadItems();
-    // Coupons are shown in the existing UI, but are not applied locally because
-    // the backend does not yet validate/redeem coupon codes.
-    _couponCode = null;
-    _couponDiscount = 0;
+    _couponCode = widget.initialCouponCode?.trim().toUpperCase();
+    _couponDiscount = widget.initialCouponDiscount;
     _loadAddresses();
     _refreshProducts();
     _loadMoreItems();
@@ -516,19 +514,45 @@ class _CheckoutState extends State<Checkout> {
     return total;
   }
 
+  // A seller is charged delivery only once per checkout, even when the
+  // basket contains multiple products from that same seller.
+  String _sellerKey(Map<String, dynamic> item) {
+    final sellerId = item['sellerId'] ?? item['artistId'] ?? item['userId'];
+    final sellerType = (item['sellerType'] ?? item['accountType'] ?? 'user')
+        .toString()
+        .trim()
+        .toLowerCase();
+    if (sellerId != null && sellerId.toString().trim().isNotEmpty) {
+      return '$sellerType:${sellerId.toString().trim()}';
+    }
+    final sellerName = (item['sellerName'] ?? item['seller'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    // Fallback for API rows without seller IDs; don't charge twice for the
+    // same seller name. Product ID is only a last resort when identity is absent.
+    return sellerName.isNotEmpty
+        ? 'name:$sellerName'
+        : 'product:${item['productId'] ?? item['id'] ?? ''}';
+  }
+
   double get _standardDeliveryFee {
     final buyerCity = (_selectedAddress?['city'] ?? '')
         .toString()
         .trim()
         .toLowerCase();
+    final chargedSellers = <String>{};
     var fee = 0.0;
     for (final item in _items) {
+      final key = _sellerKey(item);
+      if (!chargedSellers.add(key)) continue;
       final sellerCity =
           (item['sellerCity'] ??
                   item['seller_city'] ??
                   (item['seller'] is Map
                       ? (item['seller'] as Map)['city']
                       : null) ??
+                  item['city'] ??
                   '')
               .toString()
               .trim()
@@ -542,8 +566,10 @@ class _CheckoutState extends State<Checkout> {
     return fee;
   }
 
+  int get _uniqueSellerCount => _items.map(_sellerKey).toSet().length;
+
   double get _deliveryFee => _selectedDelivery == 'express'
-      ? 99.0 * _items.length
+      ? 99.0 * _uniqueSellerCount
       : _standardDeliveryFee;
 
   double get _platformFee => _items.fold<double>(0, (sum, item) {
@@ -574,8 +600,8 @@ class _CheckoutState extends State<Checkout> {
     if (_couponCode == null) return;
     final code = _couponCode!;
     final eligible = switch (code) {
-      'ECO100' => _subtotal >= 1499,
-      'FIRSTLOOP' => _subtotal >= 500,
+      'ECO100' => _subtotal >= 1599,
+      'LOOP50' => _subtotal >= 999,
       'RECYCLE20' => _subtotal >= 499,
       _ => false,
     };
@@ -586,7 +612,7 @@ class _CheckoutState extends State<Checkout> {
     }
     final amount = switch (code) {
       'ECO100' => 100.0,
-      'FIRSTLOOP' => (_subtotal * 0.10).roundToDouble(),
+      'LOOP50' => 50.0,
       'RECYCLE20' => 20.0,
       _ => 0.0,
     };
@@ -992,7 +1018,7 @@ class _CheckoutState extends State<Checkout> {
                   title: 'Express Delivery',
                   subtitle: 'Delivery in 1–2 business days',
                   price: _formatPrice(
-                    99.0 * (_items.isEmpty ? 1 : _items.length),
+                    99.0 * (_uniqueSellerCount == 0 ? 1 : _uniqueSellerCount),
                   ),
                   icon: Icons.speed_outlined,
                 ),
@@ -1128,8 +1154,8 @@ class _CheckoutState extends State<Checkout> {
                   sheetContext,
                   code: 'ECO100',
                   title: '₹100 OFF',
-                  subtitle: 'On orders above ₹1,499',
-                  minimumOrder: 1499,
+                  subtitle: 'On orders of ₹1,599 or more',
+                  minimumOrder: 1599,
                   discount: 100,
                 ),
 
@@ -1137,11 +1163,11 @@ class _CheckoutState extends State<Checkout> {
 
                 _checkoutCouponTile(
                   sheetContext,
-                  code: 'FIRSTLOOP',
-                  title: '10% OFF',
-                  subtitle: 'On orders above ₹500',
-                  minimumOrder: 500,
-                  percentage: 0.10,
+                  code: 'LOOP50',
+                  title: '₹50 OFF',
+                  subtitle: 'On orders of ₹999 or more',
+                  minimumOrder: 999,
+                  discount: 50,
                 ),
 
                 const SizedBox(height: 10),
@@ -1150,7 +1176,7 @@ class _CheckoutState extends State<Checkout> {
                   sheetContext,
                   code: 'RECYCLE20',
                   title: '₹20 OFF',
-                  subtitle: 'On orders above ₹499',
+                  subtitle: 'On orders of ₹499 or more',
                   minimumOrder: 499,
                   discount: 20,
                 ),

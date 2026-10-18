@@ -53,9 +53,11 @@ class _CheckoutState extends State<Checkout> {
   @override
   void initState() {
     super.initState();
-    // No coupon endpoint currently validates/redempts discounts. Do not allow
-    // a UI-provided amount to change the order total.
-    _couponCode = null;
+    _couponCode = widget.initialCouponCode?.trim().toUpperCase();
+    if (_couponCode != null &&
+        !{'RECYCLE20', 'LOOP50', 'ECO100'}.contains(_couponCode)) {
+      _couponCode = null;
+    }
     _couponDiscount = 0;
 
     if (widget.items != null) {
@@ -196,22 +198,87 @@ class _CheckoutState extends State<Checkout> {
     return sum + (fee * 0.18).roundToDouble();
   });
 
+  String _sellerKey(Map<String, dynamic> item) {
+    final sellerId =
+        item['sellerId'] ??
+        item['seller_id'] ??
+        item['ownerId'] ??
+        item['owner_id'];
+    final sellerType =
+        (item['sellerType'] ??
+                item['seller_type'] ??
+                item['ownerType'] ??
+                item['owner_type'] ??
+                'user')
+            .toString()
+            .trim()
+            .toLowerCase();
+    if (sellerId != null && sellerId.toString().trim().isNotEmpty) {
+      return '$sellerType:${sellerId.toString().trim()}';
+    }
+    final sellerName =
+        (item['seller'] ?? item['sellerName'] ?? item['artistName'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+    return sellerName.isEmpty
+        ? 'product:${item['productId']}'
+        : 'name:$sellerName';
+  }
+
   double get _deliveryCharges {
     final buyerCity = (_selectedAddress?['city'] ?? '')
         .toString()
         .trim()
         .toLowerCase();
     if (buyerCity.isEmpty) return 0;
-    return _items.fold<double>(0, (sum, item) {
-      final sellerCity = (item['sellerCity'] ?? '')
-          .toString()
-          .trim()
-          .toLowerCase();
-      return sum + (sellerCity.isNotEmpty && sellerCity != buyerCity ? 40 : 0);
-    });
+    final chargedSellers = <String>{};
+    var total = 0.0;
+    for (final item in _items) {
+      final sellerKey = _sellerKey(item);
+      if (!chargedSellers.add(sellerKey)) continue;
+      final sellerCity =
+          (item['sellerCity'] ?? item['seller_city'] ?? item['city'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
+      if (sellerCity.isNotEmpty && sellerCity != buyerCity) total += 40;
+    }
+    return total;
   }
 
-  double get _couponSavings => _couponDiscount.clamp(0.0, _subtotal).toDouble();
+  int _couponMinimum(String code) {
+    switch (code.toUpperCase()) {
+      case 'RECYCLE20':
+        return 499;
+      case 'LOOP50':
+        return 999;
+      case 'ECO100':
+        return 1599;
+      default:
+        return 0;
+    }
+  }
+
+  double _couponAmount(String code) {
+    switch (code.toUpperCase()) {
+      case 'RECYCLE20':
+        return 20;
+      case 'LOOP50':
+        return 50;
+      case 'ECO100':
+        return 100;
+      default:
+        return 0;
+    }
+  }
+
+  double get _couponSavings {
+    if (_couponCode == null) return 0;
+    final code = _couponCode!.toUpperCase();
+    if (_couponMinimum(code) == 0 || _subtotal < _couponMinimum(code)) return 0;
+    return _couponAmount(code).clamp(0.0, _subtotal).toDouble();
+  }
 
   double get _grandTotal {
     final value =
@@ -647,7 +714,7 @@ class _CheckoutState extends State<Checkout> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Enter a coupon code issued by EcoLoop. Discount is not applied until the backend confirms its validity.',
+                'RECYCLE20: ₹20 off at ₹499 · LOOP50: ₹50 off at ₹999 · ECO100: ₹100 off at ₹1,599. Minimum is based on product subtotal.',
               ),
               const SizedBox(height: 12),
               TextField(
@@ -668,11 +735,26 @@ class _CheckoutState extends State<Checkout> {
                       _message('Enter a coupon code.');
                       return;
                     }
-                    // Do not fabricate a discount: coupon validation must be implemented server-side.
-                    _message(
-                      'Coupon validation is not enabled in this API yet. No discount was applied.',
-                    );
+                    final minimum = _couponMinimum(code);
+                    final discount = _couponAmount(code);
+                    if (minimum == 0) {
+                      _message(
+                        'Invalid coupon. Use RECYCLE20, LOOP50 or ECO100.',
+                      );
+                      return;
+                    }
+                    if (_subtotal < minimum) {
+                      _message(
+                        '$code requires a product subtotal of at least ${_money(minimum)}.',
+                      );
+                      return;
+                    }
+                    setState(() {
+                      _couponCode = code;
+                      _couponDiscount = discount;
+                    });
                     Navigator.pop(sheetContext);
+                    _message('$code applied. You save ${_money(discount)}.');
                   },
                   child: const Text('Validate coupon'),
                 ),
@@ -770,7 +852,8 @@ class _CheckoutState extends State<Checkout> {
                 .toList(),
             address: address,
             deliveryMethod: 'Standard Delivery',
-            savings: 0,
+            savings: _couponSavings,
+            couponCode: _couponCode,
             clearCartAfterSuccess: widget.clearCartAfterOrder,
           ),
         ),
@@ -1255,7 +1338,7 @@ class _CheckoutState extends State<Checkout> {
           Text(
             city.isEmpty
                 ? 'Select a delivery address to calculate delivery charges.'
-                : '₹40 per item applies when the buyer and seller are in different cities.',
+                : '₹40 per seller applies when the buyer and seller are in different cities. Multiple products from one seller share one delivery charge.',
             style: AppTextStyles.caption.copyWith(height: 1.35),
           ),
         ],
@@ -1280,7 +1363,7 @@ class _CheckoutState extends State<Checkout> {
                 const SizedBox(height: 3),
                 Text(
                   _couponCode == null
-                      ? 'Use an eligible EcoLoop coupon'
+                      ? '₹20 off ₹499 · ₹50 off ₹999 · ₹100 off ₹1,599'
                       : 'Coupon: $_couponCode',
                   style: AppTextStyles.caption,
                 ),
