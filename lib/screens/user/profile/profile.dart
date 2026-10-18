@@ -753,18 +753,6 @@ class _ProfileState extends State<Profile> {
     );
   }
 
-  // COMING SOON MESSAGE
-
-  void _showComingSoon(BuildContext context, String page) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$page will be connected next.'),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-      ),
-    );
-  }
-
   // LOGOUT DIALOG
 
   void _showLogoutDialog(BuildContext context) {

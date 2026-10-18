@@ -738,30 +738,6 @@ class _MarketplaceState extends State<Marketplace> {
   }
 
   /// Tag chip rendered inside the product preview modal.
-  Widget _previewTag(String text, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: ArtistColors.surfaceSoft,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: ArtistColors.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: ArtistColors.primary),
-          const SizedBox(width: 5),
-          Text(
-            text,
-            style: ArtistTextStyles.small.copyWith(
-              color: ArtistColors.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Empty state placeholder rendered when zero items match search/filter criteria.
   Widget _buildEmptyState() {
@@ -1199,28 +1175,6 @@ class _ProductCard extends StatelessWidget {
                         style: ArtistTextStyles.small.copyWith(
                           fontSize: 8.5,
                           color: ArtistColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 9,
-                    top: 9,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.94),
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      child: Text(
-                        product['listingType'].toString().toUpperCase(),
-                        style: ArtistTextStyles.small.copyWith(
-                          fontSize: 7.5,
-                          color: ArtistColors.accent,
                           fontWeight: FontWeight.w700,
                         ),
                       ),

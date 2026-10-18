@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
+import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
 import 'product_details.dart';
 
@@ -177,7 +178,10 @@ class _WishlistState extends State<Wishlist> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text(
+            message,
+            style: ArtistTextStyles.bodyMedium.copyWith(color: Colors.white),
+          ),
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(14),
         ),
@@ -202,9 +206,9 @@ class _WishlistState extends State<Wishlist> {
     return Scaffold(
       backgroundColor: _background,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Wishlist',
-          style: TextStyle(fontWeight: FontWeight.w700),
+          style: ArtistTextStyles.heading.copyWith(fontSize: 20, color: _text),
         ),
         centerTitle: true,
         backgroundColor: _background,
@@ -261,18 +265,17 @@ class _WishlistState extends State<Wishlist> {
                             children: [
                               Text(
                                 '${_items.length} saved ${_items.length == 1 ? 'item' : 'items'}',
-                                style: TextStyle(
+                                style: ArtistTextStyles.title.copyWith(
                                   fontSize: 16,
-                                  fontWeight: FontWeight.w800,
                                   color: _text,
                                 ),
                               ),
                               const SizedBox(height: 3),
                               Text(
                                 'Products you want to keep for later',
-                                style: TextStyle(
+                                style: ArtistTextStyles.caption.copyWith(
                                   fontSize: 12,
-                                  color: _text.withValues(alpha: .65),
+                                  color: ArtistColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -285,9 +288,14 @@ class _WishlistState extends State<Wishlist> {
                   TextField(
                     controller: _searchController,
                     onChanged: (value) => setState(() => _query = value),
+                    style: ArtistTextStyles.bodyMedium.copyWith(color: _text),
                     decoration: InputDecoration(
                       hintText: 'Search saved products',
-                      prefixIcon: const Icon(Icons.search_rounded),
+                      hintStyle: ArtistTextStyles.hint,
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: ArtistColors.primary,
+                      ),
                       suffixIcon: _query.isEmpty
                           ? null
                           : IconButton(
@@ -322,7 +330,9 @@ class _WishlistState extends State<Wishlist> {
                       child: Center(
                         child: Text(
                           'No saved products match your search.',
-                          style: TextStyle(color: _text.withValues(alpha: .65)),
+                          style: ArtistTextStyles.body.copyWith(
+                            color: ArtistColors.textSecondary,
+                          ),
                         ),
                       ),
                     )
@@ -365,7 +375,7 @@ class _WishlistState extends State<Wishlist> {
                     height: 104,
                     child: images.isEmpty
                         ? Container(
-                            color: _primary.withOpacity(.07),
+                            color: _primary.withValues(alpha: .07),
                             child: Icon(
                               Icons.image_outlined,
                               color: _primary,
@@ -375,14 +385,15 @@ class _WishlistState extends State<Wishlist> {
                         : Image.network(
                             images.first,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: _primary.withOpacity(.07),
-                              child: Icon(
-                                Icons.broken_image_outlined,
-                                color: _primary,
-                                size: 30,
-                              ),
-                            ),
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: _primary.withValues(alpha: .07),
+                                  child: Icon(
+                                    Icons.broken_image_outlined,
+                                    color: _primary,
+                                    size: 30,
+                                  ),
+                                ),
                           ),
                   ),
                 ),
@@ -398,7 +409,7 @@ class _WishlistState extends State<Wishlist> {
                           title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
+                          style: ArtistTextStyles.bodyMedium.copyWith(
                             fontSize: 14,
                             height: 1.25,
                             fontWeight: FontWeight.w700,
@@ -417,9 +428,9 @@ class _WishlistState extends State<Wishlist> {
                                 .toString(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            style: ArtistTextStyles.caption.copyWith(
                               fontSize: 11,
-                              color: _text.withValues(alpha: .6),
+                              color: ArtistColors.textSecondary,
                             ),
                           ),
                         const SizedBox(height: 7),
@@ -427,18 +438,17 @@ class _WishlistState extends State<Wishlist> {
                           price == null
                               ? 'Price unavailable'
                               : '₹${price.toString()}',
-                          style: TextStyle(
+                          style: ArtistTextStyles.title.copyWith(
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
                             color: _primary,
                           ),
                         ),
                         const Spacer(),
                         Text(
                           'Tap to view details',
-                          style: TextStyle(
+                          style: ArtistTextStyles.small.copyWith(
                             fontSize: 10,
-                            color: _text.withValues(alpha: .55),
+                            color: ArtistColors.textSecondary,
                           ),
                         ),
                       ],
@@ -469,14 +479,17 @@ class _WishlistState extends State<Wishlist> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.cloud_off_rounded, size: 58, color: _text.withOpacity(.5)),
+          Icon(
+            Icons.cloud_off_rounded,
+            size: 58,
+            color: _text.withValues(alpha: .5),
+          ),
           const SizedBox(height: 18),
           Text(
             'Could not load wishlist',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: ArtistTextStyles.heading.copyWith(
               fontSize: 21,
-              fontWeight: FontWeight.w800,
               color: _text,
             ),
           ),
@@ -484,10 +497,10 @@ class _WishlistState extends State<Wishlist> {
           Text(
             _error ?? 'Something went wrong.',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: ArtistTextStyles.body.copyWith(
               fontSize: 14,
               height: 1.4,
-              color: _text.withValues(alpha: .65),
+              color: ArtistColors.textSecondary,
             ),
           ),
           const SizedBox(height: 22),
@@ -496,7 +509,10 @@ class _WishlistState extends State<Wishlist> {
             child: ElevatedButton.icon(
               onPressed: _load,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try Again'),
+              label: Text(
+                'Try Again',
+                style: ArtistTextStyles.button.copyWith(color: Colors.white),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primary,
                 foregroundColor: Colors.white,
@@ -534,9 +550,8 @@ class _WishlistState extends State<Wishlist> {
           const SizedBox(height: 18),
           Text(
             'Your wishlist is empty',
-            style: TextStyle(
+            style: ArtistTextStyles.heading.copyWith(
               fontSize: 21,
-              fontWeight: FontWeight.w800,
               color: _text,
             ),
           ),
@@ -544,10 +559,10 @@ class _WishlistState extends State<Wishlist> {
           Text(
             'Open any product and tap the heart to save it here.',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: ArtistTextStyles.body.copyWith(
               fontSize: 14,
               height: 1.45,
-              color: _text.withValues(alpha: .65),
+              color: ArtistColors.textSecondary,
             ),
           ),
         ],

@@ -1,14 +1,10 @@
-import 'package:ecoloop/screens/artist/buy_products/buying_orders.dart';
-import 'package:ecoloop/screens/artist/buy_products/marketplace.dart';
-import 'package:ecoloop/screens/artist/profile/profile.dart';
+import 'package:ecoloop/screens/artist/artist_main.dart';
 import 'package:ecoloop/widgets/artist_bottom_navigation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
-import '../artist_dashboard.dart';
 import '../my_products/add_product.dart';
-import '../my_products/selling_orders.dart';
 
 class OrderSuccess extends StatefulWidget {
   final String? orderId;
@@ -121,68 +117,37 @@ class _OrderSuccessState extends State<OrderSuccess>
   // NAVIGATION
   // ---------------------------------------------------------------------------
 
-  void _goToHome() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const ArtistHome()),
+  /// Return to the persistent ArtistMain shell and select the requested tab.
+  /// Clearing the checkout/payment stack prevents Back from reopening checkout.
+  void _goToArtistMain({int initialIndex = 0}) {
+    final safeIndex = initialIndex < 0
+        ? 0
+        : (initialIndex > 3 ? 3 : initialIndex);
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => ArtistMain(initialIndex: safeIndex),
+      ),
       (route) => false,
     );
   }
 
-  void _goToBuyingOrders() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const BuyingOrders()),
-    );
-  }
+  void _goToHome() => _goToArtistMain(initialIndex: 0);
 
-  void _continueShopping() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const Marketplace()),
-    );
-  }
+  void _goToBuyingOrders() => _goToArtistMain(initialIndex: 2);
+
+  void _continueShopping() => _goToArtistMain(initialIndex: 1);
 
   void _onNavigationSelected(int index) {
-    if (index == 0) {
-      _goToHome();
-      return;
+    if (index >= 0 && index <= 3) {
+      _goToArtistMain(initialIndex: index);
     }
-
-    if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const Marketplace()),
-      );
-      return;
-    }
-
-    if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const SellingOrders()),
-      );
-      return;
-    }
-
-    if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const Profile()),
-      );
-      return;
-    }
-
-    setState(() {
-      _currentIndex = index;
-    });
   }
 
   void _onAddProduct() {
-    Navigator.push(
+    Navigator.of(
       context,
-      MaterialPageRoute(builder: (_) => const AddProduct()),
-    );
+    ).push(MaterialPageRoute<void>(builder: (_) => const AddProduct()));
   }
 
   // ---------------------------------------------------------------------------
@@ -191,45 +156,53 @@ class _OrderSuccessState extends State<OrderSuccess>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: ArtistColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: Column(
-            children: [
-              _buildTopBar(),
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 20),
-                      _buildSuccessAnimation(),
-                      const SizedBox(height: 24),
-                      _buildSuccessMessage(),
-                      const SizedBox(height: 22),
-                      _buildOrderCard(),
-                      const SizedBox(height: 14),
-                      _buildDeliveryCard(),
-                      const SizedBox(height: 14),
-                      _buildEcoMessage(),
-                      const SizedBox(height: 24),
-                      _buildActionButtons(),
-                    ],
+    return WillPopScope(
+      // Back from order success should go to the Artist Orders tab, not
+      // reopen checkout/payment or leave the app's main navigation shell.
+      onWillPop: () async {
+        _goToBuyingOrders();
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: ArtistColors.background,
+        body: SafeArea(
+          bottom: false,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: Column(
+              children: [
+                _buildTopBar(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 20),
+                        _buildSuccessAnimation(),
+                        const SizedBox(height: 24),
+                        _buildSuccessMessage(),
+                        const SizedBox(height: 22),
+                        _buildOrderCard(),
+                        const SizedBox(height: 14),
+                        _buildDeliveryCard(),
+                        const SizedBox(height: 14),
+                        _buildEcoMessage(),
+                        const SizedBox(height: 24),
+                        _buildActionButtons(),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
-      bottomNavigationBar: ArtistBottomNavigation(
-        currentIndex: _currentIndex,
-        onItemSelected: _onNavigationSelected,
-        onAddProduct: _onAddProduct,
+        bottomNavigationBar: ArtistBottomNavigation(
+          currentIndex: _currentIndex,
+          onItemSelected: _onNavigationSelected,
+          onAddProduct: _onAddProduct,
+        ),
       ),
     );
   }

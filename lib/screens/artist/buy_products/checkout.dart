@@ -1098,7 +1098,7 @@ class _CheckoutState extends State<Checkout> {
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
                 color: price == 'FREE'
-                    ? ArtistColors.success
+                    ? ArtistColors.primary
                     : ArtistColors.textPrimary,
               ),
             ),
@@ -1809,9 +1809,18 @@ class _CheckoutState extends State<Checkout> {
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 10),
                             itemBuilder: (context, index) {
+                              // The available-products list can refresh while this
+                              // bottom sheet is open. A sliver may briefly request
+                              // an old index, so guard against a stale index.
+                              if (index < 0 || index >= _moreItems.length) {
+                                return const SizedBox.shrink();
+                              }
+
                               final product = _moreItems[index];
 
-                              final productId = product['id'].toString();
+                              final productId =
+                                  (product['productId'] ?? product['id'] ?? '')
+                                      .toString();
 
                               final existingIndex = _items.indexWhere(
                                 (item) =>
@@ -1856,8 +1865,18 @@ class _CheckoutState extends State<Checkout> {
                           ),
                         );
                       },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ArtistColors.primary,
+                        side: const BorderSide(color: ArtistColors.primary),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                      ),
                       icon: const Icon(Icons.storefront_outlined),
-                      label: const Text('Browse Marketplace'),
+                      label: const Text(
+                        'Browse Marketplace',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ),
                 ],
@@ -1967,13 +1986,22 @@ class _CheckoutState extends State<Checkout> {
                 child: ElevatedButton(
                   onPressed: onAdd,
                   style: ElevatedButton.styleFrom(
+                    backgroundColor: ArtistColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     minimumSize: const Size(0, 36),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   child: Text(
                     alreadyAdded ? 'Add +1' : 'Add',
-                    style: const TextStyle(fontSize: 12),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),

@@ -1191,40 +1191,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  /// Helper bar widget rendering percentage distribution for individual star ratings.
-  Widget _ratingBar(int number, double percentage) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 15,
-            child: Text(
-              '$number',
-              style: const TextStyle(
-                fontSize: 9,
-                color: ArtistColors.textSecondary,
-              ),
-            ),
-          ),
-          const Icon(Icons.star_rounded, size: 11, color: Color(0xFFFFB300)),
-          const SizedBox(width: 5),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(
-                minHeight: 5,
-                value: percentage,
-                backgroundColor: ArtistColors.border.withOpacity(0.3),
-                color: ArtistColors.primary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Review item card showing reviewer details, score, text, and user media.
   Widget _buildReviewCard({
     required String name,
