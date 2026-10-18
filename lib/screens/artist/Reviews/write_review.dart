@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
@@ -34,10 +35,12 @@ class _WriteReviewState extends State<WriteReview> {
 
   int get _productId =>
       _int(widget.product['productId'] ?? widget.product['id']);
+
   String get _title => _str(
     widget.product['title'] ?? widget.product['name'],
     fallback: 'Product',
   );
+
   String get _image {
     final images = widget.product['images'] ?? widget.product['imageUrls'];
     if (images is List && images.isNotEmpty) return images.first.toString();
@@ -316,8 +319,10 @@ Map<String, dynamic> _map(dynamic v) => v is Map<String, dynamic>
     : v is Map
     ? v.map((k, value) => MapEntry(k.toString(), value))
     : <String, dynamic>{};
+
 int _int(dynamic v) =>
     v is num ? v.toInt() : int.tryParse((v ?? '').toString()) ?? 0;
+
 String _str(dynamic v, {String fallback = ''}) {
   final s = (v ?? '').toString().trim();
   return s.isEmpty ? fallback : s;

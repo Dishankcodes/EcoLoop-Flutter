@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
@@ -6,6 +7,7 @@ import 'write_review.dart';
 
 class ReviewHistory extends StatefulWidget {
   const ReviewHistory({super.key});
+
   @override
   State<ReviewHistory> createState() => _ReviewHistoryState();
 }
@@ -15,6 +17,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
   List<Map<String, dynamic>> _reviews = [];
   bool _loading = true, _refreshing = false;
   String? _error;
+
   @override
   void initState() {
     super.initState();
@@ -191,6 +194,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
             ),
           ),
   );
+
   Widget _card(Map<String, dynamic> r) => Container(
     margin: const EdgeInsets.only(top: 11),
     padding: const EdgeInsets.all(13),
@@ -286,6 +290,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
       ],
     ),
   );
+
   Widget _status(String title, String message, VoidCallback retry) => Container(
     margin: const EdgeInsets.only(top: 20),
     padding: const EdgeInsets.all(20),
@@ -309,6 +314,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
       ],
     ),
   );
+
   BoxDecoration _decoration() => BoxDecoration(
     color: ArtistColors.surface,
     borderRadius: BorderRadius.circular(16),
@@ -321,6 +327,7 @@ Map<String, dynamic> _map(dynamic v) => v is Map<String, dynamic>
     : v is Map
     ? v.map((k, val) => MapEntry(k.toString(), val))
     : <String, dynamic>{};
+
 List<Map<String, dynamic>> _list(dynamic v) {
   if (v is List) return v.whereType<Map>().map(_map).toList();
   final m = _map(v);
@@ -332,6 +339,7 @@ List<Map<String, dynamic>> _list(dynamic v) {
 
 int _int(dynamic v) =>
     v is num ? v.toInt() : int.tryParse((v ?? '').toString()) ?? 0;
+
 String _text(dynamic v, {String fallback = ''}) {
   final s = (v ?? '').toString().trim();
   return s.isEmpty ? fallback : s;
@@ -340,6 +348,7 @@ String _text(dynamic v, {String fallback = ''}) {
 DateTime _date(dynamic v) =>
     DateTime.tryParse((v ?? '').toString()) ??
     DateTime.fromMillisecondsSinceEpoch(0);
+
 String _dateLabel(dynamic v) {
   final d = _date(v);
   return d.millisecondsSinceEpoch == 0
