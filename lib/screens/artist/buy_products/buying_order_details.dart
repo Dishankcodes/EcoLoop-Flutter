@@ -74,17 +74,29 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   String get shippingAddress {
     final raw = _order['shippingAddress'] ?? _order['address'];
-    if (raw == null || raw.toString().trim().isEmpty) return 'Address not available';
+    if (raw == null || raw.toString().trim().isEmpty)
+      return 'Address not available';
     dynamic value = raw;
     if (raw is String) {
-      try { value = jsonDecode(raw); } catch (_) { return raw.trim(); }
+      try {
+        value = jsonDecode(raw);
+      } catch (_) {
+        return raw.trim();
+      }
     }
     if (value is Map) {
-      final parts = <String>[
-        value['name'], value['addressLine'], value['area'], value['city'],
-        value['state'], value['pincode'],
-      ].map((part) => (part ?? '').toString().trim())
-       .where((part) => part.isNotEmpty).toList();
+      final parts =
+          <String>[
+                value['name'],
+                value['addressLine'],
+                value['area'],
+                value['city'],
+                value['state'],
+                value['pincode'],
+              ]
+              .map((part) => (part ?? '').toString().trim())
+              .where((part) => part.isNotEmpty)
+              .toList();
       return parts.isEmpty ? 'Address not available' : parts.toSet().join(', ');
     }
     return value.toString();
@@ -780,7 +792,10 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           _detailRow(
             Icons.local_shipping_outlined,
             'Delivery speed',
-            (_order['deliveryMethod'] ?? 'standard').toString().toLowerCase().contains('express')
+            (_order['deliveryMethod'] ?? 'standard')
+                    .toString()
+                    .toLowerCase()
+                    .contains('express')
                 ? 'Express'
                 : 'Standard',
           ),
@@ -792,7 +807,10 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             'Delivery responsibility',
             (_order['deliveryResponsibility'] ?? '').toString().trim().isEmpty
                 ? 'Not recorded for this order'
-                : _order['deliveryResponsibility'].toString().replaceAll('_', ' '),
+                : _order['deliveryResponsibility'].toString().replaceAll(
+                    '_',
+                    ' ',
+                  ),
           ),
 
           const SizedBox(height: 12),
@@ -1597,4 +1615,3 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 }
-

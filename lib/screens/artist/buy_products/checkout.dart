@@ -1,4 +1,3 @@
-
 import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
@@ -2399,10 +2398,7 @@ class _CheckoutState extends State<Checkout> {
           ],
 
           const SizedBox(height: 10),
-          _priceRow(
-            'Platform fee',
-            _formatPrice(_platformFee.roundToDouble()),
-          ),
+          _priceRow('Platform fee', _formatPrice(_platformFee.roundToDouble())),
           const SizedBox(height: 8),
           _priceRow('GST on platform fee (18%)', _formatPrice(_taxAmount)),
           const SizedBox(height: 8),
@@ -3364,4 +3360,3 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 }
-

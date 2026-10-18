@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
@@ -14,6 +16,12 @@ class ReviewHistory extends StatefulWidget {
 
 class _ReviewHistoryState extends State<ReviewHistory> {
   final EcoLoopApi _api = EcoLoopApi.instance;
+
+  // Reuse the last successful response when this screen is reopened.
+  static List<Map<String, dynamic>>? _cachedReviews;
+  static List<Map<String, dynamic>>? _cachedOrders;
+  static DateTime? _cacheTime;
+  static const Duration _cacheDuration = Duration(seconds: 90);
 
   int _tab = 0;
   bool _loading = true;
@@ -39,6 +47,119 @@ class _ReviewHistoryState extends State<ReviewHistory> {
       if (value.isNotEmpty && value.toLowerCase() != 'null') return value;
     }
     return fallback;
+  }
+
+  String _imageValue(dynamic value) {
+    if (value == null) return '';
+    if (value is List) {
+      for (final item in value) {
+        final candidate = _imageValue(item);
+        if (candidate.isNotEmpty) return candidate;
+      }
+      return '';
+    }
+    final raw = _string(value);
+    if (raw.isEmpty || raw.toLowerCase() == 'null') return '';
+    if (raw.startsWith('[') || raw.startsWith('{')) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) return _imageValue(decoded);
+        if (decoded is Map) {
+          return _first(Map<String, dynamic>.from(decoded), [
+            'url',
+            'imageUrl',
+            'image',
+            'src',
+            'downloadUrl',
+          ]);
+        }
+      } catch (_) {
+        // Treat it as a normal URL below if it is not valid JSON.
+      }
+    }
+    return raw.startsWith('http://') || raw.startsWith('https://') ? raw : '';
+  }
+
+  String _rowImage(Map<String, dynamic> row, {required bool seller}) {
+    final keys = seller
+        ? [
+            'sellerImage',
+            'sellerProfileImage',
+            'artistImage',
+            'artistProfileImage',
+            'profileImage',
+            'profilePicture',
+            'avatar',
+            'photoUrl',
+            'imageUrl',
+          ]
+        : [
+            'productImage',
+            'productImageUrl',
+            'imageUrls',
+            'productImageUrls',
+            'images',
+            'productImages',
+            'imageUrl',
+            'image',
+            'thumbnail',
+          ];
+    for (final key in keys) {
+      final image = _imageValue(row[key]);
+      if (image.isNotEmpty) return image;
+    }
+    return '';
+  }
+
+  String _reviewImage(Map<String, dynamic> review, {required bool seller}) {
+    final direct = _rowImage(review, seller: seller);
+    if (direct.isNotEmpty) return direct;
+
+    // Review endpoints may return only IDs; enrich from the already-loaded orders.
+    final productId = _productId(review);
+    final sellerId = _sellerId(review);
+    for (final order in _orders) {
+      if (seller) {
+        if (sellerId.isNotEmpty && _sellerId(order) == sellerId) {
+          final image = _rowImage(order, seller: true);
+          if (image.isNotEmpty) return image;
+        }
+      } else if (productId.isNotEmpty && _productId(order) == productId) {
+        final image = _rowImage(order, seller: false);
+        if (image.isNotEmpty) return image;
+      }
+    }
+    return '';
+  }
+
+  Widget _thumbnail(String url, {required bool seller, double size = 48}) {
+    final fallback = Container(
+      color: AppColors.light,
+      alignment: Alignment.center,
+      child: Icon(
+        seller ? Icons.person_outline_rounded : Icons.image_outlined,
+        color: AppColors.primary,
+        size: size * 0.48,
+      ),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: url.isEmpty
+            ? fallback
+            : Image.network(
+                url,
+                fit: BoxFit.cover,
+                cacheWidth: (size * 2).round(),
+                cacheHeight: (size * 2).round(),
+                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) =>
+                    wasSynchronouslyLoaded || frame != null ? child : fallback,
+                errorBuilder: (context, error, stackTrace) => fallback,
+              ),
+      ),
+    );
   }
 
   String _reviewId(Map<String, dynamic> review) =>
@@ -201,10 +322,30 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         .toList();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool force = false}) async {
+    final cacheIsFresh =
+        _cachedReviews != null &&
+        _cachedOrders != null &&
+        _cacheTime != null &&
+        DateTime.now().difference(_cacheTime!) < _cacheDuration;
+
+    if (!force && cacheIsFresh) {
+      if (mounted) {
+        setState(() {
+          _reviews = _cachedReviews!;
+          _orders = _cachedOrders!;
+          _loading = false;
+          _error = null;
+        });
+      }
+      return;
+    }
+
+    // Keep existing content visible during pull-to-refresh/background refresh.
+    final hasContent = _reviews.isNotEmpty || _orders.isNotEmpty;
     if (mounted) {
       setState(() {
-        _loading = true;
+        _loading = !hasContent;
         _error = null;
       });
     }
@@ -214,10 +355,16 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         _getRows('/orders'),
       ]);
       if (!mounted) return;
+      final reviews = results[0] as List<Map<String, dynamic>>;
+      final orders = results[1] as List<Map<String, dynamic>>;
+      _cachedReviews = reviews;
+      _cachedOrders = orders;
+      _cacheTime = DateTime.now();
       setState(() {
-        _reviews = results[0] as List<Map<String, dynamic>>;
-        _orders = results[1] as List<Map<String, dynamic>>;
+        _reviews = reviews;
+        _orders = orders;
         _loading = false;
+        _error = null;
       });
     } catch (error) {
       if (!mounted) return;
@@ -260,7 +407,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     );
     if (result == true && mounted) {
       _message('Product review submitted successfully.');
-      await _load();
+      await _load(force: true);
     }
   }
 
@@ -297,7 +444,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     );
     if (result != null && mounted) {
       _message('Seller review submitted successfully.');
-      await _load();
+      await _load(force: true);
     }
   }
 
@@ -344,6 +491,8 @@ class _ReviewHistoryState extends State<ReviewHistory> {
       if (!mounted) return;
       setState(() {
         _reviews.removeWhere((item) => _reviewId(item) == id);
+        _cachedReviews = List<Map<String, dynamic>>.from(_reviews);
+        _cacheTime = DateTime.now();
         _deletingIds.remove(id);
       });
       _message('Review deleted successfully.');
@@ -409,7 +558,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
           ),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: _load,
+              onRefresh: () => _load(force: true),
               color: AppColors.primary,
               child: _loading
                   ? ListView(
@@ -639,7 +788,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
       'artistName',
       'remakerName',
     ], fallback: artist ? 'ReMaker' : 'Seller');
-    final image = _first(order, ['productImage', 'imageUrl', 'image']);
+    final image = _rowImage(order, seller: !(_tab == 0));
     final orderId = _first(order, ['orderId', 'order_id', 'id']);
     final isProductTab = _tab == 0;
     final title = isProductTab ? productName : sellerName;
@@ -666,35 +815,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         children: [
           Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 62,
-                  height: 62,
-                  child: image.isEmpty
-                      ? Container(
-                          color: AppColors.light,
-                          child: Icon(
-                            isProductTab
-                                ? Icons.inventory_2_outlined
-                                : Icons.storefront_outlined,
-                            color: AppColors.primary,
-                          ),
-                        )
-                      : Image.network(
-                          image,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(
-                                color: AppColors.light,
-                                child: const Icon(
-                                  Icons.image_not_supported_outlined,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                        ),
-                ),
-              ),
+              _thumbnail(image, seller: !isProductTab, size: 62),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -787,6 +908,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
             'title',
           ], fallback: 'Product');
     final comment = _string(review['comment']);
+    final image = _reviewImage(review, seller: sellerReview);
     final id = _reviewId(review);
     final deleting = _deletingIds.contains(id);
     return Container(
@@ -810,21 +932,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.light,
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Icon(
-                  sellerReview
-                      ? Icons.storefront_outlined
-                      : Icons.inventory_2_outlined,
-                  color: AppColors.primary,
-                  size: 22,
-                ),
-              ),
+              _thumbnail(image, seller: sellerReview, size: 48),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

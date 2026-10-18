@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
+import '../reviews/write_seller_review.dart';
 import 'product_details.dart';
 
 /// Public profile shown when a user opens an artist/ReMaker from a listing.
@@ -30,6 +31,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
   bool _refreshing = false;
   bool _following = false;
   bool _followBusy = false;
+  int? _followerCount;
   bool _reviewEligibilityChecked = false;
   bool _canReview = false;
   bool _alreadyReviewed = false;
@@ -153,11 +155,37 @@ class _ArtistProfileState extends State<ArtistProfile> {
       final id = _value(item, [
         'artistId',
         'artist_id',
-        'id',
-        'userId',
-        'user_id',
+        'followingArtistId',
+        'following_artist_id',
+        'followedArtistId',
+        'followed_artist_id',
+        'targetArtistId',
+        'target_artist_id',
+        'artistUserId',
+        'artist_user_id',
       ]);
-      return id == _artistId;
+      final type = _value(item, [
+        'targetType',
+        'target_type',
+        'followingType',
+        'following_type',
+        'accountType',
+        'account_type',
+        'type',
+      ]).toLowerCase();
+      return id == _artistId ||
+          (id.isEmpty &&
+              _value(item, [
+                    'followedId',
+                    'followed_id',
+                    'followingId',
+                    'following_id',
+                  ]) ==
+                  _artistId &&
+              (type.isEmpty ||
+                  type == 'artist' ||
+                  type == 'remaker' ||
+                  type == 're_maker'));
     });
 
     final alreadyReviewed = myReviews.any((item) {
@@ -190,6 +218,12 @@ class _ArtistProfileState extends State<ArtistProfile> {
       _reviews = reviews;
       _orders = orders;
       _following = followsArtist;
+      _followerCount ??= _number(
+        _artist['followersCount'] ??
+            _artist['followers'] ??
+            _artist['followerCount'] ??
+            _artist['follower_count'],
+      );
       _alreadyReviewed = alreadyReviewed;
       _eligibleOrderId = eligibleOrder;
       _canReview = eligibleOrder != null && !alreadyReviewed;
@@ -323,14 +357,34 @@ class _ArtistProfileState extends State<ArtistProfile> {
 
   Future<void> _toggleFollow() async {
     if (_artistId.isEmpty || _followBusy) return;
+    final wasFollowing = _following;
     setState(() => _followBusy = true);
     try {
-      if (_following) {
+      if (wasFollowing) {
         await _api.delete('/artists/$_artistId/follow');
       } else {
         await _api.post('/artists/$_artistId/follow', <String, dynamic>{});
       }
-      if (mounted) setState(() => _following = !_following);
+      if (!mounted) return;
+      setState(() {
+        _following = !wasFollowing;
+        final current =
+            _followerCount ??
+            _number(
+              _artist['followersCount'] ??
+                  _artist['followers'] ??
+                  _artist['followerCount'] ??
+                  _artist['follower_count'],
+            );
+        _followerCount = (current + (wasFollowing ? -1 : 1))
+            .clamp(0, 1 << 30)
+            .toInt();
+        _artist['followersCount'] = _followerCount;
+        _artist['followers'] = _followerCount;
+      });
+      // Refresh the authoritative follow state/count in the background. The UI
+      // updates immediately above instead of waiting for several profile requests.
+      _refreshFollowState();
     } catch (e) {
       _message('Could not update follow status: $e');
     } finally {
@@ -338,129 +392,59 @@ class _ArtistProfileState extends State<ArtistProfile> {
     }
   }
 
+  Future<void> _refreshFollowState() async {
+    try {
+      final raw = await _api.get('/my/following');
+      if (!mounted) return;
+      final followingRows = _asList(raw);
+      final isFollowing = followingRows.any((item) {
+        final id = _value(item, [
+          'artistId',
+          'artist_id',
+          'followingArtistId',
+          'following_artist_id',
+          'followedArtistId',
+          'followed_artist_id',
+          'targetArtistId',
+          'target_artist_id',
+        ]);
+        final type = _value(item, [
+          'targetType',
+          'target_type',
+          'followingType',
+          'following_type',
+          'type',
+        ]).toLowerCase();
+        return id == _artistId &&
+            (type.isEmpty ||
+                type == 'artist' ||
+                type == 'remaker' ||
+                type == 're_maker');
+      });
+      setState(() => _following = isFollowing);
+    } catch (_) {
+      // Keep the successful local update if this optional refresh fails.
+    }
+  }
+
   Future<void> _openWriteReview() async {
     if (!_canReview || _eligibleOrderId == null) return;
-    final rating = ValueNotifier<int>(5);
-    final commentController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    final submitted = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Container(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Review $_name',
-                    style: AppTextStyles.title.copyWith(fontSize: 20),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Share feedback about your purchase from this ReMaker.',
-                    style: AppTextStyles.caption,
-                  ),
-                  const SizedBox(height: 16),
-                  ValueListenableBuilder<int>(
-                    valueListenable: rating,
-                    builder: (_, value, __) => Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        5,
-                        (index) => IconButton(
-                          onPressed: () => rating.value = index + 1,
-                          icon: Icon(
-                            index < value
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
-                            color: AppColors.primary,
-                            size: 34,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: commentController,
-                    minLines: 3,
-                    maxLines: 5,
-                    maxLength: 1000,
-                    decoration: InputDecoration(
-                      labelText: 'Your review',
-                      hintText:
-                          'Tell others about the product and your experience...',
-                      filled: true,
-                      fillColor: AppColors.background,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    validator: (value) =>
-                        (value == null || value.trim().length < 5)
-                        ? 'Please write at least 5 characters.'
-                        : null,
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        if (!(formKey.currentState?.validate() ?? false))
-                          return;
-                        Navigator.pop(sheetContext, true);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(48),
-                      ),
-                      child: const Text('Submit Review'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+    final result = await Navigator.of(context).push<SellerReviewResult>(
+      MaterialPageRoute<SellerReviewResult>(
+        builder: (_) => WriteSellerReview(
+          sellerName: _name,
+          sellerImage: _avatar.isEmpty ? null : _avatar,
+          sellerId: _artistId,
+          sellerType: 'artist',
+          orderId: _eligibleOrderId,
         ),
       ),
     );
-
-    if (submitted == true) {
-      try {
-        await _api.post('/reviews/artist', <String, dynamic>{
-          'artistId': _artistId,
-          'orderId': _eligibleOrderId,
-          'rating': rating.value,
-          'comment': commentController.text.trim(),
-          'review': commentController.text.trim(),
-        });
-        if (mounted) {
-          _message('Review submitted.');
-          await _loadProfileData(refresh: true);
-        }
-      } catch (e) {
-        _message('Could not submit review: $e');
-      }
+    if (!mounted) return;
+    if (result != null) {
+      _message('Review submitted.');
+      await _loadProfileData(refresh: true);
     }
-    rating.dispose();
-    commentController.dispose();
   }
 
   void _message(String message) {
@@ -693,23 +677,20 @@ class _ArtistProfileState extends State<ArtistProfile> {
               ],
             ),
           ],
-          if (_email.isNotEmpty || _phone.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              [_email, _phone].where((e) => e.isNotEmpty).join(' • '),
-              textAlign: TextAlign.center,
-              style: AppTextStyles.caption,
-            ),
-          ],
         ],
       ),
     );
   }
 
   Widget _buildStats() {
-    final followers = _number(
-      _artist['followersCount'] ?? _artist['followers'],
-    );
+    final followers =
+        _followerCount ??
+        _number(
+          _artist['followersCount'] ??
+              _artist['followers'] ??
+              _artist['followerCount'] ??
+              _artist['follower_count'],
+        );
     final sold = _number(
       _artist['soldCount'] ?? _artist['sold'] ?? _artist['totalSold'],
     );
@@ -1187,19 +1168,38 @@ class _ArtistProfileState extends State<ArtistProfile> {
   );
 
   void _contactArtist() {
-    final details = [_email, _phone].where((e) => e.isNotEmpty).join('\n');
+    final email = _email.trim();
+    if (email.isEmpty) {
+      _message('No public email is available for this ReMaker.');
+      return;
+    }
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text('Contact $_name'),
-        content: Text(
-          details.isEmpty
-              ? 'No public contact information is available.'
-              : details,
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.light),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.email_outlined,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 9),
+              Flexible(child: SelectableText(email, style: AppTextStyles.body)),
+            ],
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Close'),
           ),
         ],
@@ -1533,6 +1533,40 @@ class _ArtistProductsPage extends StatelessWidget {
   }
 }
 
+String _productImageUrl(Map<String, dynamic> product) {
+  dynamic raw =
+      product['imageUrls'] ??
+      product['image_urls'] ??
+      product['images'] ??
+      product['imageUrl'] ??
+      product['image_url'] ??
+      product['image'] ??
+      product['thumbnail'] ??
+      product['primaryImage'] ??
+      product['primary_image'];
+  if (raw is List) {
+    for (final value in raw) {
+      final url = value.toString().trim();
+      if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    }
+    return '';
+  }
+  if (raw == null) return '';
+  var value = raw.toString().trim();
+  if (value.isEmpty) return '';
+  if (value.startsWith('[') && value.endsWith(']')) {
+    value = value.substring(1, value.length - 1);
+  }
+  final candidates = value
+      .split(',')
+      .map((part) => part.trim().replaceAll('"', '').replaceAll("'", ''))
+      .toList();
+  for (final url in candidates) {
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  }
+  return '';
+}
+
 class _ProductCard extends StatelessWidget {
   const _ProductCard({
     required this.product,
@@ -1558,13 +1592,7 @@ class _ProductCard extends StatelessWidget {
     final title = _value(['title', 'name']);
     final price = _value(['price', 'sellingPrice', 'selling_price']);
     final category = _value(['category', 'categoryName', 'category_name']);
-    final image = _value([
-      'imageUrl',
-      'image_url',
-      'image',
-      'thumbnail',
-      'primaryImage',
-    ]);
+    final image = _productImageUrl(product);
     return GestureDetector(
       onTap: onTap,
       child: Container(

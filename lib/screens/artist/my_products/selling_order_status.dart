@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
@@ -599,4 +598,3 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
     }
   }
 }
-

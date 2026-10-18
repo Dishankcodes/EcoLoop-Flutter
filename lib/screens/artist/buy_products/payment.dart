@@ -278,111 +278,111 @@ class _PaymentState extends State<Payment> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                Container(
-                  width: 74,
-                  height: 74,
-                  decoration: const BoxDecoration(
-                    color: ArtistColors.light,
-                    shape: BoxShape.circle,
+                  Container(
+                    width: 74,
+                    height: 74,
+                    decoration: const BoxDecoration(
+                      color: ArtistColors.light,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      size: 44,
+                      color: ArtistColors.success,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    size: 44,
-                    color: ArtistColors.success,
+                  const SizedBox(height: 18),
+                  Text(
+                    'Order Placed Successfully',
+                    style: ArtistTextStyles.title.copyWith(fontSize: 21),
                   ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  'Order Placed Successfully',
-                  style: ArtistTextStyles.title.copyWith(fontSize: 21),
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  'Your COD order for ${_formatIndianPrice(_createdServerTotal ?? widget.totalAmount)} has been placed. Pay when it is delivered.',
-                  textAlign: TextAlign.center,
-                  style: ArtistTextStyles.body,
-                ),
-                const SizedBox(height: 18),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: ArtistColors.background,
-                    borderRadius: BorderRadius.circular(15),
+                  const SizedBox(height: 7),
+                  Text(
+                    'Your COD order for ${_formatIndianPrice(_createdServerTotal ?? widget.totalAmount)} has been placed. Pay when it is delivered.',
+                    textAlign: TextAlign.center,
+                    style: ArtistTextStyles.body,
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.receipt_long_outlined,
-                        color: ArtistColors.primary,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Order payment',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: ArtistColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Order ${_createdOrderId ?? ''} • Cash on Delivery',
-                              style: ArtistTextStyles.caption,
-                            ),
-                          ],
+                  const SizedBox(height: 18),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: ArtistColors.background,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.receipt_long_outlined,
+                          color: ArtistColors.primary,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(sheetContext);
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => OrderSuccess(
-                            orderId: _createdOrderId,
-                            totalAmount:
-                                _createdServerTotal ?? widget.totalAmount,
-                            itemCount:
-                                _createdItemCount ??
-                                (widget.items?.fold<int>(
-                                      0,
-                                      (sum, item) =>
-                                          sum + _productQuantity(item),
-                                    ) ??
-                                    1),
-                            paymentMethod: 'Cash on Delivery',
-                            address: widget.address,
-                            deliveryMethod: widget.deliveryMethod,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Order payment',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: ArtistColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Order ${_createdOrderId ?? ''} • Cash on Delivery',
+                                style: ArtistTextStyles.caption,
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ArtistColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: Text(
-                      'Done',
-                      style: ArtistTextStyles.button.copyWith(fontSize: 14.5),
+                      ],
                     ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => OrderSuccess(
+                              orderId: _createdOrderId,
+                              totalAmount:
+                                  _createdServerTotal ?? widget.totalAmount,
+                              itemCount:
+                                  _createdItemCount ??
+                                  (widget.items?.fold<int>(
+                                        0,
+                                        (sum, item) =>
+                                            sum + _productQuantity(item),
+                                      ) ??
+                                      1),
+                              paymentMethod: 'Cash on Delivery',
+                              address: widget.address,
+                              deliveryMethod: widget.deliveryMethod,
+                            ),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ArtistColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Text(
+                        'Done',
+                        style: ArtistTextStyles.button.copyWith(fontSize: 14.5),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1391,4 +1391,3 @@ class _PaymentState extends State<Payment> {
     return 0;
   }
 }
-

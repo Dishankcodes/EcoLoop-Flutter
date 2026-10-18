@@ -11,7 +11,7 @@ import '../../../shared_preferences_util.dart';
 
 /// Edits the authenticated artist row in Google Sheets via PUT /profile.
 /// State and city options are loaded from the States and Cities sheets.
-/// Email is displayed from the backend and remains read-only.
+/// Email and phone number are displayed from the backend and remain read-only.
 class EditProfile extends StatefulWidget {
   const EditProfile({super.key});
 
@@ -312,7 +312,6 @@ class _EditProfileState extends State<EditProfile> {
     try {
       final response = await _api.put('/profile', {
         'userName': _nameController.text.trim(),
-        'phone': _phoneController.text.trim(),
         'city': _selectedCityName!.trim(),
         'state': _selectedStateName!.trim(),
         'stateCode': _selectedStateCode!.trim().toUpperCase(),
@@ -434,21 +433,7 @@ class _EditProfileState extends State<EditProfile> {
                       const SizedBox(height: 15),
                       _emailField(),
                       const SizedBox(height: 15),
-                      _textField(
-                        controller: _phoneController,
-                        label: 'Phone Number',
-                        hint: 'Enter your phone number',
-                        icon: Icons.phone_outlined,
-                        keyboardType: TextInputType.phone,
-                        validator: (value) {
-                          final phone = (value ?? '').trim();
-                          if (phone.isEmpty)
-                            return 'Please enter your phone number.';
-                          if (phone.length < 8)
-                            return 'Please enter a valid phone number.';
-                          return null;
-                        },
-                      ),
+                      _phoneField(),
                       const SizedBox(height: 30),
                       _sectionTitle(
                         'Artist Information',
@@ -683,6 +668,58 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
+  Widget _phoneField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Phone Number',
+          style: ArtistTextStyles.label.copyWith(fontSize: 12),
+        ),
+        const SizedBox(height: 7),
+        TextFormField(
+          controller: _phoneController,
+          readOnly: true,
+          showCursor: false,
+          enableInteractiveSelection: false,
+          keyboardType: TextInputType.phone,
+          style: ArtistTextStyles.bodyMedium.copyWith(
+            color: ArtistColors.textSecondary,
+          ),
+          decoration:
+              _decoration(
+                'Phone number',
+                icon: Icons.phone_outlined,
+                readOnly: true,
+              ).copyWith(
+                suffixIcon: const Icon(
+                  Icons.lock_outline_rounded,
+                  color: ArtistColors.textMuted,
+                  size: 17,
+                ),
+              ),
+        ),
+        const SizedBox(height: 5),
+        Row(
+          children: [
+            const Icon(
+              Icons.info_outline_rounded,
+              size: 13,
+              color: ArtistColors.textMuted,
+            ),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                'Phone number is loaded from your account and cannot be edited here.',
+                style: ArtistTextStyles.small,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _emailField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -865,7 +902,7 @@ class _EditProfileState extends State<EditProfile> {
           const SizedBox(width: 9),
           Expanded(
             child: Text(
-              'Your details are saved to your artist record in Google Sheets. Your profile photo is uploaded to EcoLoop Drive and its URL is saved to the same record. Email is read-only.',
+              'Your details are saved to your artist record in Google Sheets. Your profile photo is uploaded to EcoLoop Drive and its URL is saved to the same record. Email and phone number are read-only.',
               style: ArtistTextStyles.small.copyWith(
                 fontSize: 10,
                 height: 1.45,

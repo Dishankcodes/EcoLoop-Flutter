@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
+import '../buy_products/artist_profile.dart';
+import '../buy_products/seller_profile.dart';
 
 class WriteSellerReview extends StatefulWidget {
   final String sellerName;
@@ -117,73 +119,118 @@ class _WriteSellerReviewState extends State<WriteSellerReview> {
     final hasImage =
         widget.sellerImage != null && widget.sellerImage!.trim().isNotEmpty;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.accent.withOpacity(0.4)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: AppColors.light,
-              shape: BoxShape.circle,
-              image: hasImage
-                  ? DecorationImage(
-                      image: NetworkImage(widget.sellerImage!),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
-            child: hasImage
-                ? null
-                : const Icon(
-                    Icons.person_rounded,
-                    color: AppColors.primary,
-                    size: 30,
-                  ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.sellerName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.title.copyWith(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.verified_rounded,
-                      size: 15,
+    return InkWell(
+      onTap: _openSellerProfile,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.accent.withOpacity(0.4)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: AppColors.light,
+                shape: BoxShape.circle,
+                image: hasImage
+                    ? DecorationImage(
+                        image: NetworkImage(widget.sellerImage!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+              child: hasImage
+                  ? null
+                  : const Icon(
+                      Icons.person_rounded,
                       color: AppColors.primary,
+                      size: 30,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Verified Seller',
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ),
-          ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.sellerName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.title.copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.verified_rounded,
+                        size: 15,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Verified Seller',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openSellerProfile() {
+    final sellerId = widget.sellerId.trim();
+    if (sellerId.isEmpty) {
+      _showMessage(
+        'Seller profile is unavailable because the seller ID is missing.',
+      );
+      return;
+    }
+
+    final type = widget.sellerType.trim().toLowerCase();
+    final isArtist =
+        type == 'artist' ||
+        type == 'remaker' ||
+        type == 're_maker' ||
+        type == 're-maker';
+    final profile = <String, dynamic>{
+      'id': sellerId,
+      'userId': sellerId,
+      'sellerId': sellerId,
+      'artistId': sellerId,
+      'sellerType': isArtist ? 'artist' : 'user',
+      'role': isArtist ? 'artist' : 'user',
+      'name': widget.sellerName,
+      'userName': widget.sellerName,
+      'sellerName': widget.sellerName,
+      'firstName': widget.sellerName,
+      'profilePhotoUrl': widget.sellerImage ?? '',
+      'profileImage': widget.sellerImage ?? '',
+      'image': widget.sellerImage ?? '',
+    };
+
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => isArtist
+            ? ArtistProfile(artist: profile)
+            : SellerProfile(seller: profile),
       ),
     );
   }
