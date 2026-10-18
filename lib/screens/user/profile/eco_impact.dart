@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
@@ -14,17 +12,16 @@ class EcoImpact extends StatefulWidget {
 }
 
 class _EcoImpactState extends State<EcoImpact> {
-  bool _isLoading = false;
+  bool _isLoading = true;
   bool _hasError = false;
+  String? _loadError;
 
   int _itemsReused = 0;
   int _itemsDonated = 0;
+  int _ecoPoints = 0;
+
   double _co2Saved = 0;
   double _wasteDiverted = 0;
-  int _ecoPoints = 0;
-  String? _loadError;
-  // The existing API returns aggregate totals only, not month-by-month history.
-  final List<_ImpactMonth> _monthlyImpact = [];
 
   @override
   void initState() {
@@ -36,269 +33,217 @@ class _EcoImpactState extends State<EcoImpact> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: false,
-        title: Text('Eco Impact', style: AppTextStyles.title),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: _loadImpact,
-            icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
-          ),
-          const SizedBox(width: 6),
-        ],
-      ),
+      appBar: _buildAppBar(),
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.primary,
           backgroundColor: AppColors.surface,
           onRefresh: _loadImpact,
-          child: _buildBody(),
+          child: _isLoading
+              ? _buildLoading()
+              : _hasError
+              ? _buildError()
+              : _buildPageContent(),
         ),
       ),
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return _buildLoadingState();
-    }
-    if (_hasError) {
-      return _buildErrorState();
-    }
+  // APP BAR
 
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(
-        parent: BouncingScrollPhysics(),
-      ),
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 34),
-      child: Column(
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: AppColors.background,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      titleSpacing: 18,
+      title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildIntro(),
-          const SizedBox(height: 18),
-          _buildImpactHero(),
-          const SizedBox(height: 16),
-          _buildPrimaryStats(),
-          const SizedBox(height: 22),
-          _buildSectionTitle('Your Environmental Impact'),
-          const SizedBox(height: 11),
-          _buildImpactGrid(),
-          const SizedBox(height: 24),
-          _buildSectionTitle('Impact Over Time', trailing: _buildPeriodChip()),
-          const SizedBox(height: 11),
-          _buildImpactChart(),
-          const SizedBox(height: 24),
-          _buildSectionTitle('Your Eco Contributions'),
-          const SizedBox(height: 11),
-          _buildContributionCard(),
-          const SizedBox(height: 24),
-          _buildSectionTitle('What Your Impact Means'),
-          const SizedBox(height: 11),
-          _buildImpactExplanation(),
-          const SizedBox(height: 24),
-          _buildMotivationCard(),
+          Text(
+            'Eco Impact',
+            style: AppTextStyles.title.copyWith(
+              color: AppColors.textPrimary,
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Your sustainability journey',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 11,
+            ),
+          ),
         ],
       ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 14),
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.accent.withOpacity(0.35),
+              ),
+            ),
+            child: IconButton(
+              tooltip: 'Refresh',
+              onPressed: _isLoading ? null : _loadImpact,
+              icon: Icon(
+                Icons.refresh_rounded,
+                size: 22,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildIntro() {
+  // MAIN SCROLLABLE PAGE
+
+  Widget _buildPageContent() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTablet = constraints.maxWidth >= 650;
+        final horizontalPadding = isTablet ? 28.0 : 18.0;
+
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            12,
+            horizontalPadding,
+            32,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildIntro(isTablet),
+                  const SizedBox(height: 22),
+
+                  _buildHeroCard(),
+                  const SizedBox(height: 18),
+
+                  _buildSummaryCards(),
+                  const SizedBox(height: 30),
+
+                  _sectionHeading(
+                    'Environmental Impact',
+                    'Your actions are making a difference',
+                  ),
+                  const SizedBox(height: 15),
+
+                  _buildImpactGrid(),
+                  const SizedBox(height: 30),
+
+                  _sectionHeading(
+                    'Your Contributions',
+                    'A breakdown of your EcoLoop activity',
+                  ),
+                  const SizedBox(height: 15),
+
+                  _buildContributionCard(),
+                  const SizedBox(height: 30),
+
+                  _sectionHeading(
+                    'What Your Impact Means',
+                    'Small changes create lasting benefits',
+                  ),
+                  const SizedBox(height: 15),
+
+                  _buildBenefitsCard(),
+                  const SizedBox(height: 22),
+
+                  _buildMotivationCard(),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // INTRO
+
+  Widget _buildIntro(bool isTablet) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Small Actions, Big Impact', style: AppTextStyles.heading),
-        const SizedBox(height: 5),
         Text(
-          'Every item reused, donated, or kept away from waste contributes to a more sustainable future.',
-          style: AppTextStyles.body,
+          'Small Actions,',
+          style: AppTextStyles.heading.copyWith(
+            fontSize: isTablet ? 34 : 29,
+            height: 1.15,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.8,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        Text(
+          'Big Impact.',
+          style: AppTextStyles.heading.copyWith(
+            fontSize: isTablet ? 34 : 29,
+            height: 1.15,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.8,
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Text(
+            'Every item reused or donated helps reduce waste and gives useful products another life.',
+            style: AppTextStyles.body.copyWith(
+              fontSize: 13,
+              height: 1.7,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildImpactHero() {
+  // HERO CARD
+
+  Widget _buildHeroCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 21, 20, 20),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(22),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF174D2B),
+            Color(0xFF247443),
+            Color(0xFF398B54),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.16),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: AppColors.primary.withOpacity(0.20),
+            blurRadius: 22,
+            offset: const Offset(0, 9),
           ),
         ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 62,
-            height: 62,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.eco_rounded, color: Colors.white, size: 34),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Your Eco Impact',
-            style: AppTextStyles.title.copyWith(
-              color: Colors.white,
-              fontSize: 18,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'You are helping keep useful items in circulation.',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.caption.copyWith(
-              color: Colors.white.withOpacity(0.78),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.10),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _HeroMetric(
-                    value: '$_itemsReused',
-                    label: 'Items Reused',
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 35,
-                  color: Colors.white.withOpacity(0.18),
-                ),
-                Expanded(
-                  child: _HeroMetric(
-                    value: _formatNumber(_co2Saved),
-                    label: 'kg CO₂ Saved',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPrimaryStats() {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            icon: Icons.recycling_rounded,
-            value: '$_itemsReused',
-            label: 'Items Reused',
-            iconColor: AppColors.success,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.volunteer_activism_outlined,
-            value: '$_itemsDonated',
-            label: 'Items Donated',
-            iconColor: AppColors.primary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSectionTitle(String title, {Widget? trailing}) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(title, style: AppTextStyles.title.copyWith(fontSize: 17)),
-        ),
-        if (trailing != null) trailing,
-      ],
-    );
-  }
-
-  Widget _buildImpactGrid() {
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.15,
-      children: [
-        _ImpactCard(
-          icon: Icons.cloud_outlined,
-          title: 'CO₂ Saved',
-          value: '${_formatNumber(_co2Saved)} kg',
-          description: 'Estimated emissions avoided',
-          iconColor: AppColors.success,
-        ),
-        _ImpactCard(
-          icon: Icons.delete_outline_rounded,
-          title: 'Waste Diverted',
-          value: '${_formatNumber(_wasteDiverted)} kg',
-          description: 'Kept away from waste streams',
-          iconColor: AppColors.primary,
-        ),
-        _ImpactCard(
-          icon: Icons.recycling_outlined,
-          title: 'Items Reused',
-          value: '$_itemsReused',
-          description: 'Products given another life',
-          iconColor: AppColors.secondary,
-        ),
-        _ImpactCard(
-          icon: Icons.eco_outlined,
-          title: 'Eco Points',
-          value: '$_ecoPoints',
-          description: 'Sustainability activity points',
-          iconColor: AppColors.primary,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPeriodChip() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.light,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        'Last 6 months',
-        style: AppTextStyles.caption.copyWith(
-          color: AppColors.primary,
-          fontWeight: FontWeight.w600,
-          fontSize: 10,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImpactChart() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 15),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.accent.withOpacity(0.42)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,196 +251,455 @@ class _EcoImpactState extends State<EcoImpact> {
           Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
-                  color: AppColors.light,
-                  borderRadius: BorderRadius.circular(11),
+                  color: Colors.white.withOpacity(0.13),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(
-                  Icons.bar_chart_rounded,
-                  color: AppColors.primary,
-                  size: 21,
+                  Icons.eco_rounded,
+                  color: Colors.white,
+                  size: 29,
                 ),
               ),
-              const SizedBox(width: 11),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Sustainable Activity',
-                      style: AppTextStyles.body.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
+                      'Your Eco Impact',
+                      style: AppTextStyles.title.copyWith(
+                        color: Colors.white,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 5),
                     Text(
-                      'Items contributed to reuse',
-                      style: AppTextStyles.caption,
+                      'Your journey towards a greener planet.',
+                      style: AppTextStyles.caption.copyWith(
+                        color: Colors.white.withOpacity(0.82),
+                        fontSize: 11,
+                        height: 1.5,
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          if (_monthlyImpact.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
-              child: Text(
-                'Monthly history is not provided by the current backend. Your totals above are loaded from your EcoLoop account.',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.caption.copyWith(height: 1.45),
-              ),
-            )
-          else
-            SizedBox(
-              height: 190,
-              width: double.infinity,
-              child: CustomPaint(
-                painter: _ImpactChartPainter(
-                  data: _monthlyImpact,
-                  primaryColor: AppColors.primary,
-                  secondaryColor: AppColors.secondary,
-                  gridColor: AppColors.accent.withOpacity(0.24),
-                  textColor: AppColors.textSecondary,
-                ),
+          const SizedBox(height: 24),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 18,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(19),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.12),
               ),
             ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _HeroMetric(
+                    icon: Icons.recycling_rounded,
+                    value: '$_itemsReused',
+                    label: 'Items Reused',
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 54,
+                  color: Colors.white.withOpacity(0.22),
+                ),
+                Expanded(
+                  child: _HeroMetric(
+                    icon: Icons.cloud_done_outlined,
+                    value: _formatNumber(_co2Saved),
+                    label: 'kg CO₂ Saved',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFFB9F6CA),
+                size: 17,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Every contribution counts. Keep making a difference!',
+                  style: AppTextStyles.caption.copyWith(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 11,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
+  // SUMMARY CARDS
+
+  Widget _buildSummaryCards() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _SummaryCard(
+            icon: Icons.recycling_rounded,
+            label: 'Items Reused',
+            value: '$_itemsReused',
+            iconColor: const Color(0xFF23834A),
+            iconBackground: const Color(0xFFE5F5E9),
+          ),
+        ),
+        const SizedBox(width: 13),
+        Expanded(
+          child: _SummaryCard(
+            icon: Icons.volunteer_activism_rounded,
+            label: 'Items Donated',
+            value: '$_itemsDonated',
+            iconColor: const Color(0xFF3975B9),
+            iconBackground: const Color(0xFFE7F0FC),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // SECTION HEADING
+
+  Widget _sectionHeading(String title, String subtitle) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: AppTextStyles.title.copyWith(
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          subtitle,
+          style: AppTextStyles.caption.copyWith(
+            fontSize: 11.5,
+            height: 1.5,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // RESPONSIVE IMPACT GRID
+
+  Widget _buildImpactGrid() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 650 ? 4 : 2;
+        final spacing = 13.0;
+        final cardWidth =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            _impactCard(
+              width: cardWidth,
+              icon: Icons.cloud_done_rounded,
+              title: 'CO₂ Saved',
+              value: '${_formatNumber(_co2Saved)} kg',
+              description: 'Estimated emissions avoided',
+              iconColor: const Color(0xFF23834A),
+              iconBackground: const Color(0xFFE5F5E9),
+            ),
+            _impactCard(
+              width: cardWidth,
+              icon: Icons.delete_sweep_rounded,
+              title: 'Waste Diverted',
+              value: '${_formatNumber(_wasteDiverted)} kg',
+              description: 'Material kept in circulation',
+              iconColor: const Color(0xFFB7791F),
+              iconBackground: const Color(0xFFFFF3D9),
+            ),
+            _impactCard(
+              width: cardWidth,
+              icon: Icons.recycling_rounded,
+              title: 'Items Reused',
+              value: '$_itemsReused',
+              description: 'Products given another life',
+              iconColor: const Color(0xFF3975B9),
+              iconBackground: const Color(0xFFE7F0FC),
+            ),
+            _impactCard(
+              width: cardWidth,
+              icon: Icons.stars_rounded,
+              title: 'Eco Points',
+              value: '$_ecoPoints',
+              description: 'Points from your activity',
+              iconColor: const Color(0xFF8B5BC0),
+              iconBackground: const Color(0xFFF1E8FC),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _impactCard({
+    required double width,
+    required IconData icon,
+    required String title,
+    required String value,
+    required String description,
+    required Color iconColor,
+    required Color iconBackground,
+  }) {
+    return SizedBox(
+      width: width,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 174),
+        padding: const EdgeInsets.all(15),
+        decoration: _cardDecoration(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: iconBackground,
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(
+                icon,
+                color: iconColor,
+                size: 23,
+              ),
+            ),
+            const SizedBox(height: 17),
+            Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: AppTextStyles.title.copyWith(
+                  color: AppColors.primary,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              description,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 10,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // CONTRIBUTION CARD
+
   Widget _buildContributionCard() {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.accent.withOpacity(0.42)),
-      ),
+      width: double.infinity,
+      decoration: _cardDecoration(),
       child: Column(
         children: [
-          _ContributionItem(
+          _ContributionRow(
             icon: Icons.shopping_bag_outlined,
-            title: 'Reusable Purchases',
-            subtitle: 'Choosing products that can be reused',
+            title: 'Reusable Items',
+            subtitle: 'Products given another life',
             value: '$_itemsReused',
-            valueLabel: 'items',
+            unit: 'items',
+            iconColor: const Color(0xFF23834A),
+            iconBackground: const Color(0xFFE5F5E9),
           ),
-          _buildDivider(),
-          _ContributionItem(
+          _divider(),
+          _ContributionRow(
             icon: Icons.volunteer_activism_outlined,
             title: 'Donations',
-            subtitle: 'Items donated to give them another life',
+            subtitle: 'Items donated to others',
             value: '$_itemsDonated',
-            valueLabel: 'items',
+            unit: 'items',
+            iconColor: const Color(0xFF3975B9),
+            iconBackground: const Color(0xFFE7F0FC),
           ),
-          _buildDivider(),
-          _ContributionItem(
-            icon: Icons.delete_sweep_outlined,
+          _divider(),
+          _ContributionRow(
+            icon: Icons.delete_outline_rounded,
             title: 'Waste Reduction',
-            subtitle: 'Material kept in circulation',
+            subtitle: 'Estimated material diverted',
             value: _formatNumber(_wasteDiverted),
-            valueLabel: 'kg',
+            unit: 'kg',
+            iconColor: const Color(0xFFB7791F),
+            iconBackground: const Color(0xFFFFF3D9),
           ),
-          _buildDivider(),
-          _ContributionItem(
+          _divider(),
+          _ContributionRow(
             icon: Icons.cloud_outlined,
             title: 'Carbon Reduction',
             subtitle: 'Estimated emissions avoided',
             value: _formatNumber(_co2Saved),
-            valueLabel: 'kg CO₂',
+            unit: 'kg CO₂',
+            iconColor: const Color(0xFF23834A),
+            iconBackground: const Color(0xFFE5F5E9),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDivider() {
-    return Padding(
-      padding: const EdgeInsets.only(left: 70),
-      child: Divider(height: 1, color: AppColors.accent.withOpacity(0.20)),
-    );
-  }
+  // EXPLANATION CARD
 
-  Widget _buildImpactExplanation() {
+  Widget _buildBenefitsCard() {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.accent.withOpacity(0.42)),
-      ),
+      width: double.infinity,
+      decoration: _cardDecoration(),
       child: Column(
         children: [
-          _ExplanationItem(
+          _BenefitRow(
             icon: Icons.recycling_rounded,
-            title: 'Reuse',
+            title: 'Reuse Products',
             description:
-                'Reusing products helps extend their useful life and reduces the need for new resources.',
+            'Reusing products extends their useful life and reduces the demand for new resources.',
+            iconColor: const Color(0xFF23834A),
+            iconBackground: const Color(0xFFE5F5E9),
           ),
-          _buildDivider(),
-          _ExplanationItem(
+          _divider(),
+          _BenefitRow(
             icon: Icons.delete_outline_rounded,
-            title: 'Waste Reduction',
+            title: 'Reduce Waste',
             description:
-                'Keeping usable items in circulation helps reduce the amount of material sent toward disposal.',
+            'Keeping usable items in circulation helps reduce the amount of material sent for disposal.',
+            iconColor: const Color(0xFFB7791F),
+            iconBackground: const Color(0xFFFFF3D9),
           ),
-          _buildDivider(),
-          _ExplanationItem(
-            icon: Icons.cloud_outlined,
-            title: 'Carbon Savings',
+          _divider(),
+          _BenefitRow(
+            icon: Icons.public_rounded,
+            title: 'Protect Our Planet',
             description:
-                'Reuse and recycling can reduce the environmental impact associated with producing new goods.',
+            'Reusing and donating items can reduce the need to manufacture replacement products.',
+            iconColor: const Color(0xFF3975B9),
+            iconBackground: const Color(0xFFE7F0FC),
           ),
         ],
       ),
     );
   }
+
+  // MOTIVATION CARD
 
   Widget _buildMotivationCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(19),
       decoration: BoxDecoration(
-        color: AppColors.light,
-        borderRadius: BorderRadius.circular(19),
-        border: Border.all(color: AppColors.accent.withOpacity(0.55)),
+        color: const Color(0xFFE8F5E9),
+        borderRadius: BorderRadius.circular(23),
+        border: Border.all(
+          color: const Color(0xFFC8E6C9),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 43,
-            height: 43,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(13),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
             ),
             child: const Icon(
-              Icons.eco_rounded,
-              color: AppColors.primary,
-              size: 23,
+              Icons.energy_savings_leaf_rounded,
+              color: Color(0xFF23834A),
+              size: 25,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 13),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Keep Making an Impact',
-                  style: AppTextStyles.body.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
+                  'Keep Making an Impact!',
+                  style: AppTextStyles.title.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF174D2B),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 7),
                 Text(
-                  'Every purchase, sale, reuse and donation helps move EcoLoop toward a more circular marketplace.',
-                  style: AppTextStyles.caption.copyWith(height: 1.45),
+                  'Every item reused and every donation helps build a more sustainable future.',
+                  style: AppTextStyles.body.copyWith(
+                    fontSize: 12,
+                    height: 1.65,
+                    color: const Color(0xFF466650),
+                  ),
+                ),
+                const SizedBox(height: 13),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: const Text(
+                    'Reuse more. Waste less. Live greener.',
+                    style: TextStyle(
+                      color: Color(0xFF174D2B),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -505,88 +709,141 @@ class _EcoImpactState extends State<EcoImpact> {
     );
   }
 
-  Widget _buildLoadingState() {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(
-        parent: BouncingScrollPhysics(),
+  // COMMON CARD STYLE
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(
+        color: AppColors.accent.withOpacity(0.32),
       ),
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 30),
-      children: [
-        _skeleton(height: 30, width: 225),
-        const SizedBox(height: 9),
-        _skeleton(height: 18, width: double.infinity),
-        const SizedBox(height: 18),
-        _skeleton(height: 270, width: double.infinity),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _skeleton(height: 110, width: double.infinity)),
-            const SizedBox(width: 10),
-            Expanded(child: _skeleton(height: 110, width: double.infinity)),
-          ],
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.025),
+          blurRadius: 16,
+          offset: const Offset(0, 5),
         ),
-        const SizedBox(height: 20),
-        _skeleton(height: 235, width: double.infinity),
-        const SizedBox(height: 20),
-        _skeleton(height: 230, width: double.infinity),
       ],
     );
   }
 
-  Widget _skeleton({required double height, required double width}) {
-    return Container(
-      height: height,
-      width: width,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.accent.withOpacity(0.20)),
+  Widget _divider() {
+    return Padding(
+      padding: const EdgeInsets.only(left: 72, right: 16),
+      child: Divider(
+        height: 1,
+        thickness: 1,
+        color: AppColors.accent.withOpacity(0.20),
       ),
     );
   }
 
-  Widget _buildErrorState() {
+  // LOADING
+
+  Widget _buildLoading() {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
-      padding: const EdgeInsets.fromLTRB(24, 100, 24, 30),
+      padding: const EdgeInsets.all(18),
+      children: [
+        _skeleton(65),
+        const SizedBox(height: 18),
+        _skeleton(230),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _skeleton(125)),
+            const SizedBox(width: 12),
+            Expanded(child: _skeleton(125)),
+          ],
+        ),
+        const SizedBox(height: 25),
+        _skeleton(200),
+        const SizedBox(height: 20),
+        _skeleton(240),
+        const SizedBox(height: 20),
+        _skeleton(200),
+      ],
+    );
+  }
+
+  Widget _skeleton(double height) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: AppColors.accent.withOpacity(0.18),
+        ),
+      ),
+    );
+  }
+
+  // ERROR
+
+  Widget _buildError() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 80, 24, 30),
       children: [
         Center(
           child: Container(
-            width: 65,
-            height: 65,
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
               color: AppColors.error.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(19),
+              borderRadius: BorderRadius.circular(22),
             ),
-            child: const Icon(
-              Icons.error_outline_rounded,
+            child: Icon(
+              Icons.cloud_off_rounded,
               color: AppColors.error,
-              size: 32,
+              size: 34,
             ),
           ),
         ),
-        const SizedBox(height: 17),
+        const SizedBox(height: 20),
         Text(
           'Unable to Load Eco Impact',
           textAlign: TextAlign.center,
-          style: AppTextStyles.title.copyWith(fontSize: 18),
+          style: AppTextStyles.title.copyWith(
+            color: AppColors.textPrimary,
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+          ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 9),
         Text(
           _loadError ??
-              'Something went wrong while loading your environmental impact.',
+              'Something went wrong while loading your impact.',
           textAlign: TextAlign.center,
-          style: AppTextStyles.body,
+          style: AppTextStyles.body.copyWith(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+            height: 1.6,
+          ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 22),
         Center(
-          child: SizedBox(
-            height: 44,
-            child: ElevatedButton(
-              onPressed: _loadImpact,
-              child: const Text('Try Again'),
+          child: ElevatedButton.icon(
+            onPressed: _loadImpact,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Try Again'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 23,
+                vertical: 14,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
           ),
         ),
@@ -594,76 +851,108 @@ class _EcoImpactState extends State<EcoImpact> {
     );
   }
 
+  // API DATA
+
   Future<void> _loadImpact() async {
     if (!mounted) return;
+
     setState(() {
       _isLoading = true;
       _hasError = false;
       _loadError = null;
     });
+
     try {
       final results = await Future.wait<dynamic>([
         EcoLoopApi.instance.get('/eco-impact'),
         EcoLoopApi.instance.get('/donations'),
         EcoLoopApi.instance.get('/rewards'),
       ]);
+
       final response = results[0];
+
       if (response is! Map) {
-        throw Exception(
-          'The backend returned an unexpected Eco Impact response.',
-        );
+        throw Exception('Unexpected Eco Impact response from the server.');
       }
+
       final data = Map<String, dynamic>.from(response);
       final donationResponse = results[1];
-      final donationRows = donationResponse is List
+
+      final List<dynamic> donationRows = donationResponse is List
           ? donationResponse
-          : donationResponse is Map && donationResponse['donations'] is List
+          : donationResponse is Map &&
+          donationResponse['donations'] is List
           ? donationResponse['donations'] as List
           : <dynamic>[];
+
       final acceptedDonationIds = <String>{};
+
       for (final row in donationRows.whereType<Map>()) {
-        final status = (row['status'] ?? '').toString().toLowerCase();
+        final status = (row['status'] ?? '')
+            .toString()
+            .toLowerCase()
+            .trim();
+
         if (status == 'accepted' ||
             status == 'approved' ||
             status == 'completed') {
-          final id = (row['donationId'] ?? row['id'] ?? '').toString();
-          if (id.isNotEmpty) acceptedDonationIds.add(id);
+          final id = (row['donationId'] ?? row['id'] ?? '')
+              .toString();
+
+          if (id.isNotEmpty) {
+            acceptedDonationIds.add(id);
+          }
         }
       }
+
       final rewardResponse = results[2];
-      final transactions =
-          rewardResponse is Map && rewardResponse['transactions'] is List
+
+      final List<dynamic> transactions = rewardResponse is Map &&
+          rewardResponse['transactions'] is List
           ? rewardResponse['transactions'] as List
           : rewardResponse is List
           ? rewardResponse
           : <dynamic>[];
+
       var acceptedPoints = 0;
+
       for (final row in transactions.whereType<Map>()) {
         final points = _asInt(row['points']);
+
         final referenceType = (row['referenceType'] ?? '')
             .toString()
-            .toLowerCase();
+            .toLowerCase()
+            .trim();
+
         final referenceId = (row['referenceId'] ?? '').toString();
+
         if (referenceType == 'donation' &&
-            !acceptedDonationIds.contains(referenceId))
+            !acceptedDonationIds.contains(referenceId)) {
           continue;
+        }
+
         acceptedPoints += points;
       }
+
       final reused = _asInt(data['itemsReused']);
       final donated = acceptedDonationIds.length;
+
       if (!mounted) return;
+
       setState(() {
         _itemsReused = reused;
         _itemsDonated = donated;
-        // Keep the current Code.gs impact formula, but count only donations
-        // accepted in the sheet for the user-facing impact figures.
+
         _co2Saved = (reused * 2.5) + (donated * 3.0);
         _wasteDiverted = (reused * 1.5) + (donated * 2.0);
         _ecoPoints = acceptedPoints;
+
         _isLoading = false;
+        _hasError = false;
       });
     } catch (e) {
       if (!mounted) return;
+
       setState(() {
         _hasError = true;
         _loadError = e.toString().replaceFirst('Exception: ', '');
@@ -672,194 +961,191 @@ class _EcoImpactState extends State<EcoImpact> {
     }
   }
 
-  int _asInt(dynamic value) =>
-      value is num ? value.toInt() : int.tryParse(value?.toString() ?? '') ?? 0;
-  double _asDouble(dynamic value) => value is num
-      ? value.toDouble()
-      : double.tryParse(value?.toString() ?? '') ?? 0;
+  int _asInt(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
 
   String _formatNumber(double value) {
     if (value == value.roundToDouble()) {
       return value.toInt().toString();
     }
+
     return value.toStringAsFixed(1);
   }
 }
 
+// HERO METRIC
+
 class _HeroMetric extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _HeroMetric({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.72)),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
   final IconData icon;
   final String value;
   final String label;
-  final Color iconColor;
 
-  const _StatCard({
+  const _HeroMetric({
     required this.icon,
     required this.value,
     required this.label,
-    required this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: AppColors.accent.withOpacity(0.40)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 39,
-            height: 39,
-            decoration: BoxDecoration(
-              color: AppColors.light,
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(height: 11),
-          Text(
-            value,
-            style: AppTextStyles.title.copyWith(
-              fontSize: 20,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(label, style: AppTextStyles.caption),
-        ],
-      ),
-    );
-  }
-}
-
-class _ImpactCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-  final String description;
-  final Color iconColor;
-
-  const _ImpactCard({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.description,
-    required this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.accent.withOpacity(0.40)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.light,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const Spacer(),
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.title.copyWith(fontSize: 17),
-          ),
-          const SizedBox(height: 1),
-          Text(
-            description,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.caption.copyWith(fontSize: 9.0, height: 1.2),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ContributionItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String value;
-  final String valueLabel;
-
-  const _ContributionItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.valueLabel,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            size: 21,
+            color: const Color(0xFFB9F6CA),
+          ),
+          const SizedBox(height: 9),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 25,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.white.withOpacity(0.82),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// SUMMARY CARD
+
+class _SummaryCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color iconColor;
+  final Color iconBackground;
+
+  const _SummaryCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.iconColor,
+    required this.iconBackground,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: AppColors.accent.withOpacity(0.32),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.025),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 43,
+            height: 43,
             decoration: BoxDecoration(
-              color: AppColors.light,
-              borderRadius: BorderRadius.circular(12),
+              color: iconBackground,
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 21),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 23,
+            ),
+          ),
+          const SizedBox(height: 15),
+          Text(
+            value,
+            style: AppTextStyles.title.copyWith(
+              fontSize: 25,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.6,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            label,
+            style: AppTextStyles.caption.copyWith(
+              fontSize: 11,
+              height: 1.4,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// CONTRIBUTION ROW
+
+class _ContributionRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String value;
+  final String unit;
+  final Color iconColor;
+  final Color iconBackground;
+
+  const _ContributionRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.unit,
+    required this.iconColor,
+    required this.iconBackground,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 15,
+        vertical: 16,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: iconBackground,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 22,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -870,15 +1156,18 @@ class _ContributionItem extends StatelessWidget {
                   title,
                   style: AppTextStyles.body.copyWith(
                     color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 5),
                 Text(
                   subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 10.5,
+                    height: 1.45,
+                  ),
                 ),
               ],
             ),
@@ -887,10 +1176,21 @@ class _ContributionItem extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(value, style: AppTextStyles.title.copyWith(fontSize: 17)),
               Text(
-                valueLabel,
-                style: AppTextStyles.caption.copyWith(fontSize: 9.5),
+                value,
+                style: AppTextStyles.title.copyWith(
+                  color: AppColors.primary,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                unit,
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 9.5,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -900,34 +1200,47 @@ class _ContributionItem extends StatelessWidget {
   }
 }
 
-class _ExplanationItem extends StatelessWidget {
+// BENEFIT ROW
+
+class _BenefitRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String description;
+  final Color iconColor;
+  final Color iconBackground;
 
-  const _ExplanationItem({
+  const _BenefitRow({
     required this.icon,
     required this.title,
     required this.description,
+    required this.iconColor,
+    required this.iconBackground,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 17,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: AppColors.light,
-              borderRadius: BorderRadius.circular(12),
+              color: iconBackground,
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 21),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 22,
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 13),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -936,13 +1249,18 @@ class _ExplanationItem extends StatelessWidget {
                   title,
                   style: AppTextStyles.body.copyWith(
                     color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 6),
                 Text(
                   description,
-                  style: AppTextStyles.caption.copyWith(height: 1.45),
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    height: 1.65,
+                  ),
                 ),
               ],
             ),
@@ -950,134 +1268,5 @@ class _ExplanationItem extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _ImpactMonth {
-  final String label;
-  final double value;
-
-  const _ImpactMonth({required this.label, required this.value});
-}
-
-class _ImpactChartPainter extends CustomPainter {
-  final List<_ImpactMonth> data;
-  final Color primaryColor;
-  final Color secondaryColor;
-  final Color gridColor;
-  final Color textColor;
-
-  _ImpactChartPainter({
-    required this.data,
-    required this.primaryColor,
-    required this.secondaryColor,
-    required this.gridColor,
-    required this.textColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (data.isEmpty) return;
-
-    const double leftPadding = 8;
-    const double rightPadding = 8;
-    const double topPadding = 8;
-    const double bottomPadding = 29;
-
-    final double chartWidth = size.width - leftPadding - rightPadding;
-    final double chartHeight = size.height - topPadding - bottomPadding;
-
-    final double maxValue = math.max(
-      data.map((item) => item.value).reduce(math.max),
-      1,
-    );
-
-    final Paint gridPaint = Paint()
-      ..color = gridColor
-      ..strokeWidth = 1;
-
-    final Paint barPaint = Paint()
-      ..color = secondaryColor
-      ..style = PaintingStyle.fill;
-
-    final Paint highlightPaint = Paint()
-      ..color = primaryColor
-      ..style = PaintingStyle.fill;
-
-    final double sectionHeight = chartHeight / 4;
-
-    for (int i = 0; i <= 4; i++) {
-      final double y = topPadding + (sectionHeight * i);
-      canvas.drawLine(
-        Offset(leftPadding, y),
-        Offset(size.width - rightPadding, y),
-        gridPaint,
-      );
-    }
-
-    final double slotWidth = chartWidth / data.length;
-    final double barWidth = math.min(28, slotWidth * 0.48);
-
-    for (int i = 0; i < data.length; i++) {
-      final item = data[i];
-      final double barHeight = (item.value / maxValue) * chartHeight;
-      final double centerX = leftPadding + (slotWidth * i) + (slotWidth / 2);
-      final double left = centerX - (barWidth / 2);
-      final double top = topPadding + chartHeight - barHeight;
-
-      final Rect barRect = Rect.fromLTWH(left, top, barWidth, barHeight);
-      final RRect roundedRect = RRect.fromRectAndCorners(
-        barRect,
-        topLeft: const Radius.circular(7),
-        topRight: const Radius.circular(7),
-      );
-
-      canvas.drawRRect(
-        roundedRect,
-        i == data.length - 1 ? highlightPaint : barPaint,
-      );
-
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: item.value.toInt().toString(),
-          style: TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.w600,
-            color: textColor,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-      textPainter.paint(
-        canvas,
-        Offset(centerX - (textPainter.width / 2), top - textPainter.height - 4),
-      );
-
-      final monthPainter = TextPainter(
-        text: TextSpan(
-          text: item.label,
-          style: TextStyle(fontSize: 10, color: textColor),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      monthPainter.layout();
-      monthPainter.paint(
-        canvas,
-        Offset(
-          centerX - (monthPainter.width / 2),
-          size.height - bottomPadding + 9,
-        ),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ImpactChartPainter oldDelegate) {
-    return oldDelegate.data != data ||
-        oldDelegate.primaryColor != primaryColor ||
-        oldDelegate.secondaryColor != secondaryColor ||
-        oldDelegate.gridColor != gridColor ||
-        oldDelegate.textColor != textColor;
   }
 }
