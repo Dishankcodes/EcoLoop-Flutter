@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
@@ -71,9 +73,21 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   }
 
   String get shippingAddress {
-    return (_order['shippingAddress'] ?? '').toString().trim().isEmpty
-        ? 'Address not available'
-        : (_order['shippingAddress']).toString();
+    final raw = _order['shippingAddress'] ?? _order['address'];
+    if (raw == null || raw.toString().trim().isEmpty) return 'Address not available';
+    dynamic value = raw;
+    if (raw is String) {
+      try { value = jsonDecode(raw); } catch (_) { return raw.trim(); }
+    }
+    if (value is Map) {
+      final parts = <String>[
+        value['name'], value['addressLine'], value['area'], value['city'],
+        value['state'], value['pincode'],
+      ].map((part) => (part ?? '').toString().trim())
+       .where((part) => part.isNotEmpty).toList();
+      return parts.isEmpty ? 'Address not available' : parts.toSet().join(', ');
+    }
+    return value.toString();
   }
 
   IconData get productIcon {
@@ -765,10 +779,20 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
           _detailRow(
             Icons.local_shipping_outlined,
-            'Delivery',
-            (_order['deliveryMethod'] ?? '').toString().trim().isEmpty
-                ? 'Delivery method not provided'
-                : _order['deliveryMethod'].toString(),
+            'Delivery speed',
+            (_order['deliveryMethod'] ?? 'standard').toString().toLowerCase().contains('express')
+                ? 'Express'
+                : 'Standard',
+          ),
+
+          const SizedBox(height: 12),
+
+          _detailRow(
+            Icons.storefront_outlined,
+            'Delivery responsibility',
+            (_order['deliveryResponsibility'] ?? '').toString().trim().isEmpty
+                ? 'Not recorded for this order'
+                : _order['deliveryResponsibility'].toString().replaceAll('_', ' '),
           ),
 
           const SizedBox(height: 12),
@@ -812,6 +836,17 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             'Platform fee',
             _formatCurrency(_amountValue(_order['platformFee'])),
           ),
+
+          _billRow(
+            'GST on platform fee',
+            _formatCurrency(_amountValue(_order['taxAmount'])),
+          ),
+
+          if (_amountValue(_order['couponDiscount']) > 0)
+            _billRow(
+              'Coupon discount',
+              '−${_formatCurrency(_amountValue(_order['couponDiscount']))}',
+            ),
 
           _billRow(
             'Delivery charges',
@@ -1562,3 +1597,4 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 }
+

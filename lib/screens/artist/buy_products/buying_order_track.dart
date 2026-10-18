@@ -1,3 +1,4 @@
+
 import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
@@ -74,9 +75,10 @@ class _OrderTrackingState extends State<OrderTracking> {
       ? _order['icon'] as IconData
       : Icons.inventory_2_outlined;
 
-  String get expectedDelivery =>
-      (_order['expectedDelivery'] ?? _order['estimatedDelivery'])?.toString() ??
-      'Not provided by seller';
+  String get expectedDelivery {
+    final value = (_order['expectedDelivery'] ?? _order['estimatedDelivery'])?.toString().trim() ?? '';
+    return value.isEmpty || value.toLowerCase() == 'null' ? 'Estimated delivery: 5–7 days after ordering' : value;
+  }
 
   String get sellerName =>
       (_order['sellerName'] ?? _order['seller'])?.toString() ??
@@ -1162,3 +1164,4 @@ class _OrderTrackingState extends State<OrderTracking> {
     );
   }
 }
+

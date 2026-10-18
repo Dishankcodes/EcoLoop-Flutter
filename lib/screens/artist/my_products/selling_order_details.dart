@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
@@ -64,13 +65,21 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   }
 
   String get shippingAddress {
-    final value = widget.order['shippingAddress']?.toString();
-
-    if (value == null || value.trim().isEmpty) {
-      return 'Delivery address';
+    final raw = widget.order['shippingAddress'] ?? widget.order['address'];
+    if (raw == null || raw.toString().trim().isEmpty) return 'Delivery address unavailable';
+    dynamic value = raw;
+    if (raw is String) {
+      try { value = jsonDecode(raw); } catch (_) { return raw.trim(); }
     }
-
-    return value;
+    if (value is Map) {
+      final parts = <String>[
+        value['name'], value['addressLine'], value['area'], value['city'],
+        value['state'], value['pincode'],
+      ].map((part) => (part ?? '').toString().trim())
+       .where((part) => part.isNotEmpty).toList();
+      return parts.isEmpty ? 'Delivery address unavailable' : parts.toSet().join(', ');
+    }
+    return value.toString();
   }
 
   String get paymentStatus {
@@ -890,8 +899,20 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
 
           _detailRow(
             Icons.local_shipping_outlined,
-            'Delivery',
-            'EcoLoop Delivery',
+            'Delivery speed',
+            ('${widget.order['deliveryMethod'] ?? 'standard'}').toLowerCase().contains('express')
+                ? 'Express'
+                : 'Standard',
+          ),
+
+          const SizedBox(height: 12),
+
+          _detailRow(
+            Icons.storefront_outlined,
+            'Delivery responsibility',
+            ('${widget.order['deliveryResponsibility'] ?? ''}').trim().isEmpty
+                ? 'Not recorded for this order'
+                : '${widget.order['deliveryResponsibility']}'.replaceAll('_', ' '),
           ),
 
           const SizedBox(height: 12),
@@ -1563,3 +1584,4 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
       );
   }
 }
+
