@@ -87,7 +87,29 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
 
   double get _delivery => _num(_order['deliveryCharge']);
 
-  double get _net => _subtotal - _platformFee;
+  double get _sellerDeliveryCost => _num(
+    _order['sellerDeliveryCost'] ??
+        _order['sellerCourierCost'] ??
+        _order['deliveryCostToSeller'],
+  );
+
+  String get _deliveryResponsibility {
+    final raw =
+        '${_order['deliveryResponsibility'] ?? _order['deliveryService'] ?? _order['productDeliveryMethod'] ?? _order['deliveryType'] ?? ''}'
+            .trim()
+            .toLowerCase()
+            .replaceAll('_', ' ')
+            .replaceAll('-', ' ');
+    if (raw.contains('free delivery') ||
+        raw == 'seller' ||
+        raw.contains('self'))
+      return 'Free Delivery (seller-managed)';
+    if (raw.contains('ecoloop') || raw.contains('managed'))
+      return 'EcoLoop-Managed Delivery';
+    return raw.isEmpty ? 'Not recorded' : _pretty(raw);
+  }
+
+  double get _net => _subtotal - _sellerDeliveryCost;
 
   String _money(dynamic amount) => '₹${_num(amount).toStringAsFixed(2)}';
 
@@ -573,7 +595,14 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                       Icons.account_balance_wallet_outlined,
                       [
                         _moneyRow('Product subtotal', _money(_subtotal)),
-                        _moneyRow('Platform fee', '− ${_money(_platformFee)}'),
+                        _moneyRow(
+                          'Platform fee (paid by buyer)',
+                          _money(_platformFee),
+                        ),
+                        _moneyRow(
+                          'Seller-paid delivery cost',
+                          _money(_sellerDeliveryCost),
+                        ),
                         _moneyRow(
                           'Estimated seller net',
                           _money(_net),
@@ -581,7 +610,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Tax and delivery amounts are displayed separately and are not counted as seller earnings.',
+                          'Platform fee and GST are buyer-side charges, not deducted from seller earnings. Only a recorded seller-paid delivery cost is deducted here.',
                           style: TextStyle(
                             fontSize: 10.5,
                             height: 1.45,
@@ -590,7 +619,11 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                         ),
                         const SizedBox(height: 12),
                         _info('Tax amount', _money(_tax)),
-                        _info('Delivery charge', _money(_delivery)),
+                        _info(
+                          'Delivery responsibility',
+                          _deliveryResponsibility,
+                        ),
+                        _info('Buyer delivery charge', _money(_delivery)),
                       ],
                     ),
                     _section(

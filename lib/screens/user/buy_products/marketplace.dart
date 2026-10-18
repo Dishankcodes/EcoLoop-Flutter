@@ -12,10 +12,18 @@ import 'seller_profile.dart';
 import 'wishlist.dart';
 
 class Marketplace extends StatefulWidget {
-  const Marketplace({super.key, this.initialSearch, this.initialCategory});
+  const Marketplace({
+    super.key,
+    this.initialSearch,
+    this.initialCategory,
+    this.returnToCheckoutOnSelect = false,
+  });
 
   final String? initialSearch;
   final String? initialCategory;
+
+  /// When launched from checkout, selecting a product returns it to that same checkout route.
+  final bool returnToCheckoutOnSelect;
 
   @override
   State<Marketplace> createState() => _MarketplaceState();
@@ -975,11 +983,24 @@ class _MarketplaceState extends State<Marketplace> {
 
   // PRODUCT DETAILS
 
-  void _openProductDetails(Map<String, dynamic> product) {
-    Navigator.push(
+  Future<void> _openProductDetails(Map<String, dynamic> product) async {
+    if (_isOwnProduct(product)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You cannot purchase your own listing.')),
+      );
+      return;
+    }
+    final result = await Navigator.push<Map<String, dynamic>>(
       context,
-      MaterialPageRoute(builder: (_) => ProductDetails(product: product)),
+      MaterialPageRoute(
+        builder: (_) => ProductDetails(
+          product: product,
+          returnToCheckoutOnSelect: widget.returnToCheckoutOnSelect,
+        ),
+      ),
     );
+    if (!mounted || !widget.returnToCheckoutOnSelect || result == null) return;
+    Navigator.pop(context, result);
   }
 
   // EMPTY STATE

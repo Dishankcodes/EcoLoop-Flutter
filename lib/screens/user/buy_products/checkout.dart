@@ -38,6 +38,9 @@ class _CheckoutState extends State<Checkout> {
   final List<Map<String, dynamic>> _items = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _addresses = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _suggestedProducts = <Map<String, dynamic>>[];
+  final Set<String> _ownProductIds = <String>{};
+  String? _currentAccountId;
+  String _currentAccountType = 'user';
 
   String? _selectedAddressId;
   String? _couponCode;
@@ -71,7 +74,9 @@ class _CheckoutState extends State<Checkout> {
     }
 
     _loadAddresses();
-    _loadSuggestedProducts();
+    _loadCurrentAccountAndOwnProducts().then((_) {
+      if (mounted) _loadSuggestedProducts();
+    });
   }
 
   Map<String, dynamic> _asMap(dynamic value) {
@@ -187,16 +192,16 @@ class _CheckoutState extends State<Checkout> {
     (sum, item) => sum + _number(item['price']) * _integer(item['quantity'], 1),
   );
 
-  double get _platformFee => _items.fold<double>(0, (sum, item) {
-    final line = _number(item['price']) * _integer(item['quantity'], 1);
-    return sum + (line * 0.02).roundToDouble();
-  });
+  double _calculatePlatformFee(double subtotal) {
+    // Charge one tiered fee for the complete basket, including multi-seller carts.
+    if (subtotal >= 999) return 60.0;
+    if (subtotal >= 499) return 30.0;
+    return (subtotal * 0.04).roundToDouble();
+  }
 
-  double get _taxes => _items.fold<double>(0, (sum, item) {
-    final line = _number(item['price']) * _integer(item['quantity'], 1);
-    final fee = (line * 0.02).roundToDouble();
-    return sum + (fee * 0.18).roundToDouble();
-  });
+  double get _platformFee => _calculatePlatformFee(_subtotal);
+
+  double get _taxes => (_platformFee * 0.18).roundToDouble();
 
   String _sellerKey(Map<String, dynamic> item) {
     final sellerId =
@@ -364,6 +369,114 @@ class _CheckoutState extends State<Checkout> {
     }
   }
 
+  Future<void> _loadCurrentAccountAndOwnProducts() async {
+    // Identity and own listing IDs are used as a second safety check in checkout,
+    // even if an owned listing slips through the marketplace API/filter.
+    try {
+      final response = _asMap(await _api.get('/auth/me'));
+      final data = _asMap(response['data']);
+      final account = _asMap(
+        response['account'] ??
+            response['user'] ??
+            response['artist'] ??
+            data['account'] ??
+            data['user'] ??
+            data['artist'] ??
+            data,
+      );
+      final id =
+          account['accountId'] ??
+          account['userId'] ??
+          account['artistId'] ??
+          account['id'];
+      final type =
+          (account['accountType'] ??
+                  account['ownerType'] ??
+                  account['role'] ??
+                  response['accountType'] ??
+                  data['accountType'] ??
+                  'user')
+              .toString()
+              .trim()
+              .toLowerCase();
+      if (id != null && id.toString().trim().isNotEmpty) {
+        _currentAccountId = id.toString().trim();
+        _currentAccountType =
+            <String>{'artist', 'remaker', 're-maker', 're_maker'}.contains(type)
+            ? 'artist'
+            : 'user';
+      }
+    } catch (_) {}
+    try {
+      final rows = _extractRows(
+        await _api.get('/my/products'),
+        keys: const ['products', 'items', 'data', 'results'],
+      );
+      _ownProductIds.addAll(
+        rows
+            .map((row) => _asMap(row))
+            .map(
+              (row) =>
+                  (row['productId'] ?? row['product_id'] ?? row['id'] ?? '')
+                      .toString()
+                      .trim(),
+            )
+            .where((id) => id.isNotEmpty),
+      );
+    } catch (_) {}
+  }
+
+  bool _isOwnProduct(Map<String, dynamic> product) {
+    final id =
+        (product['productId'] ?? product['product_id'] ?? product['id'] ?? '')
+            .toString()
+            .trim();
+    if (id.isNotEmpty && _ownProductIds.contains(id)) return true;
+    final sellerId =
+        (product['sellerId'] ??
+                product['seller_id'] ??
+                product['ownerId'] ??
+                product['owner_id'] ??
+                '')
+            .toString()
+            .trim();
+    if (sellerId.isEmpty ||
+        _currentAccountId == null ||
+        sellerId != _currentAccountId)
+      return false;
+    final sellerType =
+        (product['sellerType'] ??
+                product['seller_type'] ??
+                product['sellerRole'] ??
+                product['seller_role'] ??
+                product['ownerType'] ??
+                'user')
+            .toString()
+            .trim()
+            .toLowerCase();
+    final isArtist = <String>{
+      'artist',
+      'remaker',
+      're-maker',
+      're_maker',
+    }.contains(sellerType);
+    return isArtist == (_currentAccountType == 'artist');
+  }
+
+  Future<void> _browseMarketplace() async {
+    if (_proceeding) return;
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const Marketplace(returnToCheckoutOnSelect: true),
+      ),
+    );
+    if (!mounted || result == null) return;
+    final product = _asMap(result['product']);
+    final quantity = _integer(result['quantity'], 1).clamp(1, 999);
+    if (product.isNotEmpty) _addProduct(product, quantity: quantity);
+  }
+
   Future<void> _loadSuggestedProducts() async {
     if (!mounted) return;
     setState(() {
@@ -384,6 +497,7 @@ class _CheckoutState extends State<Checkout> {
             final stock = _integer(product['availableQuantity'], 0);
             return id.isNotEmpty &&
                 !currentIds.contains(id) &&
+                !_isOwnProduct(product) &&
                 status == 'published' &&
                 stock > 0;
           })
@@ -456,8 +570,12 @@ class _CheckoutState extends State<Checkout> {
     }
   }
 
-  void _addProduct(Map<String, dynamic> source) {
+  void _addProduct(Map<String, dynamic> source, {int quantity = 1}) {
     final product = _normalizeItem(source);
+    if (_isOwnProduct(product)) {
+      _message('You cannot add your own listing to checkout.');
+      return;
+    }
     final id = product['productId'].toString();
     if (id.isEmpty) {
       _message('This listing has no product ID and cannot be added.');
@@ -474,13 +592,27 @@ class _CheckoutState extends State<Checkout> {
     if (index >= 0) {
       final current = _integer(_items[index]['quantity'], 1);
       final available = _integer(_items[index]['availableQuantity'], 0);
-      if (current >= available) {
-        _message('Maximum available quantity already added.');
+      if (current + quantity > available) {
+        _message(
+          'No more stock available. Maximum available quantity is $available.',
+        );
         return;
       }
-      setState(() => _items[index]['quantity'] = current + 1);
+      setState(() {
+        _items[index]['quantity'] = current + quantity;
+        _recalculateCoupon();
+      });
     } else {
-      setState(() => _items.add({...product, 'quantity': 1}));
+      setState(() {
+        if (quantity > stock) {
+          _message(
+            'No more stock available. Maximum available quantity is $stock.',
+          );
+          return;
+        }
+        _items.add({...product, 'quantity': quantity});
+        _recalculateCoupon();
+      });
     }
     _loadSuggestedProducts();
     _message('${product['title']} added to checkout.');
@@ -495,29 +627,111 @@ class _CheckoutState extends State<Checkout> {
       _message(
         available == 0
             ? 'This product is out of stock.'
-            : 'Only $available available.',
+            : 'No more stock available. Maximum available quantity is $available.',
       );
       return;
     }
-    setState(() => item['quantity'] = quantity + 1);
+    setState(() {
+      item['quantity'] = quantity + 1;
+      _recalculateCoupon();
+    });
   }
 
-  void _decrease(int index) {
+  Future<bool> _confirmAction({
+    required String title,
+    required String message,
+    String confirmLabel = 'Confirm',
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(title, style: AppTextStyles.title),
+        content: Text(
+          message,
+          style: AppTextStyles.caption.copyWith(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(11),
+              ),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  Future<void> _decrease(int index) async {
     if (index < 0 || index >= _items.length) return;
     final quantity = _integer(_items[index]['quantity'], 1);
     if (quantity <= 1) {
-      _removeItem(index);
-    } else {
-      setState(() => _items[index]['quantity'] = quantity - 1);
+      await _removeItem(
+        index,
+        message:
+            'Quantity is 1. Removing this item will clear it from your checkout. Are you sure?',
+        confirmLabel: 'Remove item',
+      );
+      return;
     }
+    setState(() {
+      _items[index]['quantity'] = quantity - 1;
+      _recalculateCoupon();
+    });
   }
 
-  void _removeItem(int index) {
+  Future<void> _removeItem(
+    int index, {
+    String? message,
+    String confirmLabel = 'Remove',
+    bool confirm = true,
+  }) async {
     if (index < 0 || index >= _items.length) return;
     final title = _items[index]['title'].toString();
-    setState(() => _items.removeAt(index));
+    final confirmed =
+        !confirm ||
+        await _confirmAction(
+          title: 'Remove item?',
+          message:
+              message ??
+              'Are you sure you want to remove "$title" from your checkout?',
+          confirmLabel: confirmLabel,
+        );
+    if (!confirmed || !mounted || index >= _items.length) return;
+    setState(() {
+      _items.removeAt(index);
+      _recalculateCoupon();
+    });
     _loadSuggestedProducts();
-    _message('$title removed from checkout.');
+    _message(
+      _items.isEmpty
+          ? 'Your checkout is now empty.'
+          : '$title removed from checkout.',
+    );
+  }
+
+  void _recalculateCoupon() {
+    final code = _couponCode;
+    if (code == null) return;
+    final minimum = _couponMinimum(code);
+    if (minimum == 0 || _subtotal < minimum) {
+      _couponCode = null;
+      _couponDiscount = 0;
+      return;
+    }
+    _couponDiscount = _couponAmount(code).clamp(0.0, _subtotal).toDouble();
   }
 
   Future<void> _openAddMoreProducts() async {
@@ -610,12 +824,7 @@ class _CheckoutState extends State<Checkout> {
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.pop(sheetContext);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const Marketplace(),
-                          ),
-                        );
+                        _browseMarketplace();
                       },
                       icon: const Icon(Icons.storefront_outlined),
                       label: const Text('Browse full marketplace'),
@@ -686,93 +895,189 @@ class _CheckoutState extends State<Checkout> {
   }
 
   void _openCouponSheet() {
-    final controller = TextEditingController(text: _couponCode ?? '');
     showModalBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
       builder: (sheetContext) => SafeArea(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            12,
-            20,
-            MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _sheetHandle(),
-              const SizedBox(height: 18),
-              Text(
-                'Apply coupon',
-                style: AppTextStyles.title.copyWith(fontSize: 20),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'RECYCLE20: ₹20 off at ₹499 · LOOP50: ₹50 off at ₹999 · ECO100: ₹100 off at ₹1,599. Minimum is based on product subtotal.',
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                  labelText: 'Coupon code',
-                  border: OutlineInputBorder(),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sheetHandle(),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.local_offer_outlined,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 9),
+                    Text(
+                      'Apply Coupon',
+                      style: AppTextStyles.title.copyWith(fontSize: 20),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    final code = controller.text.trim().toUpperCase();
-                    if (code.isEmpty) {
-                      _message('Enter a coupon code.');
-                      return;
-                    }
-                    final minimum = _couponMinimum(code);
-                    final discount = _couponAmount(code);
-                    if (minimum == 0) {
-                      _message(
-                        'Invalid coupon. Use RECYCLE20, LOOP50 or ECO100.',
-                      );
-                      return;
-                    }
-                    if (_subtotal < minimum) {
-                      _message(
-                        '$code requires a product subtotal of at least ${_money(minimum)}.',
-                      );
-                      return;
-                    }
-                    setState(() {
-                      _couponCode = code;
-                      _couponDiscount = discount;
-                    });
-                    Navigator.pop(sheetContext);
-                    _message('$code applied. You save ${_money(discount)}.');
-                  },
-                  child: const Text('Validate coupon'),
+                const SizedBox(height: 15),
+                _couponOptionTile(
+                  sheetContext,
+                  code: 'ECO100',
+                  title: '₹100 OFF',
+                  subtitle: 'On orders of ₹1,599 or more',
+                  minimumOrder: 1599,
+                  discount: 100,
                 ),
-              ),
-              if (_couponCode != null && _couponCode!.isNotEmpty)
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _couponCode = null;
-                      _couponDiscount = 0;
-                    });
-                    Navigator.pop(sheetContext);
-                  },
-                  child: const Text('Remove existing coupon'),
+                const SizedBox(height: 10),
+                _couponOptionTile(
+                  sheetContext,
+                  code: 'LOOP50',
+                  title: '₹50 OFF',
+                  subtitle: 'On orders of ₹999 or more',
+                  minimumOrder: 999,
+                  discount: 50,
                 ),
-            ],
+                const SizedBox(height: 10),
+                _couponOptionTile(
+                  sheetContext,
+                  code: 'RECYCLE20',
+                  title: '₹20 OFF',
+                  subtitle: 'On orders of ₹499 or more',
+                  minimumOrder: 499,
+                  discount: 20,
+                ),
+                if (_couponCode != null) ...[
+                  const SizedBox(height: 8),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _couponCode = null;
+                          _couponDiscount = 0;
+                        });
+                        Navigator.pop(sheetContext);
+                        _message('Coupon removed.');
+                      },
+                      icon: const Icon(Icons.close_rounded),
+                      label: const Text('Remove applied coupon'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.red.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _couponOptionTile(
+    BuildContext sheetContext, {
+    required String code,
+    required String title,
+    required String subtitle,
+    required double minimumOrder,
+    required double discount,
+  }) {
+    final applied = _couponCode == code;
+    final eligible = _subtotal >= minimumOrder;
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: applied
+            ? AppColors.light.withValues(alpha: 0.65)
+            : AppColors.surface,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: applied
+              ? AppColors.primary
+              : AppColors.accent.withValues(alpha: 0.5),
+          width: applied ? 1.4 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 43,
+            height: 43,
+            decoration: BoxDecoration(
+              color: AppColors.light,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.confirmation_num_outlined,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(subtitle, style: AppTextStyles.caption),
+                const SizedBox(height: 3),
+                Text(
+                  code,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
+                ),
+                if (!eligible)
+                  Text(
+                    'Add ${_money(minimumOrder - _subtotal)} more to use this coupon',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            height: 36,
+            child: OutlinedButton(
+              onPressed: applied
+                  ? null
+                  : () {
+                      if (!eligible) {
+                        _message(
+                          '$code requires a product subtotal of at least ${_money(minimumOrder)}.',
+                        );
+                        return;
+                      }
+                      setState(() {
+                        _couponCode = code;
+                        _couponDiscount = discount
+                            .clamp(0.0, _subtotal)
+                            .toDouble();
+                      });
+                      Navigator.pop(sheetContext);
+                      _message(
+                        '$code applied. You save ${_money(_couponSavings)}.',
+                      );
+                    },
+              child: Text(applied ? 'Applied' : 'Apply'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -799,10 +1104,17 @@ class _CheckoutState extends State<Checkout> {
 
     setState(() => _proceeding = true);
     try {
+      // Ensure account ownership data is available before allowing payment.
+      await _loadCurrentAccountAndOwnProducts();
       // Re-read authoritative product data just before checkout. The server
       // still performs final stock validation atomically during batch ordering.
       final refreshed = <Map<String, dynamic>>[];
       for (final current in _items) {
+        if (_isOwnProduct(current)) {
+          throw Exception(
+            'You cannot checkout your own listing: ${current['title'] ?? 'Product'}. Remove it from checkout.',
+          );
+        }
         final id =
             (current['productId'] ??
                     current['product_id'] ??
@@ -823,6 +1135,11 @@ class _CheckoutState extends State<Checkout> {
           );
         }
         final normalized = _normalizeItem({...current, ...product});
+        if (_isOwnProduct(normalized)) {
+          throw Exception(
+            'You cannot checkout your own listing: ${normalized['title']}. Remove it from checkout.',
+          );
+        }
         final status = (normalized['status'] ?? 'published')
             .toString()
             .toLowerCase();
@@ -1239,7 +1556,7 @@ class _CheckoutState extends State<Checkout> {
                     _quantityControl(
                       quantity: quantity,
                       onMinus: () => _decrease(index),
-                      onPlus: stock > quantity ? () => _increase(index) : null,
+                      onPlus: () => _increase(index),
                     ),
                     const SizedBox(width: 8),
                     Flexible(
@@ -1347,41 +1664,93 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _buildCouponSection() {
+    final applied = _couponCode != null && _couponSavings > 0;
     return _sectionCard(
-      child: Row(
+      child: Column(
         children: [
-          _sectionIcon(Icons.local_offer_outlined),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Coupons & offers',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  _couponCode == null
-                      ? '₹20 off ₹499 · ₹50 off ₹999 · ₹100 off ₹1,599'
-                      : 'Coupon: $_couponCode',
-                  style: AppTextStyles.caption,
-                ),
-                if (_couponSavings > 0)
-                  Text(
-                    'Savings: ${_money(_couponSavings)}',
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
+          Row(
+            children: [
+              _sectionIcon(Icons.local_offer_outlined),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      applied ? 'Coupon Applied' : 'Apply Coupon',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
+                    const SizedBox(height: 3),
+                    Text(
+                      applied
+                          ? '$_couponCode • You saved ${_money(_couponSavings)}'
+                          : 'Save more on your EcoLoop order',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption,
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: _openCouponSheet,
+                child: Text(
+                  applied ? 'Change' : 'Apply',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
                   ),
-              ],
+                ),
+              ),
+            ],
+          ),
+          if (!applied) ...[
+            const SizedBox(height: 10),
+            InkWell(
+              onTap: _openCouponSheet,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.45),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.confirmation_num_outlined,
+                      size: 18,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'View all available coupons',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          TextButton(
-            onPressed: _openCouponSheet,
-            child: Text(_couponCode == null ? 'Apply' : 'Change'),
-          ),
+          ],
         ],
       ),
     );
@@ -1396,7 +1765,7 @@ class _CheckoutState extends State<Checkout> {
           const SizedBox(height: 14),
           _priceRow('Items subtotal', _money(_subtotal)),
           const SizedBox(height: 10),
-          _priceRow('Platform fee (2%)', _money(_platformFee)),
+          _priceRow('Platform fee', _money(_platformFee)),
           const SizedBox(height: 10),
           _priceRow('GST on platform fee (18%)', _money(_taxes)),
           const SizedBox(height: 10),
@@ -1561,10 +1930,7 @@ class _CheckoutState extends State<Checkout> {
             ),
             const SizedBox(height: 18),
             FilledButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const Marketplace()),
-              ),
+              onPressed: _browseMarketplace,
               icon: const Icon(Icons.storefront_outlined),
               label: const Text('Browse marketplace'),
             ),

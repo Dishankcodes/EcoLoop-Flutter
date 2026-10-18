@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../services/ecoloop_api.dart';
 import '../../../app_theme/user/app_colors.dart';
+import '../../../services/ecoloop_api.dart';
 import 'edit_listing.dart';
 
 class ListingDetails extends StatefulWidget {
@@ -31,6 +31,18 @@ class _ListingDetailsState extends State<ListingDetails> {
 
   String get _description => (_listing['description'] ?? '').toString();
 
+  String get _deliveryLabel {
+    final value = (_listing['deliveryMethod'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    return value == 'free delivery' ||
+            value == 'free' ||
+            value == 'free_delivery'
+        ? 'Free Delivery (seller pays courier)'
+        : 'EcoLoop-Managed Delivery (buyer pays delivery)';
+  }
+
   String get _category =>
       (_listing['categoryName'] ??
               _listing['category'] ??
@@ -44,6 +56,80 @@ class _ListingDetailsState extends State<ListingDetails> {
   void initState() {
     super.initState();
     _listing = Map<String, dynamic>.from(widget.listing);
+  }
+
+  /// Formats timestamps from Google Sheets / Apps Script as Indian local time.
+  /// ISO values ending in Z are UTC; timezone-less Apps Script values are IST.
+  String _formatDateLabel(dynamic rawValue) {
+    final raw = rawValue?.toString().trim() ?? '';
+    if (raw.isEmpty || raw == 'null') return '—';
+
+    DateTime parsed;
+    try {
+      final hasZone = RegExp(
+        r'(Z|[+-]\d{2}:?\d{2})$',
+        caseSensitive: false,
+      ).hasMatch(raw);
+      if (hasZone) {
+        parsed = DateTime.parse(
+          raw,
+        ).toUtc().add(const Duration(hours: 5, minutes: 30));
+      } else {
+        // Apps Script format yyyy-MM-dd HH:mm:ss is already in Asia/Kolkata.
+        final normalized = raw.replaceFirst(' ', 'T');
+        final localParsed = DateTime.parse(normalized);
+        parsed = DateTime.utc(
+          localParsed.year,
+          localParsed.month,
+          localParsed.day,
+          localParsed.hour,
+          localParsed.minute,
+          localParsed.second,
+          localParsed.millisecond,
+        ).add(const Duration(hours: 5, minutes: 30));
+        // Date-only values should not be shifted to the following day.
+        if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(raw)) {
+          parsed = DateTime.parse('${raw}T00:00:00');
+        }
+      }
+    } catch (_) {
+      return raw;
+    }
+
+    final nowUtc = DateTime.now().toUtc();
+    final nowIst = nowUtc.add(const Duration(hours: 5, minutes: 30));
+    final today = DateTime(nowIst.year, nowIst.month, nowIst.day);
+    final date = DateTime(parsed.year, parsed.month, parsed.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final time =
+        _twoDigits(parsed.hour % 12 == 0 ? 12 : parsed.hour % 12) +
+        ':' +
+        _twoDigits(parsed.minute) +
+        (parsed.hour >= 12 ? ' PM' : ' AM');
+
+    if (date == today) return 'Today, $time';
+    if (date == yesterday) return 'Yesterday, $time';
+    return '${_twoDigits(parsed.day)} ${_monthName(parsed.month)} ${parsed.year}, $time';
+  }
+
+  String _twoDigits(int value) => value.toString().padLeft(2, '0');
+
+  String _monthName(int month) {
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return months[month - 1];
   }
 
   String _prettyStatus(String status) {
@@ -232,9 +318,10 @@ class _ListingDetailsState extends State<ListingDetails> {
             'Description',
             _description.isEmpty ? 'No description provided.' : _description,
           ),
+          _section('Delivery option', _deliveryLabel),
           _section(
             'Listing information',
-            'Product ID: ${_listing['productId'] ?? '—'}\nCreated: ${_listing['createdAt'] ?? '—'}\nViews: ${_listing['views'] ?? 0}\nSaved: ${_listing['wishlistCount'] ?? 0}\nSales: ${_listing['salesCount'] ?? 0}',
+            'Product ID: ${_listing['productId'] ?? '—'}\nCreated: ${_formatDateLabel(_listing['createdAt'])}\nViews: ${_listing['views'] ?? 0}\nSaved: ${_listing['wishlistCount'] ?? 0}\nSales: ${_listing['salesCount'] ?? 0}',
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),

@@ -206,8 +206,14 @@ class _OrderTrackingState extends State<OrderTracking> {
 
           const SizedBox(height: 14),
 
-          const Text(
-            'Your order is on the way',
+          Text(
+            currentStatus == 'Delivered'
+                ? 'Your order was delivered'
+                : currentStatus == 'Cancelled'
+                ? 'This order was cancelled'
+                : currentStatus == 'Pending' || currentStatus == 'New Order'
+                ? 'Your order has been received'
+                : 'Your order is on the way',
 
             textAlign: TextAlign.center,
 

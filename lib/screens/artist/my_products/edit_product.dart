@@ -26,6 +26,12 @@ class _EditProductState extends State<EditProduct> {
   String? _selectedCategory;
   String? _selectedCondition;
   String? _selectedListingType;
+  String _deliveryMethod = 'EcoLoop-Managed Delivery';
+
+  static const List<String> _deliveryOptions = [
+    'Free Delivery',
+    'EcoLoop-Managed Delivery',
+  ];
 
   bool _isSaving = false;
   bool _isLoadingCategories = true;
@@ -82,6 +88,7 @@ class _EditProductState extends State<EditProduct> {
       _conditions,
     );
     _selectedListingType = 'Sell';
+    _deliveryMethod = _normalizeDeliveryMethod(product['deliveryMethod']);
     _existingImageUrls = _readImageUrls(product);
     _loadCategories();
   }
@@ -308,6 +315,26 @@ class _EditProductState extends State<EditProduct> {
                 return null;
               },
             ),
+
+            const SizedBox(height: 16),
+
+            _buildDropdown(
+              label: 'Delivery Option',
+              value: _deliveryMethod,
+              hint: 'Select delivery option',
+              icon: Icons.local_shipping_outlined,
+              items: _deliveryOptions,
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => _deliveryMethod = value);
+              },
+              validator: (value) => value == null || value.isEmpty
+                  ? 'Please select a delivery option'
+                  : null,
+            ),
+
+            const SizedBox(height: 10),
+            _buildDeliveryHint(),
 
             const SizedBox(height: 16),
 
@@ -834,10 +861,44 @@ class _EditProductState extends State<EditProduct> {
     );
   }
 
+  Widget _buildDeliveryHint() {
+    final isFreeDelivery = _deliveryMethod == 'Free Delivery';
+    final message = isFreeDelivery
+        ? 'Free for the buyer. You are responsible for the applicable courier cost; consider including it in your product price.'
+        : 'The buyer pays the applicable delivery charge at checkout. EcoLoop-managed shipping availability and charges depend on the route and service.';
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ArtistColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ArtistColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isFreeDelivery
+                ? Icons.card_giftcard_outlined
+                : Icons.local_shipping_outlined,
+            color: ArtistColors.primary,
+            size: 19,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              message,
+              style: ArtistTextStyles.small.copyWith(height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProductInfoCard() {
     final String status = widget.product['status']?.toString() ?? 'active';
 
-    final String createdAt = widget.product['createdAt']?.toString() ?? '-';
+    final String createdAt = _formatListingDate(widget.product['createdAt']);
 
     return Container(
       padding: const EdgeInsets.all(15),
@@ -855,6 +916,14 @@ class _EditProductState extends State<EditProduct> {
           ),
 
           const SizedBox(height: 13),
+
+          _buildInfoRow(
+            icon: Icons.local_shipping_outlined,
+            label: 'Delivery Option',
+            value: _deliveryMethod,
+          ),
+
+          const SizedBox(height: 10),
 
           _buildInfoRow(
             icon: Icons.toggle_on_outlined,
@@ -903,17 +972,115 @@ class _EditProductState extends State<EditProduct> {
     required String label,
     required String value,
   }) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: ArtistColors.textSecondary),
-
-        const SizedBox(width: 10),
-
-        Expanded(child: Text(label, style: ArtistTextStyles.small)),
-
-        Text(value, style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 12)),
-      ],
+    // Keep each field in a single vertical column: label first, value below.
+    // This avoids cramped, side-by-side values on narrow phone screens.
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: ArtistColors.textSecondary),
+              const SizedBox(width: 10),
+              Expanded(child: Text(label, style: ArtistTextStyles.small)),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Padding(
+            padding: const EdgeInsets.only(left: 28),
+            child: SizedBox(
+              width: double.infinity,
+              child: Text(
+                value,
+                textAlign: TextAlign.left,
+                softWrap: true,
+                style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  String _formatListingDate(dynamic value) {
+    final raw = (value ?? '').toString().trim();
+    if (raw.isEmpty || raw.toLowerCase() == 'null' || raw == '-') {
+      return 'Date unavailable';
+    }
+
+    DateTime? listedAt;
+    final sheetIstPattern = RegExp(
+      r'^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$',
+    );
+    final sheetMatch = sheetIstPattern.firstMatch(raw);
+
+    if (sheetMatch != null) {
+      // Apps Script yyyy-MM-dd HH:mm:ss timestamps are already IST.
+      listedAt = DateTime(
+        int.parse(sheetMatch.group(1)!),
+        int.parse(sheetMatch.group(2)!),
+        int.parse(sheetMatch.group(3)!),
+        int.parse(sheetMatch.group(4)!),
+        int.parse(sheetMatch.group(5)!),
+        int.parse(sheetMatch.group(6)!),
+      );
+    } else {
+      final hasTimezone = RegExp(
+        r'(Z|[+-]\d{2}:?\d{2})$',
+        caseSensitive: false,
+      ).hasMatch(raw);
+      final parsed = DateTime.tryParse(raw);
+      if (parsed == null) return 'Date unavailable';
+
+      if (hasTimezone) {
+        // Convert explicit UTC/offset timestamps to IST independent of device zone.
+        listedAt = parsed.toUtc().add(const Duration(hours: 5, minutes: 30));
+      } else {
+        // A timestamp without a timezone is treated as an IST sheet value.
+        listedAt = DateTime(
+          parsed.year,
+          parsed.month,
+          parsed.day,
+          parsed.hour,
+          parsed.minute,
+          parsed.second,
+        );
+      }
+    }
+
+    final nowIst = DateTime.now().toUtc().add(
+      const Duration(hours: 5, minutes: 30),
+    );
+    final today = DateTime(nowIst.year, nowIst.month, nowIst.day);
+    final listedDay = DateTime(listedAt.year, listedAt.month, listedAt.day);
+    final dayDifference = today.difference(listedDay).inDays;
+
+    final hour12 = listedAt.hour % 12 == 0 ? 12 : listedAt.hour % 12;
+    final minute = listedAt.minute.toString().padLeft(2, '0');
+    final period = listedAt.hour >= 12 ? 'PM' : 'AM';
+    final time = '$hour12:$minute $period';
+
+    if (dayDifference == 0) return 'Today, $time';
+    if (dayDifference == 1) return 'Yesterday, $time';
+
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${listedAt.day} ${months[listedAt.month - 1]} ${listedAt.year}, $time';
   }
 
   Widget _buildSaveButton() {
@@ -1050,6 +1217,7 @@ class _EditProductState extends State<EditProduct> {
         'price': double.parse(_priceController.text.trim()),
         'quantity': totalQuantity,
         'availableQuantity': availableQuantity,
+        'deliveryMethod': _deliveryMethod,
       };
       if (_imagesChanged) {
         payload['existingImageUrls'] = _existingImageUrls;
@@ -1092,6 +1260,23 @@ class _EditProductState extends State<EditProduct> {
       ),
       child: Icon(icon, color: iconColor),
     );
+  }
+
+  String _normalizeDeliveryMethod(dynamic value) {
+    final raw = (value ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ');
+    if (raw == 'free' ||
+        raw == 'free delivery' ||
+        raw == 'seller pays' ||
+        raw == 'seller paid delivery') {
+      return 'Free Delivery';
+    }
+    // Existing/missing values default to the buyer-paid EcoLoop-managed option.
+    return 'EcoLoop-Managed Delivery';
   }
 
   String? _getInitialValue(dynamic value, List<String> options) {

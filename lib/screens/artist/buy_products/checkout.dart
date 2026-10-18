@@ -572,18 +572,16 @@ class _CheckoutState extends State<Checkout> {
       ? 99.0 * _uniqueSellerCount
       : _standardDeliveryFee;
 
-  double get _platformFee => _items.fold<double>(0, (sum, item) {
-    final lineSubtotal =
-        _toDouble(item['price']) * _toInt(item['quantity'], fallback: 1);
-    return sum + (lineSubtotal * 0.02).roundToDouble();
-  });
+  double _calculatePlatformFee(double subtotal) {
+    // One fee is charged on the complete checkout subtotal, not per item.
+    if (subtotal >= 999) return 60.0;
+    if (subtotal >= 499) return 30.0;
+    return (subtotal * 0.04).roundToDouble();
+  }
 
-  double get _taxAmount => _items.fold<double>(0, (sum, item) {
-    final lineSubtotal =
-        _toDouble(item['price']) * _toInt(item['quantity'], fallback: 1);
-    final linePlatformFee = (lineSubtotal * 0.02).roundToDouble();
-    return sum + (linePlatformFee * 0.18).roundToDouble();
-  });
+  double get _platformFee => _calculatePlatformFee(_subtotal);
+
+  double get _taxAmount => (_platformFee * 0.18).roundToDouble();
 
   double get _grandTotal =>
       (_subtotal +
@@ -2400,10 +2398,7 @@ class _CheckoutState extends State<Checkout> {
           ],
 
           const SizedBox(height: 10),
-          _priceRow(
-            'Platform fee (2%)',
-            _formatPrice(_platformFee.roundToDouble()),
-          ),
+          _priceRow('Platform fee', _formatPrice(_platformFee.roundToDouble())),
           const SizedBox(height: 8),
           _priceRow('GST on platform fee (18%)', _formatPrice(_taxAmount)),
           const SizedBox(height: 8),

@@ -15,8 +15,13 @@ import 'seller_profile.dart';
 /// Screen displaying full item details, image gallery, seller info, reviews, and purchasing options.
 class ProductDetails extends StatefulWidget {
   final Map<String, dynamic> product;
+  final bool returnToCheckoutOnSelect;
 
-  const ProductDetails({super.key, required this.product});
+  const ProductDetails({
+    super.key,
+    required this.product,
+    this.returnToCheckoutOnSelect = false,
+  });
 
   @override
   State<ProductDetails> createState() => _ProductDetailsState();
@@ -122,6 +127,30 @@ class _ProductDetailsState extends State<ProductDetails> {
       _product['sellerName']?.toString() ??
       _product['seller']?.toString() ??
       'EcoLoop Member';
+
+  double get sellerRating {
+    final raw = _product['sellerRating'] ?? _product['seller_rating'];
+    if (raw is num) return raw.toDouble();
+    return double.tryParse((raw ?? '').toString()) ?? 0;
+  }
+
+  int get sellerReviewCount {
+    final raw =
+        _product['sellerReviews'] ??
+        _product['sellerReviewCount'] ??
+        _product['seller_reviews'];
+    if (raw is num) return raw.toInt();
+    return int.tryParse((raw ?? '').toString()) ?? 0;
+  }
+
+  int get sellerListingCount {
+    final raw =
+        _product['sellerListings'] ??
+        _product['sellerListingCount'] ??
+        _product['seller_listings'];
+    if (raw is num) return raw.toInt();
+    return int.tryParse((raw ?? '').toString()) ?? 0;
+  }
 
   /// Seller account type used for profile navigation.
   ///
@@ -674,20 +703,30 @@ class _ProductDetailsState extends State<ProductDetails> {
                               color: Color(0xFFFFB300),
                             ),
                             const SizedBox(width: 3),
-                            const Text(
-                              '4.8',
-                              style: TextStyle(
+                            Text(
+                              sellerRating > 0
+                                  ? sellerRating.toStringAsFixed(1)
+                                  : 'No rating',
+                              style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.textPrimary,
                               ),
                             ),
                             const SizedBox(width: 7),
-                            Text('127 listings', style: AppTextStyles.caption),
+                            Text(
+                              '$sellerListingCount listing${sellerListingCount == 1 ? '' : 's'}',
+                              style: AppTextStyles.caption,
+                            ),
                           ],
                         ),
                         const SizedBox(height: 3),
-                        Text('EcoLoop member', style: AppTextStyles.caption),
+                        Text(
+                          sellerReviewCount == 0
+                              ? 'EcoLoop member · No seller reviews yet'
+                              : 'EcoLoop member · $sellerReviewCount review${sellerReviewCount == 1 ? '' : 's'}',
+                          style: AppTextStyles.caption,
+                        ),
                       ],
                     ),
                   ),
@@ -1711,8 +1750,38 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
   }
 
+  void _returnSelectedProductToCheckout() {
+    if (availableQuantity <= 0) {
+      _showMessage('This product is currently unavailable.');
+      return;
+    }
+    final selected = Map<String, dynamic>.from(_product);
+    selected['productId'] = _currentProductId;
+    selected['id'] = _currentProductId;
+    selected['title'] = title;
+    selected['price'] = priceValue;
+    selected['quantity'] = _quantity;
+    selected['condition'] = condition;
+    selected['category'] = category;
+    selected['seller'] = seller;
+    selected['sellerName'] = seller;
+    selected['sellerCity'] = selected['sellerCity'] ?? selected['city'] ?? '';
+    selected['availableQuantity'] = availableQuantity;
+    selected['image'] =
+        selected['image'] ?? (images.isNotEmpty ? images.first : '');
+    selected['images'] = selected['images'] ?? images;
+    Navigator.pop(context, <String, dynamic>{
+      'product': selected,
+      'quantity': _quantity,
+    });
+  }
+
   /// Formats product data and presents the cart popup drawer.
   Future<void> _addToCart() async {
+    if (widget.returnToCheckoutOnSelect) {
+      _returnSelectedProductToCheckout();
+      return;
+    }
     if (_cartAdding) return;
     if (availableQuantity <= 0) {
       _showMessage('This product is currently unavailable.');
@@ -1764,6 +1833,10 @@ class _ProductDetailsState extends State<ProductDetails> {
   void _buyNow() {
     if (availableQuantity <= 0) {
       _showMessage('This product is currently unavailable.');
+      return;
+    }
+    if (widget.returnToCheckoutOnSelect) {
+      _returnSelectedProductToCheckout();
       return;
     }
 

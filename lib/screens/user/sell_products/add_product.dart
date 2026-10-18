@@ -24,7 +24,7 @@ class _AddProductState extends State<AddProduct> {
   final TextEditingController quantityController = TextEditingController(
     text: '1',
   );
-  String _deliveryMethod = 'EcoLoop Delivery';
+  String _deliveryMethod = 'EcoLoop-Managed Delivery';
 
   List<SelectedEcoImage> _images = [];
   bool _isSubmitting = false;
@@ -214,16 +214,17 @@ class _AddProductState extends State<AddProduct> {
             _buildSectionTitle('Delivery Option'),
             const SizedBox(height: 10),
             _buildDeliveryOption(
-              title: 'Manage delivery yourself',
-              subtitle: 'Coordinate delivery directly with the buyer.',
-              value: 'Self Delivery',
+              title: 'Free Delivery',
+              subtitle:
+                  'The buyer sees free delivery. You pay the applicable courier charge. Consider including this cost in your product price.',
+              value: 'Free Delivery',
             ),
             const SizedBox(height: 10),
             _buildDeliveryOption(
-              title: 'EcoLoop delivery',
+              title: 'EcoLoop-Managed Delivery',
               subtitle:
-                  '₹45–₹60 for the first 500 g on local/short routes. Final charges depend on distance.',
-              value: 'EcoLoop Delivery',
+                  'The buyer pays the applicable delivery charge at checkout. EcoLoop helps manage the delivery workflow where available.',
+              value: 'EcoLoop-Managed Delivery',
             ),
 
             const SizedBox(height: 14),

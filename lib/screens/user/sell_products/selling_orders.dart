@@ -66,10 +66,16 @@ class _SellingOrdersState extends State<SellingOrders> {
       ' ',
       '_',
     );
-    final subtotal = _number(
-      raw['subtotal'] ?? raw['totalAmount'] ?? raw['unitPrice'] ?? raw['price'],
-    );
     final quantity = _number(raw['quantity'] ?? 1).toInt();
+    final savedSubtotal =
+        raw['subtotal'] ?? raw['lineSubtotal'] ?? raw['productSubtotal'];
+    final rawUnitPrice =
+        raw['unitPrice'] ?? raw['productPrice'] ?? raw['price'];
+    final subtotal = savedSubtotal != null
+        ? _number(savedSubtotal)
+        : rawUnitPrice != null
+        ? _number(rawUnitPrice) * (quantity < 1 ? 1 : quantity)
+        : _number(raw['totalAmount'] ?? raw['priceValue']);
     return {
       ...raw,
       'orderId': raw['orderId'] ?? raw['id'] ?? '',

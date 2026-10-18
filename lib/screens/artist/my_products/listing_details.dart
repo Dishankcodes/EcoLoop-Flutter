@@ -89,8 +89,109 @@ class _ListingDetailsState extends State<ListingDetails> {
   String get availableQuantity =>
       widget.listing['availableQuantity']?.toString() ?? '0';
 
-  String get date =>
-      widget.listing['createdAt']?.toString() ?? 'Listed recently';
+  String get date {
+    final raw = widget.listing['createdAt']?.toString().trim() ?? '';
+
+    if (raw.isEmpty || raw.toLowerCase() == 'null') {
+      return 'Date unavailable';
+    }
+
+    DateTime? listedAt;
+    final sheetIstPattern = RegExp(
+      r'^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$',
+    );
+    final sheetMatch = sheetIstPattern.firstMatch(raw);
+
+    if (sheetMatch != null) {
+      // Code.gs timestamps formatted as yyyy-MM-dd HH:mm:ss are already IST.
+      listedAt = DateTime(
+        int.parse(sheetMatch.group(1)!),
+        int.parse(sheetMatch.group(2)!),
+        int.parse(sheetMatch.group(3)!),
+        int.parse(sheetMatch.group(4)!),
+        int.parse(sheetMatch.group(5)!),
+        int.parse(sheetMatch.group(6)!),
+      );
+    } else {
+      final hasTimezone = RegExp(
+        r'(Z|[+-]\d{2}:?\d{2})$',
+        caseSensitive: false,
+      ).hasMatch(raw);
+      final parsed = DateTime.tryParse(raw);
+
+      if (parsed == null) {
+        return 'Date unavailable';
+      }
+
+      if (hasTimezone) {
+        // Convert explicit UTC/offset timestamps to IST, regardless of device zone.
+        listedAt = parsed.toUtc().add(const Duration(hours: 5, minutes: 30));
+      } else {
+        // Date-only or timezone-less ISO values from Sheets are treated as IST.
+        listedAt = DateTime(
+          parsed.year,
+          parsed.month,
+          parsed.day,
+          parsed.hour,
+          parsed.minute,
+          parsed.second,
+        );
+      }
+    }
+
+    final nowIst = DateTime.now().toUtc().add(
+      const Duration(hours: 5, minutes: 30),
+    );
+    final today = DateTime(nowIst.year, nowIst.month, nowIst.day);
+    final listedDay = DateTime(listedAt.year, listedAt.month, listedAt.day);
+    final dayDifference = today.difference(listedDay).inDays;
+
+    final hour12 = listedAt.hour % 12 == 0 ? 12 : listedAt.hour % 12;
+    final minute = listedAt.minute.toString().padLeft(2, '0');
+    final period = listedAt.hour >= 12 ? 'PM' : 'AM';
+    final time = '$hour12:$minute $period';
+
+    if (dayDifference == 0) {
+      return 'Today, $time';
+    }
+
+    if (dayDifference == 1) {
+      return 'Yesterday, $time';
+    }
+
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    return '${listedAt.day} ${months[listedAt.month - 1]} ${listedAt.year}, $time';
+  }
+
+  String get deliveryMethod {
+    final raw = (widget.listing['deliveryMethod'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ');
+    if (raw == 'free' ||
+        raw == 'free delivery' ||
+        raw == 'seller pays' ||
+        raw == 'seller paid delivery') {
+      return 'Free Delivery — seller pays courier';
+    }
+    return 'EcoLoop-Managed Delivery — buyer pays';
+  }
 
   String get imageUrl {
     final image = widget.listing['image']?.toString() ?? '';
@@ -434,6 +535,12 @@ class _ListingDetailsState extends State<ListingDetails> {
           _infoRow(Icons.verified_outlined, 'Condition', condition),
 
           _infoRow(Icons.sell_outlined, 'Price', price),
+
+          _infoRow(
+            Icons.local_shipping_outlined,
+            'Delivery Option',
+            deliveryMethod,
+          ),
 
           _infoRow(Icons.inventory_outlined, 'Quantity', quantity),
 
@@ -975,25 +1082,38 @@ class _ListingDetailsState extends State<ListingDetails> {
   }
 
   Widget _infoRow(IconData icon, String title, String value) {
+    // One-column layout: label first, value directly underneath.
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: ArtistColors.primary),
-
-          const SizedBox(width: 10),
-
-          Text(title, style: ArtistTextStyles.small.copyWith(fontSize: 11.5)),
-
-          const Spacer(),
-
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: ArtistTextStyles.bodyMedium.copyWith(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: ArtistColors.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: ArtistTextStyles.small.copyWith(fontSize: 11.5),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Padding(
+            padding: const EdgeInsets.only(left: 28),
+            child: SizedBox(
+              width: double.infinity,
+              child: Text(
+                value,
+                textAlign: TextAlign.left,
+                softWrap: true,
+                style: ArtistTextStyles.bodyMedium.copyWith(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),

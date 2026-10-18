@@ -5,6 +5,7 @@ import '../../../services/ecoloop_api.dart';
 
 class SellingOrderStatus extends StatefulWidget {
   final Map<String, dynamic> order;
+
   const SellingOrderStatus({super.key, required this.order});
 
   @override
@@ -79,10 +80,13 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
   int get _id =>
       int.tryParse('${widget.order['orderId'] ?? widget.order['id'] ?? ''}') ??
       0;
+
   String get _product =>
       '${widget.order['productName'] ?? widget.order['product'] ?? 'Product #${widget.order['productId'] ?? '—'}'}';
+
   String get _buyer =>
       '${widget.order['buyerName'] ?? widget.order['buyer'] ?? 'Buyer details unavailable'}';
+
   double get _amount =>
       double.tryParse(
         '${widget.order['subtotal'] ?? widget.order['totalAmount'] ?? widget.order['priceValue'] ?? 0}',

@@ -24,6 +24,7 @@ class _AddProductState extends State<AddProduct> {
 
   List<SelectedEcoImage> _images = [];
   bool _isSubmitting = false;
+  String _deliveryMethod = 'EcoLoop-Managed Delivery';
 
   String? selectedCategory;
   String? selectedCondition;
@@ -257,6 +258,27 @@ class _AddProductState extends State<AddProduct> {
               },
             ),
 
+            const SizedBox(height: 18),
+
+            // Delivery preference — keep the existing Artist theme and card style.
+            _buildSectionTitle('Delivery Option'),
+            const SizedBox(height: 10),
+            _buildDeliveryOption(
+              title: 'Free Delivery',
+              subtitle:
+                  'The buyer sees free delivery. You pay the applicable courier charge. Consider including this cost in your product price.',
+              value: 'Free Delivery',
+              icon: Icons.card_giftcard_outlined,
+            ),
+            const SizedBox(height: 10),
+            _buildDeliveryOption(
+              title: 'EcoLoop-Managed Delivery',
+              subtitle:
+                  'The buyer pays the applicable delivery charge at checkout. EcoLoop helps manage the delivery workflow where available.',
+              value: 'EcoLoop-Managed Delivery',
+              icon: Icons.local_shipping_outlined,
+            ),
+
             const SizedBox(height: 14),
 
             // Description
@@ -457,6 +479,54 @@ class _AddProductState extends State<AddProduct> {
     );
   }
 
+  // Delivery option cards use the existing Artist palette and typography.
+  Widget _buildDeliveryOption({
+    required String title,
+    required String subtitle,
+    required String value,
+    required IconData icon,
+  }) {
+    final selected = _deliveryMethod == value;
+    return InkWell(
+      onTap: _isSubmitting
+          ? null
+          : () => setState(() => _deliveryMethod = value),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? ArtistColors.light : ArtistColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? ArtistColors.primary : ArtistColors.border,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: ArtistColors.primary,
+            ),
+            const SizedBox(width: 10),
+            Icon(icon, color: ArtistColors.primary, size: 21),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: ArtistTextStyles.bodyMedium),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: ArtistTextStyles.caption),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // TEXT FIELD
 
   Widget _buildTextField({
@@ -597,6 +667,7 @@ class _AddProductState extends State<AddProduct> {
         ),
         'price': double.parse(priceController.text.trim()),
         'quantity': int.parse(quantityController.text.trim()),
+        'deliveryMethod': _deliveryMethod,
         'status': 'published',
         'imageBase64': await EcoImagePicker.payload(_images),
       });

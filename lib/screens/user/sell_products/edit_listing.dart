@@ -24,6 +24,7 @@ class _EditListingState extends State<EditListing> {
   late final TextEditingController _descriptionController;
   bool _saving = false;
   bool _available = true;
+  String _deliveryMethod = 'EcoLoop-Managed Delivery';
   List<Map<String, dynamic>> _categories = [];
   String? _categoryId;
   String? _originalCategoryId;
@@ -81,6 +82,9 @@ class _EditListingState extends State<EditListing> {
     _categoryId = _originalCategoryId;
     _condition = _normalizeCondition(
       widget.listing['condition']?.toString() ?? 'good',
+    );
+    _deliveryMethod = _normalizeDeliveryMethod(
+      widget.listing['deliveryMethod']?.toString() ?? '',
     );
     _available = !_isUnavailable(
       widget.listing['status']?.toString() ?? 'published',
@@ -146,6 +150,13 @@ class _EditListingState extends State<EditListing> {
     return _conditions.any((e) => e['value'] == normalized)
         ? normalized
         : 'good';
+  }
+
+  String _normalizeDeliveryMethod(String value) {
+    final normalized = value.trim().toLowerCase().replaceAll('_', ' ');
+    return normalized == 'free delivery' || normalized == 'free'
+        ? 'Free Delivery'
+        : 'EcoLoop-Managed Delivery';
   }
 
   bool _isUnavailable(String status) =>
@@ -279,6 +290,7 @@ class _EditListingState extends State<EditListing> {
         'description': _descriptionController.text.trim(),
         'categoryId': int.parse(_categoryId!),
         'condition': _condition,
+        'deliveryMethod': _deliveryMethod,
         'price': double.parse(_priceController.text.trim()),
         // Keep sold quantity intact; editing price/details cannot restore sold stock.
         'quantity': newTotalQuantity,
@@ -482,6 +494,24 @@ class _EditListingState extends State<EditListing> {
                 ),
               ],
             ),
+            const SizedBox(height: 18),
+            _label('Delivery Option'),
+            const SizedBox(height: 8),
+            _deliveryOption(
+              title: 'Free Delivery',
+              subtitle:
+                  'The buyer sees free delivery. You pay the applicable courier charge; consider including it in your product price.',
+              value: 'Free Delivery',
+              icon: Icons.card_giftcard_outlined,
+            ),
+            const SizedBox(height: 10),
+            _deliveryOption(
+              title: 'EcoLoop-Managed Delivery',
+              subtitle:
+                  'The buyer pays the applicable delivery charge at checkout.',
+              value: 'EcoLoop-Managed Delivery',
+              icon: Icons.local_shipping_outlined,
+            ),
             const SizedBox(height: 16),
             _label('Description'),
             TextFormField(
@@ -626,6 +656,62 @@ class _EditListingState extends State<EditListing> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _deliveryOption({
+    required String title,
+    required String subtitle,
+    required String value,
+    required IconData icon,
+  }) {
+    final selected = _deliveryMethod == value;
+    return InkWell(
+      onTap: _saving ? null : () => setState(() => _deliveryMethod = value),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.light : AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary
+                : AppColors.accent.withOpacity(0.35),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 10),
+            Icon(icon, color: AppColors.primary, size: 21),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

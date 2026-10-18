@@ -255,16 +255,27 @@ class _PaymentState extends State<Payment> {
   void _showPaymentSuccess() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       isDismissible: false,
       enableDrag: false,
       backgroundColor: ArtistColors.surface,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.86,
+      ),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (sheetContext) {
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+          top: false,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              24,
+              24,
+              24,
+              20 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -284,6 +295,7 @@ class _PaymentState extends State<Payment> {
                 const SizedBox(height: 18),
                 Text(
                   'Order Placed Successfully',
+                  textAlign: TextAlign.center,
                   style: ArtistTextStyles.title.copyWith(fontSize: 21),
                 ),
                 const SizedBox(height: 7),
@@ -301,6 +313,7 @@ class _PaymentState extends State<Payment> {
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(
                         Icons.receipt_long_outlined,
@@ -321,6 +334,7 @@ class _PaymentState extends State<Payment> {
                             const SizedBox(height: 3),
                             Text(
                               'Order ${_createdOrderId ?? ''} • Cash on Delivery',
+                              softWrap: true,
                               style: ArtistTextStyles.caption,
                             ),
                           ],

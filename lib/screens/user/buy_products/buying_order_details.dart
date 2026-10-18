@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 
@@ -114,8 +116,133 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         value == 'payment pending';
   }
 
+  double _amount(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(
+          '${value ?? ''}'.replaceAll(',', '').replaceAll('₹', '').trim(),
+        ) ??
+        0;
+  }
+
+  String _money(double value) => '₹${value.round()}';
+
+  Map<String, dynamic> get _shippingAddress {
+    final raw =
+        widget.order['address'] ??
+        widget.order['shippingAddress'] ??
+        widget.order['deliveryAddress'];
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      } catch (_) {}
+    }
+    return <String, dynamic>{};
+  }
+
+  String get _addressText =>
+      <dynamic>[
+            _shippingAddress['addressLine'] ??
+                _shippingAddress['address'] ??
+                _shippingAddress['street'],
+            _shippingAddress['area'],
+            _shippingAddress['city'],
+            _shippingAddress['state'],
+            _shippingAddress['pincode'] ?? _shippingAddress['postalCode'],
+          ]
+          .where((v) => v != null && v.toString().trim().isNotEmpty)
+          .map((v) => v.toString().trim())
+          .toSet()
+          .join(', ');
+
+  double get _quantityValue =>
+      _amount(widget.order['quantity'] ?? 1).clamp(1, 999).toDouble();
+
+  double get _itemSubtotal {
+    final saved =
+        widget.order['subtotal'] ??
+        widget.order['itemSubtotal'] ??
+        widget.order['productSubtotal'] ??
+        widget.order['lineSubtotal'];
+    if (saved != null) return _amount(saved);
+    final unit = widget.order['unitPrice'] ?? widget.order['productPrice'];
+    if (unit != null) return _amount(unit) * _quantityValue;
+    return _amount(
+      widget.order['totalAmount'] ??
+          widget.order['grandTotal'] ??
+          widget.order['total'],
+    );
+  }
+
+  double get _couponDiscount => _amount(
+    widget.order['couponDiscount'] ??
+        widget.order['discountAmount'] ??
+        widget.order['discount'],
+  );
+
+  double get _platformFee =>
+      _amount(widget.order['platformFee'] ?? widget.order['platform_fee']);
+
+  double get _taxAmount => _amount(
+    widget.order['taxAmount'] ??
+        widget.order['gstAmount'] ??
+        widget.order['tax'],
+  );
+
+  double get _deliveryCharge => _amount(
+    widget.order['deliveryCharge'] ??
+        widget.order['deliveryFee'] ??
+        widget.order['shippingCharge'],
+  );
+
+  double get _savedGrandTotal {
+    final saved =
+        widget.order['grandTotal'] ??
+        widget.order['orderTotal'] ??
+        widget.order['finalAmount'] ??
+        widget.order['totalAmount'] ??
+        widget.order['total'];
+    if (saved != null) return _amount(saved);
+    return (_itemSubtotal -
+            _couponDiscount +
+            _platformFee +
+            _taxAmount +
+            _deliveryCharge)
+        .clamp(0, double.infinity)
+        .toDouble();
+  }
+
+  String get _deliveryResponsibility {
+    final raw =
+        (widget.order['deliveryResponsibility'] ??
+                widget.order['deliveryService'] ??
+                widget.order['productDeliveryMethod'] ??
+                widget.order['deliveryType'] ??
+                '')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replaceAll('_', ' ')
+            .replaceAll('-', ' ');
+    if (raw.contains('free delivery') ||
+        raw == 'seller' ||
+        raw.contains('self'))
+      return 'Free Delivery (seller-managed)';
+    if (raw.contains('ecoloop') || raw.contains('managed'))
+      return 'EcoLoop-Managed Delivery';
+    return raw.isEmpty
+        ? 'Not provided by order'
+        : raw
+              .split(' ')
+              .map(
+                (w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}',
+              )
+              .join(' ');
+  }
+
   String get deliveryMethod =>
-      widget.order['deliveryMethod']?.toString() ?? 'EcoLoop Delivery';
+      widget.order['deliveryMethod']?.toString() ?? 'Standard Delivery';
 
   String get expectedDate {
     final value =
@@ -1048,6 +1175,18 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   /// Shipping address and delivery timeline information.
   Widget _buildDeliverySection() {
+    final address = _shippingAddress;
+    final recipient =
+        (address['name'] ??
+                address['fullName'] ??
+                address['recipientName'] ??
+                '')
+            .toString()
+            .trim();
+    final phone =
+        (address['phone'] ?? address['mobile'] ?? address['phoneNumber'] ?? '')
+            .toString()
+            .trim();
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1060,44 +1199,58 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
               color: AppColors.light.withOpacity(0.60),
               borderRadius: BorderRadius.circular(15),
             ),
-            child: const Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
+                const Icon(
                   Icons.location_on_outlined,
                   color: AppColors.primary,
                   size: 22,
                 ),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Deliver to',
                         style: TextStyle(
                           fontSize: 10,
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Dishank Prajapati',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                      if (recipient.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          recipient,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 4),
+                      ],
+                      const SizedBox(height: 4),
                       Text(
-                        '28/4 Jagdish Apartment, Viratnagar Canal Road',
-                        style: TextStyle(
+                        _addressText.isEmpty
+                            ? 'Delivery address unavailable in this order'
+                            : _addressText,
+                        style: const TextStyle(
                           fontSize: 11,
                           height: 1.4,
                           color: AppColors.textSecondary,
                         ),
                       ),
+                      if (phone.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          phone,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1105,7 +1258,17 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             ),
           ),
           const SizedBox(height: 15),
-          _detailRow(Icons.local_shipping_outlined, 'Delivery', deliveryMethod),
+          _detailRow(
+            Icons.local_shipping_outlined,
+            'Delivery speed',
+            deliveryMethod,
+          ),
+          const SizedBox(height: 12),
+          _detailRow(
+            Icons.storefront_outlined,
+            'Delivery responsibility',
+            _deliveryResponsibility,
+          ),
           const SizedBox(height: 12),
           _detailRow(
             Icons.event_outlined,
@@ -1119,39 +1282,85 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   /// Payment breakdown including item cost, charges, and payment mode.
   Widget _buildPaymentSection() {
+    final hasBreakdown = [
+      'subtotal',
+      'itemSubtotal',
+      'productSubtotal',
+      'couponDiscount',
+      'discountAmount',
+      'platformFee',
+      'taxAmount',
+      'gstAmount',
+      'deliveryCharge',
+      'deliveryFee',
+      'grandTotal',
+      'orderTotal',
+      'finalAmount',
+    ].any(widget.order.containsKey);
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle('Payment Summary', Icons.receipt_long_outlined),
+          _sectionTitle('Price Summary', Icons.receipt_long_outlined),
           const SizedBox(height: 18),
-          _billRow('Item total', price),
-          _billRow('EcoLoop handling charge', '₹20'),
-          _billRow('Delivery charges', 'FREE'),
+          _billRow('Item subtotal', _money(_itemSubtotal)),
+          if (_couponDiscount > 0)
+            _billRow('Coupon discount', '− ${_money(_couponDiscount)}'),
+          if (widget.order.containsKey('platformFee') ||
+              widget.order.containsKey('platform_fee'))
+            _billRow('Platform fee', _money(_platformFee)),
+          if (widget.order.containsKey('taxAmount') ||
+              widget.order.containsKey('gstAmount') ||
+              widget.order.containsKey('tax'))
+            _billRow('GST on platform fee', _money(_taxAmount)),
+          if (widget.order.containsKey('deliveryCharge') ||
+              widget.order.containsKey('deliveryFee') ||
+              widget.order.containsKey('shippingCharge'))
+            _billRow(
+              'Delivery charge',
+              _deliveryCharge == 0 ? 'FREE' : _money(_deliveryCharge),
+            ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 5),
             child: Divider(),
           ),
-          _billRow('Total Paid', price, bold: true),
+          _billRow(
+            hasBreakdown ? 'Order total' : 'Order amount',
+            _money(_savedGrandTotal),
+            bold: true,
+          ),
           const SizedBox(height: 5),
           Row(
             children: [
               const Icon(
-                Icons.verified_outlined,
+                Icons.receipt_outlined,
                 size: 15,
-                color: AppColors.success,
+                color: AppColors.primary,
               ),
               const SizedBox(width: 5),
-              Text(
-                payment,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.success,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  'Payment: $payment',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
           ),
+          if (!hasBreakdown) ...[
+            const SizedBox(height: 9),
+            const Text(
+              'This order record does not contain a full saved fee breakdown, so only the recorded order amount is shown. No charges are estimated here.',
+              style: TextStyle(
+                fontSize: 10.5,
+                height: 1.4,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
         ],
       ),
     );
