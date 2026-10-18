@@ -22,7 +22,6 @@ class Cart extends StatefulWidget {
 
 class _CartState extends State<Cart> {
   final List<Map<String, dynamic>> _cartItems = [];
-  final List<Map<String, dynamic>> _savedForLater = [];
   List<Map<String, dynamic>> _similarProducts = [];
   bool _similarProductsLoading = false;
   String? _similarProductsError;
@@ -30,21 +29,91 @@ class _CartState extends State<Cart> {
   String? _appliedCoupon;
   double _couponDiscount = 0;
 
+  final EcoLoopApi _api = EcoLoopApi.instance;
+  bool _cartLoading = true;
+  bool _cartBusy = false;
+  String? _cartError;
+
   @override
   void initState() {
     super.initState();
-    _loadInitialItems();
-    _syncGlobalCart();
+    // The account-scoped backend cart is authoritative. Do not merge the
+    // popup's initial snapshot again: /cart already contains that item and
+    // merging it here would silently double the quantity.
+    _loadCart();
     _loadSimilarProducts();
   }
 
-  // INITIAL DATA
+  // PERSISTENT CART
 
-  void _loadInitialItems() {
-    final incoming = widget.initialItems ?? [];
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return Map<String, dynamic>.from(value);
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return <String, dynamic>{};
+  }
 
-    for (final item in incoming) {
-      _addOrMergeItem(item);
+  List<Map<String, dynamic>> _extractCartRows(dynamic response) {
+    if (response is List) {
+      return response.whereType<Map>().map(_asMap).toList();
+    }
+    final root = _asMap(response);
+    final data = root['data'];
+    if (data is List) return data.whereType<Map>().map(_asMap).toList();
+    if (data is Map) {
+      for (final key in ['items', 'cart', 'products', 'results']) {
+        final rows = data[key];
+        if (rows is List) return rows.whereType<Map>().map(_asMap).toList();
+      }
+    }
+    for (final key in ['items', 'cart', 'products', 'results']) {
+      final rows = root[key];
+      if (rows is List) return rows.whereType<Map>().map(_asMap).toList();
+    }
+    return <Map<String, dynamic>>[];
+  }
+
+  Future<void> _loadCart({bool showLoader = true}) async {
+    if (showLoader && mounted) {
+      setState(() {
+        _cartLoading = true;
+        _cartError = null;
+      });
+    }
+    try {
+      final response = await _api.get('/cart');
+      final rows = _extractCartRows(response);
+      final active = <Map<String, dynamic>>[];
+      for (final row in rows) {
+        final item = _normalizeItem(row);
+        active.add(item);
+      }
+      if (!mounted) return;
+      setState(() {
+        _cartItems
+          ..clear()
+          ..addAll(active);
+        _cartLoading = false;
+        _cartError = null;
+      });
+      _syncGlobalCart();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _cartLoading = false;
+        _cartError = error.toString();
+      });
+      // Keep any already-visible items if refresh fails, but do not pretend
+      // that a backend mutation succeeded.
+      if (_cartItems.isEmpty && (widget.initialItems?.isNotEmpty ?? false)) {
+        setState(() {
+          for (final item in widget.initialItems!) {
+            _addOrMergeItem(item);
+          }
+        });
+        _syncGlobalCart();
+      }
     }
   }
 
@@ -86,13 +155,9 @@ class _CartState extends State<Cart> {
       final cartIds = _cartItems
           .map((item) => item['productId'].toString())
           .toSet();
-      final savedIds = _savedForLater
-          .map((item) => item['productId'].toString())
-          .toSet();
-
       products.removeWhere((product) {
         final id = (product['productId'] ?? product['id'] ?? '').toString();
-        return id.isEmpty || cartIds.contains(id) || savedIds.contains(id);
+        return id.isEmpty || cartIds.contains(id);
       });
 
       final categoryId = _cartItems.isNotEmpty
@@ -110,7 +175,7 @@ class _CartState extends State<Cart> {
 
       if (!mounted) return;
       setState(() {
-        _similarProducts = products.take(10).toList();
+        _similarProducts = products.take(4).toList();
         _similarProductsLoading = false;
         _similarProductsError = null;
       });
@@ -150,33 +215,51 @@ class _CartState extends State<Cart> {
     final copy = Map<String, dynamic>.from(item);
 
     final productId =
-        copy['productId'] ??
-        copy['id'] ??
-        DateTime.now().microsecondsSinceEpoch.toString();
-
+        copy['productId'] ?? copy['product_id'] ?? copy['id'] ?? '';
     final title =
         copy['title'] ??
         copy['productName'] ??
+        copy['product_name'] ??
         copy['name'] ??
         'EcoLoop Product';
-
-    final price = _toDouble(copy['price']);
-
+    final price = _toDouble(
+      copy['price'] ?? copy['unitPrice'] ?? copy['unit_price'],
+    );
     final availableQuantity = _toInt(
-      copy['availableQuantity'] ?? copy['stock'] ?? copy['quantity'] ?? 0,
+      copy['availableQuantity'] ??
+          copy['available_quantity'] ??
+          copy['stock'] ??
+          copy['quantityAvailable'] ??
+          0,
       fallback: 0,
     );
+    final requestedQuantity = _toInt(copy['quantity'], fallback: 1);
+    final quantity = availableQuantity > 0
+        ? _safeQuantity(requestedQuantity, availableQuantity)
+        : (requestedQuantity < 1 ? 1 : requestedQuantity);
 
-    final quantity = _safeQuantity(
-      _toInt(copy['quantity'], fallback: 1),
-      availableQuantity <= 0 ? 1 : availableQuantity,
-    );
-
-    copy['productId'] = productId;
+    copy['productId'] = productId.toString();
+    copy['id'] = copy['id'] ?? productId;
     copy['title'] = title;
     copy['price'] = price;
     copy['quantity'] = quantity;
     copy['availableQuantity'] = availableQuantity;
+    copy['image'] ??=
+        copy['imageUrl'] ??
+        copy['image_url'] ??
+        copy['thumbnail'] ??
+        ((copy['imageUrls'] is List && (copy['imageUrls'] as List).isNotEmpty)
+            ? (copy['imageUrls'] as List).first
+            : null) ??
+        ((copy['images'] is List && (copy['images'] as List).isNotEmpty)
+            ? (copy['images'] as List).first
+            : null);
+    copy['seller'] ??=
+        copy['sellerName'] ??
+        copy['sellerUsername'] ??
+        copy['userName'] ??
+        'EcoLoop Seller';
+    copy['category'] ??= copy['categoryName'] ?? 'Recycled';
 
     return copy;
   }
@@ -265,30 +348,30 @@ class _CartState extends State<Cart> {
   }
 
   String _productImage(Map<String, dynamic> item) {
-    final image = item['image'];
-
-    if (image is String && image.trim().isNotEmpty) {
-      return image;
+    for (final key in [
+      'image',
+      'imageUrl',
+      'image_url',
+      'thumbnail',
+      'primaryImage',
+      'primary_image',
+    ]) {
+      final value = item[key];
+      if (value is String && value.trim().startsWith('http'))
+        return value.trim();
     }
-
-    final imageUrl = item['imageUrl'];
-
-    if (imageUrl is String && imageUrl.trim().isNotEmpty) {
-      return imageUrl;
+    for (final key in ['imageUrls', 'image_urls', 'images']) {
+      final value = item[key];
+      if (value is List) {
+        for (final entry in value) {
+          final url = entry.toString().trim();
+          if (url.startsWith('http')) return url;
+        }
+      } else if (value is String && value.trim().isNotEmpty) {
+        final match = RegExp(r'https?://[^\s,\]"}]+').firstMatch(value.trim());
+        if (match != null) return match.group(0)!;
+      }
     }
-
-    final imageUrls = item['imageUrls'];
-
-    if (imageUrls is List && imageUrls.isNotEmpty) {
-      return imageUrls.first.toString();
-    }
-
-    final images = item['images'];
-
-    if (images is List && images.isNotEmpty) {
-      return images.first.toString();
-    }
-
     return '';
   }
 
@@ -333,69 +416,110 @@ class _CartState extends State<Cart> {
     return total;
   }
 
-  double get _deliveryFee {
-    if (_cartItems.isEmpty) {
-      return 0;
-    }
-
-    if (_subtotal >= 999) {
-      return 0;
-    }
-
-    return 49;
-  }
+  // Delivery is calculated authoritatively in checkout after the selected
+  // address and each seller's city are known. Do not invent a cart-level fee.
+  double get _deliveryFee => 0;
 
   // Coupons are not discounted locally unless the backend validates them.
   // Keep the visible coupon entry point, but never show a fake discount.
-  double get _total => _subtotal + _deliveryFee;
+  double get _total => (_subtotal - _couponDiscount + _deliveryFee)
+      .clamp(0, double.infinity)
+      .toDouble();
+
+  void _recalculateCartCoupon() {
+    final code = _appliedCoupon;
+    if (code == null) return;
+    final minimum = switch (code) {
+      'RECYCLE20' => 499.0,
+      'LOOP50' => 999.0,
+      'ECO100' => 1599.0,
+      _ => double.infinity,
+    };
+    if (_subtotal < minimum) {
+      _appliedCoupon = null;
+      _couponDiscount = 0;
+      _showMessage(
+        'Coupon removed because the cart no longer meets its minimum subtotal.',
+      );
+      return;
+    }
+    _couponDiscount = switch (code) {
+      'RECYCLE20' => 20.0,
+      'LOOP50' => 50.0,
+      'ECO100' => 100.0,
+      _ => 0.0,
+    }.clamp(0, _subtotal).toDouble();
+  }
 
   // QUANTITY
 
-  void _increaseQuantity(int index) {
-    if (index < 0 || index >= _cartItems.length) {
-      return;
-    }
-
+  Future<void> _setQuantity(int index, int quantity) async {
+    if (_cartBusy || index < 0 || index >= _cartItems.length) return;
     final item = _cartItems[index];
-
-    final current = _toInt(item['quantity'], fallback: 1);
-
-    final max = _availableQuantity(item);
-
-    if (max <= 0) {
-      _showMessage('Stock must be refreshed before changing this quantity.');
+    final productId = (item['productId'] ?? item['id'] ?? '').toString();
+    if (productId.isEmpty || int.tryParse(productId) == null) {
+      _showMessage(
+        'This product has an invalid ID. Refresh the cart and try again.',
+      );
       return;
     }
+    final max = _availableQuantity(item);
+    if (max > 0 && quantity > max) {
+      _showMessage('Only $max item${max == 1 ? '' : 's'} available.');
+      return;
+    }
+    setState(() => _cartBusy = true);
+    try {
+      await _api.put('/cart/$productId', <String, dynamic>{
+        'quantity': quantity,
+      });
+      if (!mounted) return;
+      setState(() {
+        item['quantity'] = quantity;
+        _recalculateCartCoupon();
+      });
+      _syncGlobalCart();
+    } catch (error) {
+      _showMessage(_friendlyError(error));
+      await _loadCart(showLoader: false);
+    } finally {
+      if (mounted) setState(() => _cartBusy = false);
+    }
+  }
 
+  Future<void> _increaseQuantity(int index) async {
+    if (index < 0 || index >= _cartItems.length) return;
+    final item = _cartItems[index];
+    final current = _toInt(item['quantity'], fallback: 1);
+    final max = _availableQuantity(item);
+    if (max <= 0) {
+      _showMessage(
+        'This item is unavailable. Refresh the cart to check stock.',
+      );
+      return;
+    }
     if (current >= max) {
       _showMessage('Only $max item${max == 1 ? '' : 's'} available.');
       return;
     }
-
-    setState(() {
-      item['quantity'] = current + 1;
-    });
-    _syncGlobalCart();
+    await _setQuantity(index, current + 1);
   }
 
-  void _decreaseQuantity(int index) {
-    if (index < 0 || index >= _cartItems.length) {
-      return;
-    }
-
-    final item = _cartItems[index];
-
-    final current = _toInt(item['quantity'], fallback: 1);
-
+  Future<void> _decreaseQuantity(int index) async {
+    if (index < 0 || index >= _cartItems.length) return;
+    final current = _toInt(_cartItems[index]['quantity'], fallback: 1);
     if (current <= 1) {
       _confirmRemove(index);
       return;
     }
+    await _setQuantity(index, current - 1);
+  }
 
-    setState(() {
-      item['quantity'] = current - 1;
-    });
-    _syncGlobalCart();
+  String _friendlyError(Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    return message.isEmpty
+        ? 'Unable to update your cart. Please try again.'
+        : message;
   }
 
   // REMOVE
@@ -478,59 +602,40 @@ class _CartState extends State<Cart> {
     );
   }
 
-  void _removeItem(int index) {
-    if (index < 0 || index >= _cartItems.length) {
-      return;
-    }
-
+  Future<void> _removeItem(int index) async {
+    if (_cartBusy || index < 0 || index >= _cartItems.length) return;
     final item = _cartItems[index];
-
-    setState(() {
-      _cartItems.removeAt(index);
-    });
-    _syncGlobalCart();
-
-    _showMessage('${item['title']} removed from cart.');
-  }
-
-  // SAVE FOR LATER
-
-  void _saveForLater(int index) {
-    if (index < 0 || index >= _cartItems.length) {
+    final productId = (item['productId'] ?? item['id'] ?? '').toString();
+    if (productId.isEmpty || int.tryParse(productId) == null) {
+      _showMessage(
+        'This product has an invalid ID. Refresh the cart and try again.',
+      );
       return;
     }
-
-    final item = Map<String, dynamic>.from(_cartItems[index]);
-
-    setState(() {
-      _savedForLater.add(item);
-      _cartItems.removeAt(index);
-    });
-    _syncGlobalCart();
-
-    _showMessage('Item saved for later.');
-  }
-
-  void _moveBackToCart(int index) {
-    if (index < 0 || index >= _savedForLater.length) {
-      return;
+    setState(() => _cartBusy = true);
+    try {
+      await _api.delete('/cart/$productId');
+      if (!mounted) return;
+      setState(() {
+        _cartItems.removeWhere(
+          (row) => (row['productId'] ?? row['id']).toString() == productId,
+        );
+        _recalculateCartCoupon();
+      });
+      _syncGlobalCart();
+      _showMessage('${item['title']} removed from cart.');
+    } catch (error) {
+      _showMessage(_friendlyError(error));
+      await _loadCart(showLoader: false);
+    } finally {
+      if (mounted) setState(() => _cartBusy = false);
     }
-
-    final item = Map<String, dynamic>.from(_savedForLater[index]);
-
-    setState(() {
-      _savedForLater.removeAt(index);
-      _addOrMergeItem(item);
-    });
-    _syncGlobalCart();
-
-    _showMessage('Item moved back to cart.');
   }
 
   // CLEAR CART
 
   void _clearCart() {
-    if (_cartItems.isEmpty) {
+    if (_cartItems.isEmpty || _cartBusy) {
       return;
     }
 
@@ -588,13 +693,7 @@ class _CartState extends State<Cart> {
                         ),
                         onPressed: () {
                           Navigator.pop(sheetContext);
-
-                          setState(() {
-                            _cartItems.clear();
-                            _appliedCoupon = null;
-                            _couponDiscount = 0;
-                          });
-                          CartPopup.clear();
+                          _clearCartOnServer();
                         },
                         child: const Text('Clear Cart'),
                       ),
@@ -607,6 +706,27 @@ class _CartState extends State<Cart> {
         );
       },
     );
+  }
+
+  Future<void> _clearCartOnServer() async {
+    if (_cartBusy || _cartItems.isEmpty) return;
+    setState(() => _cartBusy = true);
+    try {
+      await _api.post('/cart/clear', <String, dynamic>{});
+      if (!mounted) return;
+      setState(() {
+        _cartItems.clear();
+        _appliedCoupon = null;
+        _couponDiscount = 0;
+      });
+      _syncGlobalCart();
+      _showMessage('Cart cleared.');
+    } catch (error) {
+      _showMessage(_friendlyError(error));
+      await _loadCart(showLoader: false);
+    } finally {
+      if (mounted) setState(() => _cartBusy = false);
+    }
   }
 
   // COUPONS
@@ -661,29 +781,29 @@ class _CartState extends State<Cart> {
                 const SizedBox(height: 18),
                 _couponTile(
                   sheetContext,
-                  code: 'ECO100',
-                  title: 'Save ₹100',
-                  subtitle: 'Get ₹100 off on orders above ₹1,499',
-                  minimumOrder: 1499,
-                  discount: 100,
-                ),
-                const SizedBox(height: 10),
-                _couponTile(
-                  sheetContext,
-                  code: 'FIRSTLOOP',
-                  title: '10% OFF',
-                  subtitle: '10% off on your first EcoLoop order',
-                  minimumOrder: 500,
-                  discountPercent: 0.10,
-                ),
-                const SizedBox(height: 10),
-                _couponTile(
-                  sheetContext,
                   code: 'RECYCLE20',
                   title: 'Save ₹20',
-                  subtitle: 'Flat ₹20 off on orders above ₹499',
+                  subtitle: '₹20 off on orders of ₹499 or more',
                   minimumOrder: 499,
                   discount: 20,
+                ),
+                const SizedBox(height: 10),
+                _couponTile(
+                  sheetContext,
+                  code: 'LOOP50',
+                  title: 'Save ₹50',
+                  subtitle: '₹50 off on orders of ₹999 or more',
+                  minimumOrder: 999,
+                  discount: 50,
+                ),
+                const SizedBox(height: 10),
+                _couponTile(
+                  sheetContext,
+                  code: 'ECO100',
+                  title: 'Save ₹100',
+                  subtitle: '₹100 off on orders of ₹1,599 or more',
+                  minimumOrder: 1599,
+                  discount: 100,
                 ),
               ],
             ),
@@ -700,10 +820,8 @@ class _CartState extends State<Cart> {
     required String subtitle,
     required double minimumOrder,
     double? discount,
-    double? discountPercent,
   }) {
     final alreadyApplied = _appliedCoupon == code;
-
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -768,17 +886,38 @@ class _CartState extends State<Cart> {
                 ),
                 const SizedBox(height: 4),
                 Text(subtitle, style: ArtistTextStyles.caption),
+                if (_subtotal < minimumOrder) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Add ${_formatPrice(minimumOrder - _subtotal)} more to use this coupon',
+                    style: ArtistTextStyles.caption,
+                  ),
+                ],
               ],
             ),
           ),
           const SizedBox(width: 8),
           TextButton(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              _showMessage(
-                'Coupon redemption is not connected yet. No discount has been applied.',
-              );
-            },
+            onPressed: alreadyApplied
+                ? null
+                : () {
+                    if (_subtotal < minimumOrder) {
+                      _showMessage(
+                        'Add ${_formatPrice(minimumOrder - _subtotal)} more to use $code.',
+                      );
+                      return;
+                    }
+                    setState(() {
+                      _appliedCoupon = code;
+                      _couponDiscount = (discount ?? 0)
+                          .clamp(0, _subtotal)
+                          .toDouble();
+                    });
+                    Navigator.pop(sheetContext);
+                    _showMessage(
+                      '$code applied. You save ${_formatPrice(_couponDiscount)}.',
+                    );
+                  },
             child: Text(
               alreadyApplied ? 'Applied' : 'Apply',
               style: const TextStyle(
@@ -812,8 +951,11 @@ class _CartState extends State<Cart> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            Checkout(items: List<Map<String, dynamic>>.from(_cartItems)),
+        builder: (_) => Checkout(
+          items: List<Map<String, dynamic>>.from(_cartItems),
+          initialCouponCode: _appliedCoupon,
+          initialCouponDiscount: _couponDiscount,
+        ),
       ),
     );
   }
@@ -874,7 +1016,7 @@ class _CartState extends State<Cart> {
           ],
         ),
         actions: [
-          if (hasItems)
+          if (_cartItems.isNotEmpty)
             IconButton(
               tooltip: 'Clear cart',
               onPressed: _clearCart,
@@ -883,11 +1025,51 @@ class _CartState extends State<Cart> {
           const SizedBox(width: 6),
         ],
       ),
-      body: hasItems ? _buildCartContent() : _buildEmptyCart(),
+      body: _cartLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: ArtistColors.primary),
+            )
+          : _cartError != null && _cartItems.isEmpty
+          ? _buildCartError()
+          : hasItems
+          ? _buildCartContent()
+          : _buildEmptyCart(),
     );
   }
 
   // EMPTY CART
+
+  Widget _buildCartError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_outlined,
+              size: 42,
+              color: ArtistColors.textSecondary,
+            ),
+            const SizedBox(height: 12),
+            Text('Could not load your cart', style: ArtistTextStyles.title),
+            const SizedBox(height: 8),
+            Text(
+              _friendlyError(Exception(_cartError ?? 'Please try again.')),
+              textAlign: TextAlign.center,
+              style: ArtistTextStyles.body,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => _loadCart(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildEmptyCart() {
     return SafeArea(
@@ -946,7 +1128,6 @@ class _CartState extends State<Cart> {
             const SizedBox(height: 30),
             _buildEcoMessage(),
             const SizedBox(height: 30),
-            _buildSavedForLaterSection(),
           ],
         ),
       ),
@@ -964,7 +1145,7 @@ class _CartState extends State<Cart> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildFreeDeliveryBanner(),
+                _buildDeliveryNote(),
                 const SizedBox(height: 14),
                 _buildCartItemsSection(),
                 const SizedBox(height: 16),
@@ -974,7 +1155,6 @@ class _CartState extends State<Cart> {
                 const SizedBox(height: 18),
                 _buildEcoMessage(),
                 const SizedBox(height: 22),
-                _buildSavedForLaterSection(),
                 const SizedBox(height: 24),
                 _buildSimilarProducts(),
               ],
@@ -986,45 +1166,30 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // FREE DELIVERY BANNER
-
-  Widget _buildFreeDeliveryBanner() {
-    final remaining = 999 - _subtotal;
-    final hasFreeDelivery = _subtotal >= 999;
-
+  // Delivery is determined at checkout from the selected address and seller city.
+  Widget _buildDeliveryNote() {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: ArtistColors.light,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ArtistColors.accent.withOpacity(0.7)),
+        border: Border.all(color: ArtistColors.accent.withValues(alpha: 0.7)),
       ),
       child: Row(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: ArtistColors.surface,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              hasFreeDelivery
-                  ? Icons.local_shipping_rounded
-                  : Icons.local_shipping_outlined,
-              color: ArtistColors.primary,
-            ),
+          const Icon(
+            Icons.local_shipping_outlined,
+            color: ArtistColors.primary,
+            size: 26,
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  hasFreeDelivery
-                      ? 'You unlocked FREE delivery!'
-                      : 'Free delivery on orders above ₹999',
-                  style: const TextStyle(
+                const Text(
+                  'Delivery charges calculated at checkout',
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: ArtistColors.textPrimary,
@@ -1032,9 +1197,7 @@ class _CartState extends State<Cart> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  hasFreeDelivery
-                      ? 'Your order qualifies for free delivery.'
-                      : 'Add ${_formatPrice(remaining)} more to unlock it.',
+                  'Standard delivery is ₹40 per seller when the seller is in a different city. Final charges depend on your address.',
                   style: ArtistTextStyles.caption,
                 ),
               ],
@@ -1045,7 +1208,7 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // CART ITEMS
+  // ECO POINTS
 
   Widget _buildCartItemsSection() {
     return Column(
@@ -1225,21 +1388,6 @@ class _CartState extends State<Cart> {
           const SizedBox(height: 8),
           Row(
             children: [
-              TextButton.icon(
-                onPressed: () {
-                  _saveForLater(index);
-                },
-                icon: const Icon(Icons.bookmark_border_rounded, size: 16),
-                label: const Text(
-                  'Save for later',
-                  style: TextStyle(fontSize: 12),
-                ),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 32),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
               const Spacer(),
               if (maxQuantity > 1)
                 Text(
@@ -1433,6 +1581,8 @@ class _CartState extends State<Cart> {
 
   // PRICE DETAILS
 
+  // PRICE DETAILS
+
   Widget _buildPriceDetails() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1464,10 +1614,8 @@ class _CartState extends State<Cart> {
           const SizedBox(height: 10),
           _priceRow(
             'Delivery',
-            _deliveryFee == 0 ? 'FREE' : _formatPrice(_deliveryFee),
-            valueColor: _deliveryFee == 0
-                ? ArtistColors.success
-                : ArtistColors.textPrimary,
+            'Calculated at checkout',
+            valueColor: ArtistColors.textSecondary,
           ),
           const SizedBox(height: 14),
           Divider(color: Colors.grey.shade200),
@@ -1555,121 +1703,19 @@ class _CartState extends State<Cart> {
     );
   }
 
-  // SAVED FOR LATER
-
-  Widget _buildSavedForLaterSection() {
-    if (_savedForLater.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'Saved for later',
-              style: ArtistTextStyles.title.copyWith(fontSize: 18),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: ArtistColors.light,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '${_savedForLater.length}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: ArtistColors.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        ...List.generate(
-          _savedForLater.length,
-          (index) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _buildSavedItem(_savedForLater[index], index),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSavedItem(Map<String, dynamic> item, int index) {
-    final image = _productImage(item);
-    final title = item['title'].toString();
-    final price = _toDouble(item['price']);
-
-    return Container(
-      padding: const EdgeInsets.all(11),
-      decoration: BoxDecoration(
-        color: ArtistColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          _buildProductImage(image, width: 70, height: 70, radius: 12),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: ArtistColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  _formatPrice(price),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: ArtistColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              _moveBackToCart(index);
-            },
-            child: const Text(
-              'Move to Cart',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // SIMILAR PRODUCTS
 
   Widget _buildSimilarProducts() {
     final cartIds = _cartItems
         .map((item) => item['productId'].toString())
         .toSet();
-    final savedIds = _savedForLater
-        .map((item) => item['productId'].toString())
-        .toSet();
-    final products = _similarProducts.where((product) {
-      final id = (product['productId'] ?? product['id'] ?? '').toString();
-      return id.isNotEmpty && !cartIds.contains(id) && !savedIds.contains(id);
-    }).toList();
+    final products = _similarProducts
+        .where((product) {
+          final id = (product['productId'] ?? product['id'] ?? '').toString();
+          return id.isNotEmpty && !cartIds.contains(id);
+        })
+        .take(4)
+        .toList();
 
     if (_similarProductsLoading) {
       return Column(
@@ -1765,7 +1811,7 @@ class _CartState extends State<Cart> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: products.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               return _buildSimilarProductCard(products[index]);
             },
@@ -1841,7 +1887,7 @@ class _CartState extends State<Cart> {
           width: width,
           height: height,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
+          errorBuilder: (context, error, stackTrace) {
             return _imagePlaceholder(width, height, radius);
           },
           loadingBuilder: (context, child, loadingProgress) {
@@ -1893,6 +1939,76 @@ class _CartState extends State<Cart> {
   // BOTTOM CHECKOUT BAR
 
   Widget _buildBottomCheckoutBar() {
+    Widget totalSummary() {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Total', style: ArtistTextStyles.caption),
+          const SizedBox(height: 2),
+          Text(
+            _formatPrice(_total),
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              color: ArtistColors.textPrimary,
+            ),
+          ),
+          const Text(
+            'Delivery at checkout',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: ArtistColors.textSecondary,
+            ),
+          ),
+        ],
+      );
+    }
+
+    Widget checkoutButton() {
+      return SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: ElevatedButton(
+          onPressed: _cartBusy ? null : _proceedToCheckout,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: ArtistColors.primary,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: ArtistColors.primary.withValues(
+              alpha: 0.55,
+            ),
+            disabledForegroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            textStyle: ArtistTextStyles.button.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  'Proceed to Checkout',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              SizedBox(width: 7),
+              Icon(Icons.arrow_forward_rounded, size: 18),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Positioned(
       left: 0,
       right: 0,
@@ -1903,7 +2019,7 @@ class _CartState extends State<Cart> {
           color: ArtistColors.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.10),
+              color: Colors.black.withValues(alpha: 0.10),
               blurRadius: 18,
               offset: const Offset(0, -5),
             ),
@@ -1911,58 +2027,28 @@ class _CartState extends State<Cart> {
         ),
         child: SafeArea(
           top: false,
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < 340) {
+                return Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Total', style: ArtistTextStyles.caption),
-                    const SizedBox(height: 2),
-                    Text(
-                      _formatPrice(_total),
-                      style: const TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w800,
-                        color: ArtistColors.textPrimary,
-                      ),
-                    ),
-                    if (_deliveryFee == 0)
-                      const Text(
-                        'Free delivery',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: ArtistColors.success,
-                        ),
-                      ),
+                    totalSummary(),
+                    const SizedBox(height: 10),
+                    checkoutButton(),
                   ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                flex: 2,
-                child: SizedBox(
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _proceedToCheckout,
-                    child: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('Proceed to Checkout'),
-                          SizedBox(width: 6),
-                          Icon(Icons.arrow_forward_rounded, size: 18),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: totalSummary()),
+                  const SizedBox(width: 12),
+                  Expanded(flex: 2, child: checkoutButton()),
+                ],
+              );
+            },
           ),
         ),
       ),

@@ -8,10 +8,16 @@ import 'product_details.dart';
 
 /// Screen displaying the circular marketplace catalog with search, filtering, and sorting capabilities.
 class Marketplace extends StatefulWidget {
-  const Marketplace({super.key, this.initialSearch, this.initialCategory});
+  const Marketplace({
+    super.key,
+    this.initialSearch,
+    this.initialCategory,
+    this.returnToCheckoutOnSelect = false,
+  });
 
   final String? initialSearch;
   final String? initialCategory;
+  final bool returnToCheckoutOnSelect;
 
   @override
   State<Marketplace> createState() => _MarketplaceState();
@@ -730,11 +736,18 @@ class _MarketplaceState extends State<Marketplace> {
   }
 
   /// Modal preview sheet showing details for a selected product.
-  void _showProductPreview(Map<String, dynamic> product) {
-    Navigator.push(
+  Future<void> _showProductPreview(Map<String, dynamic> product) async {
+    final result = await Navigator.push<Map<String, dynamic>>(
       context,
-      MaterialPageRoute(builder: (_) => ProductDetails(product: product)),
+      MaterialPageRoute(
+        builder: (_) => ProductDetails(
+          product: product,
+          returnToCheckoutOnSelect: widget.returnToCheckoutOnSelect,
+        ),
+      ),
     );
+    if (!mounted || !widget.returnToCheckoutOnSelect || result == null) return;
+    Navigator.pop(context, result);
   }
 
   /// Tag chip rendered inside the product preview modal.

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app_theme/artist/artist_colors.dart';
 import '../app_theme/artist/artist_text_styles.dart';
+import '../services/ecoloop_api.dart';
 import '../screens/artist/buy_products/cart.dart';
 import '../screens/artist/buy_products/checkout.dart';
 
@@ -13,7 +14,9 @@ class CartPopup {
   static OverlayEntry? _currentEntry;
   static NavigatorState? _navigatorState;
   static bool _navigationInProgress = false;
+  static final Set<String> _addingProductIds = <String>{};
   static final List<Map<String, dynamic>> _cartItems = [];
+  static final EcoLoopApi _api = EcoLoopApi.instance;
 
   static List<Map<String, dynamic>> get items {
     return _cartItems.map((item) => Map<String, dynamic>.from(item)).toList();
@@ -44,38 +47,98 @@ class CartPopup {
     return total;
   }
 
-  static void addItem(
+  /// Persists the add-to-cart operation first. The server validates login,
+  /// stock, publication status, and prevents adding the seller's own listing.
+  static Future<void> addItem(
     BuildContext context, {
     required Map<String, dynamic> item,
-  }) {
+  }) async {
     final normalized = _normalizeItem(item);
-    final productId = normalized['productId'].toString();
-
-    final existingIndex = _cartItems.indexWhere(
-      (cartItem) => cartItem['productId'].toString() == productId,
-    );
-
-    if (existingIndex == -1) {
-      _cartItems.add(normalized);
-    } else {
-      final existing = _cartItems[existingIndex];
-
-      final currentQuantity = _toInt(existing['quantity'], fallback: 1);
-
-      final incomingQuantity = _toInt(normalized['quantity'], fallback: 1);
-
-      final availableQuantity = _toInt(
-        existing['availableQuantity'],
-        fallback: 10,
+    final productId = (normalized['productId'] ?? '').toString().trim();
+    final numericId = int.tryParse(productId);
+    if (numericId == null || numericId <= 0) {
+      _showMessage(
+        context,
+        'This product has an invalid ID. Please refresh and try again.',
       );
-
-      existing['quantity'] = _safeQuantity(
-        currentQuantity + incomingQuantity,
-        availableQuantity,
-      );
+      return;
     }
+    if (_addingProductIds.contains(productId)) return;
+    _addingProductIds.add(productId);
+    try {
+      await _api.post('/cart', <String, dynamic>{
+        'productId': numericId,
+        'quantity': _toInt(normalized['quantity'], fallback: 1),
+      });
+      // Refresh from the account-scoped cart so the popup shows the actual
+      // persisted quantity rather than a local-only guess.
+      try {
+        final response = await _api.get('/cart');
+        final rows = _extractRows(response);
+        _cartItems
+          ..clear()
+          ..addAll(
+            rows
+                .map(_normalizeItem)
+                .where((row) => (row['productId'] ?? '').toString().isNotEmpty),
+          );
+      } catch (_) {
+        // POST already succeeded, so show the item even if the refresh fails.
+      }
+      if (!_cartItems.any((row) => row['productId'].toString() == productId)) {
+        _addWithoutShowing(normalized);
+      }
+      _showOrUpdate(context);
+    } catch (error) {
+      _showMessage(context, _friendlyError(error));
+    } finally {
+      _addingProductIds.remove(productId);
+    }
+  }
 
-    _showOrUpdate(context);
+  static List<Map<String, dynamic>> _extractRows(dynamic response) {
+    if (response is List) return response.whereType<Map>().map(_asMap).toList();
+    final root = _asMap(response);
+    final data = root['data'];
+    if (data is List) return data.whereType<Map>().map(_asMap).toList();
+    if (data is Map) {
+      for (final key in ['items', 'cart', 'products', 'results']) {
+        if (data[key] is List)
+          return (data[key] as List).whereType<Map>().map(_asMap).toList();
+      }
+    }
+    for (final key in ['items', 'cart', 'products', 'results']) {
+      if (root[key] is List)
+        return (root[key] as List).whereType<Map>().map(_asMap).toList();
+    }
+    return <Map<String, dynamic>>[];
+  }
+
+  static Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return Map<String, dynamic>.from(value);
+    if (value is Map)
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    return <String, dynamic>{};
+  }
+
+  static void _showMessage(BuildContext context, String message) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+  }
+
+  static String _friendlyError(Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    return message.isEmpty
+        ? 'Could not add this item to your cart. Please try again.'
+        : message;
   }
 
   static void show(
@@ -316,21 +379,23 @@ class CartPopup {
     final copy = Map<String, dynamic>.from(item);
 
     final productId =
-        copy['productId'] ??
-        copy['id'] ??
-        'product_${DateTime.now().microsecondsSinceEpoch}';
-
+        copy['productId'] ?? copy['product_id'] ?? copy['id'] ?? '';
     final title =
         copy['title'] ??
         copy['productName'] ??
+        copy['product_name'] ??
         copy['name'] ??
         'EcoLoop Product';
-
-    final price = _toDouble(copy['price']);
-
+    final price = _toDouble(
+      copy['price'] ?? copy['unitPrice'] ?? copy['unit_price'],
+    );
     final availableQuantity = _toInt(
-      copy['availableQuantity'] ?? copy['stock'] ?? copy['quantity'] ?? 0,
-      fallback: 10,
+      copy['availableQuantity'] ??
+          copy['available_quantity'] ??
+          copy['stock'] ??
+          copy['quantityAvailable'] ??
+          0,
+      fallback: 0,
     );
 
     final quantity = _safeQuantity(
@@ -340,8 +405,23 @@ class CartPopup {
           : availableQuantity,
     );
 
-    copy['productId'] = productId;
-    copy['id'] = productId;
+    copy['productId'] = productId.toString();
+    copy['id'] = copy['id'] ?? productId;
+    copy['image'] ??=
+        copy['imageUrl'] ??
+        copy['image_url'] ??
+        copy['thumbnail'] ??
+        ((copy['imageUrls'] is List && (copy['imageUrls'] as List).isNotEmpty)
+            ? (copy['imageUrls'] as List).first
+            : null) ??
+        ((copy['images'] is List && (copy['images'] as List).isNotEmpty)
+            ? (copy['images'] as List).first
+            : null);
+    copy['seller'] ??=
+        copy['sellerName'] ??
+        copy['sellerUsername'] ??
+        copy['userName'] ??
+        'EcoLoop Seller';
     copy['title'] = title;
     copy['price'] = price;
     copy['quantity'] = quantity;

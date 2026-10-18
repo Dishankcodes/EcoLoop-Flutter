@@ -16,7 +16,15 @@ import 'seller_profile.dart';
 class ProductDetails extends StatefulWidget {
   final Map<String, dynamic> product;
 
-  const ProductDetails({super.key, required this.product});
+  /// When opened from checkout's Browse Marketplace flow, return the selected
+  /// listing and quantity instead of opening a separate cart/checkout.
+  final bool returnToCheckoutOnSelect;
+
+  const ProductDetails({
+    super.key,
+    required this.product,
+    this.returnToCheckoutOnSelect = false,
+  });
 
   @override
   State<ProductDetails> createState() => _ProductDetailsState();
@@ -151,10 +159,39 @@ class _ProductDetailsState extends State<ProductDetails> {
   String get _sellerLocation =>
       location.isEmpty ? 'Location not provided' : location;
 
-  String get location => [
-    _product['sellerCity'] ?? _product['city'],
-    _product['sellerState'] ?? _product['state'],
-  ].where((v) => v != null && v.toString().trim().isNotEmpty).join(', ');
+  /// Builds a readable location from the real listing fields, including a
+  /// structured address when the product payload contains one.
+  String get location {
+    dynamic addressValue =
+        _product['address'] ??
+        _product['sellerAddress'] ??
+        _product['seller_address'] ??
+        _product['location'];
+
+    final address = _asMap(addressValue);
+    final values = <dynamic>[
+      if (address.isNotEmpty) ...[
+        address['label'],
+        address['addressLine1'],
+        address['addressLine2'],
+        address['street'],
+        address['area'],
+        address['city'],
+        address['state'],
+        address['pincode'] ?? address['postalCode'] ?? address['zipCode'],
+      ] else if (addressValue is String && addressValue.trim().isNotEmpty)
+        addressValue,
+      _product['sellerCity'] ?? _product['city'],
+      _product['sellerState'] ?? _product['state'],
+      _product['pincode'] ?? _product['postalCode'] ?? _product['zipCode'],
+    ];
+    final seen = <String>{};
+    return values
+        .where((value) => value != null && value.toString().trim().isNotEmpty)
+        .map((value) => value.toString().trim())
+        .where((value) => seen.add(value.toLowerCase()))
+        .join(', ');
+  }
 
   /// Seller account type used for profile navigation.
   ///
@@ -784,9 +821,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     return _section(
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () {
-          _showMessage(_sellerLocation);
-        },
+        onTap: _showLocationDetails,
         child: Row(
           children: [
             Container(
@@ -826,6 +861,147 @@ class _ProductDetailsState extends State<ProductDetails> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Opens a compact location card with the available listing address fields.
+  void _showLocationDetails() {
+    final addressValue =
+        _product['address'] ??
+        _product['sellerAddress'] ??
+        _product['seller_address'] ??
+        _product['location'];
+    final address = _asMap(addressValue);
+
+    final details = <String, String>{};
+    void addDetail(String label, dynamic value) {
+      final text = value?.toString().trim() ?? '';
+      if (text.isNotEmpty && text.toLowerCase() != 'null') {
+        details[label] = text;
+      }
+    }
+
+    if (address.isNotEmpty) {
+      addDetail(
+        'Address',
+        address['label'] ?? address['addressLine1'] ?? address['street'],
+      );
+      addDetail('Area', address['addressLine2'] ?? address['area']);
+      addDetail(
+        'City',
+        address['city'] ?? _product['sellerCity'] ?? _product['city'],
+      );
+      addDetail(
+        'State',
+        address['state'] ?? _product['sellerState'] ?? _product['state'],
+      );
+      addDetail(
+        'PIN code',
+        address['pincode'] ?? address['postalCode'] ?? address['zipCode'],
+      );
+    } else {
+      addDetail('Address', addressValue is String ? addressValue : null);
+      addDetail('City', _product['sellerCity'] ?? _product['city']);
+      addDetail('State', _product['sellerState'] ?? _product['state']);
+      addDetail(
+        'PIN code',
+        _product['pincode'] ?? _product['postalCode'] ?? _product['zipCode'],
+      );
+    }
+    if (details.isEmpty && _sellerLocation != 'Location not provided') {
+      details['Location'] = _sellerLocation;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: ArtistColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 18, 16, 8),
+        contentPadding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        title: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: ArtistColors.light,
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: const Icon(
+                Icons.location_on_outlined,
+                color: ArtistColors.primary,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Item Location',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: ArtistColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: details.isEmpty
+            ? const Text(
+                'Location details are not available for this listing.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  color: ArtistColors.textSecondary,
+                ),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: details.entries
+                    .map(
+                      (entry) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 7),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              entry.key,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: ArtistColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              entry.value,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: ArtistColors.textPrimary,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text(
+              'Close',
+              style: TextStyle(
+                color: ArtistColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -919,31 +1095,40 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  /// Helper row widget for individual item specification items.
+  /// One-column specification row: label first, value directly underneath.
+  /// This prevents long values from being squeezed into the middle/right edge.
   Widget _infoRow(IconData icon, String title, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 19, color: ArtistColors.primary),
+          Icon(icon, size: 18, color: ArtistColors.primary),
           const SizedBox(width: 10),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              color: ArtistColors.textSecondary,
-            ),
-          ),
-          const Spacer(),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: ArtistColors.textPrimary,
-              ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: ArtistColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value.trim().isEmpty ? 'Not provided' : value,
+                  textAlign: TextAlign.left,
+                  softWrap: true,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                    color: ArtistColors.textPrimary,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1748,8 +1933,40 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
   }
 
+  void _returnSelectedProductToCheckout() {
+    final selected = Map<String, dynamic>.from(_product);
+    selected['id'] =
+        _product['productId'] ?? _product['product_id'] ?? _product['id'] ?? '';
+    selected['productId'] =
+        _product['productId'] ?? _product['product_id'] ?? _product['id'] ?? '';
+    selected['title'] = title;
+    selected['price'] = priceValue;
+    selected['quantity'] = _quantity;
+    selected['condition'] = condition;
+    selected['category'] = category;
+    selected['seller'] = seller;
+    selected['sellerName'] = seller;
+    selected['sellerCity'] = selected['sellerCity'] ?? selected['city'] ?? '';
+    selected['availableQuantity'] = availableQuantity;
+    selected['image'] =
+        selected['image'] ?? (images.isNotEmpty ? images.first : '');
+    selected['images'] = selected['images'] ?? images;
+    Navigator.pop(context, <String, dynamic>{
+      'product': selected,
+      'quantity': _quantity,
+    });
+  }
+
   /// Formats product data and presents the cart popup drawer.
   void _addToCart() {
+    if (widget.returnToCheckoutOnSelect) {
+      if (availableQuantity <= 0) {
+        _showMessage('This product is currently unavailable.');
+        return;
+      }
+      _returnSelectedProductToCheckout();
+      return;
+    }
     if (_currentProductId.isEmpty) {
       _showMessage('This product has no valid ID and cannot be added to cart.');
       return;
@@ -1788,6 +2005,14 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   /// Directs user immediately to the checkout flow with selected quantity.
   void _buyNow() {
+    if (availableQuantity <= 0) {
+      _showMessage('This product is currently unavailable.');
+      return;
+    }
+    if (widget.returnToCheckoutOnSelect) {
+      _returnSelectedProductToCheckout();
+      return;
+    }
     if (_currentProductId.isEmpty) {
       _showMessage('This product has no valid ID and cannot be purchased.');
       return;

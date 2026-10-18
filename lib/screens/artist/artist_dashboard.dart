@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../app_theme/artist/artist_colors.dart';
@@ -25,6 +27,11 @@ class _ArtistHomeState extends State<ArtistHome> {
 
   bool _loading = true;
   bool _refreshing = false;
+  bool _ordersLoading = false;
+  bool _productsLoading = false;
+  bool _ordersLoaded = false;
+  bool _productsLoaded = false;
+  final ScrollController _scrollController = ScrollController();
   String? _error;
   Map<String, dynamic> _profile = {};
   Map<String, dynamic> _analytics = {};
@@ -57,6 +64,24 @@ class _ArtistHomeState extends State<ArtistHome> {
   void initState() {
     super.initState();
     _loadDashboard();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onDashboardScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    // Load the next sections just before they are likely to enter the viewport.
+    if (position.pixels + position.viewportDimension >= 420) {
+      _loadOrders();
+    }
+    if (position.pixels + position.viewportDimension >= 850) {
+      _loadProducts();
+    }
   }
 
   Map<String, dynamic> _asMap(dynamic value) {
@@ -126,19 +151,19 @@ class _ArtistHomeState extends State<ArtistHome> {
       _error = null;
       if (refresh) {
         _refreshing = true;
+        _ordersLoaded = false;
+        _productsLoaded = false;
       } else {
         _loading = true;
       }
     });
 
     try {
-      // Each endpoint is implemented by the currently supplied Code.gs.
+      // Load only the above-the-fold summary first; long lists load on scroll.
       final results = await Future.wait<dynamic>([
         _api.get('/profile'),
         _api.get('/artist/analytics'),
         _api.get('/artist/analytics/earnings'),
-        _api.get('/artist/analytics/products'),
-        _api.get('/artist/orders'),
       ]);
 
       if (!mounted) return;
@@ -146,11 +171,24 @@ class _ArtistHomeState extends State<ArtistHome> {
         _profile = _asMap(results[0]);
         _analytics = _asMap(results[1]);
         _earnings = _asMap(results[2]);
-        _products = _asMapList(results[3]);
-        _orders = _asMapList(results[4]);
         _loading = false;
         _refreshing = false;
+        if (refresh) {
+          _orders = [];
+          _products = [];
+        }
       });
+
+      // If refreshing while already scrolled, keep the visible sections current.
+      if (refresh && _scrollController.hasClients) {
+        final pixels = _scrollController.position.pixels;
+        if (pixels + _scrollController.position.viewportDimension >= 420) {
+          _loadOrders();
+        }
+        if (pixels + _scrollController.position.viewportDimension >= 850) {
+          _loadProducts();
+        }
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -158,6 +196,72 @@ class _ArtistHomeState extends State<ArtistHome> {
         _refreshing = false;
         _error = e.toString().replaceFirst('Exception: ', '');
       });
+    }
+  }
+
+  Future<void> _loadOrders() async {
+    if (_ordersLoading || _ordersLoaded || !mounted) return;
+    setState(() => _ordersLoading = true);
+    try {
+      final result = await _api.get('/artist/orders');
+      if (!mounted) return;
+      setState(() {
+        _orders = _asMapList(result);
+        _ordersLoaded = true;
+        _ordersLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _ordersLoading = false);
+    }
+  }
+
+  Future<void> _loadProducts() async {
+    if (_productsLoading || _productsLoaded || !mounted) return;
+    setState(() => _productsLoading = true);
+    try {
+      final results = await Future.wait<dynamic>([
+        _api.get('/artist/analytics/products'),
+        _api.get('/my/products'),
+      ]);
+      if (!mounted) return;
+      final analyticsProducts = _asMapList(results[0]);
+      final fullProducts = _asMapList(results[1]);
+      final fullById = <String, Map<String, dynamic>>{};
+      for (final product in fullProducts) {
+        final id = _value(product['productId'] ?? product['id']);
+        if (id.isNotEmpty) fullById[id] = product;
+      }
+      final merged = analyticsProducts.map((item) {
+        final id = _value(item['productId'] ?? item['id']);
+        final full = fullById[id] ?? <String, dynamic>{};
+        return <String, dynamic>{
+          ...full,
+          ...item,
+          if ((item['imageUrls'] == null ||
+                  item['imageUrls'].toString().trim().isEmpty) &&
+              full['imageUrls'] != null)
+            'imageUrls': full['imageUrls'],
+          if ((item['imageUrl'] == null ||
+                  item['imageUrl'].toString().trim().isEmpty) &&
+              full['imageUrl'] != null)
+            'imageUrl': full['imageUrl'],
+          if ((item['price'] == null ||
+                  item['price'].toString().trim().isEmpty) &&
+              full['price'] != null)
+            'price': full['price'],
+        };
+      }).toList();
+      // If analytics is empty but products exist, still show the artist's real listings.
+      final resultProducts = merged.isNotEmpty ? merged : fullProducts;
+      setState(() {
+        _products = resultProducts;
+        _productsLoaded = true;
+        _productsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _productsLoading = false);
     }
   }
 
@@ -238,69 +342,79 @@ class _ArtistHomeState extends State<ArtistHome> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final isWide = constraints.maxWidth >= 700;
-                    return SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(
-                        parent: BouncingScrollPhysics(),
-                      ),
-                      padding: EdgeInsets.fromLTRB(
-                        isWide ? 32 : 20,
-                        18,
-                        isWide ? 32 : 20,
-                        110,
-                      ),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1100),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildHeader(),
-                              if (_error != null) ...[
-                                const SizedBox(height: 14),
-                                _buildErrorBanner(),
-                              ],
-                              const SizedBox(height: 22),
-                              _buildEarningsCard(),
-                              const SizedBox(height: 18),
-                              _buildStats(isWide),
-                              const SizedBox(height: 30),
-                              _buildSectionHeader(
-                                'Quick Actions',
-                                'Manage your store',
-                              ),
-                              const SizedBox(height: 12),
-                              _buildQuickActions(isWide),
-                              const SizedBox(height: 30),
-                              _buildSectionHeader(
-                                'Recent Orders',
-                                'View all',
-                                onTap: () => _handleQuickAction('orders'),
-                              ),
-                              const SizedBox(height: 12),
-                              _buildRecentOrders(),
-                              const SizedBox(height: 30),
-                              _buildSectionHeader(
-                                'Top Performing Products',
-                                'View all',
-                                onTap: () => _handleQuickAction('products'),
-                              ),
-                              const SizedBox(height: 12),
-                              _buildTopProducts(),
-                              const SizedBox(height: 30),
-                              _buildSectionHeader(
-                                'Store Overview',
-                                'Analytics',
-                              ),
-                              const SizedBox(height: 12),
-                              _buildPerformanceCard(),
-                              if (_refreshing) ...[
-                                const SizedBox(height: 12),
-                                const LinearProgressIndicator(
-                                  color: ArtistColors.primary,
-                                  minHeight: 2,
+                    return NotificationListener<ScrollNotification>(
+                      onNotification: (notification) {
+                        if (notification is ScrollUpdateNotification ||
+                            notification is ScrollEndNotification) {
+                          _onDashboardScroll();
+                        }
+                        return false;
+                      },
+                      child: SingleChildScrollView(
+                        controller: _scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        padding: EdgeInsets.fromLTRB(
+                          isWide ? 32 : 20,
+                          18,
+                          isWide ? 32 : 20,
+                          110,
+                        ),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1100),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildHeader(),
+                                if (_error != null) ...[
+                                  const SizedBox(height: 14),
+                                  _buildErrorBanner(),
+                                ],
+                                const SizedBox(height: 22),
+                                _buildEarningsCard(),
+                                const SizedBox(height: 18),
+                                _buildStats(isWide),
+                                const SizedBox(height: 30),
+                                _buildSectionHeader(
+                                  'Quick Actions',
+                                  'Manage your store',
                                 ),
+                                const SizedBox(height: 12),
+                                _buildQuickActions(isWide),
+                                const SizedBox(height: 30),
+                                _buildSectionHeader(
+                                  'Recent Orders',
+                                  'View all',
+                                  onTap: () => _handleQuickAction('orders'),
+                                ),
+                                const SizedBox(height: 12),
+                                _buildRecentOrders(),
+                                const SizedBox(height: 30),
+                                _buildSectionHeader(
+                                  'Top Performing Products',
+                                  'View all',
+                                  onTap: () => _handleQuickAction('products'),
+                                ),
+                                const SizedBox(height: 12),
+                                _buildTopProducts(),
+                                const SizedBox(height: 30),
+                                _buildSectionHeader(
+                                  'Store Overview',
+                                  'Analytics',
+                                ),
+                                const SizedBox(height: 12),
+                                _buildPerformanceCard(),
+                                if (_refreshing) ...[
+                                  const SizedBox(height: 12),
+                                  const LinearProgressIndicator(
+                                    color: ArtistColors.primary,
+                                    minHeight: 2,
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -684,6 +798,12 @@ class _ArtistHomeState extends State<ArtistHome> {
   }
 
   Widget _buildRecentOrders() {
+    if (_ordersLoading && !_ordersLoaded) {
+      return _sectionLoadingCard(height: 112);
+    }
+    if (_orders.isEmpty && !_ordersLoaded) {
+      return _sectionLoadingCard(height: 112);
+    }
     if (_orders.isEmpty) {
       return _buildEmptyState(
         icon: Icons.receipt_long_outlined,
@@ -732,10 +852,13 @@ class _ArtistHomeState extends State<ArtistHome> {
                     color: ArtistColors.surfaceSoft,
                     borderRadius: BorderRadius.circular(13),
                   ),
-                  child: const Icon(
-                    Icons.inventory_2_outlined,
-                    color: ArtistColors.primary,
-                    size: 22,
+                  child: _networkProductImage(
+                    _imageUrl(
+                      order['productImage'] ??
+                          order['imageUrl'] ??
+                          order['imageUrls'],
+                    ),
+                    radius: 13,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -842,6 +965,12 @@ class _ArtistHomeState extends State<ArtistHome> {
   }
 
   Widget _buildTopProducts() {
+    if (_productsLoading && !_productsLoaded) {
+      return _sectionLoadingCard(height: 235);
+    }
+    if (_products.isEmpty && !_productsLoaded) {
+      return _sectionLoadingCard(height: 150);
+    }
     if (_products.isEmpty) {
       return _buildEmptyState(
         icon: Icons.inventory_2_outlined,
@@ -893,10 +1022,16 @@ class _ArtistHomeState extends State<ArtistHome> {
                 color: ArtistColors.surfaceSoft,
                 borderRadius: BorderRadius.circular(13),
               ),
-              child: const Icon(
-                Icons.inventory_2_outlined,
-                size: 36,
-                color: ArtistColors.primary,
+              child: _networkProductImage(
+                _imageUrl(
+                  product['imageUrls'] ??
+                      product['image_urls'] ??
+                      product['imageUrl'] ??
+                      product['image_url'] ??
+                      product['image'] ??
+                      product['productImage'],
+                ),
+                radius: 13,
               ),
             ),
             const SizedBox(height: 8),
@@ -940,6 +1075,73 @@ class _ArtistHomeState extends State<ArtistHome> {
             const SizedBox(height: 4),
             Text(_prettyStatus(status), style: ArtistTextStyles.small),
           ],
+        ),
+      ),
+    );
+  }
+
+  String _imageUrl(dynamic value) {
+    dynamic candidate = value;
+    if (candidate is List && candidate.isNotEmpty) candidate = candidate.first;
+    if (candidate is Map) {
+      candidate =
+          candidate['url'] ??
+          candidate['imageUrl'] ??
+          candidate['image_url'] ??
+          candidate['src'];
+    }
+    var raw = (candidate ?? '').toString().trim();
+    if (raw.startsWith('[') || raw.startsWith('{')) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List && decoded.isNotEmpty)
+          return _imageUrl(decoded.first);
+        if (decoded is Map) return _imageUrl(decoded);
+      } catch (_) {}
+    }
+    if (raw.contains(',')) raw = raw.split(',').first.trim();
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    return '';
+  }
+
+  Widget _networkProductImage(String url, {double radius = 12}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: url.isEmpty
+          ? Container(color: ArtistColors.surfaceSoft)
+          : Image.network(
+              url,
+              width: double.infinity,
+              height: double.infinity,
+              fit: BoxFit.cover,
+              filterQuality: FilterQuality.low,
+              cacheWidth: 420,
+              errorBuilder: (_, __, ___) =>
+                  Container(color: ArtistColors.surfaceSoft),
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return Container(color: ArtistColors.surfaceSoft);
+              },
+            ),
+    );
+  }
+
+  Widget _sectionLoadingCard({required double height}) {
+    return Container(
+      height: height,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: ArtistColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: ArtistColors.border),
+      ),
+      alignment: Alignment.center,
+      child: SizedBox(
+        width: 22,
+        height: 22,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: ArtistColors.primary.withOpacity(0.65),
         ),
       ),
     );

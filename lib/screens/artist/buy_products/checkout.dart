@@ -1562,48 +1562,103 @@ class _CheckoutState extends State<Checkout> {
 
                     const SizedBox(height: 14),
 
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(sheetContext);
-                              _removeItem(index);
-                            },
-                            icon: const Icon(
-                              Icons.delete_outline_rounded,
-                              size: 18,
+                    // Keep both actions readable on narrow screens while
+                    // applying the shared Artist theme to both buttons.
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 360;
+
+                        final removeButton = OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            _removeItem(index);
+                          },
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Remove',
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: ArtistColors.error,
+                            backgroundColor: ArtistColors.surface,
+                            side: BorderSide(
+                              color: ArtistColors.error.withValues(alpha: 0.45),
                             ),
-                            label: const Text('Remove'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: ArtistColors.error,
-                              side: BorderSide(
-                                color: ArtistColors.error.withOpacity(0.35),
-                              ),
-                              minimumSize: const Size.fromHeight(50),
+                            minimumSize: const Size(0, 48),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                            textStyle: ArtistTextStyles.button.copyWith(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                        ),
+                        );
 
-                        const SizedBox(width: 10),
+                        final updateButton = ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _items[index]['quantity'] = selectedQuantity;
+                              _recalculateCoupon();
+                            });
 
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                _items[index]['quantity'] = selectedQuantity;
-                                _recalculateCoupon();
-                              });
-
-                              Navigator.pop(sheetContext);
-
-                              _showMessage('Item updated successfully.');
-                            },
-                            child: const Text('Update Item'),
+                            Navigator.pop(sheetContext);
+                            _showMessage('Item updated successfully.');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ArtistColors.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            minimumSize: const Size(0, 48),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            textStyle: ArtistTextStyles.button.copyWith(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                        ),
-                      ],
+                          child: const Text(
+                            'Update Item',
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+
+                        if (compact) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              updateButton,
+                              const SizedBox(height: 9),
+                              removeButton,
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          children: [
+                            Expanded(child: removeButton),
+                            const SizedBox(width: 10),
+                            Expanded(flex: 2, child: updateButton),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -1675,7 +1730,7 @@ class _CheckoutState extends State<Checkout> {
 
   // ADD PRODUCT TO CHECKOUT
 
-  void _addProductToCheckout(Map<String, dynamic> product) {
+  void _addProductToCheckout(Map<String, dynamic> product, {int quantity = 1}) {
     final productId = product['productId'] ?? product['id'];
 
     final existingIndex = _items.indexWhere(
@@ -1690,7 +1745,7 @@ class _CheckoutState extends State<Checkout> {
         fallback: 10,
       );
 
-      if (current >= available) {
+      if (current + quantity > available) {
         _showMessage(
           'No more stock available. Maximum available quantity is $available.',
         );
@@ -1698,7 +1753,7 @@ class _CheckoutState extends State<Checkout> {
       }
 
       setState(() {
-        _items[existingIndex]['quantity'] = current + 1;
+        _items[existingIndex]['quantity'] = current + quantity;
         _recalculateCoupon();
       });
 
@@ -1708,15 +1763,42 @@ class _CheckoutState extends State<Checkout> {
       return;
     }
 
-    final newItem = _normalizeItem({...product, 'quantity': 1});
+    final normalized = _normalizeItem({...product, 'quantity': quantity});
+    final available = _toInt(normalized['availableQuantity'], fallback: 0);
+    if (available < 1 || quantity > available) {
+      _showMessage(
+        available < 1
+            ? 'This product is currently out of stock.'
+            : 'Only $available item(s) are available.',
+      );
+      return;
+    }
 
     setState(() {
-      _items.add(newItem);
+      _items.add(normalized);
       _recalculateCoupon();
     });
+    final newItem = normalized;
 
     _showMessage('${newItem['title']} added to checkout.');
     _refreshMoreItemsAfterCartChange();
+  }
+
+  /// Opens marketplace in selection mode and returns to this checkout with
+  /// the selected product/quantity. Current checkout state is kept in memory.
+  Future<void> _browseMarketplace() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const Marketplace(returnToCheckoutOnSelect: true),
+      ),
+    );
+    if (!mounted || result == null) return;
+    final selectedProduct = result['product'];
+    if (selectedProduct is! Map) return;
+    final product = Map<String, dynamic>.from(selectedProduct);
+    final quantity = _toInt(result['quantity'], fallback: 1).clamp(1, 999);
+    _addProductToCheckout(product, quantity: quantity);
   }
 
   // MORE PRODUCTS: live published listings from the backend.
@@ -1855,13 +1937,7 @@ class _CheckoutState extends State<Checkout> {
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.pop(sheetContext);
-
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const Marketplace(),
-                          ),
-                        );
+                        _browseMarketplace();
                       },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: ArtistColors.primary,
