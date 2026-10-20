@@ -265,6 +265,28 @@ class _CustomServiceHistoryState extends State<CustomServiceHistory> {
                                     height: 1.4,
                                   ),
                                 ),
+                                if (row['artistResponses'] is List &&
+                                    (row['artistResponses'] as List).isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.groups_2_outlined,
+                                          size: 16,
+                                          color: AppColors.primary,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${(row['artistResponses'] as List).length} ReMaker response(s)',
+                                          style: AppTextStyles.caption.copyWith(
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 const SizedBox(height: 11),
                                 Row(
                                   children: [

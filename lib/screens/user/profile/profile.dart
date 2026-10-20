@@ -118,10 +118,10 @@ class _ProfileState extends State<Profile> {
         _listingCount = listings
             .where(
               (p) => ![
-            'deleted',
-            'removed',
-          ].contains((p['status'] ?? '').toString().toLowerCase()),
-        )
+                'deleted',
+                'removed',
+              ].contains((p['status'] ?? '').toString().toLowerCase()),
+            )
             .length;
         _wishlistCount = wishlist.length;
       });
@@ -152,7 +152,7 @@ class _ProfileState extends State<Profile> {
           r'(?:drive\.google\.com|docs\.google\.com)/(?:file/d/|open\?id=|uc\?[^#]*?id=)([A-Za-z0-9_-]+)',
           caseSensitive: false,
         ).firstMatch(url) ??
-            RegExp(r'[?&]id=([A-Za-z0-9_-]+)').firstMatch(url);
+        RegExp(r'[?&]id=([A-Za-z0-9_-]+)').firstMatch(url);
     if (match != null &&
         (url.contains('drive.google.com') || url.contains('docs.google.com'))) {
       return 'https://drive.google.com/uc?export=view&id=${match.group(1)}';
@@ -247,30 +247,30 @@ class _ProfileState extends State<Profile> {
                 clipBehavior: Clip.antiAlias,
                 child: _loadingProfile
                     ? const Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
                     : (_photoUrl.isNotEmpty
-                    ? Image.network(
-                  _displayableProfilePhotoUrl(_photoUrl),
-                  key: ValueKey<String>(
-                    _displayableProfilePhotoUrl(_photoUrl),
-                  ),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.person_rounded,
-                    size: 46,
-                    color: AppColors.primary,
-                  ),
-                )
-                    : const Icon(
-                  Icons.person_rounded,
-                  size: 46,
-                  color: AppColors.primary,
-                )),
+                          ? Image.network(
+                              _displayableProfilePhotoUrl(_photoUrl),
+                              key: ValueKey<String>(
+                                _displayableProfilePhotoUrl(_photoUrl),
+                              ),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person_rounded,
+                                size: 46,
+                                color: AppColors.primary,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.person_rounded,
+                              size: 46,
+                              color: AppColors.primary,
+                            )),
               ),
             ],
           ),
@@ -850,7 +850,7 @@ class _ProfileState extends State<Profile> {
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-                      (route) => false,
+                  (route) => false,
                 );
               },
               style: ElevatedButton.styleFrom(

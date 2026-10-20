@@ -722,6 +722,67 @@ class _ArtistCustomServiceDetailsState
                       ),
                     ),
                   ),
+                  if (int.tryParse(v(row['acceptedArtistId'])) != null) ...[
+                    const SizedBox(height: 12),
+                    _card(
+                      'Project progress',
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            int.tryParse(v(row['acceptedArtistId'])) ==
+                                    int.tryParse(v(row['respondingArtistId']))
+                                ? 'The user accepted your offer. Please coordinate the work with the customer.'
+                                : (int.tryParse(v(row['acceptedArtistId'])) ==
+                                          int.tryParse(v(row['artistId']))
+                                      ? 'Your offer was accepted.'
+                                      : 'The user selected another ReMaker for this project.'),
+                            style: ArtistTextStyles.body.copyWith(
+                              color: ArtistColors.primary,
+                              height: 1.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (v(row['status']).toLowerCase() == 'work done' ||
+                              v(row['status']).toLowerCase() ==
+                                  'completed') ...[
+                            const SizedBox(height: 8),
+                            const Text(
+                              'The user marked this work as done.',
+                              style: TextStyle(
+                                color: ArtistColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (v(row['artistOfferStatus']).isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _card(
+                      'Your offer status',
+                      Text(
+                        v(row['artistOfferStatus']),
+                        style: const TextStyle(
+                          color: ArtistColors.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (v(row['artistResponse']).isNotEmpty &&
+                      int.tryParse(v(row['acceptedArtistId'])) == null &&
+                      v(row['artistOfferStatus']).toLowerCase() ==
+                          'waiting for user') ...[
+                    const SizedBox(height: 12),
+                    _card(
+                      'Waiting for the user',
+                      const Text(
+                        'Your offer has been sent. The user can review your response and accept or reject it. You will be notified when they decide.',
+                      ),
+                    ),
+                  ],
                   if (v(row['artistResponse']).isNotEmpty) ...[
                     const SizedBox(height: 12),
                     _card(
@@ -735,8 +796,11 @@ class _ArtistCustomServiceDetailsState
                       ),
                     ),
                   ],
-                  if (v(row['artistResponse']).isEmpty ||
-                      v(row['status']) == 'Need more details') ...[
+                  if ((v(row['artistResponse']).isEmpty ||
+                          v(row['status']) == 'Need more details') &&
+                      int.tryParse(v(row['acceptedArtistId'])) == null &&
+                      v(row['status']).toLowerCase() != 'work done' &&
+                      v(row['status']).toLowerCase() != 'completed') ...[
                     const SizedBox(height: 20),
                     const Text(
                       'Respond to customer',

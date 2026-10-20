@@ -96,7 +96,9 @@ class _ArtistCustomServicesState extends State<ArtistCustomServices> {
       // another artist's already-claimed open request if an older deployment returns it.
       if (referenceId == 0 && respondingId != 0) return false;
       if (filter == 'New')
-        return status == 'open' || status == 'sent to artist';
+        return status == 'open' ||
+            status == 'sent to artist' ||
+            status == 'waiting for user to choose a remaker';
       if (filter == 'Responded')
         return v(r['artistResponse']).trim().isNotEmpty;
       return true;
