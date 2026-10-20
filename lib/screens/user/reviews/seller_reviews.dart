@@ -41,6 +41,8 @@ class _SellerReviewsState extends State<SellerReviews> {
   List<Map<String, dynamic>> _reviews = <Map<String, dynamic>>[];
   int _ratingFilter = 0;
   String _sort = 'Newest';
+  int _loadGeneration = 0;
+  int _eligibilityGeneration = 0;
 
   String get _normalisedSellerType {
     final type = widget.sellerType.trim().toLowerCase();
@@ -97,18 +99,22 @@ class _SellerReviewsState extends State<SellerReviews> {
 
   Future<void> _load() async {
     if (!mounted) return;
+    final generation = ++_loadGeneration;
+    final sellerIdSnapshot = widget.sellerId.trim();
+    final artistSnapshot = _isArtist;
+    final hasContent = _reviews.isNotEmpty;
     setState(() {
-      _loading = true;
+      _loading = !hasContent;
       _error = null;
     });
 
     try {
-      final id = int.tryParse(widget.sellerId.trim());
+      final id = int.tryParse(sellerIdSnapshot);
       if (id == null || id <= 0) {
         throw Exception('This seller has no valid profile ID.');
       }
 
-      final path = _isArtist
+      final path = artistSnapshot
           ? '/artists/$id/reviews'
           : '/sellers/user/$id/reviews';
       final dynamic response = await _api.get(path);
@@ -123,13 +129,13 @@ class _SellerReviewsState extends State<SellerReviews> {
           )
           .toList();
 
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _reviews = reviews;
         _loading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _error = error.toString().replaceFirst('Exception: ', '');
         _loading = false;
@@ -139,13 +145,16 @@ class _SellerReviewsState extends State<SellerReviews> {
 
   Future<void> _loadEligibility() async {
     if (!mounted) return;
+    final generation = ++_eligibilityGeneration;
+    final sellerIdSnapshot = widget.sellerId.trim();
+    final artistSnapshot = _isArtist;
     setState(() {
       _checkingEligibility = true;
       _eligibleOrderId = null;
     });
 
     try {
-      final sellerId = int.tryParse(widget.sellerId.trim());
+      final sellerId = int.tryParse(sellerIdSnapshot);
       if (sellerId == null || sellerId <= 0) {
         if (mounted) setState(() => _checkingEligibility = false);
         return;
@@ -154,7 +163,7 @@ class _SellerReviewsState extends State<SellerReviews> {
       String? eligibleOrderId;
       final suppliedOrderId = (widget.orderId ?? '').trim();
 
-      if (!_isArtist) {
+      if (!artistSnapshot) {
         final dynamic response = await _api.get(
           '/sellers/user/$sellerId/review-eligibility',
         );
@@ -261,13 +270,13 @@ class _SellerReviewsState extends State<SellerReviews> {
         }
       }
 
-      if (!mounted) return;
+      if (!mounted || generation != _eligibilityGeneration) return;
       setState(() {
         _eligibleOrderId = eligibleOrderId;
         _checkingEligibility = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != _eligibilityGeneration) return;
       setState(() {
         _eligibleOrderId = null;
         _checkingEligibility = false;
@@ -626,7 +635,7 @@ class _SellerReviewsState extends State<SellerReviews> {
               ],
             ),
             const SizedBox(height: 16),
-            if (_loading)
+            if (_loading && _reviews.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 36),
                 child: Center(child: CircularProgressIndicator()),

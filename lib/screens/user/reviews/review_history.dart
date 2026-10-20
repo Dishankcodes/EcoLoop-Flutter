@@ -29,6 +29,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
   List<Map<String, dynamic>> _reviews = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _orders = <Map<String, dynamic>>[];
   final Set<String> _deletingIds = <String>{};
+  int _loadGeneration = 0;
 
   int _int(dynamic value) {
     if (value is num) return value.toInt();
@@ -323,6 +324,8 @@ class _ReviewHistoryState extends State<ReviewHistory> {
   }
 
   Future<void> _load({bool force = false}) async {
+    if (!mounted) return;
+    final generation = ++_loadGeneration;
     final cacheIsFresh =
         _cachedReviews != null &&
         _cachedOrders != null &&
@@ -330,7 +333,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         DateTime.now().difference(_cacheTime!) < _cacheDuration;
 
     if (!force && cacheIsFresh) {
-      if (mounted) {
+      if (mounted && generation == _loadGeneration) {
         setState(() {
           _reviews = _cachedReviews!;
           _orders = _cachedOrders!;
@@ -354,7 +357,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         _getRows('/my/reviews'),
         _getRows('/orders'),
       ]);
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       final reviews = results[0] as List<Map<String, dynamic>>;
       final orders = results[1] as List<Map<String, dynamic>>;
       _cachedReviews = reviews;
@@ -367,7 +370,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         _error = null;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _error = error.toString().replaceFirst('Exception: ', '');
         _loading = false;

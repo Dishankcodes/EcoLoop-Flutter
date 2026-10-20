@@ -27,6 +27,8 @@ class _ProductReviewsState extends State<ProductReviews> {
   String? _eligibleOrderId;
   String _eligibilityMessage = 'Checking your order…';
   bool _checkingEligibility = true;
+  int _loadGeneration = 0;
+  int _eligibilityGeneration = 0;
 
   final EcoLoopApi _api = EcoLoopApi.instance;
 
@@ -114,6 +116,8 @@ class _ProductReviewsState extends State<ProductReviews> {
 
   Future<void> _loadEligibleOrder() async {
     if (!mounted) return;
+    final generation = ++_eligibilityGeneration;
+    final productId = _id;
     setState(() {
       _checkingEligibility = true;
       _eligibleOrderId = null;
@@ -121,7 +125,7 @@ class _ProductReviewsState extends State<ProductReviews> {
     });
 
     try {
-      if (_id.isEmpty) {
+      if (productId.isEmpty) {
         if (mounted) {
           setState(() {
             _checkingEligibility = false;
@@ -134,7 +138,7 @@ class _ProductReviewsState extends State<ProductReviews> {
       // The backend is the source of truth: it checks the signed-in buyer,
       // order status, paid status, product match, and duplicate reviews.
       final dynamic response = await _api.get(
-        '/products/$_id/review-eligibility',
+        '/products/$productId/review-eligibility',
       );
       final result = _extractMap(response);
       final eligible =
@@ -144,7 +148,7 @@ class _ProductReviewsState extends State<ProductReviews> {
       final orderId = (rawOrderId ?? '').toString().trim();
       final reason = (result?['reason'] ?? '').toString().trim();
 
-      if (!mounted) return;
+      if (!mounted || generation != _eligibilityGeneration) return;
       setState(() {
         _eligibleOrderId = eligible && orderId.isNotEmpty ? orderId : null;
         _checkingEligibility = false;
@@ -155,7 +159,7 @@ class _ProductReviewsState extends State<ProductReviews> {
             : 'A confirmed or delivered order with paid payment is required, and each product can be reviewed only once.';
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _eligibilityGeneration) return;
       setState(() {
         _eligibleOrderId = null;
         _checkingEligibility = false;
@@ -171,17 +175,20 @@ class _ProductReviewsState extends State<ProductReviews> {
 
   Future<void> _load() async {
     if (!mounted) return;
+    final generation = ++_loadGeneration;
+    final productId = _id;
+    final hasContent = _reviews.isNotEmpty;
     setState(() {
-      _loading = true;
+      _loading = !hasContent;
       _error = null;
     });
 
     try {
-      if (_id.isEmpty) {
+      if (productId.isEmpty) {
         throw Exception('This product has no valid product ID.');
       }
 
-      final dynamic response = await _api.get('/products/$_id/reviews');
+      final dynamic response = await _api.get('/products/$productId/reviews');
       dynamic rows;
 
       if (response is List) {
@@ -208,13 +215,13 @@ class _ProductReviewsState extends State<ProductReviews> {
                 .toList()
           : <Map<String, dynamic>>[];
 
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _reviews = parsedReviews;
         _loading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _error = error.toString();
         _loading = false;
@@ -348,7 +355,7 @@ class _ProductReviewsState extends State<ProductReviews> {
               },
             ),
             const SizedBox(height: 12),
-            if (_loading)
+            if (_loading && _reviews.isEmpty)
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(28),

@@ -124,6 +124,7 @@ class _WriteReviewState extends State<WriteReview> {
   }
 
   Future<void> _submit() async {
+    if (_saving) return;
     final orderId =
         (widget.orderId ??
                 widget.product['reviewOrderId'] ??

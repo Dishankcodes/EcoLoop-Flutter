@@ -420,6 +420,7 @@ class _WriteSellerReviewState extends State<WriteSellerReview> {
   }
 
   Future<void> _submitReview() async {
+    if (_submitting) return;
     if (!canSubmit) {
       _showMessage(
         'Choose a rating, write at least 5 characters, and open this form from an eligible order.',
