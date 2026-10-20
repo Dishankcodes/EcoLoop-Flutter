@@ -16,6 +16,10 @@ class ProductReviews extends StatefulWidget {
 
 class _ProductReviewsState extends State<ProductReviews> {
   final EcoLoopApi _api = EcoLoopApi.instance;
+  static final Map<int, _ProductReviewCache> _cache =
+      <int, _ProductReviewCache>{};
+  static const Duration _cacheDuration = Duration(minutes: 2);
+  bool _requestInFlight = false;
 
   List<Map<String, dynamic>> _reviews = [];
 
@@ -73,57 +77,83 @@ class _ProductReviewsState extends State<ProductReviews> {
   @override
   void initState() {
     super.initState();
-    _load();
+    final cached = _cache[_productId];
+    if (cached != null) {
+      _reviews = List<Map<String, dynamic>>.from(cached.reviews);
+      _eligible = cached.eligible;
+      _orderId = cached.orderId;
+      _loading = false;
+    }
+    _load(silent: cached != null);
   }
 
-  Future<void> _load({bool refresh = false}) async {
-    if (!mounted) return;
-
-    setState(() {
-      if (refresh) {
-        _refreshing = true;
-      } else {
-        _loading = true;
-      }
-
-      _error = null;
-    });
-
+  Future<void> _load({bool refresh = false, bool silent = false}) async {
+    if (!mounted || _requestInFlight) return;
+    if (_productId <= 0) {
+      setState(() {
+        _loading = false;
+        _error = 'Product ID is missing.';
+      });
+      return;
+    }
+    final cached = _cache[_productId];
+    final fresh =
+        cached != null &&
+        DateTime.now().difference(cached.savedAt) < _cacheDuration;
+    if (!refresh && fresh) {
+      if (_reviews.isEmpty && mounted)
+        setState(() {
+          _reviews = List<Map<String, dynamic>>.from(cached.reviews);
+          _eligible = cached.eligible;
+          _orderId = cached.orderId;
+          _loading = false;
+        });
+      return;
+    }
+    _requestInFlight = true;
+    if (mounted && !silent)
+      setState(() {
+        if (refresh || _reviews.isNotEmpty)
+          _refreshing = true;
+        else
+          _loading = true;
+        _error = null;
+      });
     try {
-      if (_productId <= 0) {
-        throw Exception('Product ID is missing.');
-      }
-
       final results = await Future.wait<dynamic>([
         _api.get('/products/$_productId/reviews'),
         _api.get('/products/$_productId/review-eligibility'),
       ]);
-
       final rawReviews = _list(results[0]);
       final eligibility = _map(results[1]);
-
-      if (!mounted) return;
-
-      setState(() {
-        _reviews = rawReviews;
-        _eligible = _bool(eligibility['eligible']);
-
-        final eligibleOrderId = _toInt(eligibility['orderId']);
-        _orderId = eligibleOrderId > 0 ? eligibleOrderId : null;
-      });
-    } catch (error) {
-      if (mounted) {
+      final eligible = _bool(eligibility['eligible']);
+      final eligibleOrderId = _toInt(eligibility['orderId']);
+      final orderId = eligibleOrderId > 0 ? eligibleOrderId : null;
+      _cache[_productId] = _ProductReviewCache(
+        rawReviews,
+        eligible,
+        orderId,
+        DateTime.now(),
+      );
+      if (mounted)
         setState(() {
-          _error = error.toString().replaceFirst('Exception: ', '');
+          _reviews = rawReviews;
+          _eligible = eligible;
+          _orderId = orderId;
+          _error = null;
         });
-      }
+    } catch (error) {
+      if (mounted && (_reviews.isEmpty || !silent))
+        setState(
+          () => _error = error.toString().replaceFirst('Exception: ', ''),
+        );
     } finally {
-      if (mounted) {
+      _requestInFlight = false;
+      if (mounted)
         setState(() {
           _loading = false;
           _refreshing = false;
         });
-      }
     }
   }
 
@@ -152,112 +182,107 @@ class _ProductReviewsState extends State<ProductReviews> {
         foregroundColor: ArtistColors.textPrimary,
         title: Text('Product Reviews', style: ArtistTextStyles.title),
       ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: ArtistColors.primary),
-            )
-          : RefreshIndicator(
-              color: ArtistColors.primary,
-              onRefresh: () => _load(refresh: true),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                children: [
-                  _productHeader(),
-                  const SizedBox(height: 12),
-                  _summary(),
+      body: RefreshIndicator(
+        color: ArtistColors.primary,
+        onRefresh: () => _load(refresh: true),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            if (_loading) const LinearProgressIndicator(minHeight: 2),
+            _productHeader(),
+            const SizedBox(height: 12),
+            _summary(),
 
-                  if (_eligible) ...[const SizedBox(height: 12), _writeCard()],
+            if (_eligible) ...[const SizedBox(height: 12), _writeCard()],
 
-                  const SizedBox(height: 18),
+            const SizedBox(height: 18),
 
-                  Row(
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Customer reviews',
+                    style: ArtistTextStyles.title.copyWith(fontSize: 18),
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    setState(() {
+                      _sort = value;
+                    });
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(value: 'Newest', child: Text('Newest')),
+                    PopupMenuItem(
+                      value: 'Highest Rating',
+                      child: Text('Highest rating'),
+                    ),
+                    PopupMenuItem(
+                      value: 'Lowest Rating',
+                      child: Text('Lowest rating'),
+                    ),
+                  ],
+                  child: Row(
                     children: [
-                      Expanded(
-                        child: Text(
-                          'Customer reviews',
-                          style: ArtistTextStyles.title.copyWith(fontSize: 18),
-                        ),
-                      ),
-                      PopupMenuButton<String>(
-                        onSelected: (value) {
-                          setState(() {
-                            _sort = value;
-                          });
-                        },
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(value: 'Newest', child: Text('Newest')),
-                          PopupMenuItem(
-                            value: 'Highest Rating',
-                            child: Text('Highest rating'),
-                          ),
-                          PopupMenuItem(
-                            value: 'Lowest Rating',
-                            child: Text('Lowest rating'),
-                          ),
-                        ],
-                        child: Row(
-                          children: [
-                            Text(_sort, style: ArtistTextStyles.caption),
-                            const Icon(Icons.arrow_drop_down),
-                          ],
-                        ),
-                      ),
+                      Text(_sort, style: ArtistTextStyles.caption),
+                      const Icon(Icons.arrow_drop_down),
                     ],
                   ),
-
-                  const SizedBox(height: 8),
-
-                  Wrap(
-                    spacing: 7,
-                    runSpacing: 6,
-                    children: ['All', '5', '4', '3', '2', '1']
-                        .map(
-                          (value) => ChoiceChip(
-                            label: Text(value == 'All' ? 'All' : '$value ★'),
-                            selected: _filter == value,
-                            onSelected: (selected) {
-                              if (!selected) return;
-
-                              setState(() {
-                                _filter = value;
-                              });
-                            },
-                            selectedColor: ArtistColors.light,
-                          ),
-                        )
-                        .toList(),
-                  ),
-
-                  if (_error != null) ...[
-                    _status(
-                      Icons.cloud_off_outlined,
-                      'Could not load reviews',
-                      _error!,
-                      () => _load(refresh: true),
-                    ),
-                  ] else if (_visible.isEmpty) ...[
-                    _status(
-                      Icons.rate_review_outlined,
-                      'No reviews yet',
-                      'Reviews submitted by verified purchasers will appear here.',
-                      () => _load(refresh: true),
-                    ),
-                  ] else ...[
-                    ..._visible.map(_reviewCard),
-                  ],
-
-                  if (_refreshing)
-                    const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: ArtistColors.primary,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+                ),
+              ],
             ),
+
+            const SizedBox(height: 8),
+
+            Wrap(
+              spacing: 7,
+              runSpacing: 6,
+              children: ['All', '5', '4', '3', '2', '1']
+                  .map(
+                    (value) => ChoiceChip(
+                      label: Text(value == 'All' ? 'All' : '$value ★'),
+                      selected: _filter == value,
+                      onSelected: (selected) {
+                        if (!selected) return;
+
+                        setState(() {
+                          _filter = value;
+                        });
+                      },
+                      selectedColor: ArtistColors.light,
+                    ),
+                  )
+                  .toList(),
+            ),
+
+            if (_error != null) ...[
+              _status(
+                Icons.cloud_off_outlined,
+                'Could not load reviews',
+                _error!,
+                () => _load(refresh: true),
+              ),
+            ] else if (_visible.isEmpty && !_loading) ...[
+              _status(
+                Icons.rate_review_outlined,
+                'No reviews yet',
+                'Reviews submitted by verified purchasers will appear here.',
+                () => _load(refresh: true),
+              ),
+            ] else ...[
+              ..._visible.map(_reviewCard),
+            ],
+
+            if (_refreshing)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Center(
+                  child: CircularProgressIndicator(color: ArtistColors.primary),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -607,3 +632,17 @@ const List<String> _months = [
   'Nov',
   'Dec',
 ];
+
+class _ProductReviewCache {
+  final List<Map<String, dynamic>> reviews;
+  final bool eligible;
+  final int? orderId;
+  final DateTime savedAt;
+
+  const _ProductReviewCache(
+    this.reviews,
+    this.eligible,
+    this.orderId,
+    this.savedAt,
+  );
+}

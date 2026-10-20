@@ -24,6 +24,8 @@ class _FollowersState extends State<Followers> {
   static int _cachedArtistId = 0;
   static List<Map<String, dynamic>>? _cachedFollowers;
   static int _cachedTotalFollowers = 0;
+  static DateTime? _followersCachedAt;
+  static const Duration _followersCacheDuration = Duration(minutes: 2);
   Timer? _liveRefreshTimer;
   bool _requestInFlight = false;
 
@@ -54,6 +56,13 @@ class _FollowersState extends State<Followers> {
     super.initState();
     _searchController.addListener(_onSearchChanged);
     final cached = _cachedFollowers;
+    final cachedAt = _followersCachedAt;
+    final cacheIsFresh =
+        cached != null &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < _followersCacheDuration;
+
+    // Show the previous result synchronously; don't block the UI on Sheets.
     if (cached != null) {
       _followers = cached
           .map((item) => Map<String, dynamic>.from(item))
@@ -61,7 +70,9 @@ class _FollowersState extends State<Followers> {
       _totalFollowers = _cachedTotalFollowers;
       _loading = false;
     }
-    _loadFollowers(silent: cached != null);
+    // A fresh cache avoids another Apps Script round trip on quick revisits.
+    // Stale cache remains visible while a quiet refresh happens in background.
+    _loadFollowers(silent: cached != null, skipIfFresh: cacheIsFresh);
     // No aggressive polling: refresh manually or when this screen is reopened.
     // Repeated Apps Script requests every few seconds make the app slower.
   }
@@ -131,8 +142,16 @@ class _FollowersState extends State<Followers> {
   Future<void> _loadFollowers({
     bool refresh = false,
     bool silent = false,
+    bool skipIfFresh = false,
+    bool force = false,
   }) async {
     if (!mounted || _requestInFlight) return;
+    final cachedAt = _followersCachedAt;
+    final cacheIsFresh =
+        _cachedFollowers != null &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < _followersCacheDuration;
+    if (!force && (skipIfFresh || cacheIsFresh)) return;
     _requestInFlight = true;
 
     if (!silent) {
@@ -194,6 +213,7 @@ class _FollowersState extends State<Followers> {
             .map((item) => Map<String, dynamic>.from(item))
             .toList();
         _cachedTotalFollowers = _totalFollowers;
+        _followersCachedAt = DateTime.now();
         _error = null;
       });
     } catch (e) {
@@ -236,7 +256,7 @@ class _FollowersState extends State<Followers> {
       } else {
         await _api.post('/artists/$targetId/follow', <String, dynamic>{});
       }
-      await _loadFollowers(refresh: true);
+      await _loadFollowers(refresh: true, force: true);
       if (mounted) {
         final name = (follower['name'] ?? follower['userName'] ?? 'artist')
             .toString();
@@ -711,7 +731,7 @@ class _FollowersState extends State<Followers> {
             ),
             const SizedBox(height: 14),
             ElevatedButton.icon(
-              onPressed: () => _loadFollowers(),
+              onPressed: () => _loadFollowers(force: true),
               icon: const Icon(Icons.refresh_rounded, size: 17),
               label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
@@ -738,6 +758,8 @@ class _FollowersState extends State<Followers> {
               image,
               width: 56,
               height: 56,
+              cacheWidth: 112,
+              cacheHeight: 112,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return _profileFallback(name);
@@ -935,7 +957,7 @@ class _FollowersState extends State<Followers> {
                   title: 'Refresh Followers',
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    _loadFollowers(refresh: true);
+                    _loadFollowers(refresh: true, force: true);
                   },
                 ),
               ],

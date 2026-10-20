@@ -13,8 +13,12 @@ class ArtistReviews extends StatefulWidget {
 
 class _ArtistReviewsState extends State<ArtistReviews> {
   final _api = EcoLoopApi.instance;
+  static List<Map<String, dynamic>>? _cachedReviews;
+  static DateTime? _cacheTime;
+  static const Duration _cacheDuration = Duration(minutes: 2);
   List<Map<String, dynamic>> _reviews = [];
   bool _loading = true, _refreshing = false;
+  bool _requestInFlight = false;
   String? _error;
   String _filter = 'All', _sort = 'Newest';
 
@@ -44,29 +48,56 @@ class _ArtistReviewsState extends State<ArtistReviews> {
   @override
   void initState() {
     super.initState();
-    _load();
+    final cached = _cachedReviews;
+    if (cached != null) {
+      _reviews = List<Map<String, dynamic>>.from(cached);
+      _loading = false;
+    }
+    _load(silent: cached != null);
   }
 
-  Future<void> _load({bool refresh = false}) async {
-    if (!mounted) return;
-    setState(() {
-      if (refresh)
-        _refreshing = true;
-      else
-        _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool refresh = false, bool silent = false}) async {
+    if (!mounted || _requestInFlight) return;
+    final cached = _cachedReviews;
+    final fresh =
+        cached != null &&
+        _cacheTime != null &&
+        DateTime.now().difference(_cacheTime!) < _cacheDuration;
+    if (!refresh && fresh) {
+      if (_reviews.isEmpty && mounted)
+        setState(() {
+          _reviews = List<Map<String, dynamic>>.from(cached);
+          _loading = false;
+        });
+      return;
+    }
+    _requestInFlight = true;
+    if (!silent && mounted)
+      setState(() {
+        if (refresh || _reviews.isNotEmpty)
+          _refreshing = true;
+        else
+          _loading = true;
+        _error = null;
+      });
     try {
       final response = await _api.get('/artist/product-reviews');
       final all = _list(response);
       all.sort(
         (a, b) => _date(b['createdAt']).compareTo(_date(a['createdAt'])),
       );
-      if (mounted) setState(() => _reviews = all);
-    } catch (e) {
+      _cachedReviews = List<Map<String, dynamic>>.from(all);
+      _cacheTime = DateTime.now();
       if (mounted)
+        setState(() {
+          _reviews = all;
+          _error = null;
+        });
+    } catch (e) {
+      if (mounted && (_reviews.isEmpty || !silent))
         setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
+      _requestInFlight = false;
       if (mounted)
         setState(() {
           _loading = false;
@@ -90,131 +121,124 @@ class _ArtistReviewsState extends State<ArtistReviews> {
         ),
       ),
     ),
-    body: _loading
-        ? const Center(
-            child: CircularProgressIndicator(color: ArtistColors.primary),
-          )
-        : RefreshIndicator(
-            color: ArtistColors.primary,
-            onRefresh: () => _load(refresh: true),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+    body: RefreshIndicator(
+      color: ArtistColors.primary,
+      onRefresh: () => _load(refresh: true),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+        children: [
+          if (_loading) const LinearProgressIndicator(minHeight: 2),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: _decoration(),
+            child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: _decoration(),
-                  child: Row(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: ArtistColors.light,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.rate_review_outlined,
+                    color: ArtistColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: ArtistColors.light,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(
-                          Icons.rate_review_outlined,
-                          color: ArtistColors.primary,
-                        ),
+                      Text(
+                        'Your Product Feedback',
+                        style: ArtistTextStyles.heading.copyWith(fontSize: 16),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Your Product Feedback',
-                              style: ArtistTextStyles.heading.copyWith(
-                                fontSize: 16,
-                              ),
-                            ),
-                            Text(
-                              'Reviews customers have left on your listings.',
-                              style: ArtistTextStyles.body.copyWith(
-                                color: ArtistColors.textMuted,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+                      Text(
+                        'Reviews customers have left on your listings.',
+                        style: ArtistTextStyles.body.copyWith(
+                          color: ArtistColors.textMuted,
+                          fontSize: 12,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
-                _summary(),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Reviews (${_reviews.length})',
-                        style: ArtistTextStyles.heading.copyWith(fontSize: 18),
-                      ),
-                    ),
-                    PopupMenuButton<String>(
-                      onSelected: (v) => setState(() => _sort = v),
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'Newest', child: Text('Newest')),
-                        PopupMenuItem(
-                          value: 'Highest Rating',
-                          child: Text('Highest rating'),
-                        ),
-                        PopupMenuItem(
-                          value: 'Lowest Rating',
-                          child: Text('Lowest rating'),
-                        ),
-                      ],
-                      child: Row(
-                        children: [
-                          Text(_sort, style: ArtistTextStyles.small),
-                          const Icon(Icons.arrow_drop_down),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 5,
-                  children: ['All', '5', '4', '3', '2', '1']
-                      .map(
-                        (f) => ChoiceChip(
-                          label: Text(f == 'All' ? f : '$f ★'),
-                          selected: _filter == f,
-                          onSelected: (_) => setState(() => _filter = f),
-                          selectedColor: ArtistColors.light,
-                        ),
-                      )
-                      .toList(),
-                ),
-                if (_error != null)
-                  _status(
-                    'Could not load reviews',
-                    _error!,
-                    () => _load(refresh: true),
-                  )
-                else if (_visible.isEmpty)
-                  _status(
-                    'No customer reviews yet',
-                    'When customers review your products, they will appear here.',
-                    () => _load(refresh: true),
-                  )
-                else
-                  ..._visible.map(_reviewCard),
-                if (_refreshing)
-                  const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: ArtistColors.primary,
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),
+          const SizedBox(height: 14),
+          _summary(),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Reviews (${_reviews.length})',
+                  style: ArtistTextStyles.heading.copyWith(fontSize: 18),
+                ),
+              ),
+              PopupMenuButton<String>(
+                onSelected: (v) => setState(() => _sort = v),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'Newest', child: Text('Newest')),
+                  PopupMenuItem(
+                    value: 'Highest Rating',
+                    child: Text('Highest rating'),
+                  ),
+                  PopupMenuItem(
+                    value: 'Lowest Rating',
+                    child: Text('Lowest rating'),
+                  ),
+                ],
+                child: Row(
+                  children: [
+                    Text(_sort, style: ArtistTextStyles.small),
+                    const Icon(Icons.arrow_drop_down),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 7,
+            runSpacing: 5,
+            children: ['All', '5', '4', '3', '2', '1']
+                .map(
+                  (f) => ChoiceChip(
+                    label: Text(f == 'All' ? f : '$f ★'),
+                    selected: _filter == f,
+                    onSelected: (_) => setState(() => _filter = f),
+                    selectedColor: ArtistColors.light,
+                  ),
+                )
+                .toList(),
+          ),
+          if (_error != null)
+            _status(
+              'Could not load reviews',
+              _error!,
+              () => _load(refresh: true),
+            )
+          else if (_visible.isEmpty && !_loading)
+            _status(
+              'No customer reviews yet',
+              'When customers review your products, they will appear here.',
+              () => _load(refresh: true),
+            )
+          else
+            ..._visible.map(_reviewCard),
+          if (_refreshing)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(
+                child: CircularProgressIndicator(color: ArtistColors.primary),
+              ),
+            ),
+        ],
+      ),
+    ),
   );
 
   Widget _summary() {

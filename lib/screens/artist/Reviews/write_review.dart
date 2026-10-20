@@ -120,6 +120,7 @@ class _WriteReviewState extends State<WriteReview> {
   }
 
   Future<void> _loadEligibility() async {
+    if (!mounted) return;
     if (_productId <= 0) {
       setState(() => _error = 'This product has no valid ID.');
       return;
@@ -134,11 +135,12 @@ class _WriteReviewState extends State<WriteReview> {
       if (data['eligible'] == true ||
           data['eligible'].toString().toLowerCase() == 'true') {
         _orderId = _int(data['orderId']);
+        _error = null;
       } else {
         _error = _str(
           data['reason'],
           fallback:
-              'A delivered and paid order is required to review this product.',
+          'A delivered and paid order is required to review this product.',
         );
       }
     } catch (e) {
@@ -208,148 +210,145 @@ class _WriteReviewState extends State<WriteReview> {
         ),
       ),
       body: SafeArea(
-        child: _loadingEligibility
-            ? const Center(
-                child: CircularProgressIndicator(color: ArtistColors.primary),
-              )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                children: [
-                  _productCard(),
-                  const SizedBox(height: 22),
-                  Text(
-                    'How was your experience?',
-                    style: ArtistTextStyles.title.copyWith(fontSize: 18),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            if (_loadingEligibility) const LinearProgressIndicator(minHeight: 2),
+            _productCard(),
+            const SizedBox(height: 22),
+            Text(
+              'How was your experience?',
+              style: ArtistTextStyles.title.copyWith(fontSize: 18),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                5,
+                    (i) => IconButton(
+                  onPressed: _submitting
+                      ? null
+                      : () => setState(() => _rating = i + 1),
+                  iconSize: 38,
+                  icon: Icon(
+                    i < _rating
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    color: i < _rating
+                        ? ArtistColors.warning
+                        : ArtistColors.textMuted,
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      5,
-                      (i) => IconButton(
-                        onPressed: _submitting
-                            ? null
-                            : () => setState(() => _rating = i + 1),
-                        iconSize: 38,
-                        icon: Icon(
-                          i < _rating
-                              ? Icons.star_rounded
-                              : Icons.star_outline_rounded,
-                          color: i < _rating
-                              ? ArtistColors.warning
-                              : ArtistColors.textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Center(
-                    child: Text(
-                      _rating == 0
-                          ? 'Select your rating'
-                          : '$_rating out of 5 stars',
-                      style: ArtistTextStyles.bodyMedium.copyWith(
-                        color: ArtistColors.primary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Your review',
-                    style: ArtistTextStyles.title.copyWith(fontSize: 17),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _comment,
-                    maxLines: 6,
-                    maxLength: 500,
-                    textCapitalization: TextCapitalization.sentences,
-                    style: ArtistTextStyles.bodyMedium.copyWith(
-                      color: ArtistColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'Your review',
-                      hintText: 'Share an honest review of this product',
-                      alignLabelWithHint: true,
-                      filled: true,
-                      fillColor: ArtistColors.surface,
-                      contentPadding: const EdgeInsets.all(14),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: ArtistColors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: ArtistColors.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(
-                          color: ArtistColors.primary,
-                          width: 1.3,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    activeColor: ArtistColors.primary,
-                    value: _recommend,
-                    onChanged: _submitting
-                        ? null
-                        : (value) => setState(() => _recommend = value),
-                    title: Text(
-                      'Would you recommend this product?',
-                      style: ArtistTextStyles.bodyMedium,
-                    ),
-                  ),
-                  if (_error != null && !editing) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: ArtistColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: ArtistColors.border),
-                      ),
-                      child: Text(
-                        _error!,
-                        style: ArtistTextStyles.body.copyWith(
-                          color: ArtistColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _submitting || (_error != null && !editing)
-                          ? null
-                          : _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ArtistColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: _submitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              editing ? 'Save Changes' : 'Submit Review',
-                              style: ArtistTextStyles.button,
-                            ),
-                    ),
-                  ),
-                ],
+                ),
               ),
+            ),
+            Center(
+              child: Text(
+                _rating == 0
+                    ? 'Select your rating'
+                    : '$_rating out of 5 stars',
+                style: ArtistTextStyles.bodyMedium.copyWith(
+                  color: ArtistColors.primary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Your review',
+              style: ArtistTextStyles.title.copyWith(fontSize: 17),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _comment,
+              maxLines: 6,
+              maxLength: 500,
+              textCapitalization: TextCapitalization.sentences,
+              style: ArtistTextStyles.bodyMedium.copyWith(
+                color: ArtistColors.textPrimary,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Your review',
+                hintText: 'Share an honest review of this product',
+                alignLabelWithHint: true,
+                filled: true,
+                fillColor: ArtistColors.surface,
+                contentPadding: const EdgeInsets.all(14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: ArtistColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: ArtistColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: ArtistColors.primary,
+                    width: 1.3,
+                  ),
+                ),
+              ),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              activeColor: ArtistColors.primary,
+              value: _recommend,
+              onChanged: _submitting
+                  ? null
+                  : (value) => setState(() => _recommend = value),
+              title: Text(
+                'Would you recommend this product?',
+                style: ArtistTextStyles.bodyMedium,
+              ),
+            ),
+            if (_error != null && !editing) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: ArtistColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: ArtistColors.border),
+                ),
+                child: Text(
+                  _error!,
+                  style: ArtistTextStyles.body.copyWith(
+                    color: ArtistColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _submitting || (_error != null && !editing)
+                    ? null
+                    : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ArtistColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _submitting
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+                    : Text(
+                  editing ? 'Save Changes' : 'Submit Review',
+                  style: ArtistTextStyles.button,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -370,45 +369,45 @@ class _WriteReviewState extends State<WriteReview> {
             height: 68,
             child: _image.isEmpty
                 ? const ColoredBox(
-                    color: ArtistColors.light,
-                    child: Center(
-                      child: Icon(
-                        Icons.image_outlined,
-                        color: ArtistColors.primary,
-                        size: 28,
-                      ),
-                    ),
-                  )
+              color: ArtistColors.light,
+              child: Center(
+                child: Icon(
+                  Icons.image_outlined,
+                  color: ArtistColors.primary,
+                  size: 28,
+                ),
+              ),
+            )
                 : Image.network(
-                    _image,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const ColoredBox(
-                      color: ArtistColors.light,
-                      child: Center(
-                        child: Icon(
-                          Icons.image_outlined,
-                          color: ArtistColors.primary,
-                          size: 28,
-                        ),
+              _image,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const ColoredBox(
+                color: ArtistColors.light,
+                child: Center(
+                  child: Icon(
+                    Icons.image_outlined,
+                    color: ArtistColors.primary,
+                    size: 28,
+                  ),
+                ),
+              ),
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return const ColoredBox(
+                  color: ArtistColors.light,
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: ArtistColors.primary,
                       ),
                     ),
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return const ColoredBox(
-                        color: ArtistColors.light,
-                        child: Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: ArtistColors.primary,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
                   ),
+                );
+              },
+            ),
           ),
         ),
         const SizedBox(width: 12),

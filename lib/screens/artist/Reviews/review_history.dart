@@ -32,6 +32,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
   List<Map<String, dynamic>> _reviews = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _orders = <Map<String, dynamic>>[];
   final Set<String> _deletingIds = <String>{};
+  bool _requestInFlight = false;
 
   int _int(dynamic value) {
     if (value is num) return value.toInt();
@@ -390,6 +391,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
   }
 
   Future<void> _load({bool force = false}) async {
+    if (!mounted || _requestInFlight) return;
     final cacheIsFresh =
         _cachedReviews != null &&
         _cachedOrders != null &&
@@ -409,6 +411,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
       return;
     }
 
+    _requestInFlight = true;
     // Paint the page shell immediately. Fetch reviews and orders concurrently,
     // then render each section as soon as its own request finishes.
     final hasCachedContent =
@@ -473,6 +476,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         });
 
     await Future.wait<void>([reviewsFuture, ordersFuture]);
+    _requestInFlight = false;
     if (!mounted) return;
     setState(() {
       _loading = false;
