@@ -572,8 +572,9 @@ class _CheckoutState extends State<Checkout> {
       ? 99.0 * _uniqueSellerCount
       : _standardDeliveryFee;
 
+  // Matches the checkout policy: 4% below ₹499, ₹30 from ₹499,
+  // and ₹60 from ₹999. Fee is based on the complete basket subtotal.
   double _calculatePlatformFee(double subtotal) {
-    // One fee is charged on the complete checkout subtotal, not per item.
     if (subtotal >= 999) return 60.0;
     if (subtotal >= 499) return 30.0;
     return (subtotal * 0.04).roundToDouble();
@@ -2662,6 +2663,7 @@ class _CheckoutState extends State<Checkout> {
           deliveryMethod: deliveryLabel,
           savings: _couponDiscount,
           couponCode: _couponCode,
+          clearCartAfterSuccess: widget.product == null && widget.items != null,
         ),
       ),
     );

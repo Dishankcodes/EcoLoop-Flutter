@@ -129,7 +129,7 @@ class _OrderSuccessState extends State<OrderSuccess>
       MaterialPageRoute<void>(
         builder: (_) => ArtistMain(initialIndex: safeIndex),
       ),
-          (route) => false,
+      (route) => false,
     );
   }
 
@@ -661,11 +661,11 @@ class _OrderSuccessState extends State<OrderSuccess>
   // ---------------------------------------------------------------------------
 
   Widget _infoRow(
-      String title,
-      String value, {
-        Color? valueColor,
-        bool valueBold = false,
-      }) {
+    String title,
+    String value, {
+    Color? valueColor,
+    bool valueBold = false,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

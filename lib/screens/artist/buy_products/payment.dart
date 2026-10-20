@@ -18,6 +18,7 @@ class Payment extends StatefulWidget {
     this.deliveryMethod = 'Standard Delivery',
     this.savings = 0,
     this.couponCode,
+    this.clearCartAfterSuccess = false,
   });
 
   final double totalAmount;
@@ -26,6 +27,7 @@ class Payment extends StatefulWidget {
   final String deliveryMethod;
   final double savings;
   final String? couponCode;
+  final bool clearCartAfterSuccess;
 
   @override
   State<Payment> createState() => _PaymentState();
@@ -36,6 +38,9 @@ class _PaymentState extends State<Payment> {
   String? _selectedUpiApp;
   String? _selectedBank;
   bool _isProcessing = false;
+  // Stable for this Payment state: reuse for retries of the same attempt.
+  final String _checkoutRequestId =
+      'artist_order_${DateTime.now().microsecondsSinceEpoch}';
   String? _createdOrderId;
   double? _createdServerTotal;
   int? _createdItemCount;
@@ -187,6 +192,8 @@ class _PaymentState extends State<Payment> {
         'deliveryMethod': widget.deliveryMethod,
         if (widget.couponCode != null && widget.couponCode!.trim().isNotEmpty)
           'couponCode': widget.couponCode!.trim().toUpperCase(),
+        'clearCartAfterSuccess': widget.clearCartAfterSuccess,
+        'requestId': _checkoutRequestId,
       });
 
       if (response is! Map || response['orders'] is! List) {
@@ -237,8 +244,8 @@ class _PaymentState extends State<Payment> {
         _createdItemCount = itemCount;
         _isProcessing = false;
       });
-      // Clear the shared artist cart only after the backend confirms the order.
-      CartPopup.clear();
+      // Clear the shared artist cart only after a successful cart-originated checkout.
+      if (widget.clearCartAfterSuccess) CartPopup.clear();
       _showPaymentSuccess();
     } catch (error) {
       if (mounted) {

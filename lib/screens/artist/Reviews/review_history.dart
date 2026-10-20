@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
+import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
 import 'write_review.dart';
 import 'write_seller_review.dart';
@@ -172,11 +173,14 @@ class _ReviewHistoryState extends State<ReviewHistory> {
       _first(row, ['sellerId', 'seller_id', 'artistId', 'artist_id']);
 
   String _sellerType(Map<String, dynamic> row) {
-    final type = _first(row, [
-      'sellerType',
-      'seller_type',
-    ], fallback: 'user').toLowerCase();
-    return type == 'artist' || type == 'remaker' ? 'artist' : 'user';
+    final type = _first(
+      row,
+      ['sellerType', 'seller_type', 'targetType', 'target_type'],
+      fallback: 'user',
+    ).toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+    return const {'artist', 'remaker', 're_maker'}.contains(type)
+        ? 'artist'
+        : 'user';
   }
 
   bool _isSellerReview(Map<String, dynamic> review) {
@@ -189,8 +193,15 @@ class _ReviewHistoryState extends State<ReviewHistory> {
   }
 
   bool _isArtistReview(Map<String, dynamic> review) {
-    final type = _first(review, ['reviewType', 'review_type']).toLowerCase();
-    return type == 'artist' ||
+    final type = _first(review, [
+      'reviewType',
+      'review_type',
+      'sellerType',
+      'seller_type',
+      'targetType',
+      'target_type',
+    ]).toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+    return const {'artist', 'remaker', 're_maker'}.contains(type) ||
         _first(review, ['artistId', 'artist_id']).isNotEmpty;
   }
 
@@ -227,20 +238,24 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     );
   }
 
+  // A seller/artist can be reviewed only once by this account, regardless
+  // of how many qualifying orders the buyer has with them.
   bool _hasSellerReview(Map<String, dynamic> order) {
     final sellerId = _sellerId(order);
     if (sellerId.isEmpty) return true;
-    final artist = _sellerType(order) == 'artist';
+    final targetType = _sellerType(order);
     return _reviews.any((review) {
       if (!_isSellerReview(review)) return false;
-      if (artist) {
-        return _isArtistReview(review) &&
-            _first(review, ['artistId', 'artist_id']) == sellerId;
-      }
-      return !_isArtistReview(review) &&
-          _first(review, ['sellerId', 'seller_id']) == sellerId &&
-          _first(review, ['orderId', 'order_id']) ==
-              _first(order, ['orderId', 'order_id', 'id']);
+      final reviewedId = _first(review, [
+        'sellerId',
+        'seller_id',
+        'artistId',
+        'artist_id',
+      ]);
+      if (reviewedId != sellerId) return false;
+      return targetType == 'artist'
+          ? _isArtistReview(review)
+          : !_isArtistReview(review) && _sellerType(review) == 'user';
     });
   }
 
@@ -442,7 +457,12 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         ),
       ),
     );
-    if (result != null && mounted) {
+    if (result == true && mounted) {
+      // Refresh immediately so the pending card disappears and the submitted
+      // review appears in history without waiting for the cache to expire.
+      _cachedReviews = null;
+      _cachedOrders = null;
+      _cacheTime = null;
       _message('Seller review submitted successfully.');
       await _load(force: true);
     }
@@ -531,7 +551,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     return Scaffold(
       backgroundColor: ArtistColors.background,
       appBar: AppBar(
-        title: const Text('My Reviews'),
+        title: Text('My Reviews', style: ArtistTextStyles.title),
         centerTitle: true,
         backgroundColor: ArtistColors.surface,
         foregroundColor: ArtistColors.primary,
@@ -582,7 +602,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                         Text(
                           _error!,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: ArtistTextStyles.body.copyWith(
                             color: ArtistColors.textPrimary,
                             fontSize: 15,
                           ),
@@ -661,7 +681,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: ArtistTextStyles.title.copyWith(
                     color: ArtistColors.textPrimary,
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
@@ -670,7 +690,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: ArtistTextStyles.caption.copyWith(
                     color: ArtistColors.textSecondary,
                     fontSize: 12,
                     height: 1.4,
@@ -687,7 +707,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
             ),
             child: Text(
               '$count',
-              style: const TextStyle(
+              style: ArtistTextStyles.bodyMedium.copyWith(
                 color: ArtistColors.primary,
                 fontWeight: FontWeight.w800,
               ),
@@ -722,7 +742,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                 child: Text(
                   label,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: ArtistTextStyles.bodyMedium.copyWith(
                     color: selected ? Colors.white : ArtistColors.textPrimary,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     fontSize: 12,
@@ -756,7 +776,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: ArtistTextStyles.bodyMedium.copyWith(
               color: ArtistColors.textPrimary,
               fontWeight: FontWeight.w700,
             ),
@@ -765,7 +785,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: ArtistTextStyles.caption.copyWith(
               color: ArtistColors.textSecondary,
               fontSize: 12,
               height: 1.4,
@@ -825,7 +845,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: ArtistTextStyles.bodyMedium.copyWith(
                         color: ArtistColors.textPrimary,
                         fontWeight: FontWeight.w800,
                         fontSize: 14,
@@ -834,7 +854,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                     const SizedBox(height: 5),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: ArtistTextStyles.caption.copyWith(
                         color: ArtistColors.textSecondary,
                         fontSize: 11,
                       ),
@@ -850,7 +870,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                         const SizedBox(width: 4),
                         Text(
                           'Eligible order',
-                          style: TextStyle(
+                          style: ArtistTextStyles.caption.copyWith(
                             color: ArtistColors.primary,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -942,7 +962,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: ArtistTextStyles.bodyMedium.copyWith(
                         color: ArtistColors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
@@ -950,8 +970,8 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      '${sellerReview ? 'Seller / artist review' : 'Product review'} • ${_dateLabel(review['createdAt'] ?? review['created_at'])}',
-                      style: const TextStyle(
+                      '${sellerReview ? (_isArtistReview(review) ? 'Artist review' : 'Seller review') : 'Product review'} • ${_dateLabel(review['createdAt'] ?? review['created_at'])}',
+                      style: ArtistTextStyles.caption.copyWith(
                         color: ArtistColors.textSecondary,
                         fontSize: 11,
                       ),
@@ -971,8 +991,8 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                   children: [
                     Text(
                       _int(review['rating']).toString(),
-                      style: const TextStyle(
-                        color: Color(0xFF855B00),
+                      style: ArtistTextStyles.bodyMedium.copyWith(
+                        color: const Color(0xFF855B00),
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -991,7 +1011,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
             const SizedBox(height: 13),
             Text(
               comment,
-              style: const TextStyle(
+              style: ArtistTextStyles.body.copyWith(
                 color: ArtistColors.textPrimary,
                 height: 1.45,
                 fontSize: 13,

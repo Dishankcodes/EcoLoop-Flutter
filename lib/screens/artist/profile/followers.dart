@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
@@ -16,6 +18,12 @@ class _FollowersState extends State<Followers> {
   final TextEditingController _searchController = TextEditingController();
 
   final EcoLoopApi _api = EcoLoopApi.instance;
+
+  // Reuse the signed-in artist ID while this app session is alive so opening
+  // this screen again does not need to fetch /profile before fetching followers.
+  static int _cachedArtistId = 0;
+  Timer? _liveRefreshTimer;
+  bool _requestInFlight = false;
 
   List<Map<String, dynamic>> _followers = [];
   bool _loading = true;
@@ -44,10 +52,18 @@ class _FollowersState extends State<Followers> {
     super.initState();
     _searchController.addListener(_onSearchChanged);
     _loadFollowers();
+    // Apps Script has no push channel here, so poll quietly while this page is
+    // visible. This updates new followers without requiring a manual refresh.
+    _liveRefreshTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      if (mounted && !_loading && !_refreshing && !_requestInFlight) {
+        _loadFollowers(refresh: true, silent: true);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _liveRefreshTimer?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
@@ -64,7 +80,10 @@ class _FollowersState extends State<Followers> {
   // ============================================================
 
   void _openArtistProfile(Map<String, dynamic> follower) {
-    if ((follower['role'] ?? '').toString().toLowerCase() != 'artist') {
+    if (_normaliseRole(
+          follower['role'] ?? follower['accountType'] ?? follower['sellerType'],
+        ) !=
+        'artist') {
       _showMessage('This follower has a user account.');
       return;
     }
@@ -92,43 +111,92 @@ class _FollowersState extends State<Followers> {
     return int.tryParse((value ?? '').toString()) ?? 0;
   }
 
-  Future<void> _loadFollowers({bool refresh = false}) async {
-    if (!mounted) return;
-    setState(() {
-      if (refresh) {
-        _refreshing = true;
-      } else {
-        _loading = true;
-      }
-      _error = null;
-    });
+  String _normaliseRole(dynamic value) {
+    final role = (value ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+    if (const {'artist', 'remaker', 're_maker'}.contains(role)) return 'artist';
+    if (const {'user', 'seller', 'customer'}.contains(role)) return 'user';
+    return role;
+  }
+
+  Future<void> _loadFollowers({
+    bool refresh = false,
+    bool silent = false,
+  }) async {
+    if (!mounted || _requestInFlight) return;
+    _requestInFlight = true;
+
+    if (!silent) {
+      setState(() {
+        if (refresh && _followers.isNotEmpty) {
+          _refreshing = true;
+        } else if (_followers.isEmpty) {
+          _loading = true;
+        }
+        _error = null;
+      });
+    }
 
     try {
-      final profile = _asMap(await _api.get('/profile'));
-      final artistId = _toInt(profile['artistId'] ?? profile['id']);
+      var artistId = _artistId > 0 ? _artistId : _cachedArtistId;
+
+      // The profile request is needed only once per app session. Reusing this
+      // ID removes one serial network round trip from subsequent page opens.
       if (artistId <= 0) {
-        throw const EcoLoopApiException(
-          'Could not identify the signed-in artist account.',
-        );
+        final profile = _asMap(await _api.get('/profile'));
+        artistId = _toInt(profile['artistId'] ?? profile['id']);
+        if (artistId <= 0) {
+          throw const EcoLoopApiException(
+            'Could not identify the signed-in artist account.',
+          );
+        }
+        _cachedArtistId = artistId;
       }
 
       final response = _asMap(await _api.get('/artists/$artistId/followers'));
-      final list = _asList(
-        response['followers'],
-      ).map((item) => _asMap(item)).where((item) => item.isNotEmpty).toList();
+      final rawList = _asList(response['followers']);
+      final seen = <String>{};
+      final list = <Map<String, dynamic>>[];
+      for (final item in rawList) {
+        final follower = _asMap(item);
+        if (follower.isEmpty) continue;
+        final id = _toInt(
+          follower['userId'] ??
+              follower['followerId'] ??
+              follower['artistId'] ??
+              follower['id'],
+        );
+        final key = id > 0
+            ? '$id'
+            : '${follower['email'] ?? follower['username'] ?? follower['name']}';
+        if (seen.add(key)) list.add(follower);
+      }
 
       if (!mounted) return;
       setState(() {
         _artistId = artistId;
-        _totalFollowers = _toInt(response['count']);
+        // Use the returned count when present; otherwise keep the displayed
+        // count consistent with the unique rows we actually render.
+        _totalFollowers = response.containsKey('count')
+            ? _toInt(response['count'])
+            : list.length;
         _followers = list;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
-      });
+      // Background refresh failures should not blank an already-loaded list.
+      if (!silent || _followers.isEmpty) {
+        setState(() {
+          _error = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
     } finally {
+      _requestInFlight = false;
       if (mounted) {
         setState(() {
           _loading = false;
@@ -139,7 +207,9 @@ class _FollowersState extends State<Followers> {
   }
 
   Future<void> _toggleFollow(Map<String, dynamic> follower) async {
-    final role = (follower['role'] ?? '').toString().toLowerCase();
+    final role = _normaliseRole(
+      follower['role'] ?? follower['accountType'] ?? follower['sellerType'],
+    );
     final targetId = _toInt(follower['artistId'] ?? follower['id']);
     if (role != 'artist' || targetId <= 0) {
       _showMessage('Only artist accounts can be followed.');
@@ -355,32 +425,6 @@ class _FollowersState extends State<Followers> {
             ],
           ),
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-            decoration: BoxDecoration(
-              color: ArtistColors.light,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.trending_up_rounded,
-                  color: ArtistColors.primary,
-                  size: 16,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '+12%',
-                  style: ArtistTextStyles.caption.copyWith(
-                    color: ArtistColors.primary,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -505,7 +549,12 @@ class _FollowersState extends State<Followers> {
 
     final bool canFollow =
         follower['canFollow'] == true &&
-        (follower['role'] ?? '').toString().toLowerCase() == 'artist';
+        _normaliseRole(
+              follower['role'] ??
+                  follower['accountType'] ??
+                  follower['sellerType'],
+            ) ==
+            'artist';
 
     return Material(
       color: Colors.transparent,
@@ -723,7 +772,12 @@ class _FollowersState extends State<Followers> {
   ) {
     final bool enabled = canFollow || isFollowing;
     final String label =
-        (follower['role'] ?? '').toString().toLowerCase() == 'artist'
+        _normaliseRole(
+              follower['role'] ??
+                  follower['accountType'] ??
+                  follower['sellerType'],
+            ) ==
+            'artist'
         ? (isFollowing ? 'Following' : 'Follow')
         : 'User';
 

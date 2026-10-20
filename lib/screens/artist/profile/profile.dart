@@ -58,6 +58,50 @@ class _ProfileState extends State<Profile> {
     return <String, dynamic>{};
   }
 
+  /// Finds the actual list in the different response envelopes used by Apps Script.
+  /// Handles: list, {artists: [...]}, {data: {following: [...]}}, etc.
+  List<dynamic> _extractList(dynamic value, {int depth = 0}) {
+    if (value is List) return value;
+    if (depth >= 5 || value is! Map) return <dynamic>[];
+
+    final map = _asMap(value);
+    for (final key in const [
+      'artists',
+      'following',
+      'items',
+      'results',
+      'rows',
+      'records',
+      'list',
+      'data',
+    ]) {
+      if (map.containsKey(key)) {
+        final found = _extractList(map[key], depth: depth + 1);
+        if (found.isNotEmpty || map[key] is List) return found;
+      }
+    }
+    return <dynamic>[];
+  }
+
+  int _countFollowing(dynamic response) {
+    final rows = _extractList(response);
+    final ids = <String>{};
+    for (final row in rows) {
+      if (row is! Map) continue;
+      final artist = _asMap(row);
+      final id = _value(
+        artist['artistId'] ??
+            artist['artist_id'] ??
+            artist['followedArtistId'] ??
+            artist['followed_artist_id'] ??
+            artist['id'],
+      );
+      // Count only identifiable records, and avoid duplicate rows inflating the count.
+      if (id.isNotEmpty) ids.add(id);
+    }
+    return ids.length;
+  }
+
   int _int(dynamic value) {
     if (value is num) return value.toInt();
     return int.tryParse((value ?? '').toString()) ?? 0;
@@ -117,16 +161,12 @@ class _ProfileState extends State<Profile> {
 
       int followingCount = _followingCount;
       try {
-        final followingResponse = _asMap(await _api.get('/my/following'));
-        final followingRows =
-            followingResponse['artists'] ??
-            followingResponse['following'] ??
-            followingResponse['data'];
-        if (followingRows is List) {
-          followingCount = followingRows.length;
-        }
+        // Fetch the canonical following list every time the profile loads so the
+        // number updates after follow/unfollow without relying on stale analytics.
+        final followingResponse = await _api.get('/my/following');
+        followingCount = _countFollowing(followingResponse);
       } catch (_) {
-        // Keep the last successfully loaded following count if this request fails.
+        // Preserve the last known count if the network request fails.
       }
 
       if (!mounted) return;

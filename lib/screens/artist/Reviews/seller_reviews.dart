@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
+import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
 import 'rating_summary.dart';
 
@@ -55,8 +58,8 @@ class _SellerReviewsState extends State<SellerReviews> {
 
   bool get _canWriteReview =>
       widget.sellerId.trim().isNotEmpty &&
-          (_eligibleOrderId?.trim().isNotEmpty ?? false) &&
-          !_checkingEligibility;
+      (_eligibleOrderId?.trim().isNotEmpty ?? false) &&
+      !_checkingEligibility;
 
   int _int(dynamic value) {
     if (value is num) return value.toInt();
@@ -69,7 +72,7 @@ class _SellerReviewsState extends State<SellerReviews> {
     if (_reviews.isEmpty) return 0;
     final total = _reviews.fold<int>(
       0,
-          (sum, review) => sum + _int(review['rating']).clamp(0, 5).toInt(),
+      (sum, review) => sum + _int(review['rating']).clamp(0, 5).toInt(),
     );
     return total / _reviews.length;
   }
@@ -113,15 +116,13 @@ class _SellerReviewsState extends State<SellerReviews> {
           ? '/artists/$id/reviews'
           : '/sellers/user/$id/reviews';
       final dynamic response = await _api.get(path);
-      final dynamic rows = _extractRows(response);
+      final rows = _extractRows(response);
       final reviews = rows
-          .whereType<Map>()
-          .map((row) => Map<String, dynamic>.from(row))
           .where(
             (row) =>
-        _string(row['status']).isEmpty ||
-            _string(row['status']).toLowerCase() == 'active',
-      )
+                _string(row['status']).isEmpty ||
+                _string(row['status']).toLowerCase() == 'active',
+          )
           .toList();
 
       if (!mounted) return;
@@ -170,16 +171,16 @@ class _SellerReviewsState extends State<SellerReviews> {
         ]);
         final rows = _extractRows(responses[0]);
         final myReviews = _extractRows(responses[1]);
-        final alreadyReviewedArtist = myReviews.whereType<Map>().any((raw) {
-          final review = Map<String, dynamic>.from(raw);
+        final alreadyReviewedArtist = myReviews.any((review) {
           final reviewArtistId = _int(
             review['artistId'] ??
                 review['artist_id'] ??
                 (const {'artist', 'remaker', 're_maker', 're-maker'}.contains(
-                    (review['sellerType'] ?? review['seller_type'])
-                        ?.toString()
-                        .trim()
-                        .toLowerCase())
+                      (review['sellerType'] ?? review['seller_type'])
+                          ?.toString()
+                          .trim()
+                          .toLowerCase(),
+                    )
                     ? review['sellerId'] ?? review['seller_id']
                     : null),
           );
@@ -188,7 +189,7 @@ class _SellerReviewsState extends State<SellerReviews> {
           ).toLowerCase();
           final active =
               _string(review['status']).isEmpty ||
-                  _string(review['status']).toLowerCase() == 'active';
+              _string(review['status']).toLowerCase() == 'active';
           return active &&
               reviewArtistId == sellerId &&
               (type == 'artist' ||
@@ -198,64 +199,61 @@ class _SellerReviewsState extends State<SellerReviews> {
         });
         final eligibleOrders = alreadyReviewedArtist
             ? <Map<String, dynamic>>[]
-            : rows
-            .whereType<Map>()
-            .map((row) {
-          return Map<String, dynamic>.from(row);
-        })
-            .where((order) {
-          final currentSellerId = _int(
-            order['sellerId'] ??
-                order['artistId'] ??
-                order['seller_id'],
-          );
-          final status = _string(
-            order['status'],
-          ).toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
-          final payment = _string(
-            order['paymentStatus'] ??
-                order['payment_status'] ??
-                order['payment'],
-          ).toLowerCase().replaceAll('_', ' ');
-          final paid = const <String>{
-            'paid',
-            'completed',
-            'success',
-            'successful',
-            'captured',
-            'cod paid',
-          }.contains(payment);
-          final type = _string(
-            order['sellerType'] ?? order['seller_type'],
-          ).toLowerCase();
-          final sellerTypeMatches = type.isEmpty ||
-              const {'artist', 'remaker', 're_maker', 're-maker'}
-                  .contains(type);
-          return currentSellerId == sellerId &&
-              status == 'delivered' &&
-              paid &&
-              sellerTypeMatches;
-        })
-            .toList();
+            : rows.where((order) {
+                final currentSellerId = _int(
+                  order['sellerId'] ?? order['artistId'] ?? order['seller_id'],
+                );
+                final status = _string(
+                  order['status'],
+                ).toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+                final payment = _string(
+                  order['paymentStatus'] ??
+                      order['payment_status'] ??
+                      order['payment'],
+                ).toLowerCase().replaceAll('_', ' ');
+                final paid = const <String>{
+                  'paid',
+                  'completed',
+                  'success',
+                  'successful',
+                  'captured',
+                  'cod paid',
+                }.contains(payment);
+                final type = _string(
+                  order['sellerType'] ?? order['seller_type'],
+                ).toLowerCase();
+                final sellerTypeMatches =
+                    type.isEmpty ||
+                    const {
+                      'artist',
+                      'remaker',
+                      're_maker',
+                      're-maker',
+                    }.contains(type);
+                return currentSellerId == sellerId &&
+                    status == 'delivered' &&
+                    paid &&
+                    sellerTypeMatches;
+              }).toList();
 
         eligibleOrders.sort((a, b) {
           final dateA =
               DateTime.tryParse(
                 _string(a['deliveredAt'] ?? a['updatedAt'] ?? a['createdAt']),
               ) ??
-                  DateTime.fromMillisecondsSinceEpoch(0);
+              DateTime.fromMillisecondsSinceEpoch(0);
           final dateB =
               DateTime.tryParse(
                 _string(b['deliveredAt'] ?? b['updatedAt'] ?? b['createdAt']),
               ) ??
-                  DateTime.fromMillisecondsSinceEpoch(0);
+              DateTime.fromMillisecondsSinceEpoch(0);
           return dateB.compareTo(dateA);
         });
 
         if (eligibleOrders.isNotEmpty) {
           final order = eligibleOrders.firstWhere(
-                (row) =>
-            suppliedOrderId.isNotEmpty &&
+            (row) =>
+                suppliedOrderId.isNotEmpty &&
                 _string(row['orderId'] ?? row['id']) == suppliedOrderId,
             orElse: () => eligibleOrders.first,
           );
@@ -278,28 +276,70 @@ class _SellerReviewsState extends State<SellerReviews> {
     }
   }
 
-  dynamic _extractRows(dynamic response) {
-    if (response is List) return response;
-    if (response is Map) {
-      if (response['reviews'] is List) return response['reviews'];
-      if (response['items'] is List) return response['items'];
-      if (response['results'] is List) return response['results'];
-      if (response['data'] is List) return response['data'];
-      final data = response['data'];
-      if (data is Map) {
-        if (data['reviews'] is List) return data['reviews'];
-        if (data['items'] is List) return data['items'];
+  List<Map<String, dynamic>> _extractRows(dynamic response) {
+    dynamic current = response;
+    // Some deployments return JSON encoded inside a string.
+    if (current is String) {
+      try {
+        current = jsonDecode(current);
+      } catch (_) {
+        return <Map<String, dynamic>>[];
       }
     }
-    return <dynamic>[];
+    // Apps Script/API versions may wrap the same rows at different levels.
+    for (var depth = 0; depth < 6; depth++) {
+      if (current is String) {
+        try {
+          current = jsonDecode(current);
+        } catch (_) {
+          return <Map<String, dynamic>>[];
+        }
+      }
+      if (current is List) {
+        return current
+            .whereType<Map>()
+            .map(
+              (row) => Map<String, dynamic>.from(
+                row.map((key, value) => MapEntry(key.toString(), value)),
+              ),
+            )
+            .toList(growable: false);
+      }
+      if (current is! Map) return <Map<String, dynamic>>[];
+      final map = Map<String, dynamic>.from(
+        current.map((key, value) => MapEntry(key.toString(), value)),
+      );
+      dynamic next;
+      for (final key in const [
+        'reviews',
+        'items',
+        'results',
+        'data',
+        'rows',
+        'records',
+        'list',
+      ]) {
+        if (map.containsKey(key) && map[key] != null) {
+          next = map[key];
+          break;
+        }
+      }
+      if (next == null || identical(next, current)) {
+        // A single review object is not a collection; don't accidentally
+        // treat its fields as a list of reviews.
+        return <Map<String, dynamic>>[];
+      }
+      current = next;
+    }
+    return <Map<String, dynamic>>[];
   }
 
   List<Map<String, dynamic>> get _visibleReviews {
     final rows = _reviews
         .where(
           (review) =>
-      _ratingFilter == 0 || _int(review['rating']) == _ratingFilter,
-    )
+              _ratingFilter == 0 || _int(review['rating']) == _ratingFilter,
+        )
         .toList();
 
     rows.sort((a, b) {
@@ -307,10 +347,10 @@ class _SellerReviewsState extends State<SellerReviews> {
       final ratingB = _int(b['rating']);
       final dateA =
           DateTime.tryParse(_string(a['createdAt'] ?? a['created_at'])) ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+          DateTime.fromMillisecondsSinceEpoch(0);
       final dateB =
           DateTime.tryParse(_string(b['createdAt'] ?? b['created_at'])) ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+          DateTime.fromMillisecondsSinceEpoch(0);
 
       switch (_sort) {
         case 'Highest rated':
@@ -345,7 +385,10 @@ class _SellerReviewsState extends State<SellerReviews> {
               children: [
                 Text(
                   widget.sellerName,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  style: ArtistTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: ArtistColors.textPrimary,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 const Text('Your rating'),
@@ -393,7 +436,10 @@ class _SellerReviewsState extends State<SellerReviews> {
                   const SizedBox(height: 4),
                   Text(
                     validationMessage,
-                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                    style: ArtistTextStyles.caption.copyWith(
+                      color: ArtistColors.error,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ],
@@ -413,14 +459,14 @@ class _SellerReviewsState extends State<SellerReviews> {
                 final comment = commentController.text.trim();
                 if (selectedRating < 1) {
                   setDialogState(
-                        () => validationMessage = 'Please select a star rating.',
+                    () => validationMessage = 'Please select a star rating.',
                   );
                   return;
                 }
                 if (comment.length < 5) {
                   setDialogState(
-                        () => validationMessage =
-                    'Please write at least 5 characters.',
+                    () => validationMessage =
+                        'Please write at least 5 characters.',
                   );
                   return;
                 }
@@ -497,7 +543,12 @@ class _SellerReviewsState extends State<SellerReviews> {
     return Scaffold(
       backgroundColor: ArtistColors.background,
       appBar: AppBar(
-        title: Text(_isArtist ? 'ReMaker Reviews' : 'Seller Reviews'),
+        title: Text(
+          _isArtist ? 'ReMaker Reviews' : 'Seller Reviews',
+          style: ArtistTextStyles.title.copyWith(
+            color: ArtistColors.textPrimary,
+          ),
+        ),
         backgroundColor: ArtistColors.surface,
         foregroundColor: ArtistColors.textPrimary,
         elevation: 0,
@@ -518,12 +569,12 @@ class _SellerReviewsState extends State<SellerReviews> {
             ),
             const SizedBox(height: 14),
             if (_checkingEligibility)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Center(
                   child: Text(
                     'Checking your eligible orders…',
-                    style: TextStyle(
+                    style: ArtistTextStyles.caption.copyWith(
                       color: ArtistColors.textSecondary,
                       fontSize: 12,
                     ),
@@ -545,23 +596,23 @@ class _SellerReviewsState extends State<SellerReviews> {
                   ),
                   icon: _submitting
                       ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Icon(Icons.rate_review_outlined),
                   label: Text(_submitting ? 'Submitting…' : 'Write a review'),
                 ),
               ),
             if (!_checkingEligibility && !_canWriteReview) ...[
               const SizedBox(height: 2),
-              const Text(
+              Text(
                 'To review this seller, open this page from an eligible delivered order.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: ArtistTextStyles.caption.copyWith(
                   color: ArtistColors.textSecondary,
                   fontSize: 12,
                 ),
@@ -640,13 +691,13 @@ class _SellerReviewsState extends State<SellerReviews> {
             else if (_error != null)
               _message(_error!, retry: _load)
             else if (visibleReviews.isEmpty)
-                _message(
-                  _ratingFilter == 0
-                      ? 'No reviews have been submitted yet.'
-                      : 'No reviews match this rating filter.',
-                )
-              else
-                ...visibleReviews.map(_buildReviewCard),
+              _message(
+                _ratingFilter == 0
+                    ? 'No reviews have been submitted yet.'
+                    : 'No reviews match this rating filter.',
+              )
+            else
+              ...visibleReviews.map(_buildReviewCard),
           ],
         ),
       ),
@@ -660,7 +711,7 @@ class _SellerReviewsState extends State<SellerReviews> {
       decoration: BoxDecoration(
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ArtistColors.border.withOpacity(0.4)),
+        border: Border.all(color: ArtistColors.border.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
@@ -670,10 +721,10 @@ class _SellerReviewsState extends State<SellerReviews> {
             backgroundImage: image.isEmpty ? null : NetworkImage(image),
             child: image.isEmpty
                 ? const Icon(
-              Icons.person_outline_rounded,
-              color: ArtistColors.primary,
-              size: 30,
-            )
+                    Icons.person_outline_rounded,
+                    color: ArtistColors.primary,
+                    size: 30,
+                  )
                 : null,
           ),
           const SizedBox(width: 12),
@@ -685,7 +736,7 @@ class _SellerReviewsState extends State<SellerReviews> {
                   widget.sellerName,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: ArtistTextStyles.title.copyWith(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
                     color: ArtistColors.textPrimary,
@@ -697,7 +748,7 @@ class _SellerReviewsState extends State<SellerReviews> {
                     _string(widget.sellerLocation),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: ArtistTextStyles.caption.copyWith(
                       color: ArtistColors.textSecondary,
                       fontSize: 12,
                     ),
@@ -706,7 +757,7 @@ class _SellerReviewsState extends State<SellerReviews> {
                 const SizedBox(height: 5),
                 Text(
                   '${_reviews.length} ${_reviews.length == 1 ? 'review' : 'reviews'}',
-                  style: const TextStyle(
+                  style: ArtistTextStyles.caption.copyWith(
                     color: ArtistColors.textSecondary,
                     fontSize: 12,
                   ),
@@ -732,7 +783,7 @@ class _SellerReviewsState extends State<SellerReviews> {
       decoration: BoxDecoration(
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: ArtistColors.border.withOpacity(0.25)),
+        border: Border.all(color: ArtistColors.border.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -743,7 +794,7 @@ class _SellerReviewsState extends State<SellerReviews> {
               Expanded(
                 child: Text(
                   reviewerName.isEmpty ? 'EcoLoop user' : reviewerName,
-                  style: const TextStyle(
+                  style: ArtistTextStyles.bodyMedium.copyWith(
                     color: ArtistColors.textPrimary,
                     fontWeight: FontWeight.w700,
                   ),
@@ -760,7 +811,7 @@ class _SellerReviewsState extends State<SellerReviews> {
                   const SizedBox(width: 3),
                   Text(
                     '$rating.0',
-                    style: const TextStyle(
+                    style: ArtistTextStyles.bodyMedium.copyWith(
                       color: ArtistColors.primary,
                       fontWeight: FontWeight.w700,
                     ),
@@ -772,7 +823,7 @@ class _SellerReviewsState extends State<SellerReviews> {
           const SizedBox(height: 5),
           Text(
             _formatDate(review['createdAt'] ?? review['created_at']),
-            style: const TextStyle(
+            style: ArtistTextStyles.caption.copyWith(
               color: ArtistColors.textSecondary,
               fontSize: 11,
             ),
@@ -781,7 +832,7 @@ class _SellerReviewsState extends State<SellerReviews> {
             const SizedBox(height: 10),
             Text(
               comment,
-              style: const TextStyle(
+              style: ArtistTextStyles.body.copyWith(
                 color: ArtistColors.textPrimary,
                 height: 1.45,
               ),
@@ -829,7 +880,9 @@ class _SellerReviewsState extends State<SellerReviews> {
           Text(
             text,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: ArtistColors.textSecondary),
+            style: ArtistTextStyles.body.copyWith(
+              color: ArtistColors.textSecondary,
+            ),
           ),
           if (retry != null) ...[
             const SizedBox(height: 8),
@@ -840,4 +893,3 @@ class _SellerReviewsState extends State<SellerReviews> {
     );
   }
 }
-

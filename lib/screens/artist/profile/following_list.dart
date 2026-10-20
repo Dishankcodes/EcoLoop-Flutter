@@ -49,6 +49,39 @@ class _FollowingListState extends State<FollowingList> {
     return <String, dynamic>{};
   }
 
+  /// Accepts the list shapes returned by different Apps Script deployments:
+  /// a bare list, {artists: [...]}, {data: [...]}, or nested result wrappers.
+  List<dynamic> _extractArtistRows(dynamic value, [int depth = 0]) {
+    if (value is List) return value;
+    if (depth >= 5 || value is! Map) return <dynamic>[];
+
+    final map = _asMap(value);
+    for (final key in const [
+      'artists',
+      'following',
+      'items',
+      'results',
+      'data',
+      'records',
+      'followedArtists',
+      'followed_artists',
+      'list',
+    ]) {
+      if (map.containsKey(key)) {
+        final found = _extractArtistRows(map[key], depth + 1);
+        if (found.isNotEmpty || map[key] is List) return found;
+      }
+    }
+    // Some APIs return a single artist object rather than an array.
+    if (map.containsKey('artistId') ||
+        map.containsKey('artist_id') ||
+        map.containsKey('followedArtistId') ||
+        map.containsKey('targetArtistId')) {
+      return <dynamic>[map];
+    }
+    return <dynamic>[];
+  }
+
   int _toInt(dynamic value) {
     if (value is num) return value.toInt();
     return int.tryParse((value ?? '').toString()) ?? 0;
@@ -84,21 +117,74 @@ class _FollowingListState extends State<FollowingList> {
     });
 
     try {
-      final response = _asMap(await _api.get('/my/following'));
-      dynamic rows =
-          response['artists'] ?? response['following'] ?? response['data'];
+      final rawResponse = await _api.get('/my/following');
+      final rows = _extractArtistRows(rawResponse);
+      final seenIds = <int>{};
+      final artists = rows
+          .map(_asMap)
+          .where((item) {
+            if (item.isEmpty) return false;
 
-      if (rows is Map) {
-        rows = rows['artists'] ?? rows['following'] ?? rows['items'];
-      }
+            final id = _toInt(
+              item['artistId'] ??
+                  item['artist_id'] ??
+                  item['followedArtistId'] ??
+                  item['followed_artist_id'] ??
+                  item['targetArtistId'] ??
+                  item['target_artist_id'] ??
+                  item['id'] ??
+                  item['userId'] ??
+                  item['user_id'],
+            );
+            if (id <= 0 || !seenIds.add(id)) return false;
 
-      final artists = rows is List
-          ? rows
-                .whereType<Map>()
-                .map((item) => _asMap(item))
-                .where((item) => item.isNotEmpty)
-                .toList()
-          : <Map<String, dynamic>>[];
+            // This screen is for artist-to-artist follows only. If the backend
+            // provides a role/type, exclude regular users and sellers.
+            final role = _text(
+              item['role'] ??
+                  item['userRole'] ??
+                  item['user_role'] ??
+                  item['accountType'] ??
+                  item['account_type'],
+            ).toLowerCase();
+            if (role.isNotEmpty &&
+                !['artist', 'remaker', 're-maker', 'maker'].contains(role)) {
+              return false;
+            }
+            return true;
+          })
+          .map((item) {
+            final artist = Map<String, dynamic>.from(item);
+            artist['artistId'] = _toInt(
+              artist['artistId'] ??
+                  artist['artist_id'] ??
+                  artist['followedArtistId'] ??
+                  artist['followed_artist_id'] ??
+                  artist['targetArtistId'] ??
+                  artist['target_artist_id'] ??
+                  artist['id'] ??
+                  artist['userId'] ??
+                  artist['user_id'],
+            );
+            artist['name'] =
+                artist['name'] ??
+                artist['artistName'] ??
+                artist['artist_name'] ??
+                artist['userName'] ??
+                artist['username'] ??
+                'Artist';
+            artist['image'] =
+                artist['image'] ??
+                artist['profilePhotoUrl'] ??
+                artist['profile_photo_url'] ??
+                artist['profileImage'] ??
+                artist['profile_image'] ??
+                artist['photoUrl'] ??
+                artist['photo_url'] ??
+                '';
+            return artist;
+          })
+          .toList();
 
       if (!mounted) return;
       setState(() {
@@ -120,7 +206,17 @@ class _FollowingListState extends State<FollowingList> {
   }
 
   Future<void> _unfollow(Map<String, dynamic> artist) async {
-    final id = _toInt(artist['artistId'] ?? artist['id']);
+    final id = _toInt(
+      artist['artistId'] ??
+          artist['artist_id'] ??
+          artist['followedArtistId'] ??
+          artist['followed_artist_id'] ??
+          artist['targetArtistId'] ??
+          artist['target_artist_id'] ??
+          artist['id'] ??
+          artist['userId'] ??
+          artist['user_id'],
+    );
     if (id <= 0 || _updatingIds.contains(id)) return;
 
     setState(() => _updatingIds.add(id));
@@ -129,7 +225,8 @@ class _FollowingListState extends State<FollowingList> {
       if (!mounted) return;
       setState(() {
         _artists.removeWhere(
-          (item) => _toInt(item['artistId'] ?? item['id']) == id,
+          (item) =>
+              _toInt(item['artistId'] ?? item['artist_id'] ?? item['id']) == id,
         );
       });
       ScaffoldMessenger.of(context)
@@ -334,13 +431,33 @@ class _FollowingListState extends State<FollowingList> {
   }
 
   Widget _buildArtistCard(Map<String, dynamic> artist) {
-    final id = _toInt(artist['artistId'] ?? artist['id']);
+    final id = _toInt(
+      artist['artistId'] ??
+          artist['artist_id'] ??
+          artist['followedArtistId'] ??
+          artist['followed_artist_id'] ??
+          artist['targetArtistId'] ??
+          artist['target_artist_id'] ??
+          artist['id'] ??
+          artist['userId'] ??
+          artist['user_id'],
+    );
     final name = _text(
-      artist['name'] ?? artist['userName'] ?? artist['username'],
+      artist['name'] ??
+          artist['artistName'] ??
+          artist['artist_name'] ??
+          artist['userName'] ??
+          artist['username'],
       fallback: 'Artist',
     );
     final photo = _text(
-      artist['image'] ?? artist['profilePhotoUrl'] ?? artist['profileImage'],
+      artist['image'] ??
+          artist['profilePhotoUrl'] ??
+          artist['profile_photo_url'] ??
+          artist['profileImage'] ??
+          artist['profile_image'] ??
+          artist['photoUrl'] ??
+          artist['photo_url'],
     );
     final city = _text(artist['city']);
     final state = _text(artist['state']);
@@ -385,6 +502,21 @@ class _FollowingListState extends State<FollowingList> {
                       : Image.network(
                           photo,
                           fit: BoxFit.cover,
+                          width: 54,
+                          height: 54,
+                          loadingBuilder: (context, child, progress) =>
+                              progress == null
+                              ? child
+                              : const Center(
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 1.8,
+                                      color: ArtistColors.primary,
+                                    ),
+                                  ),
+                                ),
                           errorBuilder: (_, __, ___) => const Icon(
                             Icons.person_rounded,
                             size: 29,

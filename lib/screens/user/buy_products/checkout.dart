@@ -192,16 +192,21 @@ class _CheckoutState extends State<Checkout> {
     (sum, item) => sum + _number(item['price']) * _integer(item['quantity'], 1),
   );
 
-  double _calculatePlatformFee(double subtotal) {
-    // Charge one tiered fee for the complete basket, including multi-seller carts.
-    if (subtotal >= 999) return 60.0;
-    if (subtotal >= 499) return 30.0;
-    return (subtotal * 0.04).roundToDouble();
+  // Keep in sync with the backend's per-order-line calculation: round 2% of
+  // each product line subtotal, then round 18% GST on that rounded fee.
+  // The backend independently recomputes pricing from current product records.
+  double _platformFeeForLine(Map<String, dynamic> item) {
+    final lineSubtotal = _number(item['price']) * _integer(item['quantity'], 1);
+    return (lineSubtotal * 0.02).roundToDouble();
   }
 
-  double get _platformFee => _calculatePlatformFee(_subtotal);
+  double get _platformFee =>
+      _items.fold<double>(0, (sum, item) => sum + _platformFeeForLine(item));
 
-  double get _taxes => (_platformFee * 0.18).roundToDouble();
+  double get _taxes => _items.fold<double>(
+    0,
+    (sum, item) => sum + (_platformFeeForLine(item) * 0.18).roundToDouble(),
+  );
 
   String _sellerKey(Map<String, dynamic> item) {
     final sellerId =

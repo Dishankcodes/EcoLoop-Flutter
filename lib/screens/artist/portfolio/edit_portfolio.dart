@@ -32,7 +32,6 @@ class _PortfolioEditorPageState extends State<PortfolioEditorPage> {
   late final TextEditingController _materials;
   late final TextEditingController _process;
   late final TextEditingController _impact;
-  late final TextEditingController _productId;
 
   XFile? _beforeFile;
   XFile? _afterFile;
@@ -129,9 +128,6 @@ class _PortfolioEditorPageState extends State<PortfolioEditorPage> {
         'ecoImpact',
       ]),
     );
-    _productId = TextEditingController(
-      text: _firstText(item, ['productId', 'product_id', 'linkedProductId']),
-    );
     final featured =
         item['featured'] ?? item['isFeatured'] ?? item['is_featured'];
     _featured = featured == true || '$featured'.toLowerCase() == 'true';
@@ -146,7 +142,6 @@ class _PortfolioEditorPageState extends State<PortfolioEditorPage> {
     _materials.dispose();
     _process.dispose();
     _impact.dispose();
-    _productId.dispose();
     super.dispose();
   }
 
@@ -232,9 +227,6 @@ class _PortfolioEditorPageState extends State<PortfolioEditorPage> {
         'processDescription': _process.text.trim(),
         'environmentalImpact': _impact.text.trim(),
         'featured': _featured,
-        if (_productId.text.trim().isNotEmpty)
-          'productId':
-              int.tryParse(_productId.text.trim()) ?? _productId.text.trim(),
       };
 
       if (_beforeFile != null)
@@ -366,20 +358,6 @@ class _PortfolioEditorPageState extends State<PortfolioEditorPage> {
                 'What was reused, repaired or kept out of waste?',
                 minLines: 2,
                 maxLines: 4,
-              ),
-              _field(
-                _productId,
-                'Linked product ID (optional)',
-                'Enter the EcoLoop product ID',
-                keyboardType: TextInputType.number,
-                validator: (v) {
-                  if (v != null &&
-                      v.trim().isNotEmpty &&
-                      int.tryParse(v.trim()) == null) {
-                    return 'Product ID must be a number';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: 4),
               Container(
