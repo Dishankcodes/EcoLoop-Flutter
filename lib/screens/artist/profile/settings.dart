@@ -18,9 +18,6 @@ class _SettingsState extends State<Settings> {
   bool notificationsEnabled = true;
   bool emailUpdatesEnabled = true;
   bool locationEnabled = true;
-  bool darkModeEnabled = false;
-
-  String selectedLanguage = 'English';
 
   @override
   Widget build(BuildContext context) {
@@ -54,26 +51,6 @@ class _SettingsState extends State<Settings> {
           _buildSectionTitle('Preferences'),
           _buildSettingsCard(
             children: [
-              _buildSwitchTile(
-                icon: Icons.dark_mode_outlined,
-                title: 'Dark Mode',
-                subtitle: darkModeEnabled
-                    ? 'Dark appearance enabled'
-                    : 'Use dark appearance for EcoLoop',
-                value: darkModeEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    darkModeEnabled = value;
-                  });
-
-                  _showMessage(
-                    value ? 'Dark Mode enabled' : 'Dark Mode disabled',
-                  );
-                },
-              ),
-
-              _buildDivider(),
-
               _buildSwitchTile(
                 icon: Icons.notifications_none_rounded,
                 title: 'Notifications',
@@ -110,15 +87,6 @@ class _SettingsState extends State<Settings> {
                     value ? 'Email updates enabled' : 'Email updates disabled',
                   );
                 },
-              ),
-
-              _buildDivider(),
-
-              _buildSettingsTile(
-                icon: Icons.language_rounded,
-                title: 'Language',
-                subtitle: selectedLanguage,
-                onTap: _showLanguageSheet,
               ),
 
               _buildDivider(),
@@ -433,90 +401,6 @@ class _SettingsState extends State<Settings> {
     return Padding(
       padding: const EdgeInsets.only(left: 66),
       child: Divider(height: 1, color: ArtistColors.border.withOpacity(0.65)),
-    );
-  }
-
-  void _showLanguageSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ArtistColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 25),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSheetHandle(),
-
-                const SizedBox(height: 17),
-
-                Text(
-                  'Choose Language',
-                  style: ArtistTextStyles.title.copyWith(fontSize: 18),
-                ),
-
-                const SizedBox(height: 4),
-
-                Text(
-                  'Select your preferred language.',
-                  style: ArtistTextStyles.caption.copyWith(fontSize: 11),
-                ),
-
-                const SizedBox(height: 12),
-
-                _languageOption('English'),
-
-                _languageOption('Hindi'),
-
-                _languageOption('Gujarati'),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _languageOption(String language) {
-    final selected = selectedLanguage == language;
-
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        selected
-            ? Icons.radio_button_checked_rounded
-            : Icons.radio_button_off_rounded,
-        color: selected ? ArtistColors.primary : ArtistColors.textSecondary,
-      ),
-      title: Text(
-        language,
-        style: ArtistTextStyles.bodyMedium.copyWith(
-          fontSize: 13,
-          color: ArtistColors.textPrimary,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-        ),
-      ),
-      trailing: selected
-          ? const Icon(
-              Icons.check_rounded,
-              color: ArtistColors.primary,
-              size: 19,
-            )
-          : null,
-      onTap: () {
-        setState(() {
-          selectedLanguage = language;
-        });
-
-        Navigator.pop(context);
-
-        _showMessage('Language changed to $language');
-      },
     );
   }
 

@@ -758,9 +758,12 @@ class _EditProfileState extends State<EditProfile> {
               color: ArtistColors.textMuted,
             ),
             const SizedBox(width: 5),
-            Text(
-              'Email is loaded from your account and cannot be edited here.',
-              style: ArtistTextStyles.small,
+            Expanded(
+              child: Text(
+                'Email is loaded from your account and cannot be edited here.',
+                style: ArtistTextStyles.small,
+                softWrap: true,
+              ),
             ),
           ],
         ),

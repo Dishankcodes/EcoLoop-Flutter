@@ -100,7 +100,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
         setState(() {
           _loading = false;
           _loadError =
-              'Artist ID is missing. Open this page using the artist record returned by the backend.';
+          'Artist ID is missing. Open this page using the artist record returned by the backend.';
         });
       }
       return;
@@ -108,7 +108,9 @@ class _ArtistProfileState extends State<ArtistProfile> {
 
     if (mounted) {
       setState(() {
-        _loading = true;
+        if (!refresh && _portfolio.isEmpty && _products.isEmpty && _reviews.isEmpty) {
+          _loading = true;
+        }
         _loadError = null;
       });
     }
@@ -171,6 +173,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
     });
 
     final eligibleOrder = _findEligibleOrder(orders, artistProducts);
+    if (!mounted) return;
     setState(() {
       _portfolio = portfolio.where((item) => !_isUnavailable(item)).toList();
       _products = artistProducts;
@@ -197,13 +200,13 @@ class _ArtistProfileState extends State<ArtistProfile> {
     if (current is Map) {
       current =
           current['items'] ??
-          current['results'] ??
-          current['data'] ??
-          current['portfolio'] ??
-          current['products'] ??
-          current['reviews'] ??
-          current['orders'] ??
-          current['following'];
+              current['results'] ??
+              current['data'] ??
+              current['portfolio'] ??
+              current['products'] ??
+              current['reviews'] ??
+              current['orders'] ??
+              current['following'];
       if (current is Map) {
         current = current['items'] ?? current['results'] ?? current['data'];
       }
@@ -239,9 +242,9 @@ class _ArtistProfileState extends State<ArtistProfile> {
   }
 
   String? _findEligibleOrder(
-    List<Map<String, dynamic>> orders,
-    List<Map<String, dynamic>> artistProducts,
-  ) {
+      List<Map<String, dynamic>> orders,
+      List<Map<String, dynamic>> artistProducts,
+      ) {
     final productIds = artistProducts
         .map((p) => _value(p, ['productId', 'product_id', 'id']))
         .where((id) => id.isNotEmpty)
@@ -282,16 +285,16 @@ class _ArtistProfileState extends State<ArtistProfile> {
       ]);
       final hasArtist =
           directArtist == _artistId ||
-          items.any((item) {
-            final artistId = _value(item, [
-              'artistId',
-              'artist_id',
-              'sellerId',
-              'seller_id',
-            ]);
-            final productId = _value(item, ['productId', 'product_id', 'id']);
-            return artistId == _artistId || productIds.contains(productId);
-          });
+              items.any((item) {
+                final artistId = _value(item, [
+                  'artistId',
+                  'artist_id',
+                  'sellerId',
+                  'seller_id',
+                ]);
+                final productId = _value(item, ['productId', 'product_id', 'id']);
+                return artistId == _artistId || productIds.contains(productId);
+              });
       if (hasArtist && orderId.isNotEmpty) return orderId;
     }
     return null;
@@ -359,7 +362,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(
                         5,
-                        (index) => IconButton(
+                            (index) => IconButton(
                           onPressed: () => rating.value = index + 1,
                           icon: Icon(
                             index < value
@@ -381,7 +384,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
                     decoration: InputDecoration(
                       labelText: 'Your review',
                       hintText:
-                          'Tell others about the product and your experience...',
+                      'Tell others about the product and your experience...',
                       filled: true,
                       fillColor: ArtistColors.background,
                       border: OutlineInputBorder(
@@ -389,7 +392,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
                       ),
                     ),
                     validator: (value) =>
-                        (value == null || value.trim().length < 5)
+                    (value == null || value.trim().length < 5)
                         ? 'Please write at least 5 characters.'
                         : null,
                   ),
@@ -475,98 +478,98 @@ class _ArtistProfileState extends State<ArtistProfile> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              color: ArtistColors.primary,
-              onRefresh: () => _loadProfileData(refresh: true),
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                padding: const EdgeInsets.fromLTRB(18, 6, 18, 32),
-                children: [
-                  if (_loadError != null) _errorBanner(_loadError!),
-                  _buildHeader(),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _followBusy ? null : _toggleFollow,
-                          icon: _followBusy
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Icon(
-                                  _following
-                                      ? Icons.check_rounded
-                                      : Icons.person_add_alt_1_outlined,
-                                ),
-                          label: Text(_following ? 'Following' : 'Follow'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: ArtistColors.primary,
-                            side: const BorderSide(color: ArtistColors.primary),
-                            minimumSize: const Size(0, 46),
-                          ),
-                        ),
+        color: ArtistColors.primary,
+        onRefresh: () => _loadProfileData(refresh: true),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(18, 6, 18, 32),
+          children: [
+            if (_loadError != null) _errorBanner(_loadError!),
+            _buildHeader(),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _followBusy ? null : _toggleFollow,
+                    icon: _followBusy
+                        ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _email.isNotEmpty || _phone.isNotEmpty
-                              ? _contactArtist
-                              : null,
-                          icon: const Icon(Icons.chat_bubble_outline_rounded),
-                          label: const Text('Contact'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: ArtistColors.primary,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(0, 46),
-                          ),
-                        ),
-                      ),
-                    ],
+                    )
+                        : Icon(
+                      _following
+                          ? Icons.check_rounded
+                          : Icons.person_add_alt_1_outlined,
+                    ),
+                    label: Text(_following ? 'Following' : 'Follow'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ArtistColors.primary,
+                      side: const BorderSide(color: ArtistColors.primary),
+                      minimumSize: const Size(0, 46),
+                    ),
                   ),
-                  const SizedBox(height: 20),
-                  _buildStats(),
-                  if (_bio.isNotEmpty) ...[
-                    const SizedBox(height: 22),
-                    _section(
-                      'About',
-                      Icons.person_outline_rounded,
-                      Text(
-                        _bio,
-                        style: ArtistTextStyles.body.copyWith(height: 1.55),
-                      ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _email.isNotEmpty || _phone.isNotEmpty
+                        ? _contactArtist
+                        : null,
+                    icon: const Icon(Icons.chat_bubble_outline_rounded),
+                    label: const Text('Contact'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ArtistColors.primary,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(0, 46),
                     ),
-                  ],
-                  if (_skills.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    _section(
-                      'Skills & Specialties',
-                      Icons.auto_awesome_outlined,
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _skills.map(_skillChip).toList(),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 22),
-                  _buildPortfolio(),
-                  const SizedBox(height: 22),
-                  _buildProducts(),
-                  const SizedBox(height: 22),
-                  _buildReviews(),
-                  const SizedBox(height: 22),
-                  if (_verified) _buildCertification(),
-                  const SizedBox(height: 14),
-                  const Center(child: Text('EcoLoop • Give Things a New Life')),
-                ],
-              ),
+                  ),
+                ),
+              ],
             ),
+            const SizedBox(height: 20),
+            _buildStats(),
+            if (_bio.isNotEmpty) ...[
+              const SizedBox(height: 22),
+              _section(
+                'About',
+                Icons.person_outline_rounded,
+                Text(
+                  _bio,
+                  style: ArtistTextStyles.body.copyWith(height: 1.55),
+                ),
+              ),
+            ],
+            if (_skills.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              _section(
+                'Skills & Specialties',
+                Icons.auto_awesome_outlined,
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _skills.map(_skillChip).toList(),
+                ),
+              ),
+            ],
+            const SizedBox(height: 22),
+            _buildPortfolio(),
+            const SizedBox(height: 22),
+            _buildProducts(),
+            const SizedBox(height: 22),
+            _buildReviews(),
+            const SizedBox(height: 22),
+            if (_verified) _buildCertification(),
+            const SizedBox(height: 14),
+            const Center(child: Text('EcoLoop • Give Things a New Life')),
+          ],
+        ),
+      ),
     );
   }
 
@@ -605,12 +608,12 @@ class _ArtistProfileState extends State<ArtistProfile> {
             backgroundImage: _avatar.isNotEmpty ? NetworkImage(_avatar) : null,
             child: _avatar.isEmpty
                 ? Text(
-                    _name.trim().isEmpty ? 'R' : _name.trim()[0].toUpperCase(),
-                    style: ArtistTextStyles.title.copyWith(
-                      fontSize: 34,
-                      color: ArtistColors.primary,
-                    ),
-                  )
+              _name.trim().isEmpty ? 'R' : _name.trim()[0].toUpperCase(),
+              style: ArtistTextStyles.title.copyWith(
+                fontSize: 34,
+                color: ArtistColors.primary,
+              ),
+            )
                 : null,
           ),
           const SizedBox(height: 12),
@@ -761,8 +764,8 @@ class _ArtistProfileState extends State<ArtistProfile> {
     if (_reviews.isEmpty) {
       final raw =
           _artist['rating'] ??
-          _artist['averageRating'] ??
-          _artist['average_rating'];
+              _artist['averageRating'] ??
+              _artist['average_rating'];
       return raw is num
           ? raw.toDouble()
           : double.tryParse(raw?.toString() ?? '');
@@ -836,14 +839,14 @@ class _ArtistProfileState extends State<ArtistProfile> {
           onViewAll: _portfolio.isEmpty
               ? null
               : () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          _PortfolioListPage(name: _name, items: _portfolio),
-                    ),
-                  );
-                },
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    _PortfolioListPage(name: _name, items: _portfolio),
+              ),
+            );
+          },
         ),
         const SizedBox(height: 10),
         if (_portfolio.isEmpty)
@@ -876,14 +879,14 @@ class _ArtistProfileState extends State<ArtistProfile> {
           onViewAll: _products.isEmpty
               ? null
               : () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          _ArtistProductsPage(name: _name, products: _products),
-                    ),
-                  );
-                },
+            Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    _ArtistProductsPage(name: _name, products: _products),
+              ),
+            );
+          },
         ),
         const SizedBox(height: 10),
         if (_products.isEmpty)
@@ -909,10 +912,10 @@ class _ArtistProfileState extends State<ArtistProfile> {
   }
 
   Widget _sectionHeading(
-    String title,
-    String subtitle, {
-    VoidCallback? onViewAll,
-  }) {
+      String title,
+      String subtitle, {
+        VoidCallback? onViewAll,
+      }) {
     return Row(
       children: [
         Expanded(
@@ -1046,10 +1049,10 @@ class _ArtistProfileState extends State<ArtistProfile> {
               ],
             )
           else if (_reviewEligibilityChecked)
-            Text(
-              'Write a review becomes available after a qualifying paid and confirmed/delivered purchase from this ReMaker.',
-              style: ArtistTextStyles.caption.copyWith(height: 1.4),
-            ),
+              Text(
+                'Write a review becomes available after a qualifying paid and confirmed/delivered purchase from this ReMaker.',
+                style: ArtistTextStyles.caption.copyWith(height: 1.4),
+              ),
         ],
       ),
     );
@@ -1212,47 +1215,47 @@ class _ArtistProductsPage extends StatelessWidget {
       ),
       body: products.isEmpty
           ? Center(
-              child: Text(
-                'No available products yet.',
-                style: ArtistTextStyles.caption,
-              ),
-            )
+        child: Text(
+          'No available products yet.',
+          style: ArtistTextStyles.caption,
+        ),
+      )
           : GridView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              itemCount: products.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: .66,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        itemCount: products.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: .66,
+        ),
+        itemBuilder: (context, index) => _ProductCard(
+          product: products[index],
+          width: double.infinity,
+          onTap: () {
+            final product = products[index];
+            final id =
+                product['productId'] ??
+                    product['product_id'] ??
+                    product['id'];
+            if (id == null || id.toString().trim().isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Product details are unavailable.'),
+                ),
+              );
+              return;
+            }
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ProductDetails(
+                  product: Map<String, dynamic>.from(product),
+                ),
               ),
-              itemBuilder: (context, index) => _ProductCard(
-                product: products[index],
-                width: double.infinity,
-                onTap: () {
-                  final product = products[index];
-                  final id =
-                      product['productId'] ??
-                      product['product_id'] ??
-                      product['id'];
-                  if (id == null || id.toString().trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Product details are unavailable.'),
-                      ),
-                    );
-                    return;
-                  }
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ProductDetails(
-                        product: Map<String, dynamic>.from(product),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+            );
+          },
+        ),
+      ),
     );
   }
 }
@@ -1283,84 +1286,84 @@ class _ArtistReviewsPage extends StatelessWidget {
       ),
       body: reviews.isEmpty
           ? Center(
-              child: Text('No reviews yet.', style: ArtistTextStyles.caption),
-            )
+        child: Text('No reviews yet.', style: ArtistTextStyles.caption),
+      )
           : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: reviews.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final review = reviews[index];
-                final reviewer = _value(review, [
-                  'reviewerName',
-                  'userName',
-                  'name',
-                  'buyerName',
-                ]);
-                final rating = _value(review, ['rating', 'stars']);
-                final comment = _value(review, [
-                  'comment',
-                  'review',
-                  'text',
-                  'description',
-                ]);
-                final date = _value(review, [
-                  'createdAt',
-                  'created_at',
-                  'date',
-                  'reviewDate',
-                ]);
-                return Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: ArtistColors.surface,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: ArtistColors.light),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              reviewer.isEmpty ? 'EcoLoop customer' : reviewer,
-                              style: ArtistTextStyles.body.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          const Icon(
-                            Icons.star_rounded,
-                            color: ArtistColors.primary,
-                            size: 17,
-                          ),
-                          Text(rating.isEmpty ? '—' : rating),
-                        ],
-                      ),
-                      if (date.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          date,
-                          style: ArtistTextStyles.caption.copyWith(
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                      if (comment.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          comment,
-                          style: ArtistTextStyles.caption.copyWith(
-                            height: 1.45,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                );
-              },
+        padding: const EdgeInsets.all(16),
+        itemCount: reviews.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 10),
+        itemBuilder: (context, index) {
+          final review = reviews[index];
+          final reviewer = _value(review, [
+            'reviewerName',
+            'userName',
+            'name',
+            'buyerName',
+          ]);
+          final rating = _value(review, ['rating', 'stars']);
+          final comment = _value(review, [
+            'comment',
+            'review',
+            'text',
+            'description',
+          ]);
+          final date = _value(review, [
+            'createdAt',
+            'created_at',
+            'date',
+            'reviewDate',
+          ]);
+          return Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: ArtistColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: ArtistColors.light),
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        reviewer.isEmpty ? 'EcoLoop customer' : reviewer,
+                        style: ArtistTextStyles.body.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.star_rounded,
+                      color: ArtistColors.primary,
+                      size: 17,
+                    ),
+                    Text(rating.isEmpty ? '—' : rating),
+                  ],
+                ),
+                if (date.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    date,
+                    style: ArtistTextStyles.caption.copyWith(
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+                if (comment.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    comment,
+                    style: ArtistTextStyles.caption.copyWith(
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -1663,30 +1666,30 @@ class _ProductCard extends StatelessWidget {
             Expanded(
               child: image.isEmpty
                   ? Container(
-                      color: ArtistColors.light,
-                      child: const Center(
-                        child: Icon(
-                          Icons.image_outlined,
-                          color: ArtistColors.primary,
-                          size: 35,
-                        ),
-                      ),
-                    )
+                color: ArtistColors.light,
+                child: const Center(
+                  child: Icon(
+                    Icons.image_outlined,
+                    color: ArtistColors.primary,
+                    size: 35,
+                  ),
+                ),
+              )
                   : Image.network(
-                      image,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: ArtistColors.light,
-                        child: const Center(
-                          child: Icon(
-                            Icons.image_not_supported_outlined,
-                            color: ArtistColors.primary,
-                            size: 30,
-                          ),
-                        ),
-                      ),
+                image,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: ArtistColors.light,
+                  child: const Center(
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      color: ArtistColors.primary,
+                      size: 30,
                     ),
+                  ),
+                ),
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(10),

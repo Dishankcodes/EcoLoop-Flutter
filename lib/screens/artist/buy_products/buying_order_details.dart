@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../reviews/write_review.dart';
+import '../reviews/write_seller_review.dart';
 import 'buying_order_track.dart';
 
 class BuyingOrderDetails extends StatefulWidget {
@@ -19,7 +21,9 @@ class BuyingOrderDetails extends StatefulWidget {
 class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   late String _status;
   late Map<String, dynamic> _order;
-  bool _isRefreshing = false;
+  bool _checkingReviews = true;
+  bool _productReviewed = false;
+  bool _sellerReviewed = false;
 
   @override
   void initState() {
@@ -29,6 +33,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     _status = (_order['status'] ?? _order['orderStatus'] ?? 'pending')
         .toString();
     _refreshOrder(showErrors: false);
+    _loadReviewStatus();
   }
 
   // GETTERS
@@ -36,7 +41,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   String get productName {
     final value =
         _order['productTitle'] ?? _order['productName'] ?? _order['product'];
-    return value?.toString().trim().isNotEmpty == true
+    return value != null && value.toString().trim().isNotEmpty
         ? value.toString()
         : 'Product details unavailable';
   }
@@ -51,7 +56,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   String get sellerName {
     final value = _order['sellerName'] ?? _order['seller'];
-    return value?.toString().trim().isNotEmpty == true
+    return value != null && value.toString().trim().isNotEmpty
         ? value.toString()
         : 'Seller details unavailable';
   }
@@ -74,8 +79,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   String get shippingAddress {
     final raw = _order['shippingAddress'] ?? _order['address'];
-    if (raw == null || raw.toString().trim().isEmpty)
+    if (raw == null || raw.toString().trim().isEmpty) {
       return 'Address not available';
+    }
     dynamic value = raw;
     if (raw is String) {
       try {
@@ -138,6 +144,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             _buildProductSection(),
 
             _buildSellerSection(),
+
+            if (isDelivered) _buildReviewActions(),
 
             _buildDeliverySection(),
 
@@ -273,9 +281,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: ArtistColors.error.withOpacity(0.07),
+        color: ArtistColors.error.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: ArtistColors.error.withOpacity(0.18)),
+        border: Border.all(color: ArtistColors.error.withValues(alpha: 0.18)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -384,7 +392,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: ArtistColors.light.withOpacity(0.65),
+              color: ArtistColors.light.withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(13),
             ),
             child: Row(
@@ -459,7 +467,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                 height: 30,
                 width: 30,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.10),
+                  color: color.withValues(alpha: 0.10),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, size: 17, color: color),
@@ -470,7 +478,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                   height: 37,
                   width: 2,
                   color: completed
-                      ? ArtistColors.success.withOpacity(0.38)
+                      ? ArtistColors.success.withValues(alpha: 0.38)
                       : ArtistColors.border,
                 ),
             ],
@@ -520,7 +528,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -572,7 +580,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                             (_order['productImage'] ?? _order['imageUrl'])
                                 .toString(),
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Icon(
+                            errorBuilder: (context, error, stackTrace) => Icon(
                               productIcon,
                               size: 38,
                               color: ArtistColors.primary,
@@ -643,19 +651,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
           Row(
             children: [
-              Container(
-                height: 52,
-                width: 52,
-                decoration: const BoxDecoration(
-                  color: ArtistColors.light,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  color: ArtistColors.primary,
-                  size: 27,
-                ),
-              ),
+              _buildSellerAvatar(),
 
               const SizedBox(width: 12),
 
@@ -698,11 +694,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
               ),
 
               OutlinedButton(
-                onPressed: () {
-                  _showMessage(
-                    'Seller contact details are not available for this order.',
-                  );
-                },
+                onPressed: _showSellerContact,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: ArtistColors.primary,
                   side: const BorderSide(color: ArtistColors.primary),
@@ -727,6 +719,305 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
+  String? get _sellerProfileImageUrl {
+    final seller = _order['seller'] is Map
+        ? Map<String, dynamic>.from(_order['seller'] as Map)
+        : <String, dynamic>{};
+    final candidates = <dynamic>[
+      _order['sellerProfileImage'],
+      _order['sellerProfileImageUrl'],
+      _order['sellerProfilePhotoUrl'],
+      _order['sellerPhotoUrl'],
+      _order['artistProfileImage'],
+      _order['artistProfilePhotoUrl'],
+      _order['profilePhotoUrl'],
+      _order['profileImage'],
+      _order['photoUrl'],
+      seller['profilePhotoUrl'],
+      seller['profileImage'],
+      seller['image'],
+      seller['photoUrl'],
+      seller['avatar'],
+    ];
+    for (final candidate in candidates) {
+      final value = candidate?.toString().trim() ?? '';
+      if (value.startsWith('https://') || value.startsWith('http://')) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  Widget _buildSellerAvatar() {
+    final imageUrl = _sellerProfileImageUrl;
+    return Container(
+      height: 52,
+      width: 52,
+      decoration: const BoxDecoration(
+        color: ArtistColors.light,
+        shape: BoxShape.circle,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: imageUrl == null
+          ? const Icon(
+              Icons.person_rounded,
+              color: ArtistColors.primary,
+              size: 27,
+            )
+          : Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.person_rounded,
+                color: ArtistColors.primary,
+                size: 27,
+              ),
+            ),
+    );
+  }
+
+  Future<void> _showSellerContact() async {
+    final sellerIdRaw =
+        _order['sellerId'] ??
+        _order['artistId'] ??
+        _order['seller_id'] ??
+        _order['artist_id'];
+    final sellerId = sellerIdRaw is num
+        ? sellerIdRaw.toInt()
+        : int.tryParse('${sellerIdRaw ?? ''}') ?? 0;
+    final sellerType = (_order['sellerType'] ?? '').toString().toLowerCase();
+    final isArtist = sellerType == 'artist' || sellerType == 'remaker';
+    Map<String, dynamic> contact = <String, dynamic>{
+      'name': sellerName,
+      'email':
+          _order['sellerEmail'] ??
+          _order['artistEmail'] ??
+          _order['email'] ??
+          '',
+      'phone':
+          _order['sellerPhone'] ??
+          _order['artistPhone'] ??
+          _order['phone'] ??
+          '',
+      'city': _order['sellerCity'] ?? _order['artistCity'] ?? '',
+      'state': _order['sellerState'] ?? _order['artistState'] ?? '',
+    };
+
+    if (sellerId > 0) {
+      try {
+        final response = await EcoLoopApi.instance.get(
+          isArtist
+              ? '/sellers/artist/$sellerId/contact'
+              : '/sellers/user/$sellerId/contact',
+        );
+        if (response is Map) {
+          contact = {...contact, ...Map<String, dynamic>.from(response)};
+        }
+      } catch (_) {
+        // Use any contact information included in the saved order as fallback.
+      }
+    }
+    if (!mounted) return;
+
+    final email = (contact['email'] ?? '').toString().trim();
+    final phone = (contact['phone'] ?? '').toString().trim();
+    final location = [contact['city'], contact['state']]
+        .where((value) => value != null && value.toString().trim().isNotEmpty)
+        .map((value) => value.toString().trim())
+        .join(', ');
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          decoration: const BoxDecoration(
+            color: ArtistColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: ArtistColors.border,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.storefront_outlined,
+                    color: ArtistColors.primary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      isArtist ? 'Artist Contact' : 'Seller Contact',
+                      style: ArtistTextStyles.title.copyWith(fontSize: 17),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                (contact['name'] ?? sellerName).toString(),
+                style: ArtistTextStyles.bodyMedium.copyWith(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (email.isNotEmpty)
+                _contactInfoRow(Icons.email_outlined, 'Email', email),
+              if (phone.isNotEmpty)
+                _contactInfoRow(Icons.phone_outlined, 'Phone', phone),
+              if (location.isNotEmpty)
+                _contactInfoRow(
+                  Icons.location_on_outlined,
+                  'Location',
+                  location,
+                ),
+              if (email.isEmpty && phone.isEmpty && location.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Seller contact details are not available for this order yet.',
+                    style: ArtistTextStyles.body.copyWith(fontSize: 12),
+                  ),
+                ),
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+              const SizedBox(height: 14),
+              Text(
+                'Contact EcoLoop',
+                style: ArtistTextStyles.title.copyWith(fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              const Row(
+                children: [
+                  Icon(
+                    Icons.support_agent_outlined,
+                    color: ArtistColors.primary,
+                    size: 20,
+                  ),
+                  SizedBox(width: 9),
+                  Expanded(
+                    child: SelectableText(
+                      'ecoloopp2026@gmail.com',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: ArtistColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Include Order ID $orderId if you contact support.',
+                style: ArtistTextStyles.small.copyWith(fontSize: 10),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _contactInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: ArtistColors.primary, size: 18),
+          const SizedBox(width: 9),
+          SizedBox(
+            width: 58,
+            child: Text(
+              label,
+              style: ArtistTextStyles.small.copyWith(fontSize: 11),
+            ),
+          ),
+          Expanded(
+            child: SelectableText(
+              value,
+              style: ArtistTextStyles.body.copyWith(
+                fontSize: 12,
+                color: ArtistColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _contactEcoLoop() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: ArtistColors.surface,
+        title: Text(
+          'Contact EcoLoop',
+          style: ArtistTextStyles.title.copyWith(fontSize: 18),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'For order or refund support, email us at:',
+              style: ArtistTextStyles.body.copyWith(fontSize: 12, height: 1.5),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: ArtistColors.light,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const SelectableText(
+                'ecoloopp2026@gmail.com',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: ArtistColors.primary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Please include Order ID $orderId in your message.',
+              style: ArtistTextStyles.small.copyWith(fontSize: 11),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // DELIVERY
 
   Widget _buildDeliverySection() {
@@ -741,7 +1032,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: ArtistColors.light.withOpacity(0.60),
+              color: ArtistColors.light.withValues(alpha: 0.60),
               borderRadius: BorderRadius.circular(15),
             ),
             child: Row(
@@ -798,19 +1089,6 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                     .contains('express')
                 ? 'Express'
                 : 'Standard',
-          ),
-
-          const SizedBox(height: 12),
-
-          _detailRow(
-            Icons.storefront_outlined,
-            'Delivery responsibility',
-            (_order['deliveryResponsibility'] ?? '').toString().trim().isEmpty
-                ? 'Not recorded for this order'
-                : _order['deliveryResponsibility'].toString().replaceAll(
-                    '_',
-                    ' ',
-                  ),
           ),
 
           const SizedBox(height: 12),
@@ -1066,6 +1344,215 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
+  int _reviewInt(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse((value ?? '').toString()) ?? 0;
+  }
+
+  String _reviewString(dynamic value) {
+    return (value ?? '').toString().trim().toLowerCase().replaceAll('_', ' ');
+  }
+
+  Future<void> _loadReviewStatus() async {
+    try {
+      final response = await EcoLoopApi.instance.get('/my/reviews');
+      dynamic rows = response;
+      if (response is Map) {
+        rows =
+            response['reviews'] ??
+            response['data'] ??
+            response['items'] ??
+            response['results'] ??
+            const <dynamic>[];
+      }
+
+      bool productDone = false;
+      bool sellerDone = false;
+      final currentProductId = _reviewInt(_order['productId']);
+      final currentSellerId = _reviewInt(_order['sellerId']);
+      final currentSellerType = _reviewString(_order['sellerType'] ?? 'user');
+
+      if (rows is List) {
+        for (final raw in rows) {
+          if (raw is! Map) continue;
+          final review = Map<String, dynamic>.from(raw);
+          final reviewStatus = _reviewString(review['status']);
+          if (reviewStatus.isNotEmpty && reviewStatus != 'active') continue;
+
+          final reviewType = _reviewString(
+            review['reviewType'] ?? review['type'],
+          );
+          final reviewProductId = _reviewInt(review['productId']);
+          if (reviewProductId == currentProductId &&
+              (reviewType.isEmpty || reviewType == 'product')) {
+            productDone = true;
+          }
+
+          final reviewSellerId = _reviewInt(review['sellerId']);
+          final reviewArtistId = _reviewInt(review['artistId']);
+          final reviewSellerType = _reviewString(review['sellerType']);
+          final matchesSeller =
+              currentSellerId > 0 &&
+              (reviewArtistId == currentSellerId ||
+                  (reviewSellerId == currentSellerId &&
+                      reviewSellerType == currentSellerType) ||
+                  (reviewSellerId == currentSellerId &&
+                      currentSellerType == 'user' &&
+                      reviewSellerType.isEmpty));
+          if (reviewProductId == 0 &&
+              matchesSeller &&
+              (reviewType.isEmpty ||
+                  reviewType == 'seller' ||
+                  reviewType == 'artist')) {
+            sellerDone = true;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _productReviewed = productDone;
+          _sellerReviewed = sellerDone;
+          _checkingReviews = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _checkingReviews = false);
+      }
+    }
+  }
+
+  Widget _buildReviewActions() {
+    final productId = _reviewInt(_order['productId']);
+    final sellerId = _reviewInt(_order['sellerId']);
+    final currentOrderId = _reviewInt(_order['orderId'] ?? _order['id']);
+    final sellerType = _reviewString(_order['sellerType'] ?? 'user');
+    final isArtist =
+        sellerType == 'artist' ||
+        sellerType == 'remaker' ||
+        sellerType == 're maker';
+    final payment = _reviewString(_order['paymentStatus'] ?? _order['payment']);
+    final isPaid = const {
+      'paid',
+      'completed',
+      'success',
+      'successful',
+      'captured',
+      'cod paid',
+    }.contains(payment);
+    final eligible = isDelivered && isPaid && currentOrderId > 0;
+
+    return _section(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle('Share Your Experience', Icons.rate_review_outlined),
+          const SizedBox(height: 8),
+          Text(
+            'Review the product and the seller/artist after your delivered, paid order.',
+            style: ArtistTextStyles.small,
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed:
+                  !_checkingReviews &&
+                      eligible &&
+                      productId > 0 &&
+                      !_productReviewed
+                  ? () async {
+                      final result = await Navigator.push<dynamic>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => WriteReview(
+                            product: {
+                              ..._order,
+                              'productId': productId,
+                              'id': productId,
+                              'title': productName,
+                              'reviewOrderId': currentOrderId,
+                            },
+                            orderId: currentOrderId,
+                          ),
+                        ),
+                      );
+                      if (result != null && mounted) {
+                        await _loadReviewStatus();
+                      }
+                    }
+                  : null,
+              icon: const Icon(Icons.inventory_2_outlined),
+              label: Text(
+                _checkingReviews
+                    ? 'Checking review status…'
+                    : _productReviewed
+                    ? 'Product Reviewed'
+                    : 'Write Product Review',
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed:
+                  !_checkingReviews &&
+                      eligible &&
+                      sellerId > 0 &&
+                      !_sellerReviewed
+                  ? () async {
+                      final result = await Navigator.push<dynamic>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => WriteSellerReview(
+                            sellerName: sellerName,
+                            sellerImage:
+                                (_order['sellerProfilePhotoUrl'] ??
+                                        _order['sellerImage'] ??
+                                        _order['profilePhotoUrl'])
+                                    ?.toString(),
+                            sellerId: '$sellerId',
+                            sellerType: sellerType,
+                            orderId: '$currentOrderId',
+                          ),
+                        ),
+                      );
+                      if (result != null && mounted) {
+                        await _loadReviewStatus();
+                      }
+                    }
+                  : null,
+              icon: const Icon(Icons.storefront_outlined),
+              label: Text(
+                _checkingReviews
+                    ? 'Checking review status…'
+                    : _sellerReviewed
+                    ? (isArtist ? 'Artist Reviewed' : 'Seller Reviewed')
+                    : (isArtist
+                          ? 'Write Artist Review'
+                          : 'Write Seller Review'),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ArtistColors.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+          if (!eligible)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Reviews are available after the order is delivered and payment is confirmed.',
+                style: ArtistTextStyles.small,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   // HELP
 
   Widget _buildHelpSection() {
@@ -1078,11 +1565,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           const SizedBox(height: 13),
 
           InkWell(
-            onTap: () {
-              _showMessage(
-                'Please use the support option in your account settings.',
-              );
-            },
+            onTap: _contactEcoLoop,
             borderRadius: BorderRadius.circular(15),
             child: Container(
               padding: const EdgeInsets.all(15),
@@ -1144,7 +1627,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         color: ArtistColors.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
@@ -1314,7 +1797,6 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   Future<void> _refreshOrder({bool showErrors = true}) async {
     final id = _order['orderId'] ?? _order['id'];
     if (id == null || id.toString().trim().isEmpty) return;
-    if (mounted) setState(() => _isRefreshing = true);
     try {
       final response = await EcoLoopApi.instance.get(
         '/orders/${Uri.encodeComponent(id.toString())}',
@@ -1338,9 +1820,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           'Could not refresh order: ${error.toString().replaceFirst('Exception: ', '')}',
         );
       }
-    } finally {
-      if (mounted) setState(() => _isRefreshing = false);
-    }
+    } finally {}
   }
 
   Future<void> _cancelOrder() async {
@@ -1389,8 +1869,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                 if (response is Map) {
                   final dynamic payload =
                       response['order'] ?? response['data'] ?? response;
-                  if (payload is Map)
+                  if (payload is Map) {
                     _order = {..._order, ...Map<String, dynamic>.from(payload)};
+                  }
                 }
                 await _refreshOrder(showErrors: false);
                 if (mounted) {

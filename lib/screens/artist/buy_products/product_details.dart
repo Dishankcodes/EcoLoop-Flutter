@@ -9,6 +9,7 @@ import '../../../widgets/cart_popup_artist.dart';
 import '../../artist/profile/artist_profile.dart';
 import '../../artist/reviews/product_reviews.dart';
 import '../../artist/reviews/write_review.dart';
+import '../reviews/write_seller_review.dart';
 import 'checkout.dart';
 import 'seller_profile.dart';
 
@@ -44,6 +45,9 @@ class _ProductDetailsState extends State<ProductDetails> {
   bool _eligibilityLoading = false;
   bool _canReview = false;
   String? _eligibleOrderId;
+  String? _eligibleSellerOrderId;
+  bool _canReviewSeller = false;
+  bool _sellerReviewSubmitted = false;
   List<Map<String, dynamic>> _liveReviews = [];
   List<Map<String, dynamic>> _relatedProducts = <Map<String, dynamic>>[];
   bool _relatedLoading = false;
@@ -60,6 +64,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     _syncWishlistState();
     _loadReviews();
     _checkReviewEligibility();
+    _checkSellerReviewEligibility();
     _loadRelatedProducts();
   }
 
@@ -1236,9 +1241,137 @@ class _ProductDetailsState extends State<ProductDetails> {
                 color: ArtistColors.textSecondary,
               ),
             ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 43,
+            child: OutlinedButton.icon(
+              onPressed:
+                  _eligibilityLoading ||
+                      !_canReviewSeller ||
+                      _eligibleSellerOrderId == null
+                  ? null
+                  : _writeSellerReview,
+              icon: const Icon(Icons.storefront_outlined, size: 17),
+              label: Text(
+                _sellerReviewSubmitted
+                    ? 'Seller/Artist Reviewed'
+                    : 'Write Seller/Artist Review',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _checkSellerReviewEligibility() async {
+    final sellerId = _intValue(_product['sellerId'] ?? _product['artistId']);
+    if (sellerId <= 0) return;
+    try {
+      final response = await _api.get('/orders');
+      final root = _asMap(response);
+      final nested = _asMap(root['data']);
+      final dynamic rows = response is List
+          ? response
+          : (root['orders'] ??
+                root['items'] ??
+                nested['orders'] ??
+                nested['items'] ??
+                const []);
+      String? orderId;
+      if (rows is List)
+        for (final raw in rows) {
+          if (raw is! Map) continue;
+          final order = Map<String, dynamic>.from(raw);
+          final sameSeller =
+              _intValue(order['sellerId'] ?? order['artistId']) == sellerId;
+          final status = (order['status'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase()
+              .replaceAll('_', ' ');
+          final payment = (order['paymentStatus'] ?? order['payment'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase()
+              .replaceAll('_', ' ');
+          final paid = const [
+            'paid',
+            'completed',
+            'success',
+            'successful',
+            'captured',
+            'cod paid',
+          ].contains(payment);
+          if (sameSeller && status == 'delivered' && paid) {
+            orderId = (order['orderId'] ?? order['id'] ?? '').toString();
+            if (orderId.isNotEmpty) break;
+          }
+        }
+      final existing = await _api.get('/my/reviews');
+      dynamic reviewRows = existing;
+      if (existing is Map)
+        reviewRows =
+            existing['reviews'] ??
+            existing['data'] ??
+            existing['items'] ??
+            const [];
+      var reviewed = false;
+      if (reviewRows is List)
+        for (final raw in reviewRows) {
+          if (raw is! Map) continue;
+          final r = Map<String, dynamic>.from(raw);
+          final type = (r['reviewType'] ?? r['type'] ?? '')
+              .toString()
+              .toLowerCase();
+          final reviewedSeller = _intValue(r['sellerId'] ?? r['artistId']);
+          if (reviewedSeller == sellerId &&
+              _intValue(r['productId']) == 0 &&
+              (type == 'seller' || type == 'artist' || type.isEmpty))
+            reviewed = true;
+        }
+      if (mounted)
+        setState(() {
+          _eligibleSellerOrderId = orderId;
+          _canReviewSeller = orderId != null && orderId.isNotEmpty && !reviewed;
+          _sellerReviewSubmitted = reviewed;
+        });
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          _canReviewSeller = false;
+          _eligibleSellerOrderId = null;
+        });
+    }
+  }
+
+  Future<void> _writeSellerReview() async {
+    final sellerId = (_product['sellerId'] ?? _product['artistId'] ?? '')
+        .toString();
+    if (!_canReviewSeller || _eligibleSellerOrderId == null || sellerId.isEmpty)
+      return;
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WriteSellerReview(
+          sellerName: seller,
+          sellerImage:
+              (_product['sellerProfilePhotoUrl'] ??
+                      _product['sellerImage'] ??
+                      _product['profilePhotoUrl'])
+                  ?.toString(),
+          sellerId: sellerId,
+          sellerType: sellerType,
+          orderId: _eligibleSellerOrderId!,
+        ),
+      ),
+    );
+    if (result != null && mounted) _checkSellerReviewEligibility();
   }
 
   Future<void> _loadReviews() async {

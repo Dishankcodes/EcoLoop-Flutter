@@ -45,17 +45,18 @@ class _SellerReviewsState extends State<SellerReviews> {
   String get _normalisedSellerType {
     final type = widget.sellerType.trim().toLowerCase();
     if (type == 'seller' || type == 'user') return 'user';
-    if (type == 'remaker') return 'remaker';
+    if (const {'artist', 'remaker', 're_maker', 're-maker'}.contains(type)) {
+      return 'artist';
+    }
     return type.isEmpty ? 'artist' : type;
   }
 
-  bool get _isArtist =>
-      _normalisedSellerType == 'artist' || _normalisedSellerType == 'remaker';
+  bool get _isArtist => _normalisedSellerType == 'artist';
 
   bool get _canWriteReview =>
       widget.sellerId.trim().isNotEmpty &&
-      (_eligibleOrderId?.trim().isNotEmpty ?? false) &&
-      !_checkingEligibility;
+          (_eligibleOrderId?.trim().isNotEmpty ?? false) &&
+          !_checkingEligibility;
 
   int _int(dynamic value) {
     if (value is num) return value.toInt();
@@ -68,7 +69,7 @@ class _SellerReviewsState extends State<SellerReviews> {
     if (_reviews.isEmpty) return 0;
     final total = _reviews.fold<int>(
       0,
-      (sum, review) => sum + _int(review['rating']).clamp(0, 5).toInt(),
+          (sum, review) => sum + _int(review['rating']).clamp(0, 5).toInt(),
     );
     return total / _reviews.length;
   }
@@ -118,9 +119,9 @@ class _SellerReviewsState extends State<SellerReviews> {
           .map((row) => Map<String, dynamic>.from(row))
           .where(
             (row) =>
-                _string(row['status']).isEmpty ||
-                _string(row['status']).toLowerCase() == 'active',
-          )
+        _string(row['status']).isEmpty ||
+            _string(row['status']).toLowerCase() == 'active',
+      )
           .toList();
 
       if (!mounted) return;
@@ -174,10 +175,11 @@ class _SellerReviewsState extends State<SellerReviews> {
           final reviewArtistId = _int(
             review['artistId'] ??
                 review['artist_id'] ??
-                ((review['sellerType'] ?? review['seller_type'])
-                            ?.toString()
-                            .toLowerCase() ==
-                        'artist'
+                (const {'artist', 'remaker', 're_maker', 're-maker'}.contains(
+                    (review['sellerType'] ?? review['seller_type'])
+                        ?.toString()
+                        .trim()
+                        .toLowerCase())
                     ? review['sellerId'] ?? review['seller_id']
                     : null),
           );
@@ -186,7 +188,7 @@ class _SellerReviewsState extends State<SellerReviews> {
           ).toLowerCase();
           final active =
               _string(review['status']).isEmpty ||
-              _string(review['status']).toLowerCase() == 'active';
+                  _string(review['status']).toLowerCase() == 'active';
           return active &&
               reviewArtistId == sellerId &&
               (type == 'artist' ||
@@ -197,62 +199,63 @@ class _SellerReviewsState extends State<SellerReviews> {
         final eligibleOrders = alreadyReviewedArtist
             ? <Map<String, dynamic>>[]
             : rows
-                  .whereType<Map>()
-                  .map((row) {
-                    return Map<String, dynamic>.from(row);
-                  })
-                  .where((order) {
-                    final currentSellerId = _int(
-                      order['sellerId'] ??
-                          order['artistId'] ??
-                          order['seller_id'],
-                    );
-                    final status = _string(
-                      order['status'],
-                    ).toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
-                    final payment = _string(
-                      order['paymentStatus'] ??
-                          order['payment_status'] ??
-                          order['payment'],
-                    ).toLowerCase().replaceAll('_', ' ');
-                    final paid = const <String>{
-                      'paid',
-                      'completed',
-                      'success',
-                      'successful',
-                      'captured',
-                      'cod paid',
-                    }.contains(payment);
-                    final type = _string(
-                      order['sellerType'] ?? order['seller_type'],
-                    ).toLowerCase();
-                    final sellerTypeMatches =
-                        type.isEmpty || type == 'artist' || type == 'remaker';
-                    return currentSellerId == sellerId &&
-                        status == 'delivered' &&
-                        paid &&
-                        sellerTypeMatches;
-                  })
-                  .toList();
+            .whereType<Map>()
+            .map((row) {
+          return Map<String, dynamic>.from(row);
+        })
+            .where((order) {
+          final currentSellerId = _int(
+            order['sellerId'] ??
+                order['artistId'] ??
+                order['seller_id'],
+          );
+          final status = _string(
+            order['status'],
+          ).toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+          final payment = _string(
+            order['paymentStatus'] ??
+                order['payment_status'] ??
+                order['payment'],
+          ).toLowerCase().replaceAll('_', ' ');
+          final paid = const <String>{
+            'paid',
+            'completed',
+            'success',
+            'successful',
+            'captured',
+            'cod paid',
+          }.contains(payment);
+          final type = _string(
+            order['sellerType'] ?? order['seller_type'],
+          ).toLowerCase();
+          final sellerTypeMatches = type.isEmpty ||
+              const {'artist', 'remaker', 're_maker', 're-maker'}
+                  .contains(type);
+          return currentSellerId == sellerId &&
+              status == 'delivered' &&
+              paid &&
+              sellerTypeMatches;
+        })
+            .toList();
 
         eligibleOrders.sort((a, b) {
           final dateA =
               DateTime.tryParse(
                 _string(a['deliveredAt'] ?? a['updatedAt'] ?? a['createdAt']),
               ) ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+                  DateTime.fromMillisecondsSinceEpoch(0);
           final dateB =
               DateTime.tryParse(
                 _string(b['deliveredAt'] ?? b['updatedAt'] ?? b['createdAt']),
               ) ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+                  DateTime.fromMillisecondsSinceEpoch(0);
           return dateB.compareTo(dateA);
         });
 
         if (eligibleOrders.isNotEmpty) {
           final order = eligibleOrders.firstWhere(
-            (row) =>
-                suppliedOrderId.isNotEmpty &&
+                (row) =>
+            suppliedOrderId.isNotEmpty &&
                 _string(row['orderId'] ?? row['id']) == suppliedOrderId,
             orElse: () => eligibleOrders.first,
           );
@@ -295,8 +298,8 @@ class _SellerReviewsState extends State<SellerReviews> {
     final rows = _reviews
         .where(
           (review) =>
-              _ratingFilter == 0 || _int(review['rating']) == _ratingFilter,
-        )
+      _ratingFilter == 0 || _int(review['rating']) == _ratingFilter,
+    )
         .toList();
 
     rows.sort((a, b) {
@@ -304,10 +307,10 @@ class _SellerReviewsState extends State<SellerReviews> {
       final ratingB = _int(b['rating']);
       final dateA =
           DateTime.tryParse(_string(a['createdAt'] ?? a['created_at'])) ??
-          DateTime.fromMillisecondsSinceEpoch(0);
+              DateTime.fromMillisecondsSinceEpoch(0);
       final dateB =
           DateTime.tryParse(_string(b['createdAt'] ?? b['created_at'])) ??
-          DateTime.fromMillisecondsSinceEpoch(0);
+              DateTime.fromMillisecondsSinceEpoch(0);
 
       switch (_sort) {
         case 'Highest rated':
@@ -410,14 +413,14 @@ class _SellerReviewsState extends State<SellerReviews> {
                 final comment = commentController.text.trim();
                 if (selectedRating < 1) {
                   setDialogState(
-                    () => validationMessage = 'Please select a star rating.',
+                        () => validationMessage = 'Please select a star rating.',
                   );
                   return;
                 }
                 if (comment.length < 5) {
                   setDialogState(
-                    () => validationMessage =
-                        'Please write at least 5 characters.',
+                        () => validationMessage =
+                    'Please write at least 5 characters.',
                   );
                   return;
                 }
@@ -542,13 +545,13 @@ class _SellerReviewsState extends State<SellerReviews> {
                   ),
                   icon: _submitting
                       ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
                       : const Icon(Icons.rate_review_outlined),
                   label: Text(_submitting ? 'Submitting…' : 'Write a review'),
                 ),
@@ -637,13 +640,13 @@ class _SellerReviewsState extends State<SellerReviews> {
             else if (_error != null)
               _message(_error!, retry: _load)
             else if (visibleReviews.isEmpty)
-              _message(
-                _ratingFilter == 0
-                    ? 'No reviews have been submitted yet.'
-                    : 'No reviews match this rating filter.',
-              )
-            else
-              ...visibleReviews.map(_buildReviewCard),
+                _message(
+                  _ratingFilter == 0
+                      ? 'No reviews have been submitted yet.'
+                      : 'No reviews match this rating filter.',
+                )
+              else
+                ...visibleReviews.map(_buildReviewCard),
           ],
         ),
       ),
@@ -667,10 +670,10 @@ class _SellerReviewsState extends State<SellerReviews> {
             backgroundImage: image.isEmpty ? null : NetworkImage(image),
             child: image.isEmpty
                 ? const Icon(
-                    Icons.person_outline_rounded,
-                    color: ArtistColors.primary,
-                    size: 30,
-                  )
+              Icons.person_outline_rounded,
+              color: ArtistColors.primary,
+              size: 30,
+            )
                 : null,
           ),
           const SizedBox(width: 12),
@@ -837,3 +840,4 @@ class _SellerReviewsState extends State<SellerReviews> {
     );
   }
 }
+

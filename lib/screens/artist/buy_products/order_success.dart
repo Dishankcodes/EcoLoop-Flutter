@@ -1,4 +1,5 @@
 import 'package:ecoloop/screens/artist/artist_main.dart';
+import 'package:ecoloop/screens/artist/buy_products/buying_orders.dart';
 import 'package:ecoloop/widgets/artist_bottom_navigation.dart';
 import 'package:flutter/material.dart';
 
@@ -128,13 +129,17 @@ class _OrderSuccessState extends State<OrderSuccess>
       MaterialPageRoute<void>(
         builder: (_) => ArtistMain(initialIndex: safeIndex),
       ),
-      (route) => false,
+          (route) => false,
     );
   }
 
   void _goToHome() => _goToArtistMain(initialIndex: 0);
 
-  void _goToBuyingOrders() => _goToArtistMain(initialIndex: 2);
+  void _goToBuyingOrders() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const BuyingOrders()),
+    );
+  }
 
   void _continueShopping() => _goToArtistMain(initialIndex: 1);
 
@@ -656,11 +661,11 @@ class _OrderSuccessState extends State<OrderSuccess>
   // ---------------------------------------------------------------------------
 
   Widget _infoRow(
-    String title,
-    String value, {
-    Color? valueColor,
-    bool valueBold = false,
-  }) {
+      String title,
+      String value, {
+        Color? valueColor,
+        bool valueBold = false,
+      }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

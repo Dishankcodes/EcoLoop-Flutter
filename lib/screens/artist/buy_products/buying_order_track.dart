@@ -39,10 +39,89 @@ class _OrderTrackingState extends State<OrderTracking> {
 
   String get orderId => (_order['orderId'] ?? _order['id'])?.toString() ?? '—';
 
-  String get orderDate =>
-      (_order['createdAt'] ?? _order['orderDate'] ?? _order['date'])
-          ?.toString() ??
-      '—';
+  String get orderDate => _formatOrderDate(
+    _order['createdAt'] ?? _order['orderDate'] ?? _order['date'],
+  );
+
+  /// Formats order timestamps in Indian Standard Time without changing
+  /// the value stored by the backend or in Google Sheets.
+  String _formatOrderDate(dynamic value) {
+    final raw = value?.toString().trim() ?? '';
+    if (raw.isEmpty || raw.toLowerCase() == 'null' || raw == '—') {
+      return 'Date unavailable';
+    }
+
+    DateTime? parsed;
+    final sheetIstPattern = RegExp(
+      r'^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$',
+    );
+    final sheetMatch = sheetIstPattern.firstMatch(raw);
+
+    if (sheetMatch != null) {
+      // Apps Script yyyy-MM-dd HH:mm:ss values are already in IST.
+      parsed = DateTime(
+        int.parse(sheetMatch.group(1)!),
+        int.parse(sheetMatch.group(2)!),
+        int.parse(sheetMatch.group(3)!),
+        int.parse(sheetMatch.group(4)!),
+        int.parse(sheetMatch.group(5)!),
+        int.parse(sheetMatch.group(6)!),
+      );
+    } else {
+      final hasTimezone = RegExp(
+        r'(Z|[+-]\d{2}:?\d{2})$',
+        caseSensitive: false,
+      ).hasMatch(raw);
+      final dateValue = DateTime.tryParse(raw);
+      if (dateValue == null) return 'Date unavailable';
+
+      if (hasTimezone) {
+        // Normalize UTC/offset timestamps to IST, independent of device zone.
+        parsed = dateValue.toUtc().add(const Duration(hours: 5, minutes: 30));
+      } else {
+        // Timestamps without a timezone are treated as already being in IST.
+        parsed = DateTime(
+          dateValue.year,
+          dateValue.month,
+          dateValue.day,
+          dateValue.hour,
+          dateValue.minute,
+          dateValue.second,
+        );
+      }
+    }
+
+    final nowIst = DateTime.now().toUtc().add(
+      const Duration(hours: 5, minutes: 30),
+    );
+    final today = DateTime(nowIst.year, nowIst.month, nowIst.day);
+    final orderDay = DateTime(parsed.year, parsed.month, parsed.day);
+    final difference = today.difference(orderDay).inDays;
+
+    final hour = parsed.hour % 12 == 0 ? 12 : parsed.hour % 12;
+    final minute = parsed.minute.toString().padLeft(2, '0');
+    final period = parsed.hour >= 12 ? 'PM' : 'AM';
+    final time = '$hour:$minute $period';
+
+    if (difference == 0) return 'Today, $time';
+    if (difference == 1) return 'Yesterday, $time';
+
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${parsed.day} ${months[parsed.month - 1]} ${parsed.year}, $time';
+  }
 
   String get price {
     final value = _order['totalAmount'] ?? _order['price'];

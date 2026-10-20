@@ -55,7 +55,7 @@ class _SellerProfileState extends State<SellerProfile> {
   // Load this seller's published listings from the real API.
   Future<void> _loadSellerListings() async {
     setState(() {
-      _loadingListings = true;
+      if (_listings.isEmpty) _loadingListings = true;
       _listingError = null;
     });
     try {
@@ -963,6 +963,7 @@ class _SellerProductCard extends StatelessWidget {
                     child: Image.network(
                       product['image']?.toString() ?? '',
                       fit: BoxFit.cover,
+                      cacheWidth: 480,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
                           color: ArtistColors.light,
