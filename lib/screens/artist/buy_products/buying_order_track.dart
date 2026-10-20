@@ -180,6 +180,7 @@ class _OrderTrackingState extends State<OrderTracking> {
   String get paymentStatus => _order['paymentStatus']?.toString() ?? 'pending';
 
   Future<void> _refreshOrder() async {
+    if (_isLoading) return;
     final id = _order['orderId'] ?? _order['id'];
     if (id == null || id.toString().trim().isEmpty) return;
     if (mounted)

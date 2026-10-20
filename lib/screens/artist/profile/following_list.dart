@@ -21,6 +21,7 @@ class _FollowingListState extends State<FollowingList> {
   List<Map<String, dynamic>> _artists = [];
   bool _loading = true;
   bool _refreshing = false;
+  bool _requestInFlight = false;
   String? _error;
   final Set<int> _updatingIds = <int>{};
 
@@ -112,11 +113,12 @@ class _FollowingListState extends State<FollowingList> {
   }
 
   Future<void> _loadFollowing({bool refresh = false}) async {
-    if (!mounted) return;
+    if (!mounted || _requestInFlight) return;
+    _requestInFlight = true;
     setState(() {
-      if (refresh) {
+      if (refresh && _artists.isNotEmpty) {
         _refreshing = true;
-      } else {
+      } else if (_artists.isEmpty) {
         _loading = true;
       }
       _error = null;
@@ -205,6 +207,7 @@ class _FollowingListState extends State<FollowingList> {
         _error = e.toString().replaceFirst('Exception: ', '');
       });
     } finally {
+      _requestInFlight = false;
       if (mounted) {
         setState(() {
           _loading = false;
@@ -285,156 +288,157 @@ class _FollowingListState extends State<FollowingList> {
         title: Text('Following', style: ArtistTextStyles.title),
       ),
       body: SafeArea(
-        child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: ArtistColors.primary),
-              )
-            : RefreshIndicator(
-                color: ArtistColors.primary,
-                onRefresh: () => _loadFollowing(refresh: true),
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
-                  ),
-                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
+        child: RefreshIndicator(
+          color: ArtistColors.primary,
+          onRefresh: () => _loadFollowing(refresh: true),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
+            children: [
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 10),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: ArtistColors.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: ArtistColors.border),
+                ),
+                child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(18),
+                      width: 48,
+                      height: 48,
                       decoration: BoxDecoration(
-                        color: ArtistColors.surface,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: ArtistColors.border),
+                        color: ArtistColors.light,
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Row(
+                      child: const Icon(
+                        Icons.person_add_alt_1_rounded,
+                        color: ArtistColors.primary,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: ArtistColors.light,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(
-                              Icons.person_add_alt_1_rounded,
-                              color: ArtistColors.primary,
-                              size: 24,
+                          Text(
+                            '${_artists.length} ${_artists.length == 1 ? 'artist' : 'artists'}',
+                            style: ArtistTextStyles.title.copyWith(
+                              fontSize: 20,
                             ),
                           ),
-                          const SizedBox(width: 13),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${_artists.length} ${_artists.length == 1 ? 'artist' : 'artists'}',
-                                  style: ArtistTextStyles.title.copyWith(
-                                    fontSize: 20,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Artists whose work you follow',
-                                  style: ArtistTextStyles.caption,
-                                ),
-                              ],
-                            ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Artists whose work you follow',
+                            style: ArtistTextStyles.caption,
                           ),
-                          if (_refreshing)
-                            const SizedBox(
-                              width: 19,
-                              height: 19,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: ArtistColors.primary,
-                              ),
-                            ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _searchController,
-                      textInputAction: TextInputAction.search,
-                      decoration: InputDecoration(
-                        hintText: 'Search artists...',
-                        hintStyle: ArtistTextStyles.caption,
-                        prefixIcon: const Icon(
-                          Icons.search_rounded,
-                          color: ArtistColors.textSecondary,
-                        ),
-                        suffixIcon: _searchController.text.isEmpty
-                            ? null
-                            : IconButton(
-                                onPressed: _searchController.clear,
-                                icon: const Icon(Icons.close_rounded),
-                              ),
-                        filled: true,
-                        fillColor: ArtistColors.surface,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 13,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(13),
-                          borderSide: BorderSide(color: ArtistColors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(13),
-                          borderSide: BorderSide(color: ArtistColors.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(13),
-                          borderSide: const BorderSide(
-                            color: ArtistColors.primary,
-                            width: 1.4,
-                          ),
+                    if (_refreshing)
+                      const SizedBox(
+                        width: 19,
+                        height: 19,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: ArtistColors.primary,
                         ),
                       ),
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 16),
-                      _StatusPanel(
-                        icon: Icons.cloud_off_outlined,
-                        title: 'Could not load following',
-                        message: _error!,
-                        actionLabel: 'Try again',
-                        onAction: () => _loadFollowing(refresh: true),
-                      ),
-                    ] else if (visibleArtists.isEmpty) ...[
-                      const SizedBox(height: 24),
-                      _StatusPanel(
-                        icon: _searchController.text.trim().isEmpty
-                            ? Icons.people_outline_rounded
-                            : Icons.search_off_rounded,
-                        title: _searchController.text.trim().isEmpty
-                            ? 'You are not following anyone yet'
-                            : 'No artists found',
-                        message: _searchController.text.trim().isEmpty
-                            ? 'Explore the marketplace and follow artists whose creations you like.'
-                            : 'Try searching with another name or city.',
-                        actionLabel: _searchController.text.trim().isEmpty
-                            ? 'Refresh list'
-                            : 'Clear search',
-                        onAction: _searchController.text.trim().isEmpty
-                            ? () => _loadFollowing(refresh: true)
-                            : _searchController.clear,
-                      ),
-                    ] else ...[
-                      const SizedBox(height: 15),
-                      Text(
-                        'ARTISTS YOU FOLLOW',
-                        style: ArtistTextStyles.small.copyWith(
-                          color: ArtistColors.textSecondary,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ...visibleArtists.map(_buildArtistCard),
-                    ],
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _searchController,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'Search artists...',
+                  hintStyle: ArtistTextStyles.caption,
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    color: ArtistColors.textSecondary,
+                  ),
+                  suffixIcon: _searchController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          onPressed: _searchController.clear,
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                  filled: true,
+                  fillColor: ArtistColors.surface,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 13,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(13),
+                    borderSide: BorderSide(color: ArtistColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(13),
+                    borderSide: BorderSide(color: ArtistColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(13),
+                    borderSide: const BorderSide(
+                      color: ArtistColors.primary,
+                      width: 1.4,
+                    ),
+                  ),
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 16),
+                _StatusPanel(
+                  icon: Icons.cloud_off_outlined,
+                  title: 'Could not load following',
+                  message: _error!,
+                  actionLabel: 'Try again',
+                  onAction: () => _loadFollowing(refresh: true),
+                ),
+              ] else if (visibleArtists.isEmpty) ...[
+                const SizedBox(height: 24),
+                _StatusPanel(
+                  icon: _searchController.text.trim().isEmpty
+                      ? Icons.people_outline_rounded
+                      : Icons.search_off_rounded,
+                  title: _searchController.text.trim().isEmpty
+                      ? 'You are not following anyone yet'
+                      : 'No artists found',
+                  message: _searchController.text.trim().isEmpty
+                      ? 'Explore the marketplace and follow artists whose creations you like.'
+                      : 'Try searching with another name or city.',
+                  actionLabel: _searchController.text.trim().isEmpty
+                      ? 'Refresh list'
+                      : 'Clear search',
+                  onAction: _searchController.text.trim().isEmpty
+                      ? () => _loadFollowing(refresh: true)
+                      : _searchController.clear,
+                ),
+              ] else ...[
+                const SizedBox(height: 15),
+                Text(
+                  'ARTISTS YOU FOLLOW',
+                  style: ArtistTextStyles.small.copyWith(
+                    color: ArtistColors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...visibleArtists.map(_buildArtistCard),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

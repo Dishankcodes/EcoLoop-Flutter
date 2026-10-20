@@ -286,10 +286,8 @@ class _NotificationsState extends State<Notifications> {
   }
 
   Widget _buildBody(int unreadCount) {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: ArtistColors.primary),
-      );
+    if (_isLoading && _notifications.isEmpty) {
+      return _buildLoadingState();
     }
 
     if (_error != null && _notifications.isEmpty) {
@@ -430,7 +428,16 @@ class _NotificationsState extends State<Notifications> {
     final normalized = type.toLowerCase();
     IconData icon;
 
-    if (normalized.contains('wishlist')) {
+    if (normalized.contains('custom_service') ||
+        normalized.contains('custom service')) {
+      icon = Icons.design_services_outlined;
+    } else if (normalized.contains('stock')) {
+      icon = Icons.inventory_2_outlined;
+    } else if (normalized.contains('follower') ||
+        normalized.contains('follow')) {
+      icon = Icons.person_add_alt_1_rounded;
+    } else if (normalized.contains('wishlist') ||
+        normalized.contains('back_in_stock')) {
       icon = Icons.favorite_rounded;
     } else if (normalized.contains('order') ||
         normalized.contains('delivery')) {
@@ -438,7 +445,7 @@ class _NotificationsState extends State<Notifications> {
     } else if (normalized.contains('donation') ||
         normalized.contains('pickup')) {
       icon = Icons.volunteer_activism_outlined;
-    } else if (normalized.contains('review')) {
+    } else if (normalized.contains('review') || normalized.contains('rating')) {
       icon = Icons.star_outline_rounded;
     } else if (normalized.contains('report')) {
       icon = Icons.flag_outlined;
@@ -491,6 +498,83 @@ class _NotificationsState extends State<Notifications> {
           ),
         ],
       ],
+    );
+  }
+
+  /// Keeps the artist notification screen useful on the first visit while the
+  /// Google Sheets request runs in the background.
+  Widget _buildLoadingState() {
+    return RefreshIndicator(
+      color: ArtistColors.primary,
+      onRefresh: () => _loadNotifications(showLoader: false),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+        children: [
+          _buildSectionTitle('Your updates', 'Loading'),
+          const SizedBox(height: 12),
+          for (var i = 0; i < 3; i++)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: ArtistColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: ArtistColors.textSecondary.withValues(alpha: 0.10),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: ArtistColors.light,
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: const Icon(
+                      Icons.notifications_active_outlined,
+                      color: ArtistColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Checking for updates…',
+                          style: TextStyle(
+                            color: ArtistColors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 7),
+                        Text(
+                          'New orders, reviews and custom requests will appear here.',
+                          style: TextStyle(
+                            color: ArtistColors.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: ArtistColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 

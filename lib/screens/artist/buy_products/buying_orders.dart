@@ -39,6 +39,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
   // Live orders loaded from the authenticated buyer's account.
   List<Map<String, dynamic>> _orders = [];
   bool _isLoading = true;
+  bool _refreshInProgress = false;
   String? _loadError;
 
   @override
@@ -885,6 +886,9 @@ class _BuyingOrdersState extends State<BuyingOrders> {
   // REFRESH
 
   Future<void> _refreshOrders() async {
+    // Avoid overlapping list requests from pull-to-refresh and returning from details.
+    if (_refreshInProgress) return;
+    _refreshInProgress = true;
     if (mounted) {
       setState(() {
         _isLoading = true;
@@ -913,6 +917,8 @@ class _BuyingOrdersState extends State<BuyingOrders> {
         _isLoading = false;
         _loadError = error.toString().replaceFirst('Exception: ', '');
       });
+    } finally {
+      _refreshInProgress = false;
     }
   }
 

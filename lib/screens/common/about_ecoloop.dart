@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../../app_theme/user/app_colors.dart';
 
 class AboutEcoLoop extends StatelessWidget {
@@ -19,15 +18,30 @@ class AboutEcoLoop extends StatelessWidget {
         ),
       ),
       body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 30),
         child: Column(
           children: [
             _buildHero(),
-            _buildMission(),
+            _section(
+              title: 'Our Mission',
+              child: const Text(
+                'EcoLoop is a community marketplace designed to help people '
+                'buy, sell and donate reusable items. It also connects users '
+                'with ReMakers who showcase creative work and products. '
+                'Our goal is to help useful items find a new purpose and '
+                'encourage more thoughtful consumption.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.65,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
             _buildHowItWorks(),
             _buildValues(),
             _buildCommunity(),
-            _buildVersion(),
+            _buildContact(),
           ],
         ),
       ),
@@ -69,24 +83,17 @@ class AboutEcoLoop extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
+          const SizedBox(height: 10),
+          const Text(
+            'Buy, sell, donate, reuse and discover creative work.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.5,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMission() {
-    return _section(
-      title: 'Our Mission',
-      child: const Text(
-        'EcoLoop is a community marketplace built to help people '
-        'sell, buy, reuse and donate items that still have value. '
-        'Instead of letting useful products become waste, EcoLoop '
-        'helps connect them with people who can use them again.',
-        style: TextStyle(
-          fontSize: 13,
-          height: 1.65,
-          color: AppColors.textSecondary,
-        ),
       ),
     );
   }
@@ -98,27 +105,38 @@ class AboutEcoLoop extends StatelessWidget {
         children: [
           _step(
             '01',
-            Icons.sell_outlined,
-            'List an Item',
-            'Sell your unused items by creating a simple listing.',
+            Icons.search_rounded,
+            'Discover Products',
+            'Browse marketplace listings and review product details, '
+                'prices and seller information.',
           ),
           _step(
             '02',
-            Icons.search_rounded,
-            'Find Something Useful',
-            'Explore items listed by people and creators in the community.',
+            Icons.shopping_bag_outlined,
+            'Buy an Item',
+            'Choose a product, review checkout information and place '
+                'an order using the payment arrangement shown in the app.',
           ),
           _step(
             '03',
-            Icons.recycling_rounded,
-            'Reuse & Recycle',
-            'Give products, materials and useful items another purpose.',
+            Icons.sell_outlined,
+            'Sell Your Items',
+            'Create a listing with accurate photos, descriptions, '
+                'category, quantity and price.',
           ),
           _step(
             '04',
             Icons.volunteer_activism_outlined,
-            'Donate',
-            'Donate items that can help someone else instead of throwing them away.',
+            'Donate Items',
+            'Submit items through the donation flow. Acceptance, '
+                'pickup availability and rewards are subject to eligibility '
+                'and the actual service offered.',
+          ),
+          _step(
+            '05',
+            Icons.palette_outlined,
+            'Explore ReMaker Creations',
+            'Discover ReMaker profiles, products and creative portfolios.',
           ),
         ],
       ),
@@ -158,7 +176,7 @@ class AboutEcoLoop extends StatelessWidget {
                   description,
                   style: const TextStyle(
                     fontSize: 11,
-                    height: 1.45,
+                    height: 1.5,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -218,7 +236,7 @@ class AboutEcoLoop extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: AppColors.light.withOpacity(0.65),
+          color: AppColors.light,
           borderRadius: BorderRadius.circular(15),
         ),
         child: const Row(
@@ -227,8 +245,9 @@ class AboutEcoLoop extends StatelessWidget {
             SizedBox(width: 11),
             Expanded(
               child: Text(
-                'Every item reused is one less item going to waste. '
-                'Together, small actions can create a bigger impact.',
+                'Reuse can help reduce waste. Every listing, purchase '
+                'and eligible donation is an opportunity to keep useful '
+                'items in circulation.',
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.5,
@@ -242,23 +261,39 @@ class AboutEcoLoop extends StatelessWidget {
     );
   }
 
-  Widget _buildVersion() {
-    return const Padding(
-      padding: EdgeInsets.only(top: 12),
+  Widget _buildContact() {
+    return _section(
+      title: 'Contact EcoLoop',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'EcoLoop',
+          const Text(
+            'For questions about your account, orders, donations or privacy, '
+            'contact our support email.',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.55,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const SelectableText(
+            'ecoloopp2026@gmail.com',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
               color: AppColors.primary,
             ),
           ),
-          SizedBox(height: 4),
-          Text(
-            'Version 1.0.0',
-            style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+          const SizedBox(height: 10),
+          const Text(
+            'Minimum age, formal operator details and the formal grievance '
+            'procedure: Pending confirmation.',
+            style: TextStyle(
+              fontSize: 10,
+              height: 1.5,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),

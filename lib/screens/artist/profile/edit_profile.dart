@@ -35,6 +35,7 @@ class _EditProfileState extends State<EditProfile> {
   final TextEditingController _experienceController = TextEditingController();
 
   bool _loading = true;
+  bool _initialLoadInProgress = false;
   bool _saving = false;
   bool _uploadingPhoto = false;
   String? _loadError;
@@ -98,7 +99,8 @@ class _EditProfileState extends State<EditProfile> {
       _text(city['cityName'] ?? city['city_name'] ?? city['name']);
 
   Future<void> _loadInitialData() async {
-    if (!mounted) return;
+    if (!mounted || _initialLoadInProgress) return;
+    _initialLoadInProgress = true;
     setState(() {
       _loading = true;
       _loadError = null;
@@ -169,6 +171,8 @@ class _EditProfileState extends State<EditProfile> {
         _loading = false;
         _loadError = e.toString().replaceFirst('Exception: ', '');
       });
+    } finally {
+      _initialLoadInProgress = false;
     }
   }
 
@@ -407,11 +411,7 @@ class _EditProfileState extends State<EditProfile> {
         ],
       ),
       body: SafeArea(
-        child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: ArtistColors.primary),
-              )
-            : _loadError != null
+        child: _loadError != null && !_loading
             ? _LoadError(message: _loadError!, onRetry: _loadInitialData)
             : Form(
                 key: _formKey,

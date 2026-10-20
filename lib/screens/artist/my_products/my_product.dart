@@ -36,14 +36,28 @@ class _MyProductsState extends State<MyProducts> {
     'Most Sold',
   ];
 
+  // Keep the last successful response in memory so revisiting this page paints
+  // immediately instead of waiting for Google Sheets / Apps Script.
+  static List<Map<String, dynamic>>? _cachedProducts;
+  static List<Map<String, dynamic>>? _cachedCategories;
+  static DateTime? _cacheUpdatedAt;
+  static const Duration _cacheDuration = Duration(minutes: 2);
+
   final List<Map<String, dynamic>> _products = [];
   bool _isLoading = true;
+  bool _requestInProgress = false;
   String? _loadError;
   bool _isMutating = false;
 
   @override
   void initState() {
     super.initState();
+    final cached = _cachedProducts;
+    if (cached != null) {
+      _products.addAll(cached.map((item) => Map<String, dynamic>.from(item)));
+      _isLoading = false;
+    }
+    // Fresh cache is shown immediately; stale cache remains visible while refreshing.
     _loadProducts();
   }
 
@@ -64,15 +78,45 @@ class _MyProductsState extends State<MyProducts> {
     }
   }
 
-  Future<void> _loadProducts() async {
-    if (mounted)
+  Future<void> _loadProducts({bool forceRefresh = false}) async {
+    if (_requestInProgress) return;
+
+    final cached = _cachedProducts;
+    final cachedAt = _cacheUpdatedAt;
+    final hasCache = cached != null;
+    final cacheIsFresh =
+        hasCache &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < _cacheDuration;
+
+    if (hasCache && _products.isEmpty && mounted) {
+      _products.addAll(cached.map((item) => Map<String, dynamic>.from(item)));
+      if (mounted) setState(() => _isLoading = false);
+    }
+    if (cacheIsFresh && !forceRefresh) {
+      if (mounted && _isLoading) setState(() => _isLoading = false);
+      return;
+    }
+
+    _requestInProgress = true;
+    if (!hasCache && mounted) {
       setState(() {
         _isLoading = true;
         _loadError = null;
       });
+    } else if (mounted) {
+      // Keep the existing list visible during a background refresh.
+      setState(() => _loadError = null);
+    }
+
     try {
-      final results = await Future.wait([
-        EcoLoopApi.instance.get('/categories'),
+      // Categories and products are fetched in parallel. Reuse categories when
+      // available; only request them again when there is no cached category data.
+      final Future<dynamic> categoriesFuture = _cachedCategories != null
+          ? Future<dynamic>.value(_cachedCategories)
+          : EcoLoopApi.instance.get('/categories');
+      final results = await Future.wait<dynamic>([
+        categoriesFuture,
         EcoLoopApi.instance.get('/my/products'),
       ]);
       final categoryRows = results[0] is List
@@ -82,57 +126,75 @@ class _MyProductsState extends State<MyProducts> {
       final categories = categoryRows
           .whereType<Map>()
           .map((row) => Map<String, dynamic>.from(row))
-          .toList();
+          .toList(growable: false);
+      _cachedCategories = categories;
+
       final categoryNames = <int, String>{};
       for (final category in categories) {
         final id = int.tryParse(category['categoryId']?.toString() ?? '');
         if (id != null) categoryNames[id] = category['name']?.toString() ?? '';
       }
-      final products = productRows.whereType<Map>().map((raw) {
-        final product = Map<String, dynamic>.from(raw);
-        final rawStatus = product['status']?.toString() ?? '';
-        final imageUrls = product['imageUrls'] is List
-            ? (product['imageUrls'] as List)
-                  .map((value) => value.toString())
-                  .where((value) => value.isNotEmpty)
-                  .toList()
-            : <String>[];
-        product['imageUrls'] = imageUrls;
-        product['image'] = imageUrls.isNotEmpty ? imageUrls.first : '';
-        product['category'] =
-            categoryNames[int.tryParse(
-              product['categoryId']?.toString() ?? '',
-            )] ??
-            '';
-        product['_backendStatus'] = rawStatus;
-        product['status'] = _displayStatus(rawStatus);
-        product['price'] =
-            double.tryParse(product['price']?.toString() ?? '') ?? 0.0;
-        product['quantity'] =
-            int.tryParse(product['quantity']?.toString() ?? '') ?? 0;
-        product['availableQuantity'] =
-            int.tryParse(product['availableQuantity']?.toString() ?? '') ?? 0;
-        product['views'] =
-            int.tryParse(product['views']?.toString() ?? '') ?? 0;
-        product['wishlistCount'] =
-            int.tryParse(product['wishlistCount']?.toString() ?? '') ?? 0;
-        product['salesCount'] =
-            int.tryParse(product['salesCount']?.toString() ?? '') ?? 0;
-        return product;
-      }).toList();
+      final products = productRows
+          .whereType<Map>()
+          .map((raw) {
+            final product = Map<String, dynamic>.from(raw);
+            final rawStatus = product['status']?.toString() ?? '';
+            final imageUrls = product['imageUrls'] is List
+                ? (product['imageUrls'] as List)
+                      .map((value) => value.toString())
+                      .where((value) => value.isNotEmpty)
+                      .toList(growable: false)
+                : <String>[];
+            product['imageUrls'] = imageUrls;
+            product['image'] = imageUrls.isNotEmpty ? imageUrls.first : '';
+            product['category'] =
+                categoryNames[int.tryParse(
+                  product['categoryId']?.toString() ?? '',
+                )] ??
+                '';
+            product['_backendStatus'] = rawStatus;
+            product['status'] = _displayStatus(rawStatus);
+            product['price'] =
+                double.tryParse(product['price']?.toString() ?? '') ?? 0.0;
+            product['quantity'] =
+                int.tryParse(product['quantity']?.toString() ?? '') ?? 0;
+            product['availableQuantity'] =
+                int.tryParse(product['availableQuantity']?.toString() ?? '') ??
+                0;
+            product['views'] =
+                int.tryParse(product['views']?.toString() ?? '') ?? 0;
+            product['wishlistCount'] =
+                int.tryParse(product['wishlistCount']?.toString() ?? '') ?? 0;
+            product['salesCount'] =
+                int.tryParse(product['salesCount']?.toString() ?? '') ?? 0;
+            return product;
+          })
+          .toList(growable: false);
+
+      _cachedProducts = products
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList(growable: false);
+      _cacheUpdatedAt = DateTime.now();
       if (!mounted) return;
       setState(() {
         _products
           ..clear()
           ..addAll(products);
         _isLoading = false;
+        _loadError = null;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _loadError = error.toString().replaceFirst('Exception: ', '');
+        // If stale data exists, keep it on screen and report the issue subtly
+        // through the existing error state only when there is nothing to show.
+        if (_products.isEmpty) {
+          _loadError = error.toString().replaceFirst('Exception: ', '');
+        }
       });
+    } finally {
+      _requestInProgress = false;
     }
   }
 
@@ -473,7 +535,7 @@ class _MyProductsState extends State<MyProducts> {
             context,
             MaterialPageRoute(builder: (_) => ListingDetails(listing: product)),
           ).then((changed) {
-            if (changed == true) _loadProducts();
+            if (changed == true) _loadProducts(forceRefresh: true);
           });
         },
         child: Padding(
@@ -980,7 +1042,7 @@ class _MyProductsState extends State<MyProducts> {
           context,
           MaterialPageRoute(builder: (_) => ListingDetails(listing: product)),
         ).then((changed) {
-          if (changed == true) _loadProducts();
+          if (changed == true) _loadProducts(forceRefresh: true);
         });
         break;
 
@@ -989,7 +1051,7 @@ class _MyProductsState extends State<MyProducts> {
           context,
           MaterialPageRoute(builder: (_) => EditProduct(product: product)),
         ).then((changed) {
-          if (changed == true) _loadProducts();
+          if (changed == true) _loadProducts(forceRefresh: true);
         });
         break;
 
@@ -1144,7 +1206,7 @@ class _MyProductsState extends State<MyProducts> {
                   await EcoLoopApi.instance.delete('/products/$id');
                   if (!mounted) return;
                   _showOperationMessage('Product archived successfully.');
-                  await _loadProducts();
+                  await _loadProducts(forceRefresh: true);
                 } catch (error) {
                   if (mounted) {
                     _showOperationMessage(
@@ -1170,7 +1232,7 @@ class _MyProductsState extends State<MyProducts> {
   }
 
   // Simulates pull-to-refresh action
-  Future<void> _refreshProducts() => _loadProducts();
+  Future<void> _refreshProducts() => _loadProducts(forceRefresh: true);
 
   Future<void> _setProductStatus(
     Map<String, dynamic> product,
@@ -1185,7 +1247,7 @@ class _MyProductsState extends State<MyProducts> {
       });
       if (!mounted) return;
       _showOperationMessage('Product status updated.');
-      await _loadProducts();
+      await _loadProducts(forceRefresh: true);
     } catch (error) {
       if (mounted)
         _showOperationMessage(error.toString().replaceFirst('Exception: ', ''));

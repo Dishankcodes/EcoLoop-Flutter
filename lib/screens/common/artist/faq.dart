@@ -11,344 +11,279 @@ class ArtistFAQ extends StatefulWidget {
 }
 
 class _ArtistFAQState extends State<ArtistFAQ> {
-  final List<Map<String, String>> faqs = [
+  final List<Map<String, String>> faqs = const [
     {
       'question': 'What is EcoLoop?',
       'answer':
-          'EcoLoop is a community marketplace where users and artists can sell, buy, reuse and donate unused items.',
+          'EcoLoop is a community marketplace for buying, selling and donating '
+          'reusable items. ReMakers can showcase their creative work and list '
+          'products for interested buyers.',
     },
     {
-      'question': 'How do I sell a product as an artist?',
+      'question': 'How do I sell a product?',
       'answer':
-          'Open Add Product, upload your product photos, enter the product details, choose a category and condition, set your price and publish the product.',
+          'Open Add Product, provide the product details and images, choose '
+          'the available category, enter the price and quantity, and publish '
+          'the listing. Make sure all information is accurate.',
     },
     {
       'question': 'How can I manage my products?',
       'answer':
-          'Open My Products from your artist dashboard. From there you can view your products, edit product information and manage your listings.',
+          'Open My Products to view and manage your existing listings. The '
+          'available edit and stock-management actions depend on the product '
+          'and the options provided in the app.',
     },
     {
-      'question': 'Can I edit my product after publishing?',
+      'question': 'Can I edit a product after publishing?',
       'answer':
-          'Yes. Open My Products, select the product and choose the edit option to update its available product information.',
+          'Use the edit option for the relevant listing, where available. '
+          'Update its description, images, price or other editable fields '
+          'and save your changes.',
     },
     {
-      'question': 'How do I receive customer orders?',
+      'question': 'Where can I find customer orders?',
       'answer':
-          'When a customer purchases one of your products, the order will appear in your Selling Orders section where you can view the order details and manage its status.',
+          'Open Selling Orders or the relevant Orders section to view orders '
+          'associated with your products. Open an order to inspect its '
+          'available details and status.',
     },
     {
-      'question': 'Can I manage my selling order status?',
+      'question': 'How do I update an order?',
       'answer':
-          'Yes. Open Selling Orders, select an order and use the order status section to manage the available order stages.',
+          'Open the relevant selling order and use the status actions shown '
+          'in the app. Only select a status that accurately reflects the '
+          'order progress. Exact cancellation, return and refund rules are '
+          'Pending confirmation.',
     },
     {
-      'question': 'Can an artist buy products too?',
+      'question': 'Can ReMakers buy products too?',
       'answer':
-          'Yes. Artists can also use the Marketplace to discover and purchase products and materials available on EcoLoop.',
+          'Yes. ReMakers can browse the marketplace and purchase products '
+          'listed by other participating users or ReMakers.',
     },
     {
-      'question': 'Can an artist buy from another artist?',
+      'question': 'Can people follow my profile?',
       'answer':
-          'Yes. Artists can purchase products from both users and other artists when those products are available in the marketplace.',
-    },
-    {
-      'question': 'Can users follow my artist profile?',
-      'answer':
-          'Yes. Users can follow artist profiles and view their available products and profile information.',
+          'The app includes profile-following features. Public profile '
+          'information and published listings may be visible to other users '
+          'and the public.',
     },
     {
       'question': 'Where can I see my reviews?',
       'answer':
-          'Your product reviews can be accessed from the Reviews section of your artist account.',
+          'Open the Reviews or relevant profile section available in your '
+          'account to view feedback displayed for your work or products. '
+          'Reviews should reflect genuine experiences.',
     },
     {
       'question': 'Where can I see my earnings?',
       'answer':
-          'Your available earnings and sales-related information can be viewed from the relevant earnings section of your artist account.',
+          'Use the available earnings or analytics section. Figures shown '
+          'are app records and do not by themselves confirm that money has '
+          'been collected or settled. Payout methods and settlement timelines '
+          'are Pending unless explicitly provided in the live service.',
     },
     {
-      'question': 'Can I update my artist profile?',
+      'question': 'How do custom-service requests work?',
       'answer':
-          'Yes. Open your artist profile and choose Edit Profile to update information such as your name, bio, skills, location and profile image.',
+          'Users may submit a project brief, budget and reference materials. '
+          'Where custom-service responses are available, you can review the '
+          'request and send a proposal. Agree on scope, price, timeline, '
+          'revisions and delivery or collection arrangements before starting.',
     },
     {
-      'question': 'Can I change my email from Edit Profile?',
+      'question': 'Can I use customer reference images in my portfolio?',
       'answer':
-          'No. The artist email is treated as account information and is not part of the regular profile editing fields.',
+          'Only use material you have permission to use. Customer reference '
+          'images and private project details must not be republished in '
+          'your portfolio without appropriate permission.',
     },
     {
-      'question': 'How can I contact EcoLoop support?',
+      'question': 'Does EcoLoop currently support online payments?',
       'answer':
-          'Open Help & Support from the More menu to access the available support options.',
+          'Current payment arrangements are COD and/or offline only. Online '
+          'payment gateway processing is not active. Follow the payment '
+          'arrangement shown in the actual order flow.',
+    },
+    {
+      'question': 'Can I change my registered email?',
+      'answer':
+          'The current profile workflow does not offer email editing from '
+          'the edit-profile screen. A separate email-change process is '
+          'Pending confirmation. Contact support if you need assistance.',
+    },
+    {
+      'question': 'How can I request account deletion?',
+      'answer':
+          'Contact ecoloopp2026@gmail.com. Account closure may deactivate '
+          'your account without erasing all associated orders, reviews or '
+          'stored media. Complete deletion and retention timelines are '
+          'Pending confirmation.',
+    },
+    {
+      'question': 'How do I contact EcoLoop?',
+      'answer':
+          'Email ecoloopp2026@gmail.com. Live chat and phone support should '
+          'not be considered available unless EcoLoop officially activates '
+          'those channels.',
     },
   ];
 
-  String searchQuery = '';
-
-  List<Map<String, String>> get filteredFaqs {
-    if (searchQuery.trim().isEmpty) {
-      return faqs;
-    }
-
-    final query = searchQuery.toLowerCase().trim();
-
-    return faqs.where((faq) {
-      final question = faq['question']?.toLowerCase() ?? '';
-      final answer = faq['answer']?.toLowerCase() ?? '';
-
-      return question.contains(query) || answer.contains(query);
-    }).toList();
-  }
+  final Set<int> _expandedItems = <int>{};
 
   @override
   Widget build(BuildContext context) {
-    final items = filteredFaqs;
-
     return Scaffold(
       backgroundColor: ArtistColors.background,
-
       appBar: AppBar(
-        backgroundColor: ArtistColors.surface,
+        backgroundColor: ArtistColors.background,
         foregroundColor: ArtistColors.textPrimary,
         elevation: 0,
         scrolledUnderElevation: 0,
         title: Text(
           'Frequently Asked Questions',
           style: ArtistTextStyles.title.copyWith(
-            fontSize: 17,
+            fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: ArtistColors.textPrimary,
           ),
         ),
       ),
-
-      body: Column(
+      body: ListView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 30),
         children: [
-          _buildIntro(),
-          _buildSearch(),
-
-          Expanded(
-            child: items.isEmpty
-                ? _buildEmpty()
-                : ListView.separated(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
-                    itemCount: items.length,
-                    separatorBuilder: (_, __) {
-                      return const SizedBox(height: 8);
-                    },
-                    itemBuilder: (_, index) {
-                      return _buildQuestion(items[index]);
-                    },
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(19),
+            decoration: BoxDecoration(
+              color: ArtistColors.primary,
+              borderRadius: BorderRadius.circular(19),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.help_outline_rounded, color: Colors.white, size: 30),
+                SizedBox(height: 12),
+                Text(
+                  'How can we help?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w700,
                   ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // INTRO
-  // ===========================================================================
-
-  Widget _buildIntro() {
-    return Container(
-      width: double.infinity,
-      color: ArtistColors.surface,
-      padding: const EdgeInsets.fromLTRB(20, 5, 20, 17),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.help_outline_rounded,
-            color: ArtistColors.primary,
-            size: 25,
-          ),
-
-          const SizedBox(width: 11),
-
-          Expanded(
-            child: Text(
-              'Find quick answers about selling, buying and managing your artist account on EcoLoop.',
-              style: ArtistTextStyles.body.copyWith(
-                fontSize: 12,
-                height: 1.4,
-                color: ArtistColors.textSecondary,
-              ),
+                ),
+                SizedBox(height: 7),
+                Text(
+                  'Find answers about your ReMaker profile, products, orders, '
+                  'custom services and account.',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    height: 1.55,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // SEARCH
-  // ===========================================================================
-
-  Widget _buildSearch() {
-    return Container(
-      color: ArtistColors.surface,
-      padding: const EdgeInsets.fromLTRB(16, 3, 16, 15),
-      child: TextField(
-        onChanged: (value) {
-          setState(() {
-            searchQuery = value;
-          });
-        },
-
-        style: ArtistTextStyles.body.copyWith(
-          fontSize: 12,
-          color: ArtistColors.textPrimary,
-        ),
-
-        decoration: InputDecoration(
-          hintText: 'Search questions...',
-
-          hintStyle: ArtistTextStyles.body.copyWith(
-            fontSize: 12,
-            color: ArtistColors.textSecondary,
+          const SizedBox(height: 20),
+          Text(
+            'ReMaker Help',
+            style: ArtistTextStyles.title.copyWith(fontSize: 17),
           ),
+          const SizedBox(height: 10),
+          ...List.generate(faqs.length, (index) {
+            final faq = faqs[index];
+            final expanded = _expandedItems.contains(index);
 
-          prefixIcon: const Icon(
-            Icons.search_rounded,
-            color: ArtistColors.textSecondary,
-          ),
-
-          suffixIcon: searchQuery.isNotEmpty
-              ? IconButton(
-                  onPressed: () {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 9),
+              decoration: BoxDecoration(
+                color: ArtistColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: ArtistColors.border),
+              ),
+              child: Theme(
+                data: Theme.of(
+                  context,
+                ).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  key: PageStorageKey<String>('artist-faq-$index'),
+                  initiallyExpanded: expanded,
+                  onExpansionChanged: (value) {
                     setState(() {
-                      searchQuery = '';
+                      if (value) {
+                        _expandedItems.add(index);
+                      } else {
+                        _expandedItems.remove(index);
+                      }
                     });
                   },
-                  icon: const Icon(
-                    Icons.clear_rounded,
-                    color: ArtistColors.textSecondary,
+                  tilePadding: const EdgeInsets.symmetric(
+                    horizontal: 15,
+                    vertical: 3,
                   ),
-                )
-              : null,
-
-          filled: true,
-          fillColor: ArtistColors.background,
-
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide.none,
-          ),
-
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide.none,
-          ),
-
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: ArtistColors.primary, width: 1),
-          ),
-
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // QUESTION
-  // ===========================================================================
-
-  Widget _buildQuestion(Map<String, String> faq) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: Container(
-        decoration: BoxDecoration(
-          color: ArtistColors.surface,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: ArtistColors.border),
-        ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 2),
-
-          childrenPadding: const EdgeInsets.fromLTRB(15, 0, 15, 16),
-
-          iconColor: ArtistColors.primary,
-          collapsedIconColor: ArtistColors.textSecondary,
-
-          title: Text(
-            faq['question'] ?? '',
-            style: ArtistTextStyles.body.copyWith(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: ArtistColors.textPrimary,
-            ),
-          ),
-
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                faq['answer'] ?? '',
-                style: ArtistTextStyles.body.copyWith(
-                  fontSize: 11,
-                  height: 1.55,
-                  color: ArtistColors.textSecondary,
+                  childrenPadding: const EdgeInsets.fromLTRB(15, 0, 15, 16),
+                  iconColor: ArtistColors.primary,
+                  collapsedIconColor: ArtistColors.textSecondary,
+                  title: Text(
+                    faq['question']!,
+                    style: ArtistTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        faq['answer']!,
+                        style: ArtistTextStyles.body.copyWith(
+                          height: 1.6,
+                          color: ArtistColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+            );
+          }),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(17),
+            decoration: BoxDecoration(
+              color: ArtistColors.surface,
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: ArtistColors.border),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // EMPTY
-  // ===========================================================================
-
-  Widget _buildEmpty() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(30),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              height: 75,
-              width: 75,
-              decoration: BoxDecoration(
-                color: ArtistColors.surfaceSoft,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Icon(
-                Icons.search_off_rounded,
-                size: 35,
-                color: ArtistColors.primary,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Still need help?',
+                  style: ArtistTextStyles.title.copyWith(fontSize: 16),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'For account, order, privacy or other support concerns, '
+                  'contact EcoLoop by email.',
+                  style: ArtistTextStyles.body.copyWith(
+                    height: 1.5,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SelectableText(
+                  'ecoloopp2026@gmail.com',
+                  style: ArtistTextStyles.bodyMedium.copyWith(
+                    color: ArtistColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
-
-            const SizedBox(height: 15),
-
-            Text(
-              'No questions found',
-              style: ArtistTextStyles.title.copyWith(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: ArtistColors.textPrimary,
-              ),
-            ),
-
-            const SizedBox(height: 6),
-
-            Text(
-              'Try searching with a different keyword.',
-              textAlign: TextAlign.center,
-              style: ArtistTextStyles.body.copyWith(
-                fontSize: 11,
-                color: ArtistColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

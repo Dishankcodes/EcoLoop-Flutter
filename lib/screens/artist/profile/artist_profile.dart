@@ -29,6 +29,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
   List<Map<String, dynamic>> _reviews = [];
 
   bool _loading = true;
+  bool _profileLoadInProgress = false;
   bool _following = false;
   int? _followerCount;
   bool _followBusy = false;
@@ -109,6 +110,8 @@ class _ArtistProfileState extends State<ArtistProfile> {
   }
 
   Future<void> _loadProfileData({bool refresh = false}) async {
+    if (_profileLoadInProgress) return;
+    _profileLoadInProgress = true;
     if (_artistId.isEmpty) {
       if (mounted) {
         setState(() {
@@ -117,6 +120,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
               'Artist ID is missing. Open this page using the artist record returned by the backend.';
         });
       }
+      _profileLoadInProgress = false;
       return;
     }
 
@@ -238,6 +242,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
       _canReview = eligibleOrder != null && !alreadyReviewed;
       _reviewEligibilityChecked = true;
     });
+    _profileLoadInProgress = false;
   }
 
   Future<dynamic> _safeGet(String path, {required dynamic fallback}) async {

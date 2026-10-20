@@ -21,6 +21,9 @@ class _ArtistCustomServiceDetailsState
 
   bool loading = true;
   bool saving = false;
+  bool _loadInFlight = false;
+
+  static final Map<int, Map<String, dynamic>> _detailsCache = {};
 
   Map<String, dynamic> row = <String, dynamic>{};
 
@@ -39,7 +42,22 @@ class _ArtistCustomServiceDetailsState
   @override
   void initState() {
     super.initState();
-    load();
+    final cached = _detailsCache[widget.serviceId];
+    if (cached != null) {
+      row = Map<String, dynamic>.from(cached);
+      loading = false;
+      final previous = v(row['artistResponse']);
+      if (previous.isNotEmpty) response.text = previous;
+      final savedStatus = v(row['status']);
+      if (const [
+        'Interested',
+        'Need more details',
+        'Declined',
+      ].contains(savedStatus)) {
+        status = savedStatus;
+      }
+    }
+    load(silent: cached != null);
   }
 
   @override
@@ -48,13 +66,16 @@ class _ArtistCustomServiceDetailsState
     super.dispose();
   }
 
-  Future<void> load() async {
-    if (!mounted) return;
+  Future<void> load({bool silent = false}) async {
+    if (!mounted || _loadInFlight) return;
+    _loadInFlight = true;
 
-    setState(() {
-      loading = true;
-      error = null;
-    });
+    if (!silent) {
+      setState(() {
+        if (row.isEmpty) loading = true;
+        error = null;
+      });
+    }
 
     try {
       dynamic result = await api.get('/custom-services/${widget.serviceId}');
@@ -78,6 +99,7 @@ class _ArtistCustomServiceDetailsState
       }
 
       final parsed = m(result);
+      _detailsCache[widget.serviceId] = Map<String, dynamic>.from(parsed);
 
       if (!mounted) return;
 
@@ -110,10 +132,13 @@ class _ArtistCustomServiceDetailsState
     } catch (e) {
       if (!mounted) return;
 
-      setState(() {
-        error = e.toString().replaceFirst('Exception: ', '');
-      });
+      if (!silent || row.isEmpty) {
+        setState(() {
+          error = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
     } finally {
+      _loadInFlight = false;
       if (mounted) {
         setState(() => loading = false);
       }
@@ -479,11 +504,7 @@ class _ArtistCustomServiceDetailsState
           style: ArtistTextStyles.title.copyWith(fontWeight: FontWeight.w800),
         ),
       ),
-      body: loading
-          ? const Center(
-              child: CircularProgressIndicator(color: ArtistColors.primary),
-            )
-          : error != null
+      body: error != null && row.isEmpty
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -514,6 +535,11 @@ class _ArtistCustomServiceDetailsState
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(18),
                 children: [
+                  if (loading)
+                    const LinearProgressIndicator(
+                      minHeight: 2,
+                      color: ArtistColors.primary,
+                    ),
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(

@@ -28,6 +28,8 @@ class _ArtistHomeState extends State<ArtistHome> {
   final EcoLoopApi _api = EcoLoopApi.instance;
 
   bool _loading = true;
+  bool _dashboardRequestInProgress = false;
+  bool _earningsRequestInProgress = false;
   bool _refreshing = false;
   bool _ordersLoading = false;
   bool _productsLoading = false;
@@ -162,7 +164,9 @@ class _ArtistHomeState extends State<ArtistHome> {
   }
 
   Future<void> _loadDashboard({bool refresh = false}) async {
-    if (!mounted || (_refreshing && refresh)) return;
+    if (!mounted || _dashboardRequestInProgress || (_refreshing && refresh))
+      return;
+    _dashboardRequestInProgress = true;
     setState(() {
       _error = null;
       if (refresh) {
@@ -197,6 +201,7 @@ class _ArtistHomeState extends State<ArtistHome> {
         }
       });
 
+      _dashboardRequestInProgress = false;
       unawaited(_loadEarnings());
       if (refresh) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -208,6 +213,7 @@ class _ArtistHomeState extends State<ArtistHome> {
         });
       }
     } catch (e) {
+      _dashboardRequestInProgress = false;
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -218,6 +224,8 @@ class _ArtistHomeState extends State<ArtistHome> {
   }
 
   Future<void> _loadEarnings() async {
+    if (_earningsRequestInProgress || !mounted) return;
+    _earningsRequestInProgress = true;
     try {
       final result = await _api.get('/artist/analytics/earnings');
       if (!mounted) return;
@@ -225,6 +233,8 @@ class _ArtistHomeState extends State<ArtistHome> {
     } catch (_) {
       // Headline analytics already provides a revenue fallback. Keep the
       // dashboard usable if the dedicated earnings endpoint is unavailable.
+    } finally {
+      _earningsRequestInProgress = false;
     }
   }
 
@@ -376,96 +386,96 @@ class _ArtistHomeState extends State<ArtistHome> {
       backgroundColor: ArtistColors.background,
       body: SafeArea(
         bottom: false,
-        child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: ArtistColors.primary),
-              )
-            : RefreshIndicator(
-                color: ArtistColors.primary,
-                onRefresh: () => _loadDashboard(refresh: true),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isWide = constraints.maxWidth >= 700;
-                    return NotificationListener<ScrollNotification>(
-                      onNotification: (notification) {
-                        if (notification is ScrollUpdateNotification ||
-                            notification is ScrollEndNotification) {
-                          _onDashboardScroll();
-                        }
-                        return false;
-                      },
-                      child: SingleChildScrollView(
-                        controller: _scrollController,
-                        physics: const AlwaysScrollableScrollPhysics(
-                          parent: BouncingScrollPhysics(),
-                        ),
-                        padding: EdgeInsets.fromLTRB(
-                          isWide ? 32 : 20,
-                          18,
-                          isWide ? 32 : 20,
-                          110,
-                        ),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 1100),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildHeader(),
-                                if (_error != null) ...[
-                                  const SizedBox(height: 14),
-                                  _buildErrorBanner(),
-                                ],
-                                const SizedBox(height: 22),
-                                _buildEarningsCard(),
-                                const SizedBox(height: 18),
-                                _buildStats(isWide),
-                                const SizedBox(height: 30),
-                                _buildSectionHeader(
-                                  'Quick Actions',
-                                  'Manage your store',
-                                ),
-                                const SizedBox(height: 12),
-                                _buildQuickActions(isWide),
-                                const SizedBox(height: 30),
-                                _buildSectionHeader(
-                                  'Recent Orders',
-                                  'View all',
-                                  onTap: () => _handleQuickAction('orders'),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildRecentOrders(),
-                                const SizedBox(height: 30),
-                                _buildSectionHeader(
-                                  'Top Performing Products',
-                                  'View all',
-                                  onTap: () => _handleQuickAction('products'),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildTopProducts(),
-                                const SizedBox(height: 30),
-                                _buildSectionHeader(
-                                  'Store Overview',
-                                  'Analytics',
-                                ),
-                                const SizedBox(height: 12),
-                                _buildPerformanceCard(),
-                                if (_refreshing) ...[
-                                  const SizedBox(height: 12),
-                                  const LinearProgressIndicator(
-                                    color: ArtistColors.primary,
-                                    minHeight: 2,
-                                  ),
-                                ],
-                              ],
+        child: RefreshIndicator(
+          color: ArtistColors.primary,
+          onRefresh: () => _loadDashboard(refresh: true),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 700;
+              return NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (notification is ScrollUpdateNotification ||
+                      notification is ScrollEndNotification) {
+                    _onDashboardScroll();
+                  }
+                  return false;
+                },
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
+                  padding: EdgeInsets.fromLTRB(
+                    isWide ? 32 : 20,
+                    18,
+                    isWide ? 32 : 20,
+                    110,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1100),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildHeader(),
+                          if (_loading) ...[
+                            const SizedBox(height: 14),
+                            const LinearProgressIndicator(
+                              color: ArtistColors.primary,
+                              minHeight: 2,
                             ),
+                          ],
+                          if (_error != null) ...[
+                            const SizedBox(height: 14),
+                            _buildErrorBanner(),
+                          ],
+                          const SizedBox(height: 22),
+                          _buildEarningsCard(),
+                          const SizedBox(height: 18),
+                          _buildStats(isWide),
+                          const SizedBox(height: 30),
+                          _buildSectionHeader(
+                            'Quick Actions',
+                            'Manage your store',
                           ),
-                        ),
+                          const SizedBox(height: 12),
+                          _buildQuickActions(isWide),
+                          const SizedBox(height: 30),
+                          _buildSectionHeader(
+                            'Recent Orders',
+                            'View all',
+                            onTap: () => _handleQuickAction('orders'),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildRecentOrders(),
+                          const SizedBox(height: 30),
+                          _buildSectionHeader(
+                            'Top Performing Products',
+                            'View all',
+                            onTap: () => _handleQuickAction('products'),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTopProducts(),
+                          const SizedBox(height: 30),
+                          _buildSectionHeader('Store Overview', 'Analytics'),
+                          const SizedBox(height: 12),
+                          _buildPerformanceCard(),
+                          if (_refreshing) ...[
+                            const SizedBox(height: 12),
+                            const LinearProgressIndicator(
+                              color: ArtistColors.primary,
+                              minHeight: 2,
+                            ),
+                          ],
+                        ],
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
-              ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }

@@ -38,148 +38,205 @@ class UserHowItWorks extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(),
-
               const SizedBox(height: 24),
 
               _buildSectionTitle(
-                'Buy Sustainable Products',
+                'Buy Products',
                 'Find useful products and give them a new life.',
               ),
-
               const SizedBox(height: 14),
-
               _buildStep(
                 number: '01',
                 icon: Icons.search_rounded,
                 title: 'Explore Products',
                 description:
-                    'Browse the EcoLoop marketplace and explore products '
-                    'made from recycled, reused and upcycled materials.',
+                    'Browse marketplace listings from users and ReMakers. '
+                    'Explore available products and categories.',
               ),
-
               _buildConnector(),
-
               _buildStep(
                 number: '02',
                 icon: Icons.visibility_outlined,
                 title: 'View Product Details',
                 description:
-                    'Check product images, price, condition, category, '
-                    'seller information, location and availability before buying.',
+                    'Check the product images, description, price, condition, '
+                    'seller information and availability before ordering.',
               ),
-
               _buildConnector(),
-
               _buildStep(
                 number: '03',
                 icon: Icons.shopping_cart_outlined,
-                title: 'Add to Cart & Checkout',
+                title: 'Checkout',
                 description:
-                    'Choose the product you want, add it to your cart and '
-                    'complete the checkout and payment process.',
+                    'Review the order details, quantity, delivery information '
+                    'and price summary before confirming your order.',
               ),
-
               _buildConnector(),
-
               _buildStep(
                 number: '04',
                 icon: Icons.local_shipping_outlined,
-                title: 'Track Your Order',
+                title: 'Follow Your Order',
                 description:
-                    'After placing your order, use order tracking to follow '
-                    'its progress until it reaches you.',
+                    'Open Orders and Buying Orders to view available order '
+                    'status, tracking and delivery information.',
               ),
 
               const SizedBox(height: 30),
 
               _buildSectionTitle(
-                'Give Your Items a New Life',
-                'EcoLoop also lets you sell or donate unused items.',
+                'Sell Your Items',
+                'List items you are authorised to sell.',
               ),
-
               const SizedBox(height: 14),
-
               _buildStep(
                 number: '05',
-                icon: Icons.sell_outlined,
-                title: 'Sell an Item',
+                icon: Icons.add_box_outlined,
+                title: 'Create a Listing',
                 description:
-                    'Create a listing by adding your product information, '
-                    'category, price, stock, description and images.',
+                    'Open Add Product, add photos, enter the product name '
+                    'and description, choose the category, set the price '
+                    'and enter the available quantity.',
               ),
-
               _buildConnector(),
-
               _buildStep(
                 number: '06',
-                icon: Icons.volunteer_activism_outlined,
-                title: 'Donate an Item',
+                icon: Icons.storefront_outlined,
+                title: 'Publish and Manage',
                 description:
-                    'Choose an item you want to give away and create a '
-                    'donation listing so it can find a new owner.',
+                    'Publish your listing and manage it through My Listings. '
+                    'Keep product information, prices and stock accurate.',
               ),
-
               _buildConnector(),
-
               _buildStep(
                 number: '07',
-                icon: Icons.receipt_long_outlined,
-                title: 'Manage Your Orders',
+                icon: Icons.inventory_2_outlined,
+                title: 'Manage Selling Orders',
                 description:
-                    'View your purchases, selling orders and order details '
-                    'from your account.',
+                    'Review incoming orders and use the available order '
+                    'status actions to reflect actual progress.',
               ),
 
               const SizedBox(height: 30),
 
               _buildSectionTitle(
-                'Share Your Experience',
-                'Your feedback helps the EcoLoop community.',
+                'Donate Items',
+                'Help useful items find another purpose.',
+              ),
+              const SizedBox(height: 14),
+              _buildStep(
+                number: '08',
+                icon: Icons.volunteer_activism_outlined,
+                title: 'Submit a Donation',
+                description:
+                    'Open the donation feature, provide the requested item '
+                    'details and photos, and submit the donation request.',
+              ),
+              _buildConnector(),
+              _buildStep(
+                number: '09',
+                icon: Icons.local_shipping_outlined,
+                title: 'Check Donation Status',
+                description:
+                    'Follow the status shown for your request. Acceptance, '
+                    'pickup availability, timing and rewards depend on '
+                    'eligibility and the actual service offered.',
               ),
 
-              const SizedBox(height: 14),
+              const SizedBox(height: 30),
 
+              _buildSectionTitle(
+                'Explore Custom Services',
+                'Connect your project requirements with ReMakers.',
+              ),
+              const SizedBox(height: 14),
+              _buildStep(
+                number: '10',
+                icon: Icons.design_services_outlined,
+                title: 'Submit Your Requirements',
+                description:
+                    'Where custom services are available, describe your '
+                    'project, budget and expected outcome. Add reference '
+                    'images only if you have permission to share them.',
+              ),
+              _buildConnector(),
+              _buildStep(
+                number: '11',
+                icon: Icons.handshake_outlined,
+                title: 'Review ReMaker Proposals',
+                description:
+                    'Review the proposals available for your request. '
+                    'Before accepting, clarify scope, price, timeline, '
+                    'revisions and delivery or collection arrangements.',
+              ),
+              _buildConnector(),
+              _buildStep(
+                number: '12',
+                icon: Icons.check_circle_outline_rounded,
+                title: 'Confirm Completion',
+                description:
+                    'Use the available request and acceptance actions to '
+                    'record progress. Keep any agreement about completion, '
+                    'ownership and disputes clear with the ReMaker.',
+              ),
+
+              const SizedBox(height: 30),
+
+              _buildSectionTitle(
+                'Make the Most of EcoLoop',
+                'Use the features available in your account.',
+              ),
+              const SizedBox(height: 14),
               _buildFeatureCard(
                 icon: Icons.star_outline_rounded,
                 title: 'Write Reviews',
                 description:
-                    'After purchasing a product, share your rating and '
-                    'experience to help other users make informed decisions.',
+                    'Share honest feedback about a genuine purchase or '
+                    'experience when the review option is available.',
               ),
-
               const SizedBox(height: 12),
-
               _buildFeatureCard(
                 icon: Icons.favorite_border_rounded,
                 title: 'Save Products',
                 description:
-                    'Add products to your wishlist so you can easily find '
-                    'them again later.',
+                    'Add products to your wishlist so you can find them '
+                    'again later.',
               ),
-
               const SizedBox(height: 12),
-
+              _buildFeatureCard(
+                icon: Icons.palette_outlined,
+                title: 'Discover ReMakers',
+                description:
+                    'Explore public profiles, products and portfolio '
+                    'work from creators in the EcoLoop community.',
+              ),
+              const SizedBox(height: 12),
               _buildFeatureCard(
                 icon: Icons.eco_outlined,
                 title: 'Track Your Eco Impact',
                 description:
-                    'Use your Eco Impact section to see your contribution '
-                    'towards reuse and sustainable living.',
+                    'View the Eco Impact information displayed in your '
+                    'account. Figures depend on the available recorded data.',
               ),
 
               const SizedBox(height: 28),
-
               _buildBottomCard(),
+              const SizedBox(height: 15),
+              Center(
+                child: Text(
+                  'Support: ecoloopp2026@gmail.com',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.body.copyWith(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // HEADER
-  // ---------------------------------------------------------------------------
 
   Widget _buildHeader() {
     return Container(
@@ -201,9 +258,7 @@ class UserHowItWorks extends StatelessWidget {
             ),
             child: const Icon(Icons.eco_rounded, color: Colors.white, size: 31),
           ),
-
           const SizedBox(width: 15),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,14 +270,12 @@ class UserHowItWorks extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-
                 const SizedBox(height: 5),
-
                 Text(
                   'Buy, sell, donate and give unused things a new life.',
                   style: AppTextStyles.body.copyWith(
                     fontSize: 11.5,
-                    height: 1.4,
+                    height: 1.5,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -233,10 +286,6 @@ class UserHowItWorks extends StatelessWidget {
       ),
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // SECTION TITLE
-  // ---------------------------------------------------------------------------
 
   Widget _buildSectionTitle(String title, String subtitle) {
     return Column(
@@ -249,23 +298,18 @@ class UserHowItWorks extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-
         const SizedBox(height: 4),
-
         Text(
           subtitle,
           style: AppTextStyles.body.copyWith(
             fontSize: 11,
+            height: 1.5,
             color: AppColors.textSecondary,
           ),
         ),
       ],
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // STEP CARD
-  // ---------------------------------------------------------------------------
 
   Widget _buildStep({
     required String number,
@@ -303,7 +347,6 @@ class UserHowItWorks extends StatelessWidget {
                 ),
                 child: Icon(icon, color: AppColors.primary, size: 24),
               ),
-
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
@@ -321,9 +364,7 @@ class UserHowItWorks extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(width: 14),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -336,15 +377,13 @@ class UserHowItWorks extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-
                 const SizedBox(height: 5),
-
                 Text(
                   description,
                   style: AppTextStyles.body.copyWith(
                     color: AppColors.textSecondary,
                     fontSize: 11,
-                    height: 1.45,
+                    height: 1.55,
                   ),
                 ),
               ],
@@ -355,10 +394,6 @@ class UserHowItWorks extends StatelessWidget {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // CONNECTOR
-  // ---------------------------------------------------------------------------
-
   Widget _buildConnector() {
     return Container(
       margin: const EdgeInsets.only(left: 24),
@@ -367,10 +402,6 @@ class UserHowItWorks extends StatelessWidget {
       color: AppColors.accent,
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // FEATURE CARD
-  // ---------------------------------------------------------------------------
 
   Widget _buildFeatureCard({
     required IconData icon,
@@ -386,6 +417,7 @@ class UserHowItWorks extends StatelessWidget {
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 43,
@@ -396,9 +428,7 @@ class UserHowItWorks extends StatelessWidget {
             ),
             child: Icon(icon, color: AppColors.primary, size: 22),
           ),
-
           const SizedBox(width: 13),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -411,15 +441,13 @@ class UserHowItWorks extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-
                 const SizedBox(height: 4),
-
                 Text(
                   description,
                   style: AppTextStyles.body.copyWith(
                     color: AppColors.textSecondary,
                     fontSize: 10.5,
-                    height: 1.4,
+                    height: 1.5,
                   ),
                 ),
               ],
@@ -429,10 +457,6 @@ class UserHowItWorks extends StatelessWidget {
       ),
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // BOTTOM ECO CARD
-  // ---------------------------------------------------------------------------
 
   Widget _buildBottomCard() {
     return Container(
@@ -445,16 +469,16 @@ class UserHowItWorks extends StatelessWidget {
       child: Row(
         children: [
           const Icon(Icons.recycling_rounded, color: Colors.white, size: 28),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Text(
-              'Every reused, recycled, sold or donated item can help reduce waste and support a more sustainable community.',
+              'Every reused, sold or donated item can help keep useful '
+              'materials in circulation and support a more sustainable '
+              'community.',
               style: AppTextStyles.body.copyWith(
                 color: Colors.white,
                 fontSize: 11.5,
-                height: 1.45,
+                height: 1.5,
                 fontWeight: FontWeight.w500,
               ),
             ),

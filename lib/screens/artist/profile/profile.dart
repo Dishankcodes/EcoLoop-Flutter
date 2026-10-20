@@ -119,8 +119,11 @@ class _ProfileState extends State<Profile> {
     return text.isEmpty ? fallback : text;
   }
 
+  bool _profileRequestInFlight = false;
+
   Future<void> _loadProfile({bool refresh = false}) async {
-    if (!mounted) return;
+    if (!mounted || _profileRequestInFlight) return;
+    _profileRequestInFlight = true;
     setState(() {
       if (refresh) {
         _refreshing = true;
@@ -196,6 +199,8 @@ class _ProfileState extends State<Profile> {
         _refreshing = false;
         _error = e.toString().replaceFirst('Exception: ', '');
       });
+    } finally {
+      _profileRequestInFlight = false;
     }
   }
 
@@ -250,62 +255,63 @@ class _ProfileState extends State<Profile> {
         actions: const [ArtistMoreMenu(), SizedBox(width: 8)],
       ),
       body: SafeArea(
-        child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: ArtistColors.primary),
-              )
-            : RefreshIndicator(
-                color: ArtistColors.primary,
-                onRefresh: () => _loadProfile(refresh: true),
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
+        child: RefreshIndicator(
+          color: ArtistColors.primary,
+          onRefresh: () => _loadProfile(refresh: true),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 10),
+                    child: LinearProgressIndicator(minHeight: 2),
                   ),
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_error != null) ...[
-                        _ErrorBanner(
-                          message: _error!,
-                          onRetry: () => _loadProfile(refresh: true),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      _buildProfileHeader(context),
-                      const SizedBox(height: 16),
-                      _buildFollowCards(context),
-                      const SizedBox(height: 18),
-                      if (_refreshing)
-                        const LinearProgressIndicator(
-                          minHeight: 2,
-                          color: ArtistColors.primary,
-                        ),
-                      const SizedBox(height: 12),
-                      _buildQuickStats(context),
-                      const SizedBox(height: 24),
-                      _buildMyAccountSection(context),
-                      const SizedBox(height: 22),
-                      _buildProductsSection(context),
-                      const SizedBox(height: 22),
-                      _buildBusinessSection(context),
-                      const SizedBox(height: 22),
-                      _buildPreferencesSection(context),
-                      const SizedBox(height: 22),
-                      _buildLogoutButton(context),
-                      const SizedBox(height: 14),
-                      Center(
-                        child: Text(
-                          'EcoLoop • Give Things a New Life',
-                          style: ArtistTextStyles.caption.copyWith(
-                            color: ArtistColors.textSecondary.withOpacity(0.65),
-                          ),
-                        ),
-                      ),
-                    ],
+                if (_error != null) ...[
+                  _ErrorBanner(
+                    message: _error!,
+                    onRetry: () => _loadProfile(refresh: true),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _buildProfileHeader(context),
+                const SizedBox(height: 16),
+                _buildFollowCards(context),
+                const SizedBox(height: 18),
+                if (_refreshing)
+                  const LinearProgressIndicator(
+                    minHeight: 2,
+                    color: ArtistColors.primary,
+                  ),
+                const SizedBox(height: 12),
+                _buildQuickStats(context),
+                const SizedBox(height: 24),
+                _buildMyAccountSection(context),
+                const SizedBox(height: 22),
+                _buildProductsSection(context),
+                const SizedBox(height: 22),
+                _buildBusinessSection(context),
+                const SizedBox(height: 22),
+                _buildPreferencesSection(context),
+                const SizedBox(height: 22),
+                _buildLogoutButton(context),
+                const SizedBox(height: 14),
+                Center(
+                  child: Text(
+                    'EcoLoop • Give Things a New Life',
+                    style: ArtistTextStyles.caption.copyWith(
+                      color: ArtistColors.textSecondary.withOpacity(0.65),
+                    ),
                   ),
                 ),
-              ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

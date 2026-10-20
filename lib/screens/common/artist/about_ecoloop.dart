@@ -10,7 +10,6 @@ class ArtistAboutEcoLoop extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ArtistColors.background,
-
       appBar: AppBar(
         backgroundColor: ArtistColors.surface,
         foregroundColor: ArtistColors.textPrimary,
@@ -25,28 +24,31 @@ class ArtistAboutEcoLoop extends StatelessWidget {
           ),
         ),
       ),
-
       body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 30),
         child: Column(
           children: [
-            _buildHero(),
-            _buildMission(),
-            _buildHowItWorks(),
-            _buildValues(),
-            _buildCommunity(),
-            _buildVersion(),
+            _hero(),
+            _section(
+              'Our Mission',
+              'EcoLoop is a community marketplace designed to help people '
+                  'buy, sell and donate reusable items, while connecting them '
+                  'with ReMakers who create, restore and transform materials. '
+                  'The goal is to give useful things another life and encourage '
+                  'more thoughtful consumption.',
+            ),
+            _howItWorks(),
+            _values(),
+            _community(),
+            _footer(),
           ],
         ),
       ),
     );
   }
 
-  // ===========================================================================
-  // HERO
-  // ===========================================================================
-
-  Widget _buildHero() {
+  Widget _hero() {
     return Container(
       width: double.infinity,
       color: ArtistColors.surface,
@@ -66,9 +68,7 @@ class ArtistAboutEcoLoop extends StatelessWidget {
               color: ArtistColors.primary,
             ),
           ),
-
           const SizedBox(height: 18),
-
           Text(
             'EcoLoop',
             style: ArtistTextStyles.title.copyWith(
@@ -77,9 +77,7 @@ class ArtistAboutEcoLoop extends StatelessWidget {
               color: ArtistColors.primary,
             ),
           ),
-
           const SizedBox(height: 7),
-
           Text(
             'Give unused things a new life.',
             textAlign: TextAlign.center,
@@ -88,76 +86,96 @@ class ArtistAboutEcoLoop extends StatelessWidget {
               color: ArtistColors.textSecondary,
             ),
           ),
+          const SizedBox(height: 12),
+          Text(
+            'A marketplace for reuse, creativity and more sustainable choices.',
+            textAlign: TextAlign.center,
+            style: ArtistTextStyles.caption.copyWith(height: 1.5),
+          ),
         ],
       ),
     );
   }
 
-  // ===========================================================================
-  // MISSION
-  // ===========================================================================
-
-  Widget _buildMission() {
-    return _section(
-      title: 'Our Mission',
-      child: Text(
-        'EcoLoop is a community marketplace built to help people '
-        'sell, buy, reuse and donate items that still have value. '
-        'Instead of letting useful products become waste, EcoLoop '
-        'helps connect them with people who can use them again.',
-        style: ArtistTextStyles.body.copyWith(
-          fontSize: 13,
-          height: 1.65,
-          color: ArtistColors.textSecondary,
-        ),
+  Widget _section(String title, String description) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
+      color: ArtistColors.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: ArtistTextStyles.title.copyWith(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            description,
+            style: ArtistTextStyles.body.copyWith(
+              fontSize: 13,
+              height: 1.65,
+              color: ArtistColors.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // ===========================================================================
-  // HOW IT WORKS
-  // ===========================================================================
-
-  Widget _buildHowItWorks() {
-    return _section(
-      title: 'How EcoLoop Works',
+  Widget _howItWorks() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 5),
+      color: ArtistColors.surface,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            'How EcoLoop Works',
+            style: ArtistTextStyles.title.copyWith(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 18),
           _step(
             '01',
             Icons.sell_outlined,
             'List an Item',
-            'Sell your unused items by creating a simple listing.',
+            'Create a listing with an accurate description, photos, price '
+                'and availability.',
           ),
-
           _step(
             '02',
             Icons.search_rounded,
-            'Find Something Useful',
-            'Explore items listed by people and creators in the community.',
+            'Discover Useful Products',
+            'Explore products and reusable materials offered by users '
+                'and ReMakers.',
           ),
-
           _step(
             '03',
-            Icons.recycling_rounded,
-            'Reuse & Recycle',
-            'Give products, materials and useful items another purpose.',
+            Icons.palette_outlined,
+            'Showcase Your Creativity',
+            'Use your ReMaker profile and portfolio to present your work '
+                'and transformation stories.',
           ),
-
           _step(
             '04',
             Icons.volunteer_activism_outlined,
-            'Donate',
-            'Donate items that can help someone else instead of throwing them away.',
+            'Donate and Reuse',
+            'Use the available donation features to offer eligible items '
+                'for reuse. Pickup and reward availability are not guaranteed.',
           ),
         ],
       ),
     );
   }
-
-  // ===========================================================================
-  // STEP
-  // ===========================================================================
 
   Widget _step(String number, IconData icon, String title, String description) {
     return Padding(
@@ -174,9 +192,7 @@ class ArtistAboutEcoLoop extends StatelessWidget {
             ),
             child: Icon(icon, color: ArtistColors.primary, size: 22),
           ),
-
           const SizedBox(width: 13),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,9 +217,7 @@ class ArtistAboutEcoLoop extends StatelessWidget {
                         ),
                       ),
                     ),
-
                     const SizedBox(width: 7),
-
                     Expanded(
                       child: Text(
                         title,
@@ -216,14 +230,12 @@ class ArtistAboutEcoLoop extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 5),
-
                 Text(
                   description,
                   style: ArtistTextStyles.body.copyWith(
                     fontSize: 11,
-                    height: 1.45,
+                    height: 1.5,
                     color: ArtistColors.textSecondary,
                   ),
                 ),
@@ -235,159 +247,118 @@ class ArtistAboutEcoLoop extends StatelessWidget {
     );
   }
 
-  // ===========================================================================
-  // VALUES
-  // ===========================================================================
-
-  Widget _buildValues() {
-    return _section(
-      title: 'What We Believe In',
-      child: Wrap(
-        spacing: 9,
-        runSpacing: 9,
-        children: [
-          _tag(Icons.recycling, 'Reuse'),
-
-          _tag(Icons.eco_outlined, 'Sustainability'),
-
-          _tag(Icons.people_outline, 'Community'),
-
-          _tag(Icons.favorite_border, 'Responsibility'),
-
-          _tag(Icons.auto_awesome_outlined, 'Creativity'),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // TAG
-  // ===========================================================================
-
-  Widget _tag(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-      decoration: BoxDecoration(
-        color: ArtistColors.surfaceSoft,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: ArtistColors.primary),
-
-          const SizedBox(width: 6),
-
-          Text(
-            text,
-            style: ArtistTextStyles.body.copyWith(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: ArtistColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // COMMUNITY
-  // ===========================================================================
-
-  Widget _buildCommunity() {
-    return _section(
-      title: 'Built for the Community',
-      child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: ArtistColors.surfaceSoft.withValues(alpha: 0.65),
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.groups_outlined,
-              color: ArtistColors.primary,
-              size: 25,
-            ),
-
-            const SizedBox(width: 11),
-
-            Expanded(
-              child: Text(
-                'Every item reused is one less item going to waste. '
-                'Together, small actions can create a bigger impact.',
-                style: ArtistTextStyles.body.copyWith(
-                  fontSize: 11,
-                  height: 1.5,
-                  color: ArtistColors.textSecondary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // VERSION
-  // ===========================================================================
-
-  Widget _buildVersion() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Column(
-        children: [
-          Text(
-            'EcoLoop',
-            style: ArtistTextStyles.body.copyWith(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: ArtistColors.primary,
-            ),
-          ),
-
-          const SizedBox(height: 4),
-
-          Text(
-            'Version 1.0.0',
-            style: ArtistTextStyles.body.copyWith(
-              fontSize: 10,
-              color: ArtistColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // SECTION
-  // ===========================================================================
-
-  Widget _section({required String title, required Widget child}) {
+  Widget _values() {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(20),
       color: ArtistColors.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            title,
+            'What We Value',
             style: ArtistTextStyles.title.copyWith(
-              fontSize: 18,
+              fontSize: 17,
               fontWeight: FontWeight.w700,
-              color: ArtistColors.textPrimary,
             ),
           ),
-
           const SizedBox(height: 15),
+          _value(
+            Icons.recycling_outlined,
+            'Reuse over waste',
+            'Encourage useful items and materials to find a new purpose.',
+          ),
+          _value(
+            Icons.handshake_outlined,
+            'Community',
+            'Connect people who have useful items with people who need them.',
+          ),
+          _value(
+            Icons.brush_outlined,
+            'Creativity',
+            'Give ReMakers a place to present their work and skills.',
+          ),
+          _value(
+            Icons.verified_user_outlined,
+            'Responsible participation',
+            'Encourage honest listings, respectful communication and '
+                'responsible handling of customer information.',
+          ),
+        ],
+      ),
+    );
+  }
 
-          child,
+  Widget _value(IconData icon, String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 23, color: ArtistColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: ArtistTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: ArtistTextStyles.caption.copyWith(height: 1.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _community() {
+    return _section(
+      'For ReMakers',
+      'EcoLoop provides features for managing a public profile, presenting '
+          'portfolio work, publishing product listings, viewing orders and '
+          'engaging with customer reviews. ReMakers can also explore available '
+          'marketplace products and respond to custom-service requests where '
+          'those features are available. Earnings displays should not be treated '
+          'as proof that a payment has been collected or settled.',
+    );
+  }
+
+  Widget _footer() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
+      child: Column(
+        children: [
+          const Icon(Icons.eco_outlined, size: 26, color: ArtistColors.primary),
+          const SizedBox(height: 8),
+          Text(
+            'EcoLoop',
+            style: ArtistTextStyles.title.copyWith(
+              color: ArtistColors.primary,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Support: ecoloopp2026@gmail.com',
+            textAlign: TextAlign.center,
+            style: ArtistTextStyles.caption,
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Operator legal details and formal business address: Pending.',
+            textAlign: TextAlign.center,
+            style: ArtistTextStyles.caption.copyWith(height: 1.4),
+          ),
         ],
       ),
     );

@@ -15,8 +15,10 @@ class ArtistCustomServices extends StatefulWidget {
 class _ArtistCustomServicesState extends State<ArtistCustomServices> {
   final api = EcoLoopApi.instance;
   bool loading = true;
+  bool _loadInFlight = false;
   String? error, filter = 'All';
   List<Map<String, dynamic>> rows = [];
+  static List<Map<String, dynamic>>? _rowsCache;
 
   String v(dynamic x) => (x ?? '').toString();
 
@@ -63,25 +65,39 @@ class _ArtistCustomServicesState extends State<ArtistCustomServices> {
   @override
   void initState() {
     super.initState();
-    load();
+    final cached = _rowsCache;
+    if (cached != null) {
+      rows = cached.map((item) => Map<String, dynamic>.from(item)).toList();
+      loading = false;
+    }
+    load(silent: cached != null);
   }
 
-  Future<void> load() async {
-    if (!mounted) return;
-    setState(() => loading = true);
+  Future<void> load({bool silent = false}) async {
+    if (!mounted || _loadInFlight) return;
+    _loadInFlight = true;
+    if (!silent)
+      setState(() {
+        if (rows.isEmpty) loading = true;
+        error = null;
+      });
     try {
       final response = await api.get('/artist/custom-services');
       final parsedRows = _asServiceRows(response);
+      _rowsCache = parsedRows
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
       if (!mounted) return;
       setState(() {
         rows = parsedRows;
         error = null;
       });
     } catch (e) {
-      if (mounted) {
+      if (mounted && (!silent || rows.isEmpty)) {
         setState(() => error = e.toString().replaceFirst('Exception: ', ''));
       }
     } finally {
+      _loadInFlight = false;
       if (mounted) setState(() => loading = false);
     }
   }
@@ -117,11 +133,7 @@ class _ArtistCustomServicesState extends State<ArtistCustomServices> {
           IconButton(onPressed: load, icon: const Icon(Icons.refresh_rounded)),
         ],
       ),
-      body: loading
-          ? const Center(
-              child: CircularProgressIndicator(color: ArtistColors.primary),
-            )
-          : error != null
+      body: error != null && rows.isEmpty
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -148,6 +160,11 @@ class _ArtistCustomServicesState extends State<ArtistCustomServices> {
             )
           : Column(
               children: [
+                if (loading)
+                  const LinearProgressIndicator(
+                    minHeight: 2,
+                    color: ArtistColors.primary,
+                  ),
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 4, 16, 14),
                   padding: const EdgeInsets.all(18),
@@ -231,16 +248,27 @@ class _ArtistCustomServicesState extends State<ArtistCustomServices> {
                     child: visible.isEmpty
                         ? ListView(
                             children: [
-                              const SizedBox(height: 90),
+                              if (loading)
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 32),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      color: ArtistColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              SizedBox(height: loading ? 32 : 90),
                               Icon(
                                 Icons.inbox_outlined,
                                 size: 60,
                                 color: ArtistColors.light,
                               ),
                               const SizedBox(height: 14),
-                              const Center(
+                              Center(
                                 child: Text(
-                                  'No custom requests here yet',
+                                  loading
+                                      ? 'Loading your requests…'
+                                      : 'No custom requests here yet',
                                   style: TextStyle(
                                     fontSize: 17,
                                     fontWeight: FontWeight.w800,
@@ -248,10 +276,12 @@ class _ArtistCustomServicesState extends State<ArtistCustomServices> {
                                   ),
                                 ),
                               ),
-                              const Padding(
+                              Padding(
                                 padding: EdgeInsets.all(18),
                                 child: Text(
-                                  'New requests will appear here. Requests addressed to you are prioritised and notified.',
+                                  loading
+                                      ? 'Your latest requests will appear here shortly.'
+                                      : 'New requests will appear here. Requests addressed to you are prioritised and notified.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: ArtistColors.textSecondary,

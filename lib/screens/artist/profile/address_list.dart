@@ -26,6 +26,7 @@ class _AddressListState extends State<AddressList> {
   List<AddressItem> _addresses = [];
   bool _isLoading = true;
   bool _isMutating = false;
+  bool _addressRequestInFlight = false;
   String? _error;
 
   String get _token {
@@ -155,7 +156,8 @@ class _AddressListState extends State<AddressList> {
   }
 
   Future<void> _loadAddresses({bool showLoader = false}) async {
-    if (!mounted) return;
+    if (!mounted || _addressRequestInFlight) return;
+    _addressRequestInFlight = true;
 
     // Do not blank the page when cached addresses are already visible.
     if (showLoader && _addresses.isEmpty) {
@@ -172,6 +174,7 @@ class _AddressListState extends State<AddressList> {
         _isLoading = false;
         _error = 'Please sign in to view your saved addresses.';
       });
+      _addressRequestInFlight = false;
       return;
     }
 
@@ -226,6 +229,7 @@ class _AddressListState extends State<AddressList> {
       });
     } finally {
       dio.close(force: true);
+      _addressRequestInFlight = false;
     }
   }
 
@@ -440,12 +444,6 @@ class _AddressListState extends State<AddressList> {
   }
 
   Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: ArtistColors.primary),
-      );
-    }
-
     if (_error != null && _addresses.isEmpty) {
       return Center(
         child: Padding(
@@ -485,7 +483,14 @@ class _AddressListState extends State<AddressList> {
     }
 
     if (_addresses.isEmpty) {
-      return _EmptyAddressState(onAddAddress: () => _openAddressForm());
+      return Column(
+        children: [
+          if (_isLoading) const LinearProgressIndicator(minHeight: 2),
+          Expanded(
+            child: _EmptyAddressState(onAddAddress: () => _openAddressForm()),
+          ),
+        ],
+      );
     }
 
     return RefreshIndicator(

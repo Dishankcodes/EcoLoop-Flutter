@@ -23,6 +23,7 @@ class _AboutYouState extends State<AboutYou> {
   static List<Map<String, dynamic>>? _cachedReviews;
 
   bool _loading = true;
+  bool _requestInFlight = false;
   String? _error;
   Map<String, dynamic> _profile = {};
   Map<String, dynamic> _analytics = {};
@@ -108,6 +109,8 @@ class _AboutYouState extends State<AboutYou> {
   }
 
   Future<void> _load({bool showLoading = true}) async {
+    if (!mounted || _requestInFlight) return;
+    _requestInFlight = true;
     if (mounted) {
       setState(() {
         if (showLoading) _loading = true;
@@ -158,6 +161,8 @@ class _AboutYouState extends State<AboutYou> {
           _error = null;
         }
       });
+    } finally {
+      _requestInFlight = false;
     }
   }
 
@@ -210,9 +215,7 @@ class _AboutYouState extends State<AboutYou> {
         ],
       ),
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
+        child: _error != null && _reviews.isEmpty && !_loading
             ? _buildError()
             : RefreshIndicator(
                 onRefresh: _load,
@@ -224,6 +227,11 @@ class _AboutYouState extends State<AboutYou> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (_loading)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 10),
+                          child: LinearProgressIndicator(minHeight: 2),
+                        ),
                       Text(
                         'What People Say About You',
                         style: ArtistTextStyles.heading.copyWith(

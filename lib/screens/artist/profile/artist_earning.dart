@@ -23,6 +23,7 @@ class _ArtistEarningsState extends State<ArtistEarnings> {
   final EcoLoopApi _api = EcoLoopApi.instance;
   bool _loading = true;
   bool _refreshing = false;
+  bool _requestInProgress = false;
   String? _error;
   double _total = 0;
   List<Map<String, dynamic>> _transactions = [];
@@ -81,7 +82,8 @@ class _ArtistEarningsState extends State<ArtistEarnings> {
   }
 
   Future<void> _loadEarnings({bool refresh = false}) async {
-    if (!mounted) return;
+    if (!mounted || _requestInProgress) return;
+    _requestInProgress = true;
     setState(() {
       if (refresh) {
         _refreshing = true;
@@ -112,6 +114,7 @@ class _ArtistEarningsState extends State<ArtistEarnings> {
         _loading = false;
         _refreshing = false;
       });
+      _requestInProgress = false;
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -119,6 +122,7 @@ class _ArtistEarningsState extends State<ArtistEarnings> {
         _refreshing = false;
         _error = e.toString().replaceFirst('Exception: ', '');
       });
+      _requestInProgress = false;
     }
   }
 

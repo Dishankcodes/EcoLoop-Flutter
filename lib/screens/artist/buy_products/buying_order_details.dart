@@ -22,6 +22,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   late String _status;
   late Map<String, dynamic> _order;
   bool _checkingReviews = true;
+  bool _refreshingOrder = false;
+  bool _reviewRequestInProgress = false;
   bool _productReviewed = false;
   bool _sellerReviewed = false;
 
@@ -1354,6 +1356,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   }
 
   Future<void> _loadReviewStatus() async {
+    if (_reviewRequestInProgress) return;
+    _reviewRequestInProgress = true;
     try {
       final response = await EcoLoopApi.instance.get('/my/reviews');
       dynamic rows = response;
@@ -1420,6 +1424,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       if (mounted) {
         setState(() => _checkingReviews = false);
       }
+    } finally {
+      _reviewRequestInProgress = false;
     }
   }
 
@@ -1795,8 +1801,13 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   // CANCEL ORDER
 
   Future<void> _refreshOrder({bool showErrors = true}) async {
+    if (_refreshingOrder) return;
+    _refreshingOrder = true;
     final id = _order['orderId'] ?? _order['id'];
-    if (id == null || id.toString().trim().isEmpty) return;
+    if (id == null || id.toString().trim().isEmpty) {
+      _refreshingOrder = false;
+      return;
+    }
     try {
       final response = await EcoLoopApi.instance.get(
         '/orders/${Uri.encodeComponent(id.toString())}',
@@ -1820,7 +1831,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           'Could not refresh order: ${error.toString().replaceFirst('Exception: ', '')}',
         );
       }
-    } finally {}
+    } finally {
+      _refreshingOrder = false;
+    }
   }
 
   Future<void> _cancelOrder() async {

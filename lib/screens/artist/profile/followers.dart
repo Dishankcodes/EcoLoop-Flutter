@@ -296,16 +296,16 @@ class _FollowersState extends State<Followers> {
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 5, 20, 24),
-          child: _loading
-              ? const Padding(
-                  padding: EdgeInsets.only(top: 100),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : _error != null && _followers.isEmpty
+          child: _error != null && _followers.isEmpty && !_loading
               ? _buildLoadError()
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (_loading)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 10),
+                        child: LinearProgressIndicator(minHeight: 2),
+                      ),
                     _buildHeader(),
                     const SizedBox(height: 16),
                     _buildFollowerSummary(),

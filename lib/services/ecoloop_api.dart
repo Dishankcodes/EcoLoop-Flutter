@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -15,13 +14,16 @@ class EcoLoopApiException implements Exception {
   String toString() => message;
 }
 
-/// API wrapper for the EcoLoop Google Apps Script backend.
-///
-/// Optimizations:
-/// - Caches only public/reference catalogue data for a short time.
-/// - Shares identical concurrent GET requests.
-/// - Clears cached data after successful write requests.
-/// - Does not log or persist authentication tokens in this class.
+/// Thin typed-enough wrapper around the routes implemented in Code.gs.
+/// All writes go through the same Dio instance as the existing Retrofit client,
+/// so the Apps Script redirect interceptor is reused.
+class _CachedGet {
+  const _CachedGet(this.value, this.expiresAt);
+
+  final dynamic value;
+  final DateTime expiresAt;
+}
+
 class EcoLoopApi {
   static const String baseUrl =
       'https://script.google.com/macros/s/AKfycbzvHq06GwL_I8qH2IPyQP36dRlESN62PYF4Ak5WkRE2VjHL5a-tr0Yk_KEtSvU_ZL6IbQ/exec';
@@ -30,82 +32,164 @@ class EcoLoopApi {
 
   static final EcoLoopApi instance = EcoLoopApi._();
 
-  static const Duration _catalogueTtl = Duration(minutes: 5);
-  static const Duration _locationTtl = Duration(minutes: 10);
-  static const Duration _productsTtl = Duration(seconds: 15);
+  // Short-lived in-memory cache for safe, read-only reference/discovery data.
+  // Transactional and account-specific endpoints are intentionally not cached.
+  static const Duration _categoriesTtl = Duration(minutes: 10);
+  static const Duration _locationsTtl = Duration(hours: 6);
+  static const Duration _publicDiscoveryTtl = Duration(seconds: 15);
 
-  static final Map<String, _CacheEntry> _cache = {};
-  static final Map<String, Future<dynamic>> _inFlightGets = {};
+  final Map<String, _CachedGet> _getCache = <String, _CachedGet>{};
+  final Map<String, Future<dynamic>> _inFlightGets =
+      <String, Future<dynamic>>{};
 
-  String get _token {
-    final role = Prefs.getString('userRole').toLowerCase();
-    return (role == 'artist'
-            ? Prefs.getString('artistToken')
-            : Prefs.getString('authToken'))
-        .trim();
+  int _cacheGeneration = 0;
+
+  /// Clear cached GET data after a successful write or when the caller knows
+  /// that server-side data changed. This is deliberately broad and safe.
+  void invalidateCache() {
+    _cacheGeneration++;
+    _getCache.clear();
+
+    // Existing requests cannot be cancelled, but new callers must not join a
+    // request that started before the write/invalidation.
+    _inFlightGets.clear();
   }
 
-  Future<dynamic> get(String path, {Map<String, dynamic> query = const {}}) {
-    return _send('GET', path, query: query);
+  String get _token =>
+      (Prefs.getString('userRole').toLowerCase() == 'artist'
+              ? Prefs.getString('artistToken')
+              : Prefs.getString('authToken'))
+          .trim();
+
+  Future<dynamic> get(
+    String path, {
+    Map<String, dynamic> query = const {},
+  }) async {
+    final ttl = _cacheTtlFor(path, query);
+    final cacheKey = _cacheKey(path, query);
+
+    // Only explicitly approved public/reference endpoints use response caching.
+    // Account-specific and transactional reads remain fresh on every new call.
+    if (ttl != null) {
+      final cached = _getCache[cacheKey];
+      if (cached != null && cached.expiresAt.isAfter(DateTime.now())) {
+        return _copyJsonValue(cached.value);
+      }
+      if (cached != null) _getCache.remove(cacheKey);
+    }
+
+    // Coalesce duplicate GETs while the same request is already in flight.
+    // This applies to private reads too, but the in-memory key includes the
+    // active token so two accounts/roles can never share a response. Tokens
+    // are not persisted or printed.
+    final sortedQueryKeys = query.keys.toList()..sort();
+    final normalizedQuery = <String, dynamic>{
+      for (final key in sortedQueryKeys) key: query[key],
+    };
+    final requestKey = ttl != null
+        ? 'cached:$cacheKey'
+        : 'fresh:$path?${jsonEncode(normalizedQuery)}#${_token}';
+
+    final existing = _inFlightGets[requestKey];
+    if (existing != null) return _copyFutureValue(existing);
+
+    final generationAtStart = _cacheGeneration;
+    late final Future<dynamic> request;
+    request = _send('GET', path, query: query)
+        .then((value) {
+          if (ttl != null && generationAtStart == _cacheGeneration) {
+            _getCache[cacheKey] = _CachedGet(
+              _copyJsonValue(value),
+              DateTime.now().add(ttl),
+            );
+          }
+          return value;
+        })
+        .whenComplete(() {
+          if (identical(_inFlightGets[requestKey], request)) {
+            _inFlightGets.remove(requestKey);
+          }
+        });
+
+    _inFlightGets[requestKey] = request;
+    return _copyFutureValue(request);
   }
 
-  Future<dynamic> post(String path, Map<String, dynamic> body) {
-    return _send('POST', path, body: body);
+  Future<dynamic> post(String path, Map<String, dynamic> body) async {
+    final result = await _send('POST', path, body: body);
+    invalidateCache();
+    return result;
   }
 
-  Future<dynamic> put(String path, Map<String, dynamic> body) {
-    return _send('PUT', path, body: body);
+  Future<dynamic> put(String path, Map<String, dynamic> body) async {
+    final result = await _send('PUT', path, body: body);
+    invalidateCache();
+    return result;
   }
 
-  Future<dynamic> delete(String path) {
-    return _send('DELETE', path);
+  Future<dynamic> delete(String path) async {
+    final result = await _send('DELETE', path);
+    invalidateCache();
+    return result;
   }
 
-  Duration? _cacheDuration(String path) {
-    final normalized = _normalizePath(path);
+  Duration? _cacheTtlFor(String path, Map<String, dynamic> query) {
+    final normalized = path.split('?').first.trim();
 
-    if (normalized == '/categories') return _catalogueTtl;
-    if (normalized == '/locations/states') return _locationTtl;
-    if (normalized == '/locations/cities') return _locationTtl;
-    if (normalized == '/products') return _productsTtl;
+    if (normalized == '/categories' || normalized == '/locations/states') {
+      return normalized == '/categories' ? _categoriesTtl : _locationsTtl;
+    }
 
-    // Do not cache profiles, orders, wishlist, analytics, followers,
-    // notifications, or other account-specific responses.
+    if (normalized == '/locations/cities' &&
+        (query['stateCode']?.toString().trim().isNotEmpty ?? false)) {
+      return _locationsTtl;
+    }
+
+    // Public marketplace discovery can be briefly stale while browsing, but
+    // checkout always revalidates the product and available stock server-side.
+    if (normalized == '/products') {
+      return _publicDiscoveryTtl;
+    }
+
+    // Public portfolio LISTS are read-only discovery data. Reuse them briefly
+    // when a user opens the same artist/product portfolio more than once.
+    // Successful writes call invalidateCache(), so the artist's own list is
+    // refreshed after create/edit/delete. Portfolio DETAIL is intentionally
+    // excluded because its GET increments the view count on the backend.
+    if (RegExp(r'^/artists/\d+/portfolio$').hasMatch(normalized) ||
+        RegExp(r'^/products/\d+/portfolio$').hasMatch(normalized)) {
+      return _publicDiscoveryTtl;
+    }
+
     return null;
   }
 
-  String _normalizePath(String path) {
-    final value = path.trim();
-    if (value.isEmpty) return '/';
-    return value.startsWith('/') ? value : '/$value';
-  }
+  String _cacheKey(String path, Map<String, dynamic> query) {
+    final sortedQuery = query.keys.toList()..sort();
 
-  String _stableQuery(Map<String, dynamic> query) {
-    final keys = query.keys.toList()..sort();
-    final sorted = <String, dynamic>{};
-    for (final key in keys) {
-      sorted[key] = query[key];
-    }
-    return jsonEncode(sorted);
-  }
+    final queryString = sortedQuery
+        .map((key) => '$key=${query[key]}')
+        .join('&');
 
-  String _requestKey({
-    required String path,
-    required Map<String, dynamic> query,
-    required String token,
-  }) {
-    // Token is used only as an in-memory partition so one account cannot
-    // reuse another account's in-flight response. Never log this key.
-    return '${_normalizePath(path)}|${_stableQuery(query)}|${token.hashCode}';
+    // Only explicitly whitelisted public/reference GETs are cached, so tokens
+    // are not included in keys or written to persistent storage.
+    return '$path?$queryString';
   }
 
   dynamic _copyJsonValue(dynamic value) {
-    // Prevent callers from mutating objects held in the cache.
+    if (value == null || value is String || value is num || value is bool) {
+      return value;
+    }
+
     try {
       return jsonDecode(jsonEncode(value));
     } catch (_) {
       return value;
     }
+  }
+
+  Future<dynamic> _copyFutureValue(Future<dynamic> future) async {
+    return _copyJsonValue(await future);
   }
 
   Future<dynamic> _send(
@@ -114,93 +198,28 @@ class EcoLoopApi {
     Map<String, dynamic> body = const {},
     Map<String, dynamic> query = const {},
   }) async {
-    final normalizedPath = _normalizePath(path);
-    final token = _token;
-    final isGet = method == 'GET';
-    final cacheDuration = isGet ? _cacheDuration(normalizedPath) : null;
-
-    final requestKey = _requestKey(
-      path: normalizedPath,
-      query: query,
-      token: token,
-    );
-
-    if (isGet && cacheDuration != null) {
-      final cached = _cache[requestKey];
-      if (cached != null &&
-          DateTime.now().difference(cached.createdAt) < cacheDuration) {
-        return _copyJsonValue(cached.value);
-      }
-    }
-
-    if (isGet) {
-      final existingRequest = _inFlightGets[requestKey];
-      if (existingRequest != null) {
-        final result = await existingRequest;
-        return _copyJsonValue(result);
-      }
-    }
-
-    final request = _performRequest(
-      method: method,
-      path: normalizedPath,
-      body: body,
-      query: query,
-      token: token,
-    );
-
-    if (isGet) {
-      _inFlightGets[requestKey] = request;
-    }
-
-    try {
-      final result = await request;
-
-      if (isGet && cacheDuration != null) {
-        _cache[requestKey] = _CacheEntry(
-          value: _copyJsonValue(result),
-          createdAt: DateTime.now(),
-        );
-      }
-
-      if (!isGet) {
-        _invalidateAfterWrite(normalizedPath);
-      }
-
-      return _copyJsonValue(result);
-    } finally {
-      if (isGet && identical(_inFlightGets[requestKey], request)) {
-        _inFlightGets.remove(requestKey);
-      }
-    }
-  }
-
-  Future<dynamic> _performRequest({
-    required String method,
-    required String path,
-    required Map<String, dynamic> body,
-    required Map<String, dynamic> query,
-    required String token,
-  }) async {
     final payload = <String, dynamic>{...body};
 
     if (method != 'GET') {
-      if (token.isNotEmpty) payload['token'] = token;
+      if (_token.isNotEmpty) {
+        payload['token'] = _token;
+      }
+
       payload['_method'] = method;
     }
 
-    final queryParameters = <String, dynamic>{
-      'path': path,
-      ...query,
-      if ((method == 'GET' || method == 'DELETE') && token.isNotEmpty)
-        'token': token,
-      // Apps Script handles DELETE through doPost with a method override.
-      if (method == 'DELETE') '_method': 'DELETE',
-    };
-
     final response = await ApiManager().dio.request<dynamic>(
       baseUrl,
-      queryParameters: queryParameters,
+      queryParameters: {
+        'path': path,
+        ...query,
+        if ((method == 'GET' || method == 'DELETE') && _token.isNotEmpty)
+          'token': _token,
+
+        // Apps Script receives DELETE via doPost; pass method override in query
+        // because DELETE requests intentionally have no request body here.
+        if (method == 'DELETE') '_method': 'DELETE',
+      },
       data: method == 'GET' || method == 'DELETE' ? null : payload,
       options: Options(method: method == 'GET' ? 'GET' : 'POST'),
     );
@@ -210,78 +229,53 @@ class EcoLoopApi {
     if (raw is String) {
       try {
         raw = jsonDecode(raw);
-      } on FormatException {
-        throw const EcoLoopApiException(
-          'The backend returned an unreadable response. '
-          'Check the Apps Script deployment URL and access permissions.',
-        );
-      }
+      } catch (_) {}
     }
 
     if (raw is! Map) {
       throw const EcoLoopApiException(
-        'The backend did not return JSON. Check the Apps Script deployment '
-        'URL and access permissions.',
+        'The backend did not return JSON. Check the Apps Script deployment URL and access permissions.',
       );
     }
 
-    final successValue = raw['success'];
     final ok =
-        successValue == true ||
-        successValue?.toString().toLowerCase() == 'true';
+        raw['success'] == true ||
+        raw['success'].toString().toLowerCase() == 'true';
 
     if (!ok) {
-      final error = raw['error'];
-      final message = error is Map
-          ? error['message']?.toString()
-          : error?.toString();
+      final err = raw['error'];
+      final message = err is Map ? err['message']?.toString() : err?.toString();
 
       throw EcoLoopApiException(
-        (message == null || message.trim().isEmpty)
-            ? 'Request failed.'
-            : message,
+        (message == null || message.isEmpty) ? 'Request failed.' : message,
       );
     }
 
     return raw['data'];
   }
 
-  void _invalidateAfterWrite(String path) {
-    final normalized = _normalizePath(path);
+  static int categoryId(String? label) {
+    final value = (label ?? '').trim().toLowerCase();
 
-    // A product write can change the marketplace listing.
-    if (normalized == '/products' || normalized.startsWith('/products/')) {
-      _removeCachedPaths({'/products', '/categories'});
-      return;
+    if (value.contains('furniture')) return 1;
+    if (value.contains('decor') || value.contains('home')) return 2;
+    if (value.contains('wood')) return 3;
+    if (value.contains('glass')) return 4;
+
+    if (value.contains('paper') ||
+        value.contains('craft') ||
+        value.contains('book')) {
+      return 5;
     }
 
-    if (normalized.startsWith('/categories')) {
-      _removeCachedPaths({'/categories'});
-      return;
+    if (value.contains('fashion') || value.contains('cloth')) {
+      return 6;
     }
 
-    if (normalized.startsWith('/locations/')) {
-      _removeCachedPaths({'/locations/states', '/locations/cities'});
+    if (value.contains('plant') || value.contains('garden')) {
+      return 7;
     }
+
+    return 8;
   }
-
-  void _removeCachedPaths(Set<String> paths) {
-    _cache.removeWhere((key, _) {
-      final cachedPath = key.split('|').first;
-      return paths.contains(cachedPath);
-    });
-  }
-
-  /// Call this after changing accounts or roles if your app changes session
-  /// without restarting. It clears only in-memory API cache entries.
-  void clearCache() {
-    _cache.clear();
-  }
-}
-
-class _CacheEntry {
-  final dynamic value;
-  final DateTime createdAt;
-
-  const _CacheEntry({required this.value, required this.createdAt});
 }
