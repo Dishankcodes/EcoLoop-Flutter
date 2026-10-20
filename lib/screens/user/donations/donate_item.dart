@@ -4,6 +4,7 @@ import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../services/eco_image_picker.dart';
 import '../../../services/ecoloop_api.dart';
+import 'donation_data_cache.dart';
 import '../profile/add_address.dart';
 
 /// Screen allowing users to list unused items for free donation and pickup.
@@ -32,6 +33,8 @@ class _DonateItemState extends State<DonateItem> {
   String? selectedCondition;
   List<Map<String, dynamic>> _categories = [];
   bool _loadingCategories = true;
+  bool _categoriesRequestInFlight = false;
+  bool _addressesRequestInFlight = false;
   String? _categoryLoadError;
 
   List<String> get categories => _categories
@@ -47,6 +50,8 @@ class _DonateItemState extends State<DonateItem> {
   }
 
   Future<void> _loadCategories() async {
+    if (_categoriesRequestInFlight) return;
+    _categoriesRequestInFlight = true;
     try {
       final response = await EcoLoopApi.instance.get('/categories');
       final rows = response is List
@@ -77,6 +82,8 @@ class _DonateItemState extends State<DonateItem> {
         _loadingCategories = false;
         _categoryLoadError = e.toString().replaceFirst('Exception: ', '');
       });
+    } finally {
+      _categoriesRequestInFlight = false;
     }
   }
 
@@ -496,7 +503,8 @@ class _DonateItemState extends State<DonateItem> {
   }
 
   Future<void> _loadAddresses() async {
-    if (!mounted) return;
+    if (!mounted || _addressesRequestInFlight) return;
+    _addressesRequestInFlight = true;
     setState(() {
       _loadingAddresses = true;
       _addressError = null;
@@ -560,6 +568,8 @@ class _DonateItemState extends State<DonateItem> {
         _loadingAddresses = false;
         _addressError = error.toString().replaceFirst('Exception: ', '');
       });
+    } finally {
+      _addressesRequestInFlight = false;
     }
   }
 
@@ -801,6 +811,7 @@ class _DonateItemState extends State<DonateItem> {
   );
 
   Future<void> _submitDonation() async {
+    if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
     if (_loadingCategories || _categories.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -847,6 +858,7 @@ class _DonateItemState extends State<DonateItem> {
         'pickupAddress': Map<String, dynamic>.from(pickupAddress),
         'imageBase64': await EcoImagePicker.payload(_images),
       });
+      DonationDataCache.clear();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Donation saved successfully.')),

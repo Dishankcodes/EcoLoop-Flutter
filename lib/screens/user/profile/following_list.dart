@@ -112,11 +112,13 @@ class _FollowingListState extends State<FollowingList> {
   }
 
   Future<void> _loadFollowing({bool showLoader = true}) async {
-    if (showLoader && mounted) {
+    if (showLoader && mounted && _following.isEmpty) {
       setState(() {
         _loading = true;
         _error = null;
       });
+    } else if (mounted) {
+      setState(() => _error = null);
     }
     try {
       final result = await _api.get('/my/following');

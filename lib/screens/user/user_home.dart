@@ -8,6 +8,23 @@ import 'buy_products/product_details.dart';
 import 'donations/donate_item.dart';
 import 'sell_products/add_product.dart';
 
+// Five-minute in-memory cache for public discovery data only. Account-specific
+// data (profile, rewards and impact) is refreshed separately and never stored here.
+class _UserHomeDiscoveryCache {
+  _UserHomeDiscoveryCache({
+    required this.categories,
+    required this.products,
+    required this.savedAt,
+  });
+
+  final List<Map<String, dynamic>> categories;
+  final List<Map<String, dynamic>> products;
+  final DateTime savedAt;
+
+  bool get isFresh =>
+      DateTime.now().difference(savedAt) < const Duration(minutes: 5);
+}
+
 class UserHome extends StatefulWidget {
   const UserHome({super.key});
 
@@ -16,6 +33,8 @@ class UserHome extends StatefulWidget {
 }
 
 class _UserHomeState extends State<UserHome> {
+  static _UserHomeDiscoveryCache? _discoveryCache;
+  int _loadGeneration = 0;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -52,97 +71,142 @@ class _UserHomeState extends State<UserHome> {
   }
 
   Future<void> _loadDashboard({bool refresh = false}) async {
-    if (refresh) {
-      setState(() => _refreshing = true);
+    final generation = ++_loadGeneration;
+    final cached = _discoveryCache;
+
+    // Repaint cached marketplace data immediately on a warm visit. Fresh data
+    // is then requested in the background without blocking the existing UI.
+    if (!refresh && cached != null && cached.isFresh) {
+      setState(() {
+        _categories = cached.categories
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+        _products = cached.products
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+        _categoriesError = false;
+        _productsError = false;
+        _loading = false;
+        _refreshing = false;
+        _errorMessage = null;
+      });
+    } else if (_products.isEmpty && _categories.isEmpty) {
+      setState(() {
+        _loading = true;
+        _refreshing = refresh;
+      });
     } else {
-      setState(() => _loading = true);
+      setState(() => _refreshing = refresh);
     }
 
-    // Start all requests together, but let the marketplace portion of the
-    // dashboard render as soon as its two essential datasets arrive. Profile,
-    // impact and rewards continue in parallel and update their own sections;
-    // they no longer keep the entire dashboard in its initial loading state.
-    final secondaryFuture = Future.wait<dynamic>([
-      _safeGet('/auth/me'),
-      _safeGet('/eco-impact'),
-      _safeGet('/rewards'),
-    ]);
+    // Start all five endpoints together. Secondary account data is applied as
+    // soon as it arrives and cannot delay marketplace content rendering.
+    _loadSecondaryDashboard(generation);
 
     final primaryResults = await Future.wait<dynamic>([
       _safeGet('/categories'),
       _safeGet('/products'),
     ]);
 
-    if (!mounted) return;
+    if (!mounted || generation != _loadGeneration) return;
 
     final categoryResult = primaryResults[0];
     final productResult = primaryResults[1];
+    var nextCategories = _categories;
+    var nextProducts = _products;
+    var categoriesSucceeded = false;
+    var productsSucceeded = false;
+
+    if (categoryResult is List) {
+      nextCategories = categoryResult
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .where(
+            (e) =>
+                (e['status'] ?? 'active').toString().toLowerCase() == 'active',
+          )
+          .toList(growable: false);
+      categoriesSucceeded = true;
+    }
+
+    if (productResult is List) {
+      // Normalize after assigning categories so fallback category labels are
+      // resolved against the latest category data.
+      _categories = nextCategories;
+      nextProducts = productResult
+          .whereType<Map>()
+          .map(_normalizeProduct)
+          .where(
+            (p) =>
+                (p['status'] ?? 'published').toString().toLowerCase() ==
+                'published',
+          )
+          .where(
+            (p) =>
+                (p['availableQuantity'] == null ||
+                _number(p['availableQuantity']) > 0),
+          )
+          .toList(growable: false);
+      productsSucceeded = true;
+    }
 
     setState(() {
-      if (categoryResult is List) {
-        _categories = categoryResult
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .where(
-              (e) =>
-                  (e['status'] ?? 'active').toString().toLowerCase() ==
-                  'active',
-            )
-            .toList();
-
+      if (categoriesSucceeded) {
+        _categories = nextCategories;
         _categoriesError = false;
-      } else if (categoryResult == null) {
+      } else if (_categories.isEmpty) {
         _categoriesError = true;
       }
 
-      if (productResult is List) {
-        _products = productResult
-            .whereType<Map>()
-            .map(_normalizeProduct)
-            .where(
-              (p) =>
-                  (p['status'] ?? 'published').toString().toLowerCase() ==
-                  'published',
-            )
-            .where(
-              (p) =>
-                  (p['availableQuantity'] == null ||
-                  _number(p['availableQuantity']) > 0),
-            )
-            .toList();
-
+      if (productsSucceeded) {
+        _products = nextProducts;
         _productsError = false;
-      } else if (productResult == null) {
+      } else if (_products.isEmpty) {
         _productsError = true;
       }
 
       _errorMessage = _productsError && _categoriesError
           ? 'We could not load marketplace data. Check your connection and try again.'
           : null;
-
       _loading = false;
       _refreshing = false;
     });
 
-    // Non-essential dashboard information updates after the main content is
-    // already visible. Failure of one of these endpoints cannot block products.
-    final secondaryResults = await secondaryFuture;
+    // Save only public marketplace discovery data, never private account data.
+    // Keep the last good result if one endpoint temporarily fails.
+    if (categoriesSucceeded || productsSucceeded) {
+      _discoveryCache = _UserHomeDiscoveryCache(
+        categories: _categories
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList(growable: false),
+        products: _products
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList(growable: false),
+        savedAt: DateTime.now(),
+      );
+    }
+  }
 
-    if (!mounted) return;
+  Future<void> _loadSecondaryDashboard(int generation) async {
+    final results = await Future.wait<dynamic>([
+      _safeGet('/auth/me'),
+      _safeGet('/eco-impact'),
+      _safeGet('/rewards'),
+    ]);
+
+    if (!mounted || generation != _loadGeneration) return;
 
     setState(() {
-      final profileResult = secondaryResults[0];
-      final impactResult = secondaryResults[1];
-      final rewardResult = secondaryResults[2];
+      final profileResult = results[0];
+      final impactResult = results[1];
+      final rewardResult = results[2];
 
       if (profileResult is Map) {
         _profile = Map<String, dynamic>.from(profileResult);
       }
-
       if (impactResult is Map) {
         _impact = Map<String, dynamic>.from(impactResult);
       }
-
       if (rewardResult is Map) {
         _rewards = Map<String, dynamic>.from(rewardResult);
       }

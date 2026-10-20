@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../services/ecoloop_api.dart';
+import 'donation_data_cache.dart';
 
 class DonationDetails extends StatefulWidget {
   final Map<String, dynamic> donation;
@@ -15,6 +16,7 @@ class DonationDetails extends StatefulWidget {
 class _DonationDetailsState extends State<DonationDetails> {
   late Map<String, dynamic> _donation;
   bool _loading = false;
+  bool _detailsRequestInFlight = false;
   bool _requestingPickup = false;
   String? _error;
   Map<String, String> _categoryNames = {};
@@ -146,9 +148,11 @@ class _DonationDetailsState extends State<DonationDetails> {
   }
 
   Future<void> _refreshDetails() async {
+    if (_detailsRequestInFlight) return;
     final id = (_donation['id'] ?? '').toString();
     if (id.isEmpty || int.tryParse(id) == null) return;
 
+    _detailsRequestInFlight = true;
     setState(() {
       _loading = true;
       _error = null;
@@ -174,6 +178,7 @@ class _DonationDetailsState extends State<DonationDetails> {
       if (mounted)
         setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
+      _detailsRequestInFlight = false;
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -188,6 +193,7 @@ class _DonationDetailsState extends State<DonationDetails> {
     setState(() => _requestingPickup = true);
     try {
       await EcoLoopApi.instance.post('/donations/$id/pickup-request', {});
+      DonationDataCache.clear();
       if (!mounted) return;
       _message('Pickup request submitted successfully.');
       await _refreshDetails();

@@ -29,11 +29,15 @@ class _NotificationsState extends State<Notifications> {
   }
 
   Future<void> _loadNotifications({bool showLoader = true}) async {
-    if (showLoader && mounted) {
+    // Preserve visible notifications during refresh instead of flashing a
+    // full-screen loader when we already have usable data.
+    if (showLoader && mounted && _notifications.isEmpty) {
       setState(() {
         _isLoading = true;
         _error = null;
       });
+    } else if (mounted) {
+      setState(() => _error = null);
     }
 
     try {

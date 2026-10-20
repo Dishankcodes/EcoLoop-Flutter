@@ -732,6 +732,7 @@ class _AddressCard extends StatelessWidget {
 
 class _AddressTypeBadge extends StatelessWidget {
   const _AddressTypeBadge({required this.type});
+
   final String type;
 
   @override
@@ -755,6 +756,7 @@ class _AddressTypeBadge extends StatelessWidget {
 
 class _EmptyAddressState extends StatelessWidget {
   const _EmptyAddressState({required this.onAddAddress});
+
   final VoidCallback onAddAddress;
 
   @override

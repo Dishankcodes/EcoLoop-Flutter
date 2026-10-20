@@ -46,6 +46,8 @@ class _ProfileState extends State<Profile> {
   @override
   void initState() {
     super.initState();
+    // Independent account and count requests run concurrently so profile
+    // content does not wait for order/listing/wishlist counts.
     _loadProfile();
     _loadProfileCounts();
   }

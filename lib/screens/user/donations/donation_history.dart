@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../services/ecoloop_api.dart';
+import '../../../shared_preferences_util.dart';
+import 'donation_data_cache.dart';
 import 'donation_details.dart';
 
 class DonationHistory extends StatefulWidget {
@@ -12,6 +14,19 @@ class DonationHistory extends StatefulWidget {
 }
 
 class _DonationHistoryState extends State<DonationHistory> {
+  bool _requestInFlight = false;
+
+  String get _cacheKey {
+    final role = Prefs.getString('userRole').trim().toLowerCase();
+    final token = role == 'artist'
+        ? Prefs.getString('artistToken').trim()
+        : Prefs.getString('authToken').trim();
+    // Never reuse private donation data if there is no authenticated session.
+    return token.isEmpty
+        ? ''
+        : '${role.isEmpty ? 'user' : role}:${token.hashCode}';
+  }
+
   String _selectedFilter = 'All';
   bool _loading = true;
   String? _error;
@@ -21,18 +36,29 @@ class _DonationHistoryState extends State<DonationHistory> {
   @override
   void initState() {
     super.initState();
-    _loadDonations();
+    final key = _cacheKey;
+    final cached = key.isEmpty ? null : DonationDataCache.read(key);
+    if (cached != null) {
+      _donations = cached.donations;
+      _categoryNames = cached.categoryNames;
+      _loading = false;
+    }
+    _loadDonations(showLoader: cached == null);
   }
 
-  Future<void> _loadDonations() async {
+  Future<void> _loadDonations({bool showLoader = true}) async {
+    if (_requestInFlight) return;
+    _requestInFlight = true;
     if (mounted) {
       setState(() {
-        _loading = true;
+        if (showLoader || _donations.isEmpty) _loading = true;
         _error = null;
       });
     }
 
     try {
+      // Independent endpoints run concurrently; categories are already cached
+      // by EcoLoopApi on repeat visits.
       final results = await Future.wait<dynamic>([
         EcoLoopApi.instance.get('/donations'),
         EcoLoopApi.instance.get('/categories'),
@@ -50,8 +76,8 @@ class _DonationHistoryState extends State<DonationHistory> {
           categoryNames[row['categoryId'].toString()] = row['name'].toString();
         }
       }
-      final List<dynamic> rows;
 
+      final List<dynamic> rows;
       if (response is List) {
         rows = response;
       } else if (response is Map && response['donations'] is List) {
@@ -73,12 +99,15 @@ class _DonationHistoryState extends State<DonationHistory> {
             ),
           )
           .toList();
+      final key = _cacheKey;
+      if (key.isNotEmpty) DonationDataCache.write(key, parsed, categoryNames);
 
       if (!mounted) return;
       setState(() {
         _donations = parsed;
         _categoryNames = categoryNames;
         _loading = false;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -86,6 +115,8 @@ class _DonationHistoryState extends State<DonationHistory> {
         _error = e.toString().replaceFirst('Exception: ', '');
         _loading = false;
       });
+    } finally {
+      _requestInFlight = false;
     }
   }
 
@@ -257,7 +288,7 @@ class _DonationHistoryState extends State<DonationHistory> {
         actions: [
           IconButton(
             tooltip: 'Refresh donations',
-            onPressed: _loadDonations,
+            onPressed: () => _loadDonations(showLoader: _donations.isEmpty),
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
@@ -269,12 +300,12 @@ class _DonationHistoryState extends State<DonationHistory> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _error != null
+                : _error != null && _donations.isEmpty
                 ? _buildErrorState()
                 : _filteredDonations.isEmpty
                 ? _buildEmptyState()
                 : RefreshIndicator(
-                    onRefresh: _loadDonations,
+                    onRefresh: () => _loadDonations(showLoader: false),
                     child: ListView.builder(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 25),
@@ -404,7 +435,7 @@ class _DonationHistoryState extends State<DonationHistory> {
             builder: (_) => DonationDetails(donation: donation),
           ),
         );
-        if (mounted) _loadDonations();
+        if (mounted) _loadDonations(showLoader: false);
       },
       borderRadius: BorderRadius.circular(17),
       child: Container(
@@ -556,7 +587,7 @@ class _DonationHistoryState extends State<DonationHistory> {
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: _loadDonations,
+              onPressed: () => _loadDonations(showLoader: _donations.isEmpty),
               icon: const Icon(Icons.refresh),
               label: const Text('Try again'),
             ),

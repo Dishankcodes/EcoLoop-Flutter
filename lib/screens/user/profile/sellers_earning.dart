@@ -52,11 +52,14 @@ class _SellersEarningState extends State<SellersEarning> {
   }
 
   Future<void> _loadEarnings() async {
-    if (mounted) {
+    // Keep earnings visible during a refresh when a previous result exists.
+    if (mounted && _summary.isEmpty) {
       setState(() {
         _loading = true;
         _error = null;
       });
+    } else if (mounted) {
+      setState(() => _error = null);
     }
     try {
       final response = await EcoLoopApi.instance.get('/selling/earnings');

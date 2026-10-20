@@ -54,11 +54,14 @@ class _CustomServiceHistoryState extends State<CustomServiceHistory> {
   }
 
   Future<void> _load() async {
-    if (mounted) {
+    // Keep previous request cards on screen while refreshing after details.
+    if (mounted && _rows.isEmpty) {
       setState(() {
         _loading = true;
         _error = null;
       });
+    } else if (mounted) {
+      setState(() => _error = null);
     }
     try {
       final response = await _api.get('/custom-services/mine');

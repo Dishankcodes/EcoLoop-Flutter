@@ -140,7 +140,7 @@ class _WriteReviewState extends State<WriteReview> {
         _error = _str(
           data['reason'],
           fallback:
-          'A delivered and paid order is required to review this product.',
+              'A delivered and paid order is required to review this product.',
         );
       }
     } catch (e) {
@@ -213,7 +213,8 @@ class _WriteReviewState extends State<WriteReview> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            if (_loadingEligibility) const LinearProgressIndicator(minHeight: 2),
+            if (_loadingEligibility)
+              const LinearProgressIndicator(minHeight: 2),
             _productCard(),
             const SizedBox(height: 22),
             Text(
@@ -225,7 +226,7 @@ class _WriteReviewState extends State<WriteReview> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
                 5,
-                    (i) => IconButton(
+                (i) => IconButton(
                   onPressed: _submitting
                       ? null
                       : () => setState(() => _rating = i + 1),
@@ -243,9 +244,7 @@ class _WriteReviewState extends State<WriteReview> {
             ),
             Center(
               child: Text(
-                _rating == 0
-                    ? 'Select your rating'
-                    : '$_rating out of 5 stars',
+                _rating == 0 ? 'Select your rating' : '$_rating out of 5 stars',
                 style: ArtistTextStyles.bodyMedium.copyWith(
                   color: ArtistColors.primary,
                 ),
@@ -334,17 +333,17 @@ class _WriteReviewState extends State<WriteReview> {
                 ),
                 child: _submitting
                     ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
                     : Text(
-                  editing ? 'Save Changes' : 'Submit Review',
-                  style: ArtistTextStyles.button,
-                ),
+                        editing ? 'Save Changes' : 'Submit Review',
+                        style: ArtistTextStyles.button,
+                      ),
               ),
             ),
           ],
@@ -369,45 +368,45 @@ class _WriteReviewState extends State<WriteReview> {
             height: 68,
             child: _image.isEmpty
                 ? const ColoredBox(
-              color: ArtistColors.light,
-              child: Center(
-                child: Icon(
-                  Icons.image_outlined,
-                  color: ArtistColors.primary,
-                  size: 28,
-                ),
-              ),
-            )
-                : Image.network(
-              _image,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const ColoredBox(
-                color: ArtistColors.light,
-                child: Center(
-                  child: Icon(
-                    Icons.image_outlined,
-                    color: ArtistColors.primary,
-                    size: 28,
-                  ),
-                ),
-              ),
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return const ColoredBox(
-                  color: ArtistColors.light,
-                  child: Center(
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
+                    color: ArtistColors.light,
+                    child: Center(
+                      child: Icon(
+                        Icons.image_outlined,
                         color: ArtistColors.primary,
+                        size: 28,
                       ),
                     ),
+                  )
+                : Image.network(
+                    _image,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const ColoredBox(
+                      color: ArtistColors.light,
+                      child: Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          color: ArtistColors.primary,
+                          size: 28,
+                        ),
+                      ),
+                    ),
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const ColoredBox(
+                        color: ArtistColors.light,
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: ArtistColors.primary,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ),
         const SizedBox(width: 12),

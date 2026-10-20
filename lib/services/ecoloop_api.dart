@@ -32,11 +32,13 @@ class EcoLoopApi {
 
   static final EcoLoopApi instance = EcoLoopApi._();
 
-  // Short-lived in-memory cache for safe, read-only reference/discovery data.
-  // Transactional and account-specific endpoints are intentionally not cached.
+  // In-memory cache for safe reference/discovery data and selected account snapshots.
+  // Transaction-critical endpoints remain fresh on every new call.
   static const Duration _categoriesTtl = Duration(minutes: 10);
   static const Duration _locationsTtl = Duration(hours: 6);
-  static const Duration _publicDiscoveryTtl = Duration(seconds: 15);
+  static const Duration _publicDiscoveryTtl = Duration(minutes: 5);
+  static const Duration _privateSnapshotTtl = Duration(minutes: 5);
+  static const int _maxCacheEntries = 160;
 
   final Map<String, _CachedGet> _getCache = <String, _CachedGet>{};
   final Map<String, Future<dynamic>> _inFlightGets =
@@ -68,8 +70,10 @@ class EcoLoopApi {
     final ttl = _cacheTtlFor(path, query);
     final cacheKey = _cacheKey(path, query);
 
-    // Only explicitly approved public/reference endpoints use response caching.
-    // Account-specific and transactional reads remain fresh on every new call.
+    // Cache only explicit read-only snapshots. Account-scoped cache keys include
+    // the active token, and every successful write invalidates the whole cache.
+    // Transaction-critical reads (checkout validation, order/payment/tracking
+    // details and product details that increment views) remain uncached.
     if (ttl != null) {
       final cached = _getCache[cacheKey];
       if (cached != null && cached.expiresAt.isAfter(DateTime.now())) {
@@ -98,6 +102,7 @@ class EcoLoopApi {
     request = _send('GET', path, query: query)
         .then((value) {
           if (ttl != null && generationAtStart == _cacheGeneration) {
+            _pruneCache();
             _getCache[cacheKey] = _CachedGet(
               _copyJsonValue(value),
               DateTime.now().add(ttl),
@@ -145,9 +150,52 @@ class EcoLoopApi {
       return _locationsTtl;
     }
 
-    // Public marketplace discovery can be briefly stale while browsing, but
-    // checkout always revalidates the product and available stock server-side.
+    // Public marketplace discovery can be cached while browsing; checkout
+    // always validates product availability and stock server-side.
     if (normalized == '/products') {
+      return _publicDiscoveryTtl;
+    }
+
+    // Account-specific screens commonly reopen the same read-only snapshot.
+    // These routes are deliberately whitelisted rather than caching every GET.
+    // Order/payment/tracking and item-detail endpoints are intentionally absent.
+    const privateSnapshotPaths = <String>{
+      '/profile',
+      '/auth/me',
+      '/addresses',
+      '/wishlist',
+      '/cart',
+      '/my/products',
+      '/my/reviews',
+      '/rewards',
+      '/rewards/history',
+      '/rewards/claims',
+      '/eco-impact',
+      '/notifications',
+      '/settings',
+      '/my/following',
+      '/custom-services/mine',
+      '/custom-services/artists',
+      '/selling/earnings',
+    };
+    if (privateSnapshotPaths.contains(normalized)) {
+      return _privateSnapshotTtl;
+    }
+
+    // Donation history is useful to reuse when revisiting the history screen;
+    // create/update/pickup actions invalidate the cache through write methods.
+    if (normalized == '/donations') {
+      return _privateSnapshotTtl;
+    }
+
+    // Public seller summaries and review lists are read-only. A successful
+    // review/product/follow write invalidates cached data globally.
+    if (RegExp(
+          r'^/public/seller/(user|artist|remaker|re_maker)/\d+/profile$',
+        ).hasMatch(normalized) ||
+        RegExp(r'^/artists/\d+/reviews$').hasMatch(normalized) ||
+        RegExp(r'^/sellers/user/\d+/reviews$').hasMatch(normalized) ||
+        RegExp(r'^/products/\d+/reviews$').hasMatch(normalized)) {
       return _publicDiscoveryTtl;
     }
 
@@ -166,14 +214,55 @@ class EcoLoopApi {
 
   String _cacheKey(String path, Map<String, dynamic> query) {
     final sortedQuery = query.keys.toList()..sort();
+    final normalizedQuery = <String, dynamic>{
+      for (final key in sortedQuery) key: query[key],
+    };
+    final queryString = jsonEncode(normalizedQuery);
+    final normalizedPath = path.split('?').first.trim();
+    final isPrivateSnapshot = _isPrivateSnapshotPath(normalizedPath);
 
-    final queryString = sortedQuery
-        .map((key) => '$key=${query[key]}')
-        .join('&');
+    // Private responses are isolated by the current session token in memory.
+    // Tokens are never persisted or printed. Public reference data stays shared.
+    return isPrivateSnapshot
+        ? '$path?$queryString#${Prefs.getString('userRole').toLowerCase()}:$_token'
+        : '$path?$queryString';
+  }
 
-    // Only explicitly whitelisted public/reference GETs are cached, so tokens
-    // are not included in keys or written to persistent storage.
-    return '$path?$queryString';
+  bool _isPrivateSnapshotPath(String path) {
+    const paths = <String>{
+      '/profile',
+      '/auth/me',
+      '/addresses',
+      '/wishlist',
+      '/cart',
+      '/my/products',
+      '/my/reviews',
+      '/rewards',
+      '/rewards/history',
+      '/rewards/claims',
+      '/eco-impact',
+      '/notifications',
+      '/settings',
+      '/my/following',
+      '/custom-services/mine',
+      '/custom-services/artists',
+      '/selling/earnings',
+      '/donations',
+    };
+    return paths.contains(path);
+  }
+
+  void _pruneCache() {
+    final now = DateTime.now();
+    _getCache.removeWhere((_, entry) => !entry.expiresAt.isAfter(now));
+    if (_getCache.length >= _maxCacheEntries) {
+      // Map iteration order is insertion order; remove the oldest entries first.
+      final removeCount = _getCache.length - _maxCacheEntries + 1;
+      final keys = _getCache.keys.take(removeCount).toList();
+      for (final key in keys) {
+        _getCache.remove(key);
+      }
+    }
   }
 
   dynamic _copyJsonValue(dynamic value) {

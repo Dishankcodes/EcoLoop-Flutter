@@ -827,8 +827,16 @@ class _RewardsState extends State<Rewards> {
     });
 
     try {
-      // Rewards are the primary source for points and vouchers.
-      final rewardResponse = await EcoLoopApi.instance.get('/rewards');
+      // Rewards are authoritative; fetch supplementary donation statuses in
+      // parallel so the screen does not wait for two sequential round trips.
+      final responses = await Future.wait<dynamic>([
+        EcoLoopApi.instance.get('/rewards'),
+        EcoLoopApi.instance
+            .get('/donations')
+            .then<dynamic>((value) => value, onError: (_) => null),
+      ]);
+      final rewardResponse = responses[0];
+      final donationResponse = responses[1];
       final rewardRoot = _asMap(rewardResponse);
       final rewardData = rewardRoot['data'] is Map
           ? _asMap(rewardRoot['data'])
@@ -847,15 +855,8 @@ class _RewardsState extends State<Rewards> {
           ? transactionValue
           : <dynamic>[];
 
-      // Donation status is supplementary. If the endpoint is unavailable,
-      // the rewards API remains authoritative for already-credited rewards.
-      dynamic donationResponse;
-      try {
-        donationResponse = await EcoLoopApi.instance.get('/donations');
-      } catch (_) {
-        donationResponse = null;
-      }
-
+      // Donation status is supplementary. If unavailable, rewards remain
+      // authoritative for already-credited points.
       final donationRoot = _asMap(donationResponse);
       final donationData = donationRoot['data'] is Map
           ? _asMap(donationRoot['data'])
