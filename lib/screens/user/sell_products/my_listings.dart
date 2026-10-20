@@ -18,6 +18,9 @@ class _MyListingsState extends State<MyListings>
   List<Map<String, dynamic>> _listings = [];
   Map<String, String> _categoryNames = {};
   bool _loading = true;
+  bool _hasLoaded = false;
+  bool _requestInFlight = false;
+  int _loadGeneration = 0;
   String? _error;
 
   @override
@@ -37,10 +40,16 @@ class _MyListingsState extends State<MyListings>
   }
 
   Future<void> _loadListings() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_requestInFlight) return;
+    _requestInFlight = true;
+    final generation = ++_loadGeneration;
+    if (mounted) {
+      setState(() {
+        // Keep already loaded cards visible during pull-to-refresh or revisit.
+        _loading = !_hasLoaded;
+        _error = null;
+      });
+    }
     try {
       final responses = await Future.wait([
         EcoLoopApi.instance.get('/my/products'),
@@ -69,7 +78,7 @@ class _MyListingsState extends State<MyListings>
         if (row is Map)
           categories['${row['categoryId']}'] = '${row['name'] ?? 'Category'}';
       }
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _listings = listings
             .where(
@@ -79,13 +88,16 @@ class _MyListingsState extends State<MyListings>
             .toList();
         _categoryNames = categories;
         _loading = false;
+        _hasLoaded = true;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _loading = false;
         _error = e.toString().replaceFirst('Exception: ', '');
       });
+    } finally {
+      if (generation == _loadGeneration) _requestInFlight = false;
     }
   }
 

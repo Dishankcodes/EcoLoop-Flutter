@@ -19,6 +19,8 @@ class _OrdersState extends State<Orders> {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _orders = <Map<String, dynamic>>[];
+  bool _requestInFlight = false;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -27,11 +29,16 @@ class _OrdersState extends State<Orders> {
   }
 
   Future<void> _load() async {
-    if (mounted) {
+    if (!mounted || _requestInFlight) return;
+    _requestInFlight = true;
+    final generation = ++_loadGeneration;
+    if (_orders.isEmpty) {
       setState(() {
         _loading = true;
         _error = null;
       });
+    } else {
+      setState(() => _error = null);
     }
 
     try {
@@ -43,17 +50,20 @@ class _OrdersState extends State<Orders> {
                 .toList()
           : <Map<String, dynamic>>[];
 
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _orders = rows;
         _loading = false;
+        _error = null;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
-        _error = error.toString();
+        if (_orders.isEmpty) _error = error.toString();
         _loading = false;
       });
+    } finally {
+      _requestInFlight = false;
     }
   }
 

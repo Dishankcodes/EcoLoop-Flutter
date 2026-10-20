@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../../../app_theme/artist/artist_colors.dart';
-import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../app_theme/user/app_colors.dart';
+import '../../../app_theme/user/app_text_styles.dart';
 import '../../common/about_ecoloop.dart';
-import '../../common/artist/help_support.dart';
+import '../../common/help_support.dart';
 import '../../common/terms_conditions.dart';
+import 'change_password.dart';
 import 'edit_profile.dart';
 
+/// Settings for account preferences, privacy, security, and support.
 class Settings extends StatefulWidget {
   const Settings({super.key});
 
@@ -22,31 +24,20 @@ class _SettingsState extends State<Settings> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ArtistColors.background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         elevation: 0,
-        scrolledUnderElevation: 0,
-        backgroundColor: ArtistColors.background,
-        surfaceTintColor: Colors.transparent,
-        foregroundColor: ArtistColors.textPrimary,
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
         leading: IconButton(
-          tooltip: 'Back',
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          icon: const Icon(Icons.arrow_back_rounded, size: 23),
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_rounded),
         ),
-        title: Text(
-          'Settings',
-          style: ArtistTextStyles.title.copyWith(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+        title: Text('Settings', style: AppTextStyles.title),
       ),
       body: ListView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 5, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
         children: [
           _buildSectionTitle('Preferences'),
           _buildSettingsCard(
@@ -55,22 +46,16 @@ class _SettingsState extends State<Settings> {
                 icon: Icons.notifications_none_rounded,
                 title: 'Notifications',
                 subtitle: notificationsEnabled
-                    ? 'Receive updates about your shop and orders'
+                    ? 'Receive updates about your activity'
                     : 'Notifications are turned off',
                 value: notificationsEnabled,
                 onChanged: (value) {
                   setState(() {
                     notificationsEnabled = value;
                   });
-
-                  _showMessage(
-                    value ? 'Notifications enabled' : 'Notifications disabled',
-                  );
                 },
               ),
-
               _buildDivider(),
-
               _buildSwitchTile(
                 icon: Icons.email_outlined,
                 title: 'Email Updates',
@@ -82,15 +67,9 @@ class _SettingsState extends State<Settings> {
                   setState(() {
                     emailUpdatesEnabled = value;
                   });
-
-                  _showMessage(
-                    value ? 'Email updates enabled' : 'Email updates disabled',
-                  );
                 },
               ),
-
               _buildDivider(),
-
               _buildSettingsTile(
                 icon: Icons.location_on_outlined,
                 title: 'Location',
@@ -99,7 +78,7 @@ class _SettingsState extends State<Settings> {
                     : 'Location services disabled',
                 trailing: Switch(
                   value: locationEnabled,
-                  activeColor: ArtistColors.primary,
+                  activeColor: AppColors.primary,
                   onChanged: (value) {
                     setState(() {
                       locationEnabled = value;
@@ -114,16 +93,14 @@ class _SettingsState extends State<Settings> {
               ),
             ],
           ),
-
-          const SizedBox(height: 21),
-
+          const SizedBox(height: 25),
           _buildSectionTitle('Account'),
           _buildSettingsCard(
             children: [
               _buildSettingsTile(
                 icon: Icons.person_outline_rounded,
                 title: 'Edit Profile',
-                subtitle: 'Update your artist profile information',
+                subtitle: 'Update your personal information',
                 onTap: () {
                   Navigator.push(
                     context,
@@ -131,57 +108,61 @@ class _SettingsState extends State<Settings> {
                   );
                 },
               ),
+              _buildDivider(),
+              _buildSettingsTile(
+                icon: Icons.lock_outline_rounded,
+                title: 'Change Password',
+                subtitle: 'Update your account password',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChangePasswordPage(),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
-
-          const SizedBox(height: 21),
-
+          const SizedBox(height: 25),
           _buildSectionTitle('Privacy & Security'),
           _buildSettingsCard(
             children: [
               _buildSettingsTile(
                 icon: Icons.privacy_tip_outlined,
                 title: 'Privacy',
-                subtitle: 'Manage your profile visibility and privacy',
+                subtitle: 'Manage your privacy preferences',
                 onTap: _showPrivacySheet,
               ),
-
               _buildDivider(),
-
               _buildSettingsTile(
                 icon: Icons.security_outlined,
                 title: 'Security',
-                subtitle: 'Manage your account security',
+                subtitle: 'Manage account security',
                 onTap: _showSecuritySheet,
               ),
             ],
           ),
-
-          const SizedBox(height: 21),
-
+          const SizedBox(height: 25),
           _buildSectionTitle('Support'),
           _buildSettingsCard(
             children: [
               _buildSettingsTile(
                 icon: Icons.help_outline_rounded,
                 title: 'Help & Support',
-                subtitle: 'Get help with your EcoLoop artist account',
+                subtitle: 'Get help with EcoLoop',
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => const ArtistHelpSupportScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const HelpSupport()),
                   );
                 },
               ),
-
               _buildDivider(),
-
               _buildSettingsTile(
                 icon: Icons.description_outlined,
                 title: 'Terms & Conditions',
-                subtitle: 'Read EcoLoop terms and conditions',
+                subtitle: 'Read EcoLoop terms',
                 onTap: () {
                   Navigator.push(
                     context,
@@ -189,9 +170,7 @@ class _SettingsState extends State<Settings> {
                   );
                 },
               ),
-
               _buildDivider(),
-
               _buildSettingsTile(
                 icon: Icons.info_outline_rounded,
                 title: 'About EcoLoop',
@@ -205,31 +184,25 @@ class _SettingsState extends State<Settings> {
               ),
             ],
           ),
-
-          const SizedBox(height: 22),
-
+          const SizedBox(height: 25),
           Center(
             child: Text(
               'EcoLoop',
-              style: ArtistTextStyles.title.copyWith(fontSize: 16),
+              style: AppTextStyles.title.copyWith(fontSize: 16),
             ),
           ),
-
           const SizedBox(height: 3),
-
           Center(
             child: Text(
-              'Create. Reuse. Inspire.',
-              style: ArtistTextStyles.caption,
+              'Small Actions. Big Impact.',
+              style: AppTextStyles.caption,
             ),
           ),
-
-          const SizedBox(height: 4),
-
+          const SizedBox(height: 5),
           Center(
             child: Text(
-              'Artist Version 1.0.0',
-              style: ArtistTextStyles.caption.copyWith(fontSize: 10),
+              'Version 1.0.0',
+              style: AppTextStyles.caption.copyWith(fontSize: 10),
             ),
           ),
         ],
@@ -237,29 +210,25 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  /// Title header label for setting categories.
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 3, bottom: 8),
-      child: Text(
-        title,
-        style: ArtistTextStyles.title.copyWith(
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+      padding: const EdgeInsets.only(left: 3, bottom: 9),
+      child: Text(title, style: AppTextStyles.title.copyWith(fontSize: 16)),
     );
   }
 
+  /// Container card wrapping settings tile options in a styled block.
   Widget _buildSettingsCard({required List<Widget> children}) {
     return Container(
       decoration: BoxDecoration(
-        color: ArtistColors.surface,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ArtistColors.border),
+        border: Border.all(color: AppColors.accent.withOpacity(0.45)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.025),
-            blurRadius: 9,
+            blurRadius: 10,
             offset: const Offset(0, 3),
           ),
         ],
@@ -268,6 +237,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  /// Clickable navigation tile item.
   Widget _buildSettingsTile({
     required IconData icon,
     required String title,
@@ -281,44 +251,38 @@ class _SettingsState extends State<Settings> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
           child: Row(
             children: [
               _buildIconBox(icon),
-
-              const SizedBox(width: 11),
-
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: ArtistTextStyles.bodyMedium.copyWith(
-                        fontSize: 13,
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.textPrimary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-
-                    const SizedBox(height: 2),
-
+                    const SizedBox(height: 3),
                     Text(
                       subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: ArtistTextStyles.caption.copyWith(fontSize: 10),
+                      style: AppTextStyles.caption,
                     ),
                   ],
                 ),
               ),
-
-              const SizedBox(width: 7),
-
+              const SizedBox(width: 8),
               trailing ??
                   const Icon(
                     Icons.chevron_right_rounded,
-                    size: 20,
-                    color: ArtistColors.textSecondary,
+                    size: 21,
+                    color: AppColors.textSecondary,
                   ),
             ],
           ),
@@ -327,6 +291,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  /// Toggle switch tile item for notification and email preferences.
   Widget _buildSwitchTile({
     required IconData icon,
     required String title,
@@ -337,45 +302,37 @@ class _SettingsState extends State<Settings> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          onChanged(!value);
-        },
+        onTap: () => onChanged(!value),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
           child: Row(
             children: [
               _buildIconBox(icon),
-
-              const SizedBox(width: 11),
-
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: ArtistTextStyles.bodyMedium.copyWith(
-                        fontSize: 13,
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.textPrimary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-
-                    const SizedBox(height: 2),
-
+                    const SizedBox(height: 3),
                     Text(
                       subtitle,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: ArtistTextStyles.caption.copyWith(fontSize: 10),
+                      style: AppTextStyles.caption,
                     ),
                   ],
                 ),
               ),
-
               Switch(
                 value: value,
-                activeColor: ArtistColors.primary,
-                activeTrackColor: ArtistColors.light,
+                activeColor: AppColors.primary,
                 onChanged: onChanged,
               ),
             ],
@@ -385,25 +342,28 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  /// Styled background box wrapping leading category icons.
   Widget _buildIconBox(IconData icon) {
     return Container(
-      width: 41,
-      height: 41,
+      width: 42,
+      height: 42,
       decoration: BoxDecoration(
-        color: ArtistColors.light,
+        color: AppColors.light,
         borderRadius: BorderRadius.circular(11),
       ),
-      child: Icon(icon, size: 20, color: ArtistColors.primary),
+      child: Icon(icon, size: 21, color: AppColors.primary),
     );
   }
 
+  /// Inset horizontal line separator for card lists.
   Widget _buildDivider() {
     return Padding(
-      padding: const EdgeInsets.only(left: 66),
-      child: Divider(height: 1, color: ArtistColors.border.withOpacity(0.65)),
+      padding: const EdgeInsets.only(left: 69),
+      child: Divider(height: 1, color: AppColors.accent.withOpacity(0.22)),
     );
   }
 
+  /// Displays the modal sheet for managing user privacy controls.
   void _showPrivacySheet() {
     bool profileVisible = true;
     bool activityVisible = false;
@@ -412,36 +372,43 @@ class _SettingsState extends State<Settings> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: ArtistColors.surface,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 25),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildSheetHandle(),
-
-                      const SizedBox(height: 17),
-
-                      Text(
-                        'Privacy Preferences',
-                        style: ArtistTextStyles.title.copyWith(fontSize: 18),
+                      Center(
+                        child: Container(
+                          height: 4,
+                          width: 42,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
                       ),
-
-                      const SizedBox(height: 13),
-
+                      const SizedBox(height: 20),
+                      Text('Privacy & Data', style: AppTextStyles.title),
+                      const SizedBox(height: 5),
+                      Text(
+                        'Choose what you are comfortable sharing on EcoLoop.',
+                        style: AppTextStyles.caption,
+                      ),
+                      const SizedBox(height: 15),
                       _privacySwitch(
-                        title: 'Public Artist Profile',
+                        title: 'Profile visibility',
                         subtitle:
-                            'Allow other users to view your artist profile',
+                            'Let other EcoLoop users view your public profile',
                         value: profileVisible,
                         onChanged: (value) {
                           setSheetState(() {
@@ -449,11 +416,10 @@ class _SettingsState extends State<Settings> {
                           });
                         },
                       ),
-
                       _privacySwitch(
-                        title: 'Activity Visibility',
+                        title: 'Marketplace activity',
                         subtitle:
-                            'Control visibility of your marketplace activity',
+                            'Show activity such as reviews and listings on your profile',
                         value: activityVisible,
                         onChanged: (value) {
                           setSheetState(() {
@@ -461,11 +427,10 @@ class _SettingsState extends State<Settings> {
                           });
                         },
                       ),
-
                       _privacySwitch(
-                        title: 'Location Sharing',
+                        title: 'Use location for recommendations',
                         subtitle:
-                            'Allow location to improve marketplace results',
+                            'Use location to make nearby listings more relevant',
                         value: locationSharing,
                         onChanged: (value) {
                           setSheetState(() {
@@ -473,32 +438,29 @@ class _SettingsState extends State<Settings> {
                           });
                         },
                       ),
-
-                      const SizedBox(height: 7),
-
+                      const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(13),
                         decoration: BoxDecoration(
-                          color: ArtistColors.light,
-                          borderRadius: BorderRadius.circular(12),
+                          color: AppColors.light,
+                          borderRadius: BorderRadius.circular(13),
                         ),
-                        child: Row(
+                        child: const Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.info_outline_rounded,
-                              color: ArtistColors.primary,
-                              size: 19,
+                              color: AppColors.primary,
+                              size: 20,
                             ),
-
-                            const SizedBox(width: 8),
-
+                            SizedBox(width: 9),
                             Expanded(
                               child: Text(
-                                'Your privacy controls can be connected to your account settings when the backend is integrated.',
-                                style: ArtistTextStyles.caption.copyWith(
+                                'These switches are currently a UI preview. They do not change server-side visibility or location permissions until connected to your account backend.',
+                                style: TextStyle(
                                   fontSize: 10,
-                                  height: 1.4,
+                                  height: 1.45,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ),
@@ -516,6 +478,7 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  /// Switch item rendered within the privacy bottom sheet.
   Widget _privacySwitch({
     required String title,
     required String subtitle,
@@ -523,7 +486,7 @@ class _SettingsState extends State<Settings> {
     required ValueChanged<bool> onChanged,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
           Expanded(
@@ -532,23 +495,26 @@ class _SettingsState extends State<Settings> {
               children: [
                 Text(
                   title,
-                  style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 12.5),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-
-                const SizedBox(height: 2),
-
+                const SizedBox(height: 3),
                 Text(
                   subtitle,
-                  style: ArtistTextStyles.caption.copyWith(fontSize: 9.5),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
           ),
-
           Switch(
             value: value,
-            activeColor: ArtistColors.primary,
-            activeTrackColor: ArtistColors.light,
+            activeColor: AppColors.primary,
             onChanged: onChanged,
           ),
         ],
@@ -556,73 +522,117 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  /// Displays the modal sheet detailing security features and active sessions.
   void _showSecuritySheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: ArtistColors.surface,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 25),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildSheetHandle(),
-
-                  const SizedBox(height: 17),
-
+                  Center(
+                    child: Container(
+                      height: 4,
+                      width: 42,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text('Account Security', style: AppTextStyles.title),
+                  const SizedBox(height: 5),
                   Text(
-                    'Account Security',
-                    style: ArtistTextStyles.title.copyWith(fontSize: 18),
+                    'Review the key protections for your account.',
+                    style: AppTextStyles.caption,
                   ),
-
-                  const SizedBox(height: 13),
-
+                  const SizedBox(height: 15),
                   _securityItem(
-                    Icons.lock_outline_rounded,
+                    Icons.password_rounded,
                     'Password',
-                    'Your account password is protected.',
+                    'Use a strong, unique password and update it if you suspect it was exposed.',
                   ),
-
                   _securityItem(
                     Icons.verified_user_outlined,
-                    'Account Verification',
-                    'Your EcoLoop artist account verification status.',
+                    'Account details',
+                    'Keep your registered email and phone number accurate so you can be reached.',
                   ),
-
+                  _securityItem(
+                    Icons.phonelink_lock_outlined,
+                    'Sign-in safety',
+                    'Never share your password or one-time verification codes with anyone.',
+                  ),
                   _securityItem(
                     Icons.devices_outlined,
-                    'Active Sessions',
-                    'Manage devices where your account is signed in.',
+                    'Signed-in devices',
+                    'Device and session management is not available in this screen yet.',
                   ),
-
-                  _securityItem(
-                    Icons.warning_amber_rounded,
-                    'Security Alerts',
-                    'Important security notifications will appear here.',
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: BorderSide(
+                          color: AppColors.primary.withOpacity(0.5),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                      ),
+                      icon: const Icon(Icons.lock_reset_rounded),
+                      label: const Text('Change Password'),
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ChangePasswordPage(),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-
-                  const SizedBox(height: 8),
-
+                  const SizedBox(height: 12),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(13),
                     decoration: BoxDecoration(
-                      color: ArtistColors.light,
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.light,
+                      borderRadius: BorderRadius.circular(13),
                     ),
-                    child: Text(
-                      'Security management will be connected to the backend during the authentication phase.',
-                      style: ArtistTextStyles.caption.copyWith(
-                        fontSize: 10,
-                        height: 1.4,
-                      ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: AppColors.primary,
+                          size: 19,
+                        ),
+                        SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            'Password updates, verification status and active-session controls need authentication-backend support. This screen does not claim to change them.',
+                            style: TextStyle(
+                              fontSize: 10,
+                              height: 1.45,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -634,66 +644,42 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  /// Item tile rendered inside the account security bottom sheet.
   Widget _securityItem(IconData icon, String title, String subtitle) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: ArtistColors.light,
-          borderRadius: BorderRadius.circular(11),
-        ),
-        child: Icon(icon, color: ArtistColors.primary, size: 20),
-      ),
-      title: Text(
-        title,
-        style: ArtistTextStyles.bodyMedium.copyWith(fontSize: 12.5),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: ArtistTextStyles.caption.copyWith(fontSize: 9.5),
-      ),
-    );
-  }
-
-  Widget _buildSheetHandle() {
-    return Center(
-      child: Container(
-        height: 4,
-        width: 40,
-        decoration: BoxDecoration(
-          color: ArtistColors.border,
-          borderRadius: BorderRadius.circular(10),
-        ),
-      ),
-    );
-  }
-
-  void _showMessage(String message) {
-    if (!mounted) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: ArtistTextStyles.body.copyWith(
-              color: Colors.white,
-              fontSize: 11.5,
-            ),
-          ),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-          backgroundColor: ArtistColors.accent,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Container(
+          height: 40,
+          width: 40,
+          decoration: BoxDecoration(
+            color: AppColors.light,
             borderRadius: BorderRadius.circular(11),
           ),
+          child: Icon(icon, color: AppColors.primary, size: 20),
         ),
-      );
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+        ),
+      ),
+    );
+  }
+
+  /// Displays a floating snackbar feedback message.
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
   }
 }

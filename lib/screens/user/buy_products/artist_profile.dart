@@ -36,6 +36,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
   bool _followBusy = false;
   int? _followerCount;
   bool _reviewEligibilityChecked = false;
+  bool _profileLoadInFlight = false;
   bool _canReview = false;
   bool _alreadyReviewed = false;
   String? _eligibleOrderId;
@@ -104,6 +105,8 @@ class _ArtistProfileState extends State<ArtistProfile> {
   }
 
   Future<void> _loadProfileData({bool refresh = false}) async {
+    // Avoid duplicate seven-endpoint bursts from refresh gestures/buttons.
+    if (_profileLoadInFlight) return;
     if (_artistId.isEmpty) {
       if (mounted) {
         setState(() {
@@ -115,9 +118,14 @@ class _ArtistProfileState extends State<ArtistProfile> {
       return;
     }
 
+    _profileLoadInFlight = true;
     if (mounted) {
       setState(() {
-        if (refresh) {
+        final hasExistingData =
+            _portfolio.isNotEmpty ||
+            _products.isNotEmpty ||
+            _reviews.isNotEmpty;
+        if (refresh && hasExistingData) {
           _refreshing = true;
         } else {
           _loading = true;
@@ -136,6 +144,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
       _safeGet('/artists/$_artistId/followers', fallback: <String, dynamic>{}),
     ]);
 
+    _profileLoadInFlight = false;
     if (!mounted) return;
 
     final portfolio = _asList(results[0]);

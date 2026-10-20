@@ -25,6 +25,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   bool _checkingReviewStatus = true;
   bool _cancellingOrder = false;
   bool _refundExpected = false;
+  Future<bool>? _reviewStatusRequest;
 
   @override
   void initState() {
@@ -349,7 +350,20 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   String _reviewText(dynamic value) =>
       (value ?? '').toString().trim().toLowerCase().replaceAll('_', ' ');
 
-  Future<bool> _loadExistingReviewStatus({bool showError = false}) async {
+  Future<bool> _loadExistingReviewStatus({bool showError = false}) {
+    final inFlight = _reviewStatusRequest;
+    if (inFlight != null) return inFlight;
+    final request = _fetchExistingReviewStatus(showError: showError);
+    _reviewStatusRequest = request;
+    request.whenComplete(() {
+      if (identical(_reviewStatusRequest, request)) {
+        _reviewStatusRequest = null;
+      }
+    });
+    return request;
+  }
+
+  Future<bool> _fetchExistingReviewStatus({bool showError = false}) async {
     if (mounted) setState(() => _checkingReviewStatus = true);
     try {
       final dynamic response = await EcoLoopApi.instance.get('/my/reviews');

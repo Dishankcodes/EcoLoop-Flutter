@@ -24,6 +24,9 @@ class _SellerProfileState extends State<SellerProfile> {
   List<Map<String, dynamic>> _reviews = [];
   Map<String, dynamic>? _reviewEligibility;
   bool _loadingReviews = false;
+  bool _listingsRequestInFlight = false;
+  bool _reviewsRequestInFlight = false;
+  bool _eligibilityRequestInFlight = false;
 
   Map<String, dynamic> _map(dynamic v) {
     if (v is Map<String, dynamic>) return v;
@@ -76,7 +79,11 @@ class _SellerProfileState extends State<SellerProfile> {
   }
 
   Future<void> _loadListings() async {
-    if (mounted) setState(() => _loading = true);
+    if (_listingsRequestInFlight) return;
+    _listingsRequestInFlight = true;
+    // Keep existing listing cards visible while refreshing.
+    if (mounted && _listings.isEmpty) setState(() => _loading = true);
+    if (mounted) setState(() => _error = null);
     try {
       final rows = _rows(
         await _api.get(
@@ -115,6 +122,7 @@ class _SellerProfileState extends State<SellerProfile> {
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
+      _listingsRequestInFlight = false;
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -125,7 +133,8 @@ class _SellerProfileState extends State<SellerProfile> {
           widget.seller['id'] ??
           widget.seller['sellerId'],
     );
-    if (id.isEmpty) return;
+    if (id.isEmpty || _reviewsRequestInFlight) return;
+    _reviewsRequestInFlight = true;
     if (mounted) setState(() => _loadingReviews = true);
     try {
       final data = await _api.get('/sellers/user/$id/reviews');
@@ -134,6 +143,7 @@ class _SellerProfileState extends State<SellerProfile> {
     } catch (_) {
       if (mounted) setState(() => _reviews = []);
     } finally {
+      _reviewsRequestInFlight = false;
       if (mounted) setState(() => _loadingReviews = false);
     }
   }
@@ -144,7 +154,8 @@ class _SellerProfileState extends State<SellerProfile> {
           widget.seller['id'] ??
           widget.seller['sellerId'],
     );
-    if (id.isEmpty) return;
+    if (id.isEmpty || _eligibilityRequestInFlight) return;
+    _eligibilityRequestInFlight = true;
     try {
       final data = await _api.get('/sellers/user/$id/review-eligibility');
       if (mounted)
@@ -155,6 +166,8 @@ class _SellerProfileState extends State<SellerProfile> {
         );
     } catch (_) {
       if (mounted) setState(() => _reviewEligibility = {'eligible': false});
+    } finally {
+      _eligibilityRequestInFlight = false;
     }
   }
 
@@ -507,7 +520,7 @@ class _SellerProfileState extends State<SellerProfile> {
               style: AppTextStyles.caption,
             ),
             const SizedBox(height: 14),
-            if (_loading)
+            if (_loading && _listings.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(30),
                 child: Center(child: CircularProgressIndicator()),

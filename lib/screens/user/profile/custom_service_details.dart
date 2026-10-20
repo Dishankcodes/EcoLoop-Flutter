@@ -30,6 +30,8 @@ class _CustomServiceDetailsState extends State<CustomServiceDetails> {
   List<Map<String, dynamic>> _availableArtists = <Map<String, dynamic>>[];
 
   bool _loading = true;
+  bool _hasLoadedOnce = false;
+  int _loadGeneration = 0;
   String? _error;
   Map<String, dynamic> _row = <String, dynamic>{};
 
@@ -55,6 +57,7 @@ class _CustomServiceDetailsState extends State<CustomServiceDetails> {
   }
 
   Future<void> _sendAdditionalDetails() async {
+    if (_sendingMessage) return;
     final message = _messageController.text.trim();
     if (message.length < 5) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -87,12 +90,14 @@ class _CustomServiceDetailsState extends State<CustomServiceDetails> {
   }
 
   Future<void> _load() async {
-    if (mounted) {
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
-    }
+    if (!mounted) return;
+    final generation = ++_loadGeneration;
+    setState(() {
+      // On refresh, keep the current details visible instead of replacing the
+      // whole screen with a spinner. The first load still shows the loader.
+      _loading = !_hasLoadedOnce;
+      _error = null;
+    });
 
     try {
       dynamic result = await _api.get('/custom-services/${widget.serviceId}');
@@ -132,22 +137,25 @@ class _CustomServiceDetailsState extends State<CustomServiceDetails> {
         );
       }
 
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _row = row;
         _error = null;
+        _hasLoadedOnce = true;
       });
       if (_value(row['status']).toLowerCase() ==
           'waiting for user to choose another artist') {
         await _loadAlternativeArtists();
       }
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _error = error.toString().replaceFirst('Exception: ', '').trim();
       });
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -669,6 +677,7 @@ class _CustomServiceDetailsState extends State<CustomServiceDetails> {
   }
 
   Future<void> _assignAlternativeArtist() async {
+    if (_reassigningArtist) return;
     final id = _selectedArtistId;
     if (id == null || _reassigningArtist) return;
     setState(() => _reassigningArtist = true);

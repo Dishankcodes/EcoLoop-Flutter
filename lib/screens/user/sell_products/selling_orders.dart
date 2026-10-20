@@ -17,6 +17,7 @@ class _SellingOrdersState extends State<SellingOrders> {
   List<Map<String, dynamic>> _orders = [];
   String _filter = 'All';
   final TextEditingController _search = TextEditingController();
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -100,9 +101,11 @@ class _SellingOrdersState extends State<SellingOrders> {
   }
 
   Future<void> _loadOrders() async {
+    final generation = ++_loadGeneration;
     if (mounted)
       setState(() {
-        _loading = true;
+        // Avoid replacing existing order cards with a full-screen loader.
+        if (_orders.isEmpty) _loading = true;
         _error = null;
       });
     try {
@@ -118,14 +121,16 @@ class _SellingOrdersState extends State<SellingOrders> {
                 .map((e) => _normalize(Map<String, dynamic>.from(e)))
                 .toList()
           : <Map<String, dynamic>>[];
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _orders = mapped;
         _loading = false;
+        _error = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
+        // If cached/in-memory orders already exist, keep them visible on failure.
         _error = e.toString().replaceFirst('Exception: ', '');
         _loading = false;
       });

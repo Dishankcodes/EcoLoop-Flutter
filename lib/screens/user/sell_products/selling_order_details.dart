@@ -21,6 +21,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   bool _cancelling = false;
   bool _refundExpected = false;
   String? _error;
+  int _refreshGeneration = 0;
 
   @override
   void initState() {
@@ -365,19 +366,37 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   }
 
   Future<void> _refresh() async {
-    if (_id <= 0) return;
+    if (_id <= 0 || _loading || _cancelling) return;
+    final generation = ++_refreshGeneration;
     setState(() {
+      // Keep the already-rendered order visible while refreshing.
       _loading = true;
       _error = null;
     });
     try {
       final result = await EcoLoopApi.instance.get('/orders/$_id');
-      if (result is Map)
-        _order = {..._order, ...Map<String, dynamic>.from(result)};
+      if (!mounted || generation != _refreshGeneration) return;
+      if (result is Map) {
+        final refreshed = Map<String, dynamic>.from(result);
+        // Some API responses wrap the order in an `order` field.
+        final nested = refreshed['order'];
+        _order = {
+          ..._order,
+          ...Map<String, dynamic>.from(nested is Map ? nested : refreshed),
+        };
+        _refundExpected =
+            _isPaid('${_order['paymentStatus'] ?? ''}') ||
+            '${_order['paymentStatus'] ?? ''}'.toLowerCase() ==
+                'refund_required';
+      }
     } catch (e) {
-      if (mounted) _error = e.toString().replaceFirst('Exception: ', '');
+      if (mounted && generation == _refreshGeneration) {
+        _error = e.toString().replaceFirst('Exception: ', '');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && generation == _refreshGeneration) {
+        setState(() => _loading = false);
+      }
     }
   }
 

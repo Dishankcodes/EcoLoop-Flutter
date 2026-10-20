@@ -31,6 +31,8 @@ class _CustomServiceState extends State<CustomService> {
   final TextEditingController _artistSearchController = TextEditingController();
   final List<XFile> _photos = [];
   bool loadingArtists = true, submitting = false;
+  bool _loadingArtistsRequest = false;
+  int _artistLoadGeneration = 0;
   String artistSearchQuery = '';
   String? error;
   List<Map<String, dynamic>> artists = [];
@@ -58,6 +60,9 @@ class _CustomServiceState extends State<CustomService> {
   String val(dynamic x) => (x ?? '').toString().trim();
 
   Future<void> _loadArtists() async {
+    if (_loadingArtistsRequest) return;
+    _loadingArtistsRequest = true;
+    final generation = ++_artistLoadGeneration;
     try {
       dynamic response = await api.get('/custom-services/artists');
       Map<String, dynamic> payload = map(response);
@@ -101,7 +106,7 @@ class _CustomServiceState extends State<CustomService> {
           'isPreselected': true,
         });
       }
-      if (!mounted) return;
+      if (!mounted || generation != _artistLoadGeneration) return;
       setState(() {
         artists = loaded;
         userCity = val(payload['userCity']);
@@ -109,10 +114,14 @@ class _CustomServiceState extends State<CustomService> {
         error = null;
       });
     } catch (e) {
-      if (mounted)
+      if (mounted && generation == _artistLoadGeneration) {
         setState(() => error = e.toString().replaceFirst('Exception: ', ''));
+      }
     } finally {
-      if (mounted) setState(() => loadingArtists = false);
+      _loadingArtistsRequest = false;
+      if (mounted && generation == _artistLoadGeneration) {
+        setState(() => loadingArtists = false);
+      }
     }
   }
 
@@ -135,6 +144,7 @@ class _CustomServiceState extends State<CustomService> {
   }
 
   Future<void> _submit() async {
+    if (submitting) return;
     final d = description.text.trim();
     final b = double.tryParse(budget.text.trim());
     if (d.length < 10) {
@@ -147,14 +157,16 @@ class _CustomServiceState extends State<CustomService> {
     }
     setState(() => submitting = true);
     try {
-      final photoPayload = <Map<String, dynamic>>[];
-      for (final photo in _photos) {
-        photoPayload.add({
-          'base64': base64Encode(await photo.readAsBytes()),
-          'fileName': photo.name,
-          'mimeType': photo.mimeType ?? 'image/jpeg',
-        });
-      }
+      // Read the selected (maximum three) images concurrently to reduce wait time.
+      final photoPayload = await Future.wait(
+        _photos.map(
+          (photo) async => <String, dynamic>{
+            'base64': base64Encode(await photo.readAsBytes()),
+            'fileName': photo.name,
+            'mimeType': photo.mimeType ?? 'image/jpeg',
+          },
+        ),
+      );
       await api.post('/custom-services', {
         'description': d,
         'budget': b,

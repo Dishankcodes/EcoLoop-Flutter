@@ -250,6 +250,7 @@ class _EditListingState extends State<EditListing> {
   }
 
   Future<void> _saveChanges() async {
+    if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
     if (_id <= 0) {
       _message(
@@ -268,22 +269,24 @@ class _EditListingState extends State<EditListing> {
           .clamp(0, 1 << 30)
           .toInt();
       final newTotalQuantity = soldQuantity + newAvailableQuantity;
-      final encodedImages = <Map<String, dynamic>>[];
-      for (final image in _newImages) {
-        final bytes = await image.readAsBytes();
-        final pathParts = image.name.split('.');
-        final extension = pathParts.length > 1
-            ? pathParts.last.toLowerCase()
-            : 'jpg';
-        final mimeType = extension == 'png'
-            ? 'image/png'
-            : (extension == 'webp' ? 'image/webp' : 'image/jpeg');
-        encodedImages.add({
-          'base64': base64Encode(bytes),
-          'fileName': image.name,
-          'mimeType': mimeType,
-        });
-      }
+      // Read selected files concurrently to reduce time spent waiting on each image.
+      final encodedImages = await Future.wait(
+        _newImages.map((image) async {
+          final bytes = await image.readAsBytes();
+          final pathParts = image.name.split('.');
+          final extension = pathParts.length > 1
+              ? pathParts.last.toLowerCase()
+              : 'jpg';
+          final mimeType = extension == 'png'
+              ? 'image/png'
+              : (extension == 'webp' ? 'image/webp' : 'image/jpeg');
+          return <String, dynamic>{
+            'base64': base64Encode(bytes),
+            'fileName': image.name,
+            'mimeType': mimeType,
+          };
+        }),
+      );
 
       await EcoLoopApi.instance.put('/products/$_id', {
         'title': _nameController.text.trim(),
@@ -314,6 +317,7 @@ class _EditListingState extends State<EditListing> {
   }
 
   Future<void> _deleteListing() async {
+    if (_saving) return;
     if (_id <= 0) {
       _message('Invalid product ID.');
       return;
@@ -337,13 +341,16 @@ class _EditListingState extends State<EditListing> {
         ],
       ),
     );
-    if (confirm != true || !mounted) return;
+    if (confirm != true || !mounted || _saving) return;
+    setState(() => _saving = true);
     try {
       await EcoLoopApi.instance.delete('/products/$_id');
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (e) {
       _message(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 

@@ -575,6 +575,8 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
       );
 
   Future<void> _save() async {
+    // Guard against rapid taps or a second invocation before the widget rebuilds.
+    if (_saving) return;
     if (_id <= 0) {
       setState(() => _error = 'This order does not have a valid order ID.');
       return;

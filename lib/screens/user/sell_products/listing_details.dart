@@ -164,6 +164,7 @@ class _ListingDetailsState extends State<ListingDetails> {
   }
 
   Future<void> _setStatus(String status) async {
+    if (_busy) return;
     if (_id <= 0) {
       _message('Invalid product ID.');
       return;
@@ -173,11 +174,13 @@ class _ListingDetailsState extends State<ListingDetails> {
       final updated = await EcoLoopApi.instance.post('/products/$_id/status', {
         'status': status,
       });
-      if (updated is Map)
+      if (!mounted) return;
+      if (updated is Map) {
         _listing = {..._listing, ...Map<String, dynamic>.from(updated)};
-      else
+      } else {
         _listing['status'] = status;
-      if (mounted) setState(() {});
+      }
+      setState(() {});
       _message('Listing status updated.');
     } catch (e) {
       _message(e.toString().replaceFirst('Exception: ', ''));
