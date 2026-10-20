@@ -118,10 +118,10 @@ class _ProfileState extends State<Profile> {
         _listingCount = listings
             .where(
               (p) => ![
-                'deleted',
-                'removed',
-              ].contains((p['status'] ?? '').toString().toLowerCase()),
-            )
+            'deleted',
+            'removed',
+          ].contains((p['status'] ?? '').toString().toLowerCase()),
+        )
             .length;
         _wishlistCount = wishlist.length;
       });
@@ -152,7 +152,7 @@ class _ProfileState extends State<Profile> {
           r'(?:drive\.google\.com|docs\.google\.com)/(?:file/d/|open\?id=|uc\?[^#]*?id=)([A-Za-z0-9_-]+)',
           caseSensitive: false,
         ).firstMatch(url) ??
-        RegExp(r'[?&]id=([A-Za-z0-9_-]+)').firstMatch(url);
+            RegExp(r'[?&]id=([A-Za-z0-9_-]+)').firstMatch(url);
     if (match != null &&
         (url.contains('drive.google.com') || url.contains('docs.google.com'))) {
       return 'https://drive.google.com/uc?export=view&id=${match.group(1)}';
@@ -187,6 +187,8 @@ class _ProfileState extends State<Profile> {
               _buildQuickStats(context),
               const SizedBox(height: 24),
               _buildAccountSection(context),
+              const SizedBox(height: 22),
+              _buildCustomServiceSection(context),
               const SizedBox(height: 22),
               _buildSellingSection(context),
               const SizedBox(height: 22),
@@ -245,30 +247,30 @@ class _ProfileState extends State<Profile> {
                 clipBehavior: Clip.antiAlias,
                 child: _loadingProfile
                     ? const Center(
-                        child: SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
                     : (_photoUrl.isNotEmpty
-                          ? Image.network(
-                              _displayableProfilePhotoUrl(_photoUrl),
-                              key: ValueKey<String>(
-                                _displayableProfilePhotoUrl(_photoUrl),
-                              ),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.person_rounded,
-                                size: 46,
-                                color: AppColors.primary,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.person_rounded,
-                              size: 46,
-                              color: AppColors.primary,
-                            )),
+                    ? Image.network(
+                  _displayableProfilePhotoUrl(_photoUrl),
+                  key: ValueKey<String>(
+                    _displayableProfilePhotoUrl(_photoUrl),
+                  ),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.person_rounded,
+                    size: 46,
+                    color: AppColors.primary,
+                  ),
+                )
+                    : const Icon(
+                  Icons.person_rounded,
+                  size: 46,
+                  color: AppColors.primary,
+                )),
               ),
             ],
           ),
@@ -452,34 +454,6 @@ class _ProfileState extends State<Profile> {
 
         _ProfileDivider(),
 
-        _ProfileDivider(),
-
-        _ProfileTile(
-          icon: Icons.design_services_outlined,
-          title: 'Custom Service',
-          subtitle: 'Request a made-to-order project from a ReMaker',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CustomService()),
-            );
-          },
-        ),
-
-        _ProfileDivider(),
-
-        _ProfileTile(
-          icon: Icons.history_rounded,
-          title: 'Custom Service History',
-          subtitle: 'Track your custom project requests and artist replies',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CustomServiceHistory()),
-            );
-          },
-        ),
-
         // REVIEW HISTORY
         _ProfileTile(
           icon: Icons.rate_review_outlined,
@@ -512,36 +486,6 @@ class _ProfileState extends State<Profile> {
 
         _ProfileDivider(),
 
-        // FOLLOWING ARTISTS / REMAKERS
-        _ProfileTile(
-          icon: Icons.person_add_alt_1_outlined,
-          title: 'My Following',
-          subtitle: 'Artists and ReMakers you follow',
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FollowingList()),
-            );
-          },
-        ),
-
-        _ProfileDivider(),
-
-        // DISCOVER ALL ECLOOP ARTISTS
-        _ProfileTile(
-          icon: Icons.diversity_3_outlined,
-          title: 'See All EcoLoop Artists',
-          subtitle: 'Discover ReMakers, search and follow artists',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AllArtist()),
-            );
-          },
-        ),
-
-        _ProfileDivider(),
-
         // MY LISTINGS
         _ProfileTile(
           icon: Icons.inventory_2_outlined,
@@ -566,6 +510,70 @@ class _ProfileState extends State<Profile> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AddressList()),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // CUSTOM SERVICE
+
+  Widget _buildCustomServiceSection(BuildContext context) {
+    return _ProfileSection(
+      title: 'Custom Service',
+      children: [
+        // CREATE A CUSTOM SERVICE REQUEST
+        _ProfileTile(
+          icon: Icons.design_services_outlined,
+          title: 'Custom Service',
+          subtitle: 'Request a made-to-order project from a ReMaker',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CustomService()),
+            );
+          },
+        ),
+        _ProfileDivider(),
+
+        // CUSTOM SERVICE REQUEST HISTORY
+        _ProfileTile(
+          icon: Icons.history_rounded,
+          title: 'Custom Service History',
+          subtitle: 'Track your requests and artist replies',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CustomServiceHistory()),
+            );
+          },
+        ),
+        _ProfileDivider(),
+
+        // DISCOVER ALL ECLOOP ARTISTS
+        _ProfileTile(
+          icon: Icons.diversity_3_outlined,
+          title: 'See All EcoLoop Artists',
+          subtitle: 'Discover ReMakers, search and follow artists',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AllArtist()),
+            );
+          },
+        ),
+        _ProfileDivider(),
+
+        // FOLLOWING ARTISTS / REMAKERS
+        _ProfileTile(
+          icon: Icons.person_add_alt_1_outlined,
+          title: 'My Following',
+          subtitle: 'Artists and ReMakers you follow',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FollowingList()),
             );
           },
         ),
@@ -842,7 +850,7 @@ class _ProfileState extends State<Profile> {
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-                  (route) => false,
+                      (route) => false,
                 );
               },
               style: ElevatedButton.styleFrom(

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../services/ecoloop_api.dart';
+import 'all_artist.dart';
 import 'custom_service_history.dart';
 
 class CustomService extends StatefulWidget {
@@ -27,8 +28,10 @@ class _CustomServiceState extends State<CustomService> {
   final description = TextEditingController();
   final budget = TextEditingController();
   final ImagePicker _picker = ImagePicker();
+  final TextEditingController _artistSearchController = TextEditingController();
   final List<XFile> _photos = [];
   bool loadingArtists = true, submitting = false;
+  String artistSearchQuery = '';
   String? error;
   List<Map<String, dynamic>> artists = [];
   int? selectedArtist;
@@ -45,6 +48,7 @@ class _CustomServiceState extends State<CustomService> {
   void dispose() {
     description.dispose();
     budget.dispose();
+    _artistSearchController.dispose();
     super.dispose();
   }
 
@@ -421,7 +425,7 @@ class _CustomServiceState extends State<CustomService> {
                     children: [
                       const Expanded(
                         child: Text(
-                          'Top 10 recommended artists',
+                          'Choose an artist',
                           style: TextStyle(
                             color: AppColors.textPrimary,
                             fontWeight: FontWeight.w700,
@@ -448,72 +452,179 @@ class _CustomServiceState extends State<CustomService> {
                       ),
                     ),
                   ),
-                ...artists.take(10).map((a) {
-                  final id = int.tryParse(val(a['artistId'])) ?? 0;
-                  final city = val(a['city']);
-                  final state = val(a['state']);
-                  final photo = val(a['profilePhotoUrl']);
-                  final same = a['sameCity'] == true;
-                  return RadioListTile<int?>(
-                    value: id,
-                    groupValue: selectedArtist,
-                    onChanged: (v) => setState(() => selectedArtist = v),
-                    activeColor: AppColors.primary,
-                    contentPadding: EdgeInsets.zero,
-                    title: Row(
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _artistSearchController,
+                  onChanged: (value) => setState(
+                    () => artistSearchQuery = value.trim().toLowerCase(),
+                  ),
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: 'Search artist name or city...',
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: AppColors.primary,
+                    ),
+                    suffixIcon: artistSearchQuery.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: () {
+                              _artistSearchController.clear();
+                              setState(() => artistSearchQuery = '');
+                            },
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                    filled: true,
+                    fillColor: AppColors.background,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.accent),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.primary,
+                        width: 1.4,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Builder(
+                  builder: (context) {
+                    final query = artistSearchQuery;
+                    final filteredArtists = artists
+                        .where((a) {
+                          if (query.isEmpty) return true;
+                          final name = val(
+                            a['name'] ?? a['userName'],
+                          ).toLowerCase();
+                          final city = val(a['city']).toLowerCase();
+                          final state = val(a['state']).toLowerCase();
+                          return name.contains(query) ||
+                              city.contains(query) ||
+                              state.contains(query);
+                        })
+                        .take(10)
+                        .toList();
+                    if (filteredArtists.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 18),
+                        child: Text(
+                          'No artists match your search. Try another name or location.',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      );
+                    }
+                    return Column(
                       children: [
-                        Expanded(
-                          child: Text(
-                            val(a['name']).isEmpty ? 'ReMaker' : val(a['name']),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+                        ...filteredArtists.map((a) {
+                          final id = int.tryParse(val(a['artistId'])) ?? 0;
+                          final city = val(a['city']);
+                          final state = val(a['state']);
+                          final photo = val(a['profilePhotoUrl']);
+                          final same = a['sameCity'] == true;
+                          return RadioListTile<int?>(
+                            value: id,
+                            groupValue: selectedArtist,
+                            onChanged: (v) =>
+                                setState(() => selectedArtist = v),
+                            activeColor: AppColors.primary,
+                            contentPadding: EdgeInsets.zero,
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    val(a['name']).isEmpty
+                                        ? 'ReMaker'
+                                        : val(a['name']),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                if (same)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.light,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const Text(
+                                      'Nearby',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            subtitle: Text(
+                              [
+                                city,
+                                state,
+                              ].where((x) => x.isNotEmpty).join(', '),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            secondary: CircleAvatar(
+                              radius: 23,
+                              backgroundColor: AppColors.light,
+                              backgroundImage: photo.isNotEmpty
+                                  ? NetworkImage(photo)
+                                  : null,
+                              child: photo.isEmpty
+                                  ? const Icon(
+                                      Icons.person_outline,
+                                      color: AppColors.primary,
+                                    )
+                                  : null,
+                            ),
+                          );
+                        }),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AllArtist(),
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 17,
+                            ),
+                            label: const Text('View all artists'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primary,
                             ),
                           ),
                         ),
-                        if (same)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.light,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'Nearby',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
                       ],
-                    ),
-                    subtitle: Text(
-                      [city, state].where((x) => x.isNotEmpty).join(', '),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    secondary: CircleAvatar(
-                      radius: 23,
-                      backgroundColor: AppColors.light,
-                      backgroundImage: photo.isNotEmpty
-                          ? NetworkImage(photo)
-                          : null,
-                      child: photo.isEmpty
-                          ? const Icon(
-                              Icons.person_outline,
-                              color: AppColors.primary,
-                            )
-                          : null,
-                    ),
-                  );
-                }),
+                    );
+                  },
+                ),
               ],
             ],
           ),
