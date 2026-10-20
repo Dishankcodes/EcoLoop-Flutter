@@ -20,10 +20,13 @@ import 'address_list.dart';
 import 'eco_impact.dart';
 import 'edit_profile.dart';
 import 'following_list.dart';
+import 'all_artist.dart';
 import 'notifications.dart';
 import 'rewards.dart';
 import 'sellers_earning.dart';
 import 'settings.dart';
+import 'custom_service.dart';
+import 'custom_service_history.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -449,6 +452,34 @@ class _ProfileState extends State<Profile> {
 
         _ProfileDivider(),
 
+        _ProfileDivider(),
+
+        _ProfileTile(
+          icon: Icons.design_services_outlined,
+          title: 'Custom Service',
+          subtitle: 'Request a made-to-order project from a ReMaker',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CustomService()),
+            );
+          },
+        ),
+
+        _ProfileDivider(),
+
+        _ProfileTile(
+          icon: Icons.history_rounded,
+          title: 'Custom Service History',
+          subtitle: 'Track your custom project requests and artist replies',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CustomServiceHistory()),
+            );
+          },
+        ),
+
         // REVIEW HISTORY
         _ProfileTile(
           icon: Icons.rate_review_outlined,
@@ -490,6 +521,21 @@ class _ProfileState extends State<Profile> {
             await Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const FollowingList()),
+            );
+          },
+        ),
+
+        _ProfileDivider(),
+
+        // DISCOVER ALL ECLOOP ARTISTS
+        _ProfileTile(
+          icon: Icons.diversity_3_outlined,
+          title: 'See All EcoLoop Artists',
+          subtitle: 'Discover ReMakers, search and follow artists',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AllArtist()),
             );
           },
         ),

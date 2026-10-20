@@ -24,6 +24,7 @@ import 'followers.dart';
 import 'following_list.dart';
 import 'notification.dart';
 import 'settings.dart';
+import 'artist_custom_services.dart';
 
 /// Artist profile backed by the live Apps Script / Google Sheets API.
 /// Profile details come from GET /profile and business numbers from
@@ -777,6 +778,16 @@ class _ProfileState extends State<Profile> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const ArtistEarnings()),
+          ),
+        ),
+        const _ProfileDivider(),
+        _ProfileTile(
+          icon: Icons.design_services_outlined,
+          title: 'Custom Services',
+          subtitle: 'Review project requests and respond to customers',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ArtistCustomServices()),
           ),
         ),
         const _ProfileDivider(),

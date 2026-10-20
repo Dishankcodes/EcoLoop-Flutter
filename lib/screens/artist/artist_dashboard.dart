@@ -12,6 +12,7 @@ import 'my_products/my_product.dart';
 import 'my_products/product_analytics.dart';
 import 'my_products/selling_orders.dart';
 import 'reviews/review_history.dart';
+import 'profile/artist_custom_services.dart';
 
 /// Artist dashboard. Business figures and lists are loaded from Code.gs;
 /// this screen does not use demonstration orders, products, or analytics.
@@ -58,6 +59,11 @@ class _ArtistHomeState extends State<ArtistHome> {
       'type': 'earnings',
     },
     {'title': 'Reviews', 'icon': Icons.star_outline_rounded, 'type': 'reviews'},
+    {
+      'title': 'Custom Services',
+      'icon': Icons.design_services_outlined,
+      'type': 'customServices',
+    },
   ];
 
   @override
@@ -322,6 +328,9 @@ class _ArtistHomeState extends State<ArtistHome> {
         break;
       case 'reviews':
         _openPage(const ReviewHistory());
+        break;
+      case 'customServices':
+        _openPage(const ArtistCustomServices());
         break;
     }
   }

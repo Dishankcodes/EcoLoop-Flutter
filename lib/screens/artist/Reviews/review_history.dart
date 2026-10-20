@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -40,10 +39,10 @@ class _ReviewHistoryState extends State<ReviewHistory> {
   String _string(dynamic value) => (value ?? '').toString().trim();
 
   String _first(
-      Map<String, dynamic> row,
-      List<String> keys, {
-        String fallback = '',
-      }) {
+    Map<String, dynamic> row,
+    List<String> keys, {
+    String fallback = '',
+  }) {
     for (final key in keys) {
       final value = _string(row[key]);
       if (value.isNotEmpty && value.toLowerCase() != 'null') return value;
@@ -55,7 +54,16 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     if (value == null) return '';
     if (value is Map) {
       final map = Map<String, dynamic>.from(value);
-      for (final key in const ['url', 'imageUrl', 'image_url', 'image', 'src', 'downloadUrl', 'thumbnailUrl', 'thumbnail']) {
+      for (final key in const [
+        'url',
+        'imageUrl',
+        'image_url',
+        'image',
+        'src',
+        'downloadUrl',
+        'thumbnailUrl',
+        'thumbnail',
+      ]) {
         final candidate = _imageValue(map[key]);
         if (candidate.isNotEmpty) return candidate;
       }
@@ -91,8 +99,11 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     }
     if (!(raw.startsWith('http://') || raw.startsWith('https://'))) return '';
     // Normalize common Google Drive share URLs for Image.network.
-    final driveFile = RegExp(r'drive\.google\.com/file/d/([^/?#]+)').firstMatch(raw);
-    if (driveFile != null) return 'https://drive.google.com/uc?export=view&id=${driveFile.group(1)}';
+    final driveFile = RegExp(
+      r'drive\.google\.com/file/d/([^/?#]+)',
+    ).firstMatch(raw);
+    if (driveFile != null)
+      return 'https://drive.google.com/uc?export=view&id=${driveFile.group(1)}';
     final driveId = RegExp(r'[?&]id=([^&#]+)').firstMatch(raw);
     if (raw.contains('drive.google.com') && driveId != null) {
       return 'https://drive.google.com/uc?export=view&id=${driveId.group(1)}';
@@ -103,31 +114,31 @@ class _ReviewHistoryState extends State<ReviewHistory> {
   String _rowImage(Map<String, dynamic> row, {required bool seller}) {
     final keys = seller
         ? [
-      'sellerImage',
-      'sellerProfileImage',
-      'sellerProfilePhotoUrl',
-      'artistImage',
-      'artistProfileImage',
-      'artistPhotoUrl',
-      'profilePhotoUrl',
-      'profileImage',
-      'profilePicture',
-      'avatar',
-      'photoUrl',
-      'imageUrl',
-    ]
+            'sellerImage',
+            'sellerProfileImage',
+            'sellerProfilePhotoUrl',
+            'artistImage',
+            'artistProfileImage',
+            'artistPhotoUrl',
+            'profilePhotoUrl',
+            'profileImage',
+            'profilePicture',
+            'avatar',
+            'photoUrl',
+            'imageUrl',
+          ]
         : [
-      'productImage',
-      'productImageUrl',
-      'productImageURL',
-      'imageUrls',
-      'productImageUrls',
-      'images',
-      'productImages',
-      'imageUrl',
-      'image',
-      'thumbnail',
-    ];
+            'productImage',
+            'productImageUrl',
+            'productImageURL',
+            'imageUrls',
+            'productImageUrls',
+            'images',
+            'productImages',
+            'imageUrl',
+            'image',
+            'thumbnail',
+          ];
     for (final key in keys) {
       final image = _imageValue(row[key]);
       if (image.isNotEmpty) return image;
@@ -174,14 +185,14 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         child: url.isEmpty
             ? fallback
             : Image.network(
-          url,
-          fit: BoxFit.cover,
-          cacheWidth: (size * 2).round(),
-          cacheHeight: (size * 2).round(),
-          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) =>
-          wasSynchronouslyLoaded || frame != null ? child : fallback,
-          errorBuilder: (context, error, stackTrace) => fallback,
-        ),
+                url,
+                fit: BoxFit.cover,
+                cacheWidth: (size * 2).round(),
+                cacheHeight: (size * 2).round(),
+                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) =>
+                    wasSynchronouslyLoaded || frame != null ? child : fallback,
+                errorBuilder: (context, error, stackTrace) => fallback,
+              ),
       ),
     );
   }
@@ -255,8 +266,8 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     final productId = _productId(order);
     if (productId.isEmpty) return true;
     return _reviews.any(
-          (review) =>
-      !_isSellerReview(review) &&
+      (review) =>
+          !_isSellerReview(review) &&
           _first(review, ['productId', 'product_id']) == productId,
     );
   }
@@ -287,8 +298,8 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     final filtered = eligible
         .where(
           (order) =>
-      _tab == 0 ? !_hasProductReview(order) : !_hasSellerReview(order),
-    )
+              _tab == 0 ? !_hasProductReview(order) : !_hasSellerReview(order),
+        )
         .toList();
     filtered.sort((a, b) {
       final da = DateTime.tryParse(_first(a, ['createdAt', 'created_at']));
@@ -314,8 +325,8 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     final result = _reviews
         .where(
           (review) =>
-      _tab == 0 ? !_isSellerReview(review) : _isSellerReview(review),
-    )
+              _tab == 0 ? !_isSellerReview(review) : _isSellerReview(review),
+        )
         .toList();
     result.sort((a, b) {
       final dateA = DateTime.tryParse(_first(a, ['createdAt', 'created_at']));
@@ -338,14 +349,30 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     dynamic rows = response;
     for (var depth = 0; depth < 4; depth++) {
       if (rows is String) {
-        try { rows = jsonDecode(rows); } catch (_) { break; }
+        try {
+          rows = jsonDecode(rows);
+        } catch (_) {
+          break;
+        }
       }
       if (rows is List) break;
       if (rows is Map) {
         final map = Map<String, dynamic>.from(rows);
         dynamic next;
-        for (final key in const ['reviews', 'orders', 'items', 'results', 'data', 'rows', 'records', 'list']) {
-          if (map.containsKey(key) && map[key] != null) { next = map[key]; break; }
+        for (final key in const [
+          'reviews',
+          'orders',
+          'items',
+          'results',
+          'data',
+          'rows',
+          'records',
+          'list',
+        ]) {
+          if (map.containsKey(key) && map[key] != null) {
+            next = map[key];
+            break;
+          }
         }
         if (next == null || identical(next, rows)) break;
         rows = next;
@@ -363,9 +390,9 @@ class _ReviewHistoryState extends State<ReviewHistory> {
   Future<void> _load({bool force = false}) async {
     final cacheIsFresh =
         _cachedReviews != null &&
-            _cachedOrders != null &&
-            _cacheTime != null &&
-            DateTime.now().difference(_cacheTime!) < _cacheDuration;
+        _cachedOrders != null &&
+        _cacheTime != null &&
+        DateTime.now().difference(_cacheTime!) < _cacheDuration;
 
     if (!force && cacheIsFresh) {
       if (mounted) {
@@ -605,82 +632,82 @@ class _ReviewHistoryState extends State<ReviewHistory> {
               color: ArtistColors.primary,
               child: _loading
                   ? ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: const [
-                  SizedBox(height: 140),
-                  Center(child: CircularProgressIndicator()),
-                ],
-              )
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 140),
+                        Center(child: CircularProgressIndicator()),
+                      ],
+                    )
                   : _error != null
                   ? ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(24, 100, 24, 24),
-                children: [
-                  const Icon(
-                    Icons.rate_review_outlined,
-                    size: 42,
-                    color: ArtistColors.textSecondary,
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: ArtistTextStyles.body.copyWith(
-                      color: ArtistColors.textPrimary,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Center(
-                    child: TextButton(
-                      onPressed: _load,
-                      child: const Text('Try again'),
-                    ),
-                  ),
-                ],
-              )
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(24, 100, 24, 24),
+                      children: [
+                        const Icon(
+                          Icons.rate_review_outlined,
+                          size: 42,
+                          color: ArtistColors.textSecondary,
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: ArtistTextStyles.body.copyWith(
+                            color: ArtistColors.textPrimary,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: TextButton(
+                            onPressed: _load,
+                            child: const Text('Try again'),
+                          ),
+                        ),
+                      ],
+                    )
                   : ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
-                children: [
-                  _sectionHeader(
-                    title: 'Waiting for your review',
-                    subtitle: _tab == 0
-                        ? 'Share feedback about products from eligible orders.'
-                        : 'Review the seller or ReMaker behind your purchase.',
-                    count: pending.length,
-                  ),
-                  if (pending.isEmpty)
-                    _emptyPanel(
-                      icon: Icons.task_alt_rounded,
-                      title: _tab == 0
-                          ? 'No product reviews pending'
-                          : 'No seller reviews pending',
-                      message:
-                      'Eligible paid orders that have not been reviewed will appear here.',
-                    )
-                  else
-                    ...pending.map(_pendingCard),
-                  const SizedBox(height: 22),
-                  _sectionHeader(
-                    title: _tab == 0
-                        ? 'Your product reviews'
-                        : 'Your seller & artist reviews',
-                    subtitle: 'Reviews you have already submitted.',
-                    count: reviews.length,
-                  ),
-                  if (reviews.isEmpty)
-                    _emptyPanel(
-                      icon: Icons.rate_review_outlined,
-                      title: _tab == 0
-                          ? 'No product reviews yet'
-                          : 'No seller reviews yet',
-                      message: 'Reviews you submit will appear here.',
-                    )
-                  else
-                    ...reviews.map(_reviewCard),
-                ],
-              ),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                      children: [
+                        _sectionHeader(
+                          title: 'Waiting for your review',
+                          subtitle: _tab == 0
+                              ? 'Share feedback about products from eligible orders.'
+                              : 'Review the seller or ReMaker behind your purchase.',
+                          count: pending.length,
+                        ),
+                        if (pending.isEmpty)
+                          _emptyPanel(
+                            icon: Icons.task_alt_rounded,
+                            title: _tab == 0
+                                ? 'No product reviews pending'
+                                : 'No seller reviews pending',
+                            message:
+                                'Eligible paid orders that have not been reviewed will appear here.',
+                          )
+                        else
+                          ...pending.map(_pendingCard),
+                        const SizedBox(height: 22),
+                        _sectionHeader(
+                          title: _tab == 0
+                              ? 'Your product reviews'
+                              : 'Your seller & artist reviews',
+                          subtitle: 'Reviews you have already submitted.',
+                          count: reviews.length,
+                        ),
+                        if (reviews.isEmpty)
+                          _emptyPanel(
+                            icon: Icons.rate_review_outlined,
+                            title: _tab == 0
+                                ? 'No product reviews yet'
+                                : 'No seller reviews yet',
+                            message: 'Reviews you submit will appear here.',
+                          )
+                        else
+                          ...reviews.map(_reviewCard),
+                      ],
+                    ),
             ),
           ),
         ],
@@ -941,15 +968,15 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     final sellerReview = _isSellerReview(review);
     final title = sellerReview
         ? _first(review, [
-      'sellerName',
-      'artistName',
-      'remakerName',
-    ], fallback: 'Seller / ReMaker')
+            'sellerName',
+            'artistName',
+            'remakerName',
+          ], fallback: 'Seller / ReMaker')
         : _first(review, [
-      'productTitle',
-      'productName',
-      'title',
-    ], fallback: 'Product');
+            'productTitle',
+            'productName',
+            'title',
+          ], fallback: 'Product');
     final comment = _string(review['comment']);
     final image = _reviewImage(review, seller: sellerReview);
     final id = _reviewId(review);
@@ -1049,10 +1076,10 @@ class _ReviewHistoryState extends State<ReviewHistory> {
               onPressed: deleting ? null : () => _confirmDelete(review),
               icon: deleting
                   ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Icon(Icons.delete_outline_rounded, size: 18),
               label: Text(deleting ? 'Deleting…' : 'Delete review'),
               style: TextButton.styleFrom(
@@ -1066,4 +1093,3 @@ class _ReviewHistoryState extends State<ReviewHistory> {
     );
   }
 }
-

@@ -7,6 +7,7 @@ import '../../../app_theme/user/app_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
 import 'product_details.dart';
 import '../reviews/write_seller_review.dart';
+import '../profile/custom_service.dart';
 
 /// Public profile shown when a user opens an artist/ReMaker from a listing.
 /// Profile details are taken from the selected backend artist record; portfolio,
@@ -578,6 +579,27 @@ class _ArtistProfileState extends State<ArtistProfile> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _openCustomServiceRequest,
+                      icon: const Icon(Icons.design_services_outlined),
+                      label: const Text(
+                        'Contact this artist for a custom service',
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        backgroundColor: AppColors.light.withOpacity(0.45),
+                        minimumSize: const Size(0, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 20),
                   _buildStats(),
@@ -1209,6 +1231,27 @@ class _ArtistProfileState extends State<ArtistProfile> {
     ),
     child: Text(message, style: AppTextStyles.caption),
   );
+
+  Future<void> _openCustomServiceRequest() async {
+    final artistId = int.tryParse(_artistId);
+    if (artistId == null) {
+      _message(
+        'This artist cannot be preselected because their ID is unavailable. You can still choose them from the artist list.',
+      );
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const CustomService()));
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CustomService(
+          referenceArtistId: artistId,
+          referenceArtistName: _name,
+        ),
+      ),
+    );
+  }
 
   void _contactArtist() {
     final email = _email.trim();
