@@ -58,27 +58,27 @@ class _UserHomeState extends State<UserHome> {
       setState(() => _loading = true);
     }
 
-    final results = await Future.wait<dynamic>([
+    // Start all requests together, but let the marketplace portion of the
+    // dashboard render as soon as its two essential datasets arrive. Profile,
+    // impact and rewards continue in parallel and update their own sections;
+    // they no longer keep the entire dashboard in its initial loading state.
+    final secondaryFuture = Future.wait<dynamic>([
       _safeGet('/auth/me'),
-      _safeGet('/categories'),
-      _safeGet('/products'),
       _safeGet('/eco-impact'),
       _safeGet('/rewards'),
     ]);
 
+    final primaryResults = await Future.wait<dynamic>([
+      _safeGet('/categories'),
+      _safeGet('/products'),
+    ]);
+
     if (!mounted) return;
 
-    final profileResult = results[0];
-    final categoryResult = results[1];
-    final productResult = results[2];
-    final impactResult = results[3];
-    final rewardResult = results[4];
+    final categoryResult = primaryResults[0];
+    final productResult = primaryResults[1];
 
     setState(() {
-      if (profileResult != null && profileResult is Map) {
-        _profile = Map<String, dynamic>.from(profileResult);
-      }
-
       if (categoryResult is List) {
         _categories = categoryResult
             .whereType<Map>()
@@ -89,6 +89,7 @@ class _UserHomeState extends State<UserHome> {
                   'active',
             )
             .toList();
+
         _categoriesError = false;
       } else if (categoryResult == null) {
         _categoriesError = true;
@@ -109,23 +110,42 @@ class _UserHomeState extends State<UserHome> {
                   _number(p['availableQuantity']) > 0),
             )
             .toList();
+
         _productsError = false;
       } else if (productResult == null) {
         _productsError = true;
       }
 
-      if (impactResult is Map) {
-        _impact = Map<String, dynamic>.from(impactResult);
-      }
-      if (rewardResult is Map) {
-        _rewards = Map<String, dynamic>.from(rewardResult);
-      }
-
       _errorMessage = _productsError && _categoriesError
           ? 'We could not load marketplace data. Check your connection and try again.'
           : null;
+
       _loading = false;
       _refreshing = false;
+    });
+
+    // Non-essential dashboard information updates after the main content is
+    // already visible. Failure of one of these endpoints cannot block products.
+    final secondaryResults = await secondaryFuture;
+
+    if (!mounted) return;
+
+    setState(() {
+      final profileResult = secondaryResults[0];
+      final impactResult = secondaryResults[1];
+      final rewardResult = secondaryResults[2];
+
+      if (profileResult is Map) {
+        _profile = Map<String, dynamic>.from(profileResult);
+      }
+
+      if (impactResult is Map) {
+        _impact = Map<String, dynamic>.from(impactResult);
+      }
+
+      if (rewardResult is Map) {
+        _rewards = Map<String, dynamic>.from(rewardResult);
+      }
     });
   }
 

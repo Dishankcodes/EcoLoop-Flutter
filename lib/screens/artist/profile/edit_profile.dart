@@ -20,6 +20,10 @@ class EditProfile extends StatefulWidget {
 }
 
 class _EditProfileState extends State<EditProfile> {
+  // Location lists are shared between visits to avoid repeatedly reading Sheets.
+  static List<Map<String, dynamic>>? _statesCache;
+  static final Map<String, List<Map<String, dynamic>>> _citiesCache = {};
+
   final EcoLoopApi _api = EcoLoopApi.instance;
   final _formKey = GlobalKey<FormState>();
 
@@ -101,12 +105,15 @@ class _EditProfileState extends State<EditProfile> {
     });
 
     try {
-      final values = await Future.wait<dynamic>([
-        _api.get('/profile'),
-        _api.get('/locations/states'),
-      ]);
+      // Profile is account-specific; location data is shared and can be cached.
+      final profileFuture = _api.get('/profile');
+      final statesFuture = _statesCache == null
+          ? _api.get('/locations/states')
+          : Future<dynamic>.value(_statesCache);
+      final values = await Future.wait<dynamic>([profileFuture, statesFuture]);
       final profile = _asMap(values[0]);
       final states = _asList(values[1]);
+      _statesCache = states;
 
       if (profile.isEmpty) {
         throw const EcoLoopApiException(
@@ -167,11 +174,12 @@ class _EditProfileState extends State<EditProfile> {
 
   Future<void> _loadCities(String stateCode, {String? selectCityName}) async {
     try {
-      final result = await _api.get(
-        '/locations/cities',
-        query: {'stateCode': stateCode},
-      );
+      final cached = _citiesCache[stateCode];
+      final result =
+          cached ??
+          await _api.get('/locations/cities', query: {'stateCode': stateCode});
       final cities = _asList(result);
+      _citiesCache[stateCode] = cities;
       if (!mounted) return;
       setState(() {
         _cities = cities;

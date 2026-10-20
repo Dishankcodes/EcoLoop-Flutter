@@ -13,6 +13,11 @@ class SellingOrders extends StatefulWidget {
 }
 
 class _SellingOrdersState extends State<SellingOrders> {
+  // Shared in-memory cache keeps the page instant when revisiting it.
+  static List<Map<String, dynamic>>? _cachedOrders;
+  static DateTime? _ordersCachedAt;
+  static Future<dynamic>? _ordersRequest;
+  static const Duration _cacheDuration = Duration(minutes: 2);
   String _searchQuery = '';
   String _selectedFilter = 'All';
   String _selectedSort = 'Newest';
@@ -45,23 +50,43 @@ class _SellingOrdersState extends State<SellingOrders> {
     _loadOrders();
   }
 
-  Future<void> _loadOrders() async {
-    if (mounted) {
+  Future<void> _loadOrders({bool forceRefresh = false}) async {
+    final cached = _cachedOrders;
+    final cachedAt = _ordersCachedAt;
+    final cacheIsFresh =
+        cached != null &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < _cacheDuration;
+
+    // Show previously loaded orders immediately. Only the first-ever load
+    // needs to block the list with a full-screen loading indicator.
+    if (cached != null && mounted) {
+      setState(() {
+        _orders
+          ..clear()
+          ..addAll(cached.map((order) => Map<String, dynamic>.from(order)));
+        _isLoading = false;
+        _loadError = null;
+      });
+      if (cacheIsFresh && !forceRefresh) return;
+    } else if (mounted) {
       setState(() {
         _isLoading = true;
         _loadError = null;
       });
     }
+
     try {
-      final dynamic response = await EcoLoopApi.instance.get('/artist/orders');
+      final request = _ordersRequest ??= EcoLoopApi.instance.get(
+        '/artist/orders',
+      );
+      final dynamic response = await request;
       final List<dynamic> rows = response is List
           ? response
           : response is Map && response['orders'] is List
           ? response['orders'] as List
           : <dynamic>[];
-      final List<Map<String, dynamic>> loaded = rows.whereType<Map>().map((
-        raw,
-      ) {
+      final loaded = rows.whereType<Map>().map((raw) {
         final order = Map<String, dynamic>.from(raw);
         order['productTitle'] =
             order['productTitle'] ??
@@ -76,6 +101,13 @@ class _SellingOrdersState extends State<SellingOrders> {
             (_toDouble(order['unitPrice']) * _toDouble(order['quantity']));
         return order;
       }).toList();
+
+      _cachedOrders = loaded
+          .map((order) => Map<String, dynamic>.from(order))
+          .toList();
+      _ordersCachedAt = DateTime.now();
+      _ordersRequest = null;
+
       if (!mounted) return;
       setState(() {
         _orders
@@ -85,10 +117,14 @@ class _SellingOrdersState extends State<SellingOrders> {
         _loadError = null;
       });
     } catch (error) {
+      _ordersRequest = null;
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _loadError = error.toString().replaceFirst('Exception: ', '');
+        // Keep already-rendered cached orders if a background refresh fails.
+        if (_orders.isEmpty) {
+          _loadError = error.toString().replaceFirst('Exception: ', '');
+        }
       });
     }
   }
@@ -1045,7 +1081,7 @@ class _SellingOrdersState extends State<SellingOrders> {
   // REFRESH
 
   Future<void> _refreshOrders() async {
-    await _loadOrders();
+    await _loadOrders(forceRefresh: true);
   }
 
   // STATUS COLOR

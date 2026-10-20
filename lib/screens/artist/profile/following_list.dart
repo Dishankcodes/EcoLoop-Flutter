@@ -17,6 +17,7 @@ class _FollowingListState extends State<FollowingList> {
   final EcoLoopApi _api = EcoLoopApi.instance;
   final TextEditingController _searchController = TextEditingController();
 
+  static List<Map<String, dynamic>>? _cachedArtists;
   List<Map<String, dynamic>> _artists = [];
   bool _loading = true;
   bool _refreshing = false;
@@ -27,6 +28,11 @@ class _FollowingListState extends State<FollowingList> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    final cached = _cachedArtists;
+    if (cached != null) {
+      _artists = cached.map((item) => Map<String, dynamic>.from(item)).toList();
+      _loading = false;
+    }
     _loadFollowing();
   }
 
@@ -189,6 +195,9 @@ class _FollowingListState extends State<FollowingList> {
       if (!mounted) return;
       setState(() {
         _artists = artists;
+        _cachedArtists = artists
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
       });
     } catch (e) {
       if (!mounted) return;

@@ -523,11 +523,97 @@ class _CustomServiceDetailsState extends State<CustomServiceDetails> {
     return AppColors.textSecondary;
   }
 
+  DateTime? _parseDate(String raw) {
+    if (raw.trim().isEmpty) return null;
+    final value = raw.trim();
+    // Apps Script may append a display-only timezone name, e.g.
+    // '(India Standard Time)'. Never show that suffix in the UI.
+    final cleanValue = value
+        .replaceFirst(RegExp(r'\s*\([^)]*\)\s*$'), '')
+        .trim();
+
+    // First handle ISO timestamps and common Apps Script date strings.
+    final iso = DateTime.tryParse(cleanValue.replaceFirst(' ', 'T'));
+    if (iso != null) {
+      final hasZone = RegExp(
+        r'(Z|[+-]\d{2}:?\d{2})$',
+        caseSensitive: false,
+      ).hasMatch(cleanValue);
+      return hasZone ? iso.toLocal() : iso;
+    }
+
+    // Example: Tue Oct 20 2026 22:10:31 GMT+0530 (India Standard Time)
+    final match = RegExp(
+      r'^(?:\w{3}\s+)?(\w{3})\s+(\d{1,2})\s+(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s+GMT([+-])(\d{2}):?(\d{2})',
+      caseSensitive: false,
+    ).firstMatch(cleanValue);
+    if (match != null) {
+      const monthNumbers = {
+        'jan': 1,
+        'feb': 2,
+        'mar': 3,
+        'apr': 4,
+        'may': 5,
+        'jun': 6,
+        'jul': 7,
+        'aug': 8,
+        'sep': 9,
+        'oct': 10,
+        'nov': 11,
+        'dec': 12,
+      };
+      final month = monthNumbers[match.group(1)!.toLowerCase()];
+      if (month == null) return null;
+      final day = int.tryParse(match.group(2)!);
+      final year = int.tryParse(match.group(3)!);
+      final hour = int.tryParse(match.group(4)!);
+      final minute = int.tryParse(match.group(5)!);
+      final second = int.tryParse(match.group(6) ?? '0');
+      final offsetHour = int.tryParse(match.group(8)!);
+      final offsetMinute = int.tryParse(match.group(9)!);
+      if ([
+        day,
+        year,
+        hour,
+        minute,
+        second,
+        offsetHour,
+        offsetMinute,
+      ].any((n) => n == null))
+        return null;
+
+      final sign = match.group(7) == '-' ? -1 : 1;
+      final offset = Duration(
+        hours: sign * offsetHour!,
+        minutes: sign * offsetMinute!,
+      );
+      final local = DateTime(year!, month, day!, hour!, minute!, second!);
+      return DateTime.fromMillisecondsSinceEpoch(
+        local.millisecondsSinceEpoch - offset.inMilliseconds,
+        isUtc: true,
+      ).toLocal();
+    }
+
+    // Fallback for a timestamp without a timezone.
+    return DateTime.tryParse(cleanValue);
+  }
+
   String _formatDate(String raw) {
-    if (raw.isEmpty) return 'Not available';
-    final parsed = DateTime.tryParse(raw.replaceFirst(' ', 'T'));
-    if (parsed == null) return raw;
-    final date = parsed.toLocal();
+    if (raw.trim().isEmpty) return 'Not available';
+    final date = _parseDate(raw);
+    if (date == null) {
+      return raw.replaceFirst(RegExp(r'\s*\([^)]*\)\s*$'), '').trim();
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(date.year, date.month, date.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final time = _formatTime(date);
+
+    if (day == today) return 'Today, $time';
+    if (day == yesterday) return 'Yesterday, $time';
+
     const months = [
       'Jan',
       'Feb',
@@ -542,10 +628,14 @@ class _CustomServiceDetailsState extends State<CustomServiceDetails> {
       'Nov',
       'Dec',
     ];
+    return '${date.day} ${months[date.month - 1]} ${date.year} · $time';
+  }
+
+  String _formatTime(DateTime date) {
     final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
     final minute = date.minute.toString().padLeft(2, '0');
     final period = date.hour >= 12 ? 'PM' : 'AM';
-    return '${date.day} ${months[date.month - 1]} ${date.year} · $hour:$minute $period';
+    return '$hour:$minute $period';
   }
 
   Future<void> _loadAlternativeArtists() async {
@@ -1205,9 +1295,10 @@ class _CustomServiceDetailsState extends State<CustomServiceDetails> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 118,
+            width: 92,
             child: Text(
               label,
+              softWrap: true,
               style: AppTextStyles.caption.copyWith(fontSize: 11.5),
             ),
           ),
@@ -1215,9 +1306,11 @@ class _CustomServiceDetailsState extends State<CustomServiceDetails> {
           Expanded(
             child: Text(
               value.isEmpty ? 'Not available' : value,
+              softWrap: true,
               style: AppTextStyles.body.copyWith(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w600,
+                height: 1.4,
               ),
             ),
           ),
@@ -1227,8 +1320,18 @@ class _CustomServiceDetailsState extends State<CustomServiceDetails> {
   }
 
   String _money(dynamic value) {
-    final amount = double.tryParse(_value(value));
-    if (amount == null) return '₹0';
-    return '₹${amount == amount.roundToDouble() ? amount.toStringAsFixed(0) : amount.toStringAsFixed(2)}';
+    final raw = _value(value).replaceAll(',', '').replaceAll('₹', '').trim();
+    final amount = double.tryParse(raw);
+    if (amount == null) return raw.isEmpty ? '₹0' : '₹$raw';
+    final whole = amount == amount.roundToDouble();
+    final fixed = whole ? amount.toStringAsFixed(0) : amount.toStringAsFixed(2);
+    final parts = fixed.split('.');
+    final digits = parts.first;
+    final buffer = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(digits[i]);
+    }
+    return '₹${buffer.toString()}${parts.length > 1 ? '.${parts[1]}' : ''}';
   }
 }

@@ -54,11 +54,12 @@ class _CustomServiceHistoryState extends State<CustomServiceHistory> {
   }
 
   Future<void> _load() async {
-    if (mounted)
+    if (mounted) {
       setState(() {
         _loading = true;
         _error = null;
       });
+    }
     try {
       final response = await _api.get('/custom-services/mine');
       final rows = _extractRows(response);
@@ -289,24 +290,58 @@ class _CustomServiceHistoryState extends State<CustomServiceHistory> {
                                   ),
                                 const SizedBox(height: 11),
                                 Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(
-                                      Icons.currency_rupee_rounded,
-                                      size: 17,
-                                      color: AppColors.primary,
-                                    ),
-                                    Text(
-                                      _v(row['budget']),
-                                      style: AppTextStyles.body.copyWith(
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 2),
+                                      child: Icon(
+                                        Icons.currency_rupee_rounded,
+                                        size: 17,
                                         color: AppColors.primary,
-                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                    const Spacer(),
-                                    Text(
-                                      _date(_v(row['createdAt'])),
-                                      style: AppTextStyles.caption.copyWith(
-                                        fontSize: 11,
+                                    const SizedBox(width: 2),
+                                    Expanded(
+                                      child: Text(
+                                        _v(row['budget']).isEmpty
+                                            ? 'Not specified'
+                                            : _v(row['budget']),
+                                        softWrap: true,
+                                        style: AppTextStyles.body.copyWith(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 5),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 1),
+                                      child: Icon(
+                                        Icons.schedule_rounded,
+                                        size: 14,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Expanded(
+                                      child: Text(
+                                        _date(
+                                          _v(
+                                            row['createdAt'] ??
+                                                row['created_at'],
+                                          ),
+                                        ),
+                                        softWrap: true,
+                                        style: AppTextStyles.caption.copyWith(
+                                          fontSize: 11,
+                                          height: 1.4,
+                                          color: AppColors.textSecondary,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 4),
@@ -331,7 +366,9 @@ class _CustomServiceHistoryState extends State<CustomServiceHistory> {
                                   Container(
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: AppColors.light.withOpacity(.65),
+                                      color: AppColors.light.withValues(
+                                        alpha: 0.65,
+                                      ),
                                       borderRadius: BorderRadius.circular(13),
                                     ),
                                     child: Row(
@@ -396,11 +433,130 @@ class _CustomServiceHistoryState extends State<CustomServiceHistory> {
           ),
   );
 
+  DateTime? _parseDate(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return null;
+
+    // Prefer ISO timestamps (including an explicit timezone/offset).
+    final iso = DateTime.tryParse(value.replaceFirst(' ', 'T'));
+    if (iso != null) {
+      final hasZone = RegExp(
+        r'(Z|[+-]\d{2}:?\d{2})$',
+        caseSensitive: false,
+      ).hasMatch(value);
+      return hasZone ? iso.toLocal() : iso;
+    }
+
+    // Apps Script can also return JavaScript-style dates, e.g.
+    // Tue Oct 20 2026 22:10:31 GMT+0530.
+    final js = RegExp(
+      r'^(?:[A-Za-z]{3},?\s+)?[A-Za-z]{3}\s+(\d{1,2})\s+(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s+GMT([+-])(\d{2}):?(\d{2}))?(?:\s*\([^)]*\))?$',
+      caseSensitive: false,
+    ).firstMatch(value);
+
+    if (js != null) {
+      final day = int.tryParse(js.group(1)!);
+      final year = int.tryParse(js.group(2)!);
+      final hour = int.tryParse(js.group(3)!);
+      final minute = int.tryParse(js.group(4)!);
+      final second = int.tryParse(js.group(5) ?? '0') ?? 0;
+      final offsetSign = js.group(6);
+      final offsetHour = int.tryParse(js.group(7) ?? '0') ?? 0;
+      final offsetMinute = int.tryParse(js.group(8) ?? '0') ?? 0;
+      const monthNames = {
+        'jan': 1,
+        'feb': 2,
+        'mar': 3,
+        'apr': 4,
+        'may': 5,
+        'jun': 6,
+        'jul': 7,
+        'aug': 8,
+        'sep': 9,
+        'oct': 10,
+        'nov': 11,
+        'dec': 12,
+      };
+      final monthMatch = RegExp(
+        r'^(?:[A-Za-z]{3},?\s+)?([A-Za-z]{3})\s+',
+        caseSensitive: false,
+      ).firstMatch(value);
+      final month = monthNames[(monthMatch?.group(1) ?? '').toLowerCase()];
+
+      if (day != null &&
+          year != null &&
+          month != null &&
+          hour != null &&
+          minute != null) {
+        final localLike = DateTime(year, month, day, hour, minute, second);
+        if (offsetSign == null) return localLike;
+        var offset = Duration(hours: offsetHour, minutes: offsetMinute);
+        if (offsetSign == '-') offset = -offset;
+        return DateTime.utc(
+          year,
+          month,
+          day,
+          hour,
+          minute,
+          second,
+        ).subtract(offset).toLocal();
+      }
+    }
+
+    // Fallback for common sheet date strings such as 20/10/2026 22:10:31.
+    final dmy = RegExp(
+      r'^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$',
+    ).firstMatch(value);
+    if (dmy != null) {
+      return DateTime(
+        int.parse(dmy.group(3)!),
+        int.parse(dmy.group(2)!),
+        int.parse(dmy.group(1)!),
+        int.tryParse(dmy.group(4) ?? '0') ?? 0,
+        int.tryParse(dmy.group(5) ?? '0') ?? 0,
+        int.tryParse(dmy.group(6) ?? '0') ?? 0,
+      );
+    }
+    return null;
+  }
+
   String _date(String raw) {
-    final parsed = DateTime.tryParse(raw.replaceFirst(' ', 'T'));
-    if (parsed == null) return raw;
-    final d = parsed.toLocal();
-    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    final date = _parseDate(raw);
+    if (date == null) return raw.isEmpty ? 'Date unavailable' : raw;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(date.year, date.month, date.day);
+    final time = _formatTime(date);
+
+    if (day == today) return 'Today, $time';
+    if (day == today.subtract(const Duration(days: 1)))
+      return 'Yesterday, $time';
+    return '${date.day} ${_month(date.month)} ${date.year}, $time';
+  }
+
+  String _formatTime(DateTime date) {
+    final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$hour:$minute ${date.hour >= 12 ? 'PM' : 'AM'}';
+  }
+
+  String _month(int month) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return month >= 1 && month <= 12 ? months[month - 1] : '';
   }
 
   Widget _status(String value) {

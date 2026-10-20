@@ -16,6 +16,10 @@ class ArtistEarnings extends StatefulWidget {
 }
 
 class _ArtistEarningsState extends State<ArtistEarnings> {
+  // Keeps the last successful response available when this page is reopened.
+  static double? _cachedTotal;
+  static List<Map<String, dynamic>>? _cachedTransactions;
+
   final EcoLoopApi _api = EcoLoopApi.instance;
   bool _loading = true;
   bool _refreshing = false;
@@ -27,7 +31,15 @@ class _ArtistEarningsState extends State<ArtistEarnings> {
   @override
   void initState() {
     super.initState();
-    _loadEarnings();
+    final cachedTransactions = _cachedTransactions;
+    if (_cachedTotal != null && cachedTransactions != null) {
+      _total = _cachedTotal!;
+      _transactions = cachedTransactions;
+      _loading = false;
+      _loadEarnings(refresh: true);
+    } else {
+      _loadEarnings();
+    }
   }
 
   Map<String, dynamic> _asMap(dynamic value) {
@@ -91,8 +103,11 @@ class _ArtistEarningsState extends State<ArtistEarnings> {
         return bd.compareTo(ad);
       });
       if (!mounted) return;
+      final total = _number(response['totalEarnings']);
+      _cachedTotal = total;
+      _cachedTransactions = transactions;
       setState(() {
-        _total = _number(response['totalEarnings']);
+        _total = total;
         _transactions = transactions;
         _loading = false;
         _refreshing = false;

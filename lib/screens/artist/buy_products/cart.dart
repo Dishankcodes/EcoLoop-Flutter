@@ -40,6 +40,8 @@ class _CartState extends State<Cart> {
     // The account-scoped backend cart is authoritative. Do not merge the
     // popup's initial snapshot again: /cart already contains that item and
     // merging it here would silently double the quantity.
+    // These requests are independent. Start them together so the cart screen
+    // does not wait for the cart request to finish before loading suggestions.
     _loadCart();
     _loadSimilarProducts();
   }
@@ -77,7 +79,8 @@ class _CartState extends State<Cart> {
   Future<void> _loadCart({bool showLoader = true}) async {
     if (showLoader && mounted) {
       setState(() {
-        _cartLoading = true;
+        // Keep the existing cart visible during refreshes.
+        _cartLoading = _cartItems.isEmpty;
         _cartError = null;
       });
     }
@@ -102,7 +105,8 @@ class _CartState extends State<Cart> {
       if (!mounted) return;
       setState(() {
         _cartLoading = false;
-        _cartError = error.toString();
+        // Do not replace a usable, already-loaded cart with an error screen.
+        _cartError = _cartItems.isEmpty ? error.toString() : null;
       });
       // Keep any already-visible items if refresh fails, but do not pretend
       // that a backend mutation succeeded.
@@ -131,13 +135,20 @@ class _CartState extends State<Cart> {
 
     try {
       final response = await EcoLoopApi.instance.get('/products');
-      if (response is! List) {
+      final rawProducts = response is List
+          ? response
+          : response is Map && response['products'] is List
+          ? response['products'] as List
+          : response is Map && response['data'] is List
+          ? response['data'] as List
+          : const <dynamic>[];
+      if (rawProducts.isEmpty && response is! List && response is! Map) {
         throw const EcoLoopApiException(
           'The products response has an unexpected format.',
         );
       }
 
-      final products = response
+      final products = rawProducts
           .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item))
           .where((item) {
@@ -311,7 +322,7 @@ class _CartState extends State<Cart> {
   int _safeQuantity(int quantity, int maxQuantity) {
     if (quantity < 1) return 1;
 
-    if (quantity > maxQuantity) {
+    if (maxQuantity > 0 && quantity > maxQuantity) {
       return maxQuantity;
     }
 

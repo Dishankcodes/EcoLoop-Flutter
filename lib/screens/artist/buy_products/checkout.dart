@@ -84,7 +84,8 @@ class _CheckoutState extends State<Checkout> {
     _couponDiscount = widget.initialCouponDiscount;
     _loadAddresses();
     _refreshProducts();
-    _loadMoreItems();
+    // _loadCurrentAccount loads recommendations after it knows the account ID,
+    // avoiding a duplicate /products request and briefly showing own listings.
     _loadCurrentAccount();
   }
 
@@ -147,64 +148,96 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Future<void> _refreshProducts() async {
-    if (_items.isEmpty) return;
+    if (_items.isEmpty || _isRefreshingProducts) return;
+
     if (mounted) {
       setState(() {
         _isRefreshingProducts = true;
         _productError = null;
       });
     }
+
     try {
-      for (var index = 0; index < _items.length; index++) {
-        final item = _items[index];
-        final id = int.tryParse(
-          (item['productId'] ?? item['id'] ?? '').toString(),
-        );
-        if (id == null || id <= 0) {
-          throw Exception(
-            'A product has an invalid ID. Remove it and add it again.',
+      // Work from a snapshot so the cart is not partially updated
+      // while individual product requests are still running.
+      final snapshot = _items
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+
+      final refreshed = await Future.wait(
+        snapshot.map((item) async {
+          final id = int.tryParse(
+            (item['productId'] ?? item['id'] ?? '').toString(),
           );
-        }
-        final response = await EcoLoopApi.instance.get(
-          '/products/$id/validate',
-        );
-        if (response is! Map)
-          throw Exception(
-            'Could not validate ${item['title'] ?? 'a product'}.',
+
+          if (id == null || id <= 0) {
+            throw Exception(
+              'A product has an invalid ID. '
+              'Remove it and add it again.',
+            );
+          }
+
+          final response = await EcoLoopApi.instance.get(
+            '/products/$id/validate',
           );
-        final live = Map<String, dynamic>.from(response);
-        if ((live['status'] ?? '').toString().toLowerCase() != 'published') {
-          throw Exception(
-            '${live['title'] ?? 'A product'} is no longer available.',
+
+          if (response is! Map) {
+            throw Exception(
+              'Could not validate ${item['title'] ?? 'a product'}.',
+            );
+          }
+
+          final live = Map<String, dynamic>.from(response);
+
+          if ((live['status'] ?? '').toString().toLowerCase() != 'published') {
+            throw Exception(
+              '${live['title'] ?? item['title'] ?? 'A product'} '
+              'is no longer available.',
+            );
+          }
+
+          final available = _toInt(
+            live['availableQuantity'] ?? live['stock'],
+            fallback: 0,
           );
-        }
-        final available = _toInt(
-          live['availableQuantity'] ?? live['stock'],
-          fallback: 0,
-        );
-        final quantity = _toInt(item['quantity'], fallback: 1);
-        if (available < quantity) {
-          throw Exception(
-            'Only $available item(s) remain for ${live['title'] ?? 'this product'}.',
-          );
-        }
-        _items[index] = {
-          ...item,
-          ...live,
-          'productId': live['productId'] ?? id,
-          'quantity': quantity,
-          'availableQuantity': available,
-        };
-      }
-      if (mounted) setState(() {});
+
+          final quantity = _toInt(item['quantity'], fallback: 1);
+
+          if (available < quantity) {
+            throw Exception(
+              'Only $available item(s) remain for '
+              '${live['title'] ?? item['title'] ?? 'this product'}.',
+            );
+          }
+
+          return <String, dynamic>{
+            ...item,
+            ...live,
+            'productId': live['productId'] ?? id,
+            'quantity': quantity,
+            'availableQuantity': available,
+          };
+        }),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _items
+          ..clear()
+          ..addAll(refreshed);
+        _productError = null;
+      });
     } catch (error) {
-      if (mounted)
-        setState(
-          () =>
-              _productError = error.toString().replaceFirst('Exception: ', ''),
-        );
+      if (mounted) {
+        setState(() {
+          _productError = error.toString().replaceFirst('Exception: ', '');
+        });
+      }
     } finally {
-      if (mounted) setState(() => _isRefreshingProducts = false);
+      if (mounted) {
+        setState(() => _isRefreshingProducts = false);
+      }
     }
   }
 
@@ -225,6 +258,7 @@ class _CheckoutState extends State<Checkout> {
       await _loadMoreItems();
     } catch (_) {
       // Product discovery remains available if the API's profile response varies.
+      await _loadMoreItems();
     }
   }
 
@@ -1681,7 +1715,7 @@ class _CheckoutState extends State<Checkout> {
       decoration: BoxDecoration(
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: ArtistColors.primary.withOpacity(0.75)),
+        border: Border.all(color: ArtistColors.primary.withValues(alpha: 0.75)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2146,7 +2180,9 @@ class _CheckoutState extends State<Checkout> {
               decoration: BoxDecoration(
                 color: ArtistColors.light,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: ArtistColors.accent.withOpacity(0.8)),
+                border: Border.all(
+                  color: ArtistColors.accent.withValues(alpha: 0.8),
+                ),
               ),
               child: const Row(
                 children: [
@@ -2626,6 +2662,7 @@ class _CheckoutState extends State<Checkout> {
   // CONTINUE TO PAYMENT
 
   Future<void> _continueToPayment() async {
+    if (_isProcessing) return;
     if (_isLoadingAddresses) {
       _showMessage('Please wait while saved addresses load.');
       return;
@@ -2642,31 +2679,42 @@ class _CheckoutState extends State<Checkout> {
       _showMessage('Please add and select a delivery address.');
       return;
     }
-    await _refreshProducts();
-    if (!mounted) return;
-    if (_productError != null) {
-      _showMessage(_productError!);
+    if (_isRefreshingProducts) {
+      _showMessage('Please wait while product availability is checked.');
       return;
     }
 
-    final deliveryLabel = _selectedDelivery == 'express'
-        ? 'Express Delivery'
-        : 'Standard Delivery';
+    setState(() => _isProcessing = true);
+    try {
+      await _refreshProducts();
+      if (!mounted) return;
+      if (_productError != null) {
+        _showMessage(_productError!);
+        return;
+      }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Payment(
-          totalAmount: _grandTotal,
-          items: List<Map<String, dynamic>>.from(_items),
-          address: _selectedAddress,
-          deliveryMethod: deliveryLabel,
-          savings: _couponDiscount,
-          couponCode: _couponCode,
-          clearCartAfterSuccess: widget.product == null && widget.items != null,
+      final deliveryLabel = _selectedDelivery == 'express'
+          ? 'Express Delivery'
+          : 'Standard Delivery';
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => Payment(
+            totalAmount: _grandTotal,
+            items: List<Map<String, dynamic>>.from(_items),
+            address: _selectedAddress,
+            deliveryMethod: deliveryLabel,
+            savings: _couponDiscount,
+            couponCode: _couponCode,
+            clearCartAfterSuccess:
+                widget.product == null && widget.items != null,
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
   }
 
   // MESSAGE

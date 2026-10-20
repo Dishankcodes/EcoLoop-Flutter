@@ -13,6 +13,12 @@ class AddProduct extends StatefulWidget {
 }
 
 class _AddProductState extends State<AddProduct> {
+  // Reuse categories when artists return to this page; avoid a fresh Sheets request
+  // on every Add Product visit. The cache expires after five minutes.
+  static List<Map<String, dynamic>>? _cachedCategories;
+  static DateTime? _categoriesCachedAt;
+  static Future<dynamic>? _categoriesRequest;
+  static const Duration _categoryCacheDuration = Duration(minutes: 5);
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController titleController = TextEditingController();
@@ -48,19 +54,46 @@ class _AddProductState extends State<AddProduct> {
   }
 
   Future<void> _loadCategories() async {
+    final cached = _cachedCategories;
+    final cachedAt = _categoriesCachedAt;
+    final cacheIsFresh =
+        cached != null &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < _categoryCacheDuration;
+
+    // Render cached categories immediately; refresh stale data without blocking the form.
+    if (cached != null && mounted) {
+      setState(() {
+        _categories = List<Map<String, dynamic>>.from(cached);
+        _isLoadingCategories = false;
+        _categoryLoadError = null;
+      });
+      if (cacheIsFresh) return;
+    }
+
     try {
-      final result = await EcoLoopApi.instance.get('/categories');
+      final request = _categoriesRequest ??= EcoLoopApi.instance.get(
+        '/categories',
+      );
+      final result = await request;
       final rows = result is List ? result : <dynamic>[];
+      final categories = rows
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+
+      _cachedCategories = categories;
+      _categoriesCachedAt = DateTime.now();
+      _categoriesRequest = null;
+
       if (!mounted) return;
       setState(() {
-        _categories = rows
-            .whereType<Map>()
-            .map((row) => Map<String, dynamic>.from(row))
-            .toList();
+        _categories = categories;
         _isLoadingCategories = false;
         _categoryLoadError = null;
       });
     } catch (error) {
+      _categoriesRequest = null;
       if (!mounted) return;
       setState(() {
         _isLoadingCategories = false;
@@ -656,6 +689,11 @@ class _AddProductState extends State<AddProduct> {
           _categoryLoadError ?? 'Please select a valid category.',
         );
       }
+      // Build the image payload only after validation, and send one product request.
+      // The backend still stores the real images and product details in Drive/Sheets.
+      final imagePayload = await EcoImagePicker.payload(_images);
+      if (!mounted) return;
+
       await EcoLoopApi.instance.post('/products', {
         'title': titleController.text.trim(),
         'description': descriptionController.text.trim(),
@@ -669,7 +707,7 @@ class _AddProductState extends State<AddProduct> {
         'quantity': int.parse(quantityController.text.trim()),
         'deliveryMethod': _deliveryMethod,
         'status': 'published',
-        'imageBase64': await EcoImagePicker.payload(_images),
+        'imageBase64': imagePayload,
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

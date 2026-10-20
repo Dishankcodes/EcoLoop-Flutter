@@ -93,6 +93,12 @@ class _ProductDetailsState extends State<ProductDetails> {
       if (fetched.isNotEmpty && mounted) {
         setState(() {
           _product = <String, dynamic>{..._product, ...fetched};
+          final stock = availableQuantity;
+          if (stock <= 0) {
+            _quantity = 1;
+          } else if (_quantity > stock) {
+            _quantity = stock;
+          }
           final rawImages = _product['imageUrls'] ?? _product['images'];
           if (rawImages is List && rawImages.isNotEmpty) {
             _product['images'] = rawImages
@@ -190,12 +196,23 @@ class _ProductDetailsState extends State<ProductDetails> {
       _product['sellerState'] ?? _product['state'],
       _product['pincode'] ?? _product['postalCode'] ?? _product['zipCode'],
     ];
+
+    // Some address labels already contain the city/state (for example,
+    // "Ahmedabad, Gujarat"). Split into readable components and de-duplicate
+    // each component so the location is not rendered twice.
     final seen = <String>{};
-    return values
-        .where((value) => value != null && value.toString().trim().isNotEmpty)
-        .map((value) => value.toString().trim())
-        .where((value) => seen.add(value.toLowerCase()))
-        .join(', ');
+    final parts = <String>[];
+    for (final value in values) {
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isEmpty || text.toLowerCase() == 'null') continue;
+      for (final part in text.split(',')) {
+        final component = part.trim();
+        if (component.isEmpty) continue;
+        if (seen.add(component.toLowerCase())) parts.add(component);
+      }
+    }
+    return parts.join(', ');
   }
 
   /// Seller account type used for profile navigation.
@@ -429,7 +446,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   top: 16,
                   right: 16,
                   child: Material(
-                    color: Colors.white.withOpacity(0.95),
+                    color: Colors.white.withValues(alpha: 0.95),
                     shape: const CircleBorder(),
                     elevation: 1,
                     child: InkWell(
@@ -459,7 +476,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.55),
+                      color: Colors.black.withValues(alpha: 0.55),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -614,9 +631,9 @@ class _ProductDetailsState extends State<ProductDetails> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.18)),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Row(
         children: [
@@ -706,7 +723,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 color: ArtistColors.background,
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color: ArtistColors.border.withOpacity(0.45),
+                  color: ArtistColors.border.withValues(alpha: 0.45),
                 ),
               ),
               child: Row(
@@ -792,7 +809,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
-              color: ArtistColors.light.withOpacity(0.55),
+              color: ArtistColors.light.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(11),
             ),
             child: const Row(
@@ -1038,7 +1055,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
-              color: ArtistColors.light.withOpacity(0.65),
+              color: ArtistColors.light.withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(11),
             ),
             child: const Row(
@@ -1271,35 +1288,50 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   Future<void> _checkSellerReviewEligibility() async {
     final sellerId = _intValue(_product['sellerId'] ?? _product['artistId']);
+
     if (sellerId <= 0) return;
+
     try {
-      final response = await _api.get('/orders');
-      final root = _asMap(response);
-      final nested = _asMap(root['data']);
-      final dynamic rows = response is List
-          ? response
-          : (root['orders'] ??
-                root['items'] ??
-                nested['orders'] ??
-                nested['items'] ??
+      final responses = await Future.wait<dynamic>([
+        _api.get('/orders'),
+        _api.get('/my/reviews'),
+      ]);
+
+      final ordersResponse = responses[0];
+      final ordersRoot = _asMap(ordersResponse);
+      final ordersNested = _asMap(ordersRoot['data']);
+
+      final dynamic orderRows = ordersResponse is List
+          ? ordersResponse
+          : (ordersRoot['orders'] ??
+                ordersRoot['items'] ??
+                ordersNested['orders'] ??
+                ordersNested['items'] ??
                 const []);
-      String? orderId;
-      if (rows is List)
-        for (final raw in rows) {
+
+      String? eligibleOrderId;
+
+      if (orderRows is List) {
+        for (final raw in orderRows) {
           if (raw is! Map) continue;
+
           final order = Map<String, dynamic>.from(raw);
+
           final sameSeller =
               _intValue(order['sellerId'] ?? order['artistId']) == sellerId;
+
           final status = (order['status'] ?? '')
               .toString()
               .trim()
               .toLowerCase()
               .replaceAll('_', ' ');
+
           final payment = (order['paymentStatus'] ?? order['payment'] ?? '')
               .toString()
               .trim()
               .toLowerCase()
               .replaceAll('_', ' ');
+
           final paid = const [
             'paid',
             'completed',
@@ -1308,45 +1340,69 @@ class _ProductDetailsState extends State<ProductDetails> {
             'captured',
             'cod paid',
           ].contains(payment);
+
           if (sameSeller && status == 'delivered' && paid) {
-            orderId = (order['orderId'] ?? order['id'] ?? '').toString();
-            if (orderId.isNotEmpty) break;
+            final id = (order['orderId'] ?? order['id'] ?? '')
+                .toString()
+                .trim();
+
+            if (id.isNotEmpty) {
+              eligibleOrderId = id;
+              break;
+            }
           }
         }
-      final existing = await _api.get('/my/reviews');
-      dynamic reviewRows = existing;
-      if (existing is Map)
-        reviewRows =
-            existing['reviews'] ??
-            existing['data'] ??
-            existing['items'] ??
-            const [];
+      }
+
+      final reviewsResponse = responses[1];
+      final reviewsRoot = _asMap(reviewsResponse);
+
+      final dynamic reviewRows = reviewsResponse is List
+          ? reviewsResponse
+          : (reviewsRoot['reviews'] ??
+                reviewsRoot['data'] ??
+                reviewsRoot['items'] ??
+                const []);
+
       var reviewed = false;
-      if (reviewRows is List)
+
+      if (reviewRows is List) {
         for (final raw in reviewRows) {
           if (raw is! Map) continue;
-          final r = Map<String, dynamic>.from(raw);
-          final type = (r['reviewType'] ?? r['type'] ?? '')
+
+          final review = Map<String, dynamic>.from(raw);
+
+          final type = (review['reviewType'] ?? review['type'] ?? '')
               .toString()
               .toLowerCase();
-          final reviewedSeller = _intValue(r['sellerId'] ?? r['artistId']);
+
+          final reviewedSeller = _intValue(
+            review['sellerId'] ?? review['artistId'],
+          );
+
           if (reviewedSeller == sellerId &&
-              _intValue(r['productId']) == 0 &&
-              (type == 'seller' || type == 'artist' || type.isEmpty))
+              _intValue(review['productId']) == 0 &&
+              (type == 'seller' || type == 'artist' || type.isEmpty)) {
             reviewed = true;
+            break;
+          }
         }
-      if (mounted)
-        setState(() {
-          _eligibleSellerOrderId = orderId;
-          _canReviewSeller = orderId != null && orderId.isNotEmpty && !reviewed;
-          _sellerReviewSubmitted = reviewed;
-        });
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _eligibleSellerOrderId = eligibleOrderId;
+        _canReviewSeller = eligibleOrderId != null && !reviewed;
+        _sellerReviewSubmitted = reviewed;
+      });
     } catch (_) {
-      if (mounted)
-        setState(() {
-          _canReviewSeller = false;
-          _eligibleSellerOrderId = null;
-        });
+      if (!mounted) return;
+
+      setState(() {
+        _canReviewSeller = false;
+        _eligibleSellerOrderId = null;
+      });
     }
   }
 
@@ -1460,7 +1516,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       decoration: BoxDecoration(
         color: ArtistColors.background,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: ArtistColors.border.withOpacity(0.4)),
+        border: Border.all(color: ArtistColors.border.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
@@ -1522,7 +1578,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       decoration: BoxDecoration(
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: ArtistColors.border.withOpacity(0.35)),
+        border: Border.all(color: ArtistColors.border.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1816,7 +1872,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.94),
+                      color: Colors.white.withValues(alpha: 0.94),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -1929,7 +1985,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           color: ArtistColors.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.10),
+              color: Colors.black.withValues(alpha: 0.10),
               blurRadius: 15,
               offset: const Offset(0, -5),
             ),
@@ -1945,7 +2001,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   color: ArtistColors.light,
                   borderRadius: BorderRadius.circular(13),
                   border: Border.all(
-                    color: ArtistColors.border.withOpacity(0.4),
+                    color: ArtistColors.border.withValues(alpha: 0.4),
                   ),
                 ),
                 child: Row(
@@ -2148,10 +2204,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     }
     if (_currentProductId.isEmpty) {
       _showMessage('This product has no valid ID and cannot be purchased.');
-      return;
-    }
-    if (availableQuantity <= 0) {
-      _showMessage('This product is currently unavailable.');
       return;
     }
 
@@ -2773,7 +2825,7 @@ Discover sustainable products with EcoLoop!
                             backgroundColor: ArtistColors.primary,
                             foregroundColor: Colors.white,
                             disabledBackgroundColor: ArtistColors.primary
-                                .withOpacity(0.6),
+                                .withValues(alpha: 0.6),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),

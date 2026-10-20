@@ -147,7 +147,11 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
         elevation: 0,
         title: const Text(
           'Update Order Status',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: ArtistColors.textPrimary,
+          ),
         ),
         centerTitle: true,
       ),
@@ -218,7 +222,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
                       color: ArtistColors.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: ArtistColors.accent.withOpacity(.4),
+                        color: ArtistColors.accent.withValues(alpha: .4),
                       ),
                     ),
                     child: Column(
@@ -259,7 +263,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
                       color: ArtistColors.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: ArtistColors.accent.withOpacity(.35),
+                        color: ArtistColors.accent.withValues(alpha: .35),
                       ),
                     ),
                     child: Column(
@@ -287,7 +291,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
                       color: ArtistColors.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: ArtistColors.accent.withOpacity(.35),
+                        color: ArtistColors.accent.withValues(alpha: .35),
                       ),
                     ),
                     child: Column(
@@ -333,7 +337,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
                 color: ArtistColors.surface,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(.06),
+                    color: Colors.black.withValues(alpha: .06),
                     blurRadius: 15,
                     offset: const Offset(0, -4),
                   ),
@@ -461,7 +465,7 @@ class _SellingOrderStatusState extends State<SellingOrderStatus> {
             border: Border.all(
               color: selected
                   ? ArtistColors.primary
-                  : ArtistColors.accent.withOpacity(.3),
+                  : ArtistColors.accent.withValues(alpha: .3),
               width: selected ? 1.5 : 1,
             ),
           ),

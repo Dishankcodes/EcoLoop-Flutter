@@ -16,6 +16,10 @@ class AddressList extends StatefulWidget {
 }
 
 class _AddressListState extends State<AddressList> {
+  // Keep a short-lived in-memory cache so reopening this screen is instant.
+  static final Map<String, List<AddressItem>> _addressCache = {};
+  static final Map<String, DateTime> _addressCacheTime = {};
+  static const Duration _cacheTtl = Duration(seconds: 60);
   static const String _baseUrl =
       'https://script.google.com/macros/s/AKfycbzvHq06GwL_I8qH2IPyQP36dRlESN62PYF4Ak5WkRE2VjHL5a-tr0Yk_KEtSvU_ZL6IbQ/exec';
 
@@ -35,14 +39,25 @@ class _AddressListState extends State<AddressList> {
   @override
   void initState() {
     super.initState();
-    _loadAddresses();
+    final key = _token;
+    final cached = _addressCache[key];
+    if (key.isNotEmpty && cached != null) {
+      _addresses = List<AddressItem>.of(cached);
+      _isLoading = false;
+      final savedAt = _addressCacheTime[key];
+      // Fresh cache: render immediately without another network request.
+      if (savedAt != null && DateTime.now().difference(savedAt) < _cacheTtl) {
+        return;
+      }
+    }
+    _loadAddresses(showLoader: _addresses.isEmpty);
   }
 
   Dio _dio() => Dio(
     BaseOptions(
-      connectTimeout: const Duration(seconds: 20),
-      sendTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 30),
+      connectTimeout: const Duration(seconds: 8),
+      sendTimeout: const Duration(seconds: 8),
+      receiveTimeout: const Duration(seconds: 12),
       headers: const {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -139,13 +154,18 @@ class _AddressListState extends State<AddressList> {
     return error.toString().replaceFirst('Exception: ', '');
   }
 
-  Future<void> _loadAddresses() async {
+  Future<void> _loadAddresses({bool showLoader = false}) async {
     if (!mounted) return;
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    // Do not blank the page when cached addresses are already visible.
+    if (showLoader && _addresses.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    } else {
+      setState(() => _error = null);
+    }
 
     if (_token.isEmpty) {
       setState(() {
@@ -191,6 +211,8 @@ class _AddressListState extends State<AddressList> {
 
       setState(() {
         _addresses = parsed;
+        _addressCache[_token] = List<AddressItem>.unmodifiable(parsed);
+        _addressCacheTime[_token] = DateTime.now();
         _isLoading = false;
         _error = null;
       });
@@ -199,7 +221,8 @@ class _AddressListState extends State<AddressList> {
 
       setState(() {
         _isLoading = false;
-        _error = _errorMessage(error);
+        // Keep cached content on screen if refresh fails.
+        _error = _addresses.isEmpty ? _errorMessage(error) : null;
       });
     } finally {
       dio.close(force: true);

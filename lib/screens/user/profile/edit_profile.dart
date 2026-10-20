@@ -5,13 +5,13 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../api/api_manager.dart';
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../models/location/city_model.dart';
 import '../../../models/location/state_model.dart';
 import '../../../services/ecoloop_api.dart';
 import '../../../services/image_picker_service.dart';
+import '../../../services/location_data_cache.dart';
 import '../../../shared_preferences_util.dart';
 
 class EditProfile extends StatefulWidget {
@@ -171,25 +171,26 @@ class _EditProfileState extends State<EditProfile> {
   }
 
   Future<void> _loadStates() async {
+    if (!mounted) return;
     setState(() => _loadingStates = true);
 
     try {
-      final response = await ApiManager().client.getStates('/locations/states');
+      final states = await LocationDataCache.instance.getStates();
 
       if (!mounted) return;
 
-      if (response.success == true && response.data != null) {
-        setState(() {
-          _states = response.data!;
-          _matchState();
-        });
-      } else {
-        _notice(response.error ?? 'Unable to load states.', error: true);
-      }
+      setState(() {
+        _states = states;
+        _matchState();
+      });
     } catch (error) {
-      _notice('Unable to load states: ${_errorText(error)}', error: true);
+      if (mounted) {
+        _notice('Unable to load states: ${_errorText(error)}', error: true);
+      }
     } finally {
-      if (mounted) setState(() => _loadingStates = false);
+      if (mounted) {
+        setState(() => _loadingStates = false);
+      }
     }
   }
 
@@ -221,6 +222,8 @@ class _EditProfileState extends State<EditProfile> {
   }) async {
     final requestId = ++_cityRequest;
 
+    if (!mounted) return;
+
     setState(() {
       _loadingCities = true;
       _cities = [];
@@ -228,36 +231,27 @@ class _EditProfileState extends State<EditProfile> {
     });
 
     try {
-      final response = await ApiManager().client.getCities(
-        '/locations/cities',
-        stateCode,
-      );
+      final cities = await LocationDataCache.instance.getCities(stateCode);
 
       if (!mounted || requestId != _cityRequest) return;
 
-      if (response.success == true && response.data != null) {
-        final cities = response.data!;
+      CityModel? selected;
 
-        CityModel? selected;
-
-        if (preserveSavedCity) {
-          for (final city in cities) {
-            if (city.cityName.toLowerCase() == _savedCity.toLowerCase()) {
-              selected = city;
-              break;
-            }
+      if (preserveSavedCity) {
+        for (final city in cities) {
+          if (city.cityName.toLowerCase() == _savedCity.toLowerCase()) {
+            selected = city;
+            break;
           }
         }
-
-        setState(() {
-          _cities = cities;
-          _selectedCity = selected;
-        });
-      } else {
-        _notice(response.error ?? 'Unable to load cities.', error: true);
       }
+
+      setState(() {
+        _cities = cities;
+        _selectedCity = selected;
+      });
     } catch (error) {
-      if (requestId == _cityRequest) {
+      if (mounted && requestId == _cityRequest) {
         _notice('Unable to load cities: ${_errorText(error)}', error: true);
       }
     } finally {

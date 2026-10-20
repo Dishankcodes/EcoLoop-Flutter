@@ -26,6 +26,8 @@ class _ReviewHistoryState extends State<ReviewHistory> {
 
   int _tab = 0;
   bool _loading = true;
+  bool _reviewsLoaded = false;
+  bool _ordersLoaded = false;
   String? _error;
   List<Map<String, dynamic>> _reviews = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _orders = <Map<String, dynamic>>[];
@@ -395,49 +397,96 @@ class _ReviewHistoryState extends State<ReviewHistory> {
         DateTime.now().difference(_cacheTime!) < _cacheDuration;
 
     if (!force && cacheIsFresh) {
-      if (mounted) {
-        setState(() {
-          _reviews = _cachedReviews!;
-          _orders = _cachedOrders!;
-          _loading = false;
-          _error = null;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _reviews = List<Map<String, dynamic>>.from(_cachedReviews!);
+        _orders = List<Map<String, dynamic>>.from(_cachedOrders!);
+        _reviewsLoaded = true;
+        _ordersLoaded = true;
+        _loading = false;
+        _error = null;
+      });
       return;
     }
 
-    // Keep existing content visible during pull-to-refresh/background refresh.
-    final hasContent = _reviews.isNotEmpty || _orders.isNotEmpty;
-    if (mounted) {
-      setState(() {
-        _loading = !hasContent;
+    // Paint the page shell immediately. Fetch reviews and orders concurrently,
+    // then render each section as soon as its own request finishes.
+    final hasCachedContent =
+        _reviewsLoaded ||
+        _ordersLoaded ||
+        _reviews.isNotEmpty ||
+        _orders.isNotEmpty ||
+        _cachedReviews != null ||
+        _cachedOrders != null;
+    if (!mounted) return;
+    setState(() {
+      if (_cachedReviews != null) {
+        _reviews = List<Map<String, dynamic>>.from(_cachedReviews!);
+        _reviewsLoaded = true;
+      } else if (_reviews.isEmpty) {
+        _reviewsLoaded = false;
+      }
+      if (_cachedOrders != null) {
+        _orders = List<Map<String, dynamic>>.from(_cachedOrders!);
+        _ordersLoaded = true;
+      } else if (_orders.isEmpty) {
+        _ordersLoaded = false;
+      }
+      _loading = !hasCachedContent;
+      _error = null;
+    });
+
+    var succeeded = 0;
+    Object? firstError;
+    final reviewsFuture = _getRows('/my/reviews')
+        .then((rows) {
+          if (!mounted) return;
+          _cachedReviews = List<Map<String, dynamic>>.from(rows);
+          if (_cachedOrders != null) _cacheTime = DateTime.now();
+          setState(() {
+            _reviews = rows;
+            _reviewsLoaded = true;
+            _loading = false;
+            _error = null;
+          });
+          succeeded++;
+        })
+        .catchError((Object error) {
+          firstError ??= error;
+        });
+
+    final ordersFuture = _getRows('/orders')
+        .then((rows) {
+          if (!mounted) return;
+          _cachedOrders = List<Map<String, dynamic>>.from(rows);
+          if (_cachedReviews != null) _cacheTime = DateTime.now();
+          setState(() {
+            _orders = rows;
+            _ordersLoaded = true;
+            _loading = false;
+            _error = null;
+          });
+          succeeded++;
+        })
+        .catchError((Object error) {
+          firstError ??= error;
+        });
+
+    await Future.wait<void>([reviewsFuture, ordersFuture]);
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      if (succeeded == 0) {
+        _error = (firstError ?? 'Unable to load review history.')
+            .toString()
+            .replaceFirst('Exception: ', '');
+      } else {
         _error = null;
-      });
-    }
-    try {
-      final results = await Future.wait<dynamic>([
-        _getRows('/my/reviews'),
-        _getRows('/orders'),
-      ]);
-      if (!mounted) return;
-      final reviews = results[0] as List<Map<String, dynamic>>;
-      final orders = results[1] as List<Map<String, dynamic>>;
-      _cachedReviews = reviews;
-      _cachedOrders = orders;
-      _cacheTime = DateTime.now();
-      setState(() {
-        _reviews = reviews;
-        _orders = orders;
-        _loading = false;
-        _error = null;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
-        _loading = false;
-      });
-    }
+        if (_cachedReviews != null && _cachedOrders != null) {
+          _cacheTime = DateTime.now();
+        }
+      }
+    });
   }
 
   Future<void> _writeProductReview(Map<String, dynamic> order) async {
@@ -513,6 +562,8 @@ class _ReviewHistoryState extends State<ReviewHistory> {
       _cachedReviews = null;
       _cachedOrders = null;
       _cacheTime = null;
+      _reviewsLoaded = false;
+      _ordersLoaded = false;
       _message('Seller review submitted successfully.');
       await _load(force: true);
     }
@@ -630,7 +681,7 @@ class _ReviewHistoryState extends State<ReviewHistory> {
             child: RefreshIndicator(
               onRefresh: () => _load(force: true),
               color: ArtistColors.primary,
-              child: _loading
+              child: _loading && !_reviewsLoaded && !_ordersLoaded
                   ? ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: const [
@@ -677,7 +728,21 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                               : 'Review the seller or ReMaker behind your purchase.',
                           count: pending.length,
                         ),
-                        if (pending.isEmpty)
+                        if (!_ordersLoaded)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: ArtistColors.primary,
+                                ),
+                              ),
+                            ),
+                          )
+                        else if (pending.isEmpty)
                           _emptyPanel(
                             icon: Icons.task_alt_rounded,
                             title: _tab == 0
@@ -696,7 +761,21 @@ class _ReviewHistoryState extends State<ReviewHistory> {
                           subtitle: 'Reviews you have already submitted.',
                           count: reviews.length,
                         ),
-                        if (reviews.isEmpty)
+                        if (!_reviewsLoaded)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: ArtistColors.primary,
+                                ),
+                              ),
+                            ),
+                          )
+                        else if (reviews.isEmpty)
                           _emptyPanel(
                             icon: Icons.rate_review_outlined,
                             title: _tab == 0

@@ -15,6 +15,13 @@ class AboutYou extends StatefulWidget {
 
 class _AboutYouState extends State<AboutYou> {
   final EcoLoopApi _api = EcoLoopApi.instance;
+
+  // Keep the last successful result in memory so reopening this screen is instant.
+  // This is display-only cache; every manual refresh still requests fresh backend data.
+  static Map<String, dynamic>? _cachedProfile;
+  static Map<String, dynamic>? _cachedAnalytics;
+  static List<Map<String, dynamic>>? _cachedReviews;
+
   bool _loading = true;
   String? _error;
   Map<String, dynamic> _profile = {};
@@ -84,16 +91,31 @@ class _AboutYouState extends State<AboutYou> {
   @override
   void initState() {
     super.initState();
-    _load();
+
+    // Render previously loaded content immediately while refreshing in background.
+    final cachedProfile = _cachedProfile;
+    final cachedAnalytics = _cachedAnalytics;
+    final cachedReviews = _cachedReviews;
+    if (cachedProfile != null && cachedReviews != null) {
+      _profile = Map<String, dynamic>.from(cachedProfile);
+      _analytics = Map<String, dynamic>.from(cachedAnalytics ?? {});
+      _reviews = cachedReviews
+          .map((review) => Map<String, dynamic>.from(review))
+          .toList(growable: false);
+      _loading = false;
+    }
+    _load(showLoading: _cachedProfile == null || _cachedReviews == null);
   }
 
-  Future<void> _load() async {
-    if (mounted)
+  Future<void> _load({bool showLoading = true}) async {
+    if (mounted) {
       setState(() {
-        _loading = true;
+        if (showLoading) _loading = true;
         _error = null;
       });
+    }
     try {
+      // The profile is needed to build the artist-specific reviews URL.
       final profile = _map(await _api.get('/profile'));
       final artistId = _text(profile['artistId'] ?? profile['id']);
       if (artistId.isEmpty) {
@@ -102,22 +124,39 @@ class _AboutYouState extends State<AboutYou> {
         );
       }
 
+      // These independent requests run together to avoid serial network waits.
       final results = await Future.wait<dynamic>([
         _api.get('/artists/$artistId/reviews'),
         _api.get('/artist/analytics'),
       ]);
+      final reviews = _list(results[0]);
+      final analytics = _map(results[1]);
+
+      // Only cache successful responses; never replace valid cached content on error.
+      _cachedProfile = Map<String, dynamic>.from(profile);
+      _cachedReviews = reviews
+          .map((review) => Map<String, dynamic>.from(review))
+          .toList(growable: false);
+      _cachedAnalytics = Map<String, dynamic>.from(analytics);
+
       if (!mounted) return;
       setState(() {
         _profile = profile;
-        _reviews = _list(results[0]);
-        _analytics = _map(results[1]);
+        _reviews = reviews;
+        _analytics = analytics;
         _loading = false;
+        _error = null;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        // Keep already displayed cached data visible if background refresh fails.
+        if (_reviews.isEmpty && _profile.isEmpty) {
+          _error = error.toString().replaceFirst('Exception: ', '');
+        } else {
+          _error = null;
+        }
       });
     }
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -11,8 +12,8 @@ import 'my_products/add_product.dart';
 import 'my_products/my_product.dart';
 import 'my_products/product_analytics.dart';
 import 'my_products/selling_orders.dart';
-import 'reviews/review_history.dart';
 import 'profile/artist_custom_services.dart';
+import 'reviews/review_history.dart';
 
 /// Artist dashboard. Business figures and lists are loaded from Code.gs;
 /// this screen does not use demonstration orders, products, or analytics.
@@ -34,6 +35,8 @@ class _ArtistHomeState extends State<ArtistHome> {
   bool _productsLoaded = false;
   final ScrollController _scrollController = ScrollController();
   String? _error;
+  String? _ordersError;
+  String? _productsError;
   Map<String, dynamic> _profile = {};
   Map<String, dynamic> _analytics = {};
   Map<String, dynamic> _earnings = {};
@@ -81,13 +84,20 @@ class _ArtistHomeState extends State<ArtistHome> {
   void _onDashboardScroll() {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
-    // Load the next sections just before they are likely to enter the viewport.
-    if (position.pixels + position.viewportDimension >= 420) {
-      _loadOrders();
-    }
-    if (position.pixels + position.viewportDimension >= 850) {
-      _loadProducts();
-    }
+    final visibleEdge = position.pixels + position.viewportDimension;
+
+    // The first threshold is near Recent Orders; products stay deferred until
+    // the user is closer to the lower part of the dashboard.
+    if (visibleEdge >= 650) unawaited(_loadOrders());
+    if (visibleEdge >= 1200) unawaited(_loadProducts());
+  }
+
+  void _loadSectionsVisibleAfterRefresh() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final visibleEdge = position.pixels + position.viewportDimension;
+    if (visibleEdge >= 650) unawaited(_loadOrders());
+    if (visibleEdge >= 1200) unawaited(_loadProducts());
   }
 
   Map<String, dynamic> _asMap(dynamic value) {
@@ -152,31 +162,33 @@ class _ArtistHomeState extends State<ArtistHome> {
   }
 
   Future<void> _loadDashboard({bool refresh = false}) async {
-    if (!mounted) return;
+    if (!mounted || (_refreshing && refresh)) return;
     setState(() {
       _error = null;
       if (refresh) {
         _refreshing = true;
         _ordersLoaded = false;
         _productsLoaded = false;
+        _ordersError = null;
+        _productsError = null;
       } else {
         _loading = true;
       }
     });
 
     try {
-      // Load only the above-the-fold summary first; long lists load on scroll.
+      // Profile and headline analytics are enough to render the first screen.
+      // Earnings are fetched separately so a slower endpoint cannot hold the
+      // entire dashboard behind a full-screen loader.
       final results = await Future.wait<dynamic>([
         _api.get('/profile'),
         _api.get('/artist/analytics'),
-        _api.get('/artist/analytics/earnings'),
       ]);
 
       if (!mounted) return;
       setState(() {
         _profile = _asMap(results[0]);
         _analytics = _asMap(results[1]);
-        _earnings = _asMap(results[2]);
         _loading = false;
         _refreshing = false;
         if (refresh) {
@@ -185,15 +197,15 @@ class _ArtistHomeState extends State<ArtistHome> {
         }
       });
 
-      // If refreshing while already scrolled, keep the visible sections current.
-      if (refresh && _scrollController.hasClients) {
-        final pixels = _scrollController.position.pixels;
-        if (pixels + _scrollController.position.viewportDimension >= 420) {
-          _loadOrders();
-        }
-        if (pixels + _scrollController.position.viewportDimension >= 850) {
-          _loadProducts();
-        }
+      unawaited(_loadEarnings());
+      if (refresh) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _loadSectionsVisibleAfterRefresh();
+        });
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _onDashboardScroll();
+        });
       }
     } catch (e) {
       if (!mounted) return;
@@ -205,9 +217,23 @@ class _ArtistHomeState extends State<ArtistHome> {
     }
   }
 
+  Future<void> _loadEarnings() async {
+    try {
+      final result = await _api.get('/artist/analytics/earnings');
+      if (!mounted) return;
+      setState(() => _earnings = _asMap(result));
+    } catch (_) {
+      // Headline analytics already provides a revenue fallback. Keep the
+      // dashboard usable if the dedicated earnings endpoint is unavailable.
+    }
+  }
+
   Future<void> _loadOrders() async {
     if (_ordersLoading || _ordersLoaded || !mounted) return;
-    setState(() => _ordersLoading = true);
+    setState(() {
+      _ordersLoading = true;
+      _ordersError = null;
+    });
     try {
       final result = await _api.get('/artist/orders');
       if (!mounted) return;
@@ -216,15 +242,21 @@ class _ArtistHomeState extends State<ArtistHome> {
         _ordersLoaded = true;
         _ordersLoading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _ordersLoading = false);
+      setState(() {
+        _ordersLoading = false;
+        _ordersError = e.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
   Future<void> _loadProducts() async {
     if (_productsLoading || _productsLoaded || !mounted) return;
-    setState(() => _productsLoading = true);
+    setState(() {
+      _productsLoading = true;
+      _productsError = null;
+    });
     try {
       final results = await Future.wait<dynamic>([
         _api.get('/artist/analytics/products'),
@@ -265,9 +297,12 @@ class _ArtistHomeState extends State<ArtistHome> {
         _productsLoaded = true;
         _productsLoading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _productsLoading = false);
+      setState(() {
+        _productsLoading = false;
+        _productsError = e.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
@@ -807,6 +842,15 @@ class _ArtistHomeState extends State<ArtistHome> {
   }
 
   Widget _buildRecentOrders() {
+    if (_ordersError != null && !_ordersLoading) {
+      return _buildEmptyState(
+        icon: Icons.cloud_off_outlined,
+        title: 'Could not load orders',
+        subtitle: 'Check your connection and try again.',
+        actionLabel: 'Retry',
+        onAction: () => unawaited(_loadOrders()),
+      );
+    }
     if (_ordersLoading && !_ordersLoaded) {
       return _sectionLoadingCard(height: 112);
     }
@@ -974,6 +1018,15 @@ class _ArtistHomeState extends State<ArtistHome> {
   }
 
   Widget _buildTopProducts() {
+    if (_productsError != null && !_productsLoading) {
+      return _buildEmptyState(
+        icon: Icons.cloud_off_outlined,
+        title: 'Could not load products',
+        subtitle: 'Check your connection and try again.',
+        actionLabel: 'Retry',
+        onAction: () => unawaited(_loadProducts()),
+      );
+    }
     if (_productsLoading && !_productsLoaded) {
       return _sectionLoadingCard(height: 235);
     }

@@ -22,6 +22,8 @@ class _FollowersState extends State<Followers> {
   // Reuse the signed-in artist ID while this app session is alive so opening
   // this screen again does not need to fetch /profile before fetching followers.
   static int _cachedArtistId = 0;
+  static List<Map<String, dynamic>>? _cachedFollowers;
+  static int _cachedTotalFollowers = 0;
   Timer? _liveRefreshTimer;
   bool _requestInFlight = false;
 
@@ -51,14 +53,17 @@ class _FollowersState extends State<Followers> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    _loadFollowers();
-    // Apps Script has no push channel here, so poll quietly while this page is
-    // visible. This updates new followers without requiring a manual refresh.
-    _liveRefreshTimer = Timer.periodic(const Duration(seconds: 12), (_) {
-      if (mounted && !_loading && !_refreshing && !_requestInFlight) {
-        _loadFollowers(refresh: true, silent: true);
-      }
-    });
+    final cached = _cachedFollowers;
+    if (cached != null) {
+      _followers = cached
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+      _totalFollowers = _cachedTotalFollowers;
+      _loading = false;
+    }
+    _loadFollowers(silent: cached != null);
+    // No aggressive polling: refresh manually or when this screen is reopened.
+    // Repeated Apps Script requests every few seconds make the app slower.
   }
 
   @override
@@ -185,6 +190,10 @@ class _FollowersState extends State<Followers> {
             ? _toInt(response['count'])
             : list.length;
         _followers = list;
+        _cachedFollowers = list
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+        _cachedTotalFollowers = _totalFollowers;
         _error = null;
       });
     } catch (e) {

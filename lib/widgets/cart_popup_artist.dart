@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../app_theme/artist/artist_colors.dart';
 import '../app_theme/artist/artist_text_styles.dart';
-import '../services/ecoloop_api.dart';
 import '../screens/artist/buy_products/cart.dart';
 import '../screens/artist/buy_products/checkout.dart';
+import '../services/ecoloop_api.dart';
 
 class CartPopup {
   CartPopup._();
@@ -49,6 +49,8 @@ class CartPopup {
 
   /// Persists the add-to-cart operation first. The server validates login,
   /// stock, publication status, and prevents adding the seller's own listing.
+  /// Saves the item, displays the popup immediately after the save succeeds,
+  /// and refreshes the complete cart in the background.
   static Future<void> addItem(
     BuildContext context, {
     required Map<String, dynamic> item,
@@ -56,6 +58,7 @@ class CartPopup {
     final normalized = _normalizeItem(item);
     final productId = (normalized['productId'] ?? '').toString().trim();
     final numericId = int.tryParse(productId);
+
     if (numericId == null || numericId <= 0) {
       _showMessage(
         context,
@@ -63,36 +66,48 @@ class CartPopup {
       );
       return;
     }
+
     if (_addingProductIds.contains(productId)) return;
     _addingProductIds.add(productId);
+
     try {
       await _api.post('/cart', <String, dynamic>{
         'productId': numericId,
         'quantity': _toInt(normalized['quantity'], fallback: 1),
       });
-      // Refresh from the account-scoped cart so the popup shows the actual
-      // persisted quantity rather than a local-only guess.
-      try {
-        final response = await _api.get('/cart');
-        final rows = _extractRows(response);
-        _cartItems
-          ..clear()
-          ..addAll(
-            rows
-                .map(_normalizeItem)
-                .where((row) => (row['productId'] ?? '').toString().isNotEmpty),
-          );
-      } catch (_) {
-        // POST already succeeded, so show the item even if the refresh fails.
-      }
-      if (!_cartItems.any((row) => row['productId'].toString() == productId)) {
-        _addWithoutShowing(normalized);
-      }
+
+      // Update the popup immediately without waiting for GET /cart.
+      _addWithoutShowing(normalized);
       _showOrUpdate(context);
+
+      // Refresh the authoritative cart in the background.
+      unawaited(_refreshCartInBackground());
     } catch (error) {
       _showMessage(context, _friendlyError(error));
     } finally {
       _addingProductIds.remove(productId);
+    }
+  }
+
+  /// Refreshes saved cart data without delaying the popup.
+  static Future<void> _refreshCartInBackground() async {
+    try {
+      final response = await _api.get('/cart');
+      final rows = _extractRows(response);
+
+      final refreshedItems = rows
+          .map(_normalizeItem)
+          .where((row) => (row['productId'] ?? '').toString().isNotEmpty)
+          .toList();
+
+      _cartItems
+        ..clear()
+        ..addAll(refreshedItems);
+
+      // Update the visible popup if it is still present.
+      _currentEntry?.markNeedsBuild();
+    } catch (_) {
+      // The POST succeeded. Keep the locally displayed cart if refresh fails.
     }
   }
 
@@ -700,10 +715,10 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
       decoration: BoxDecoration(
         color: ArtistColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: ArtistColors.accent.withOpacity(0.55)),
+        border: Border.all(color: ArtistColors.accent.withValues(alpha: 0.55)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.14),
+            color: Colors.black.withValues(alpha: 0.14),
             blurRadius: 22,
             offset: const Offset(0, 8),
           ),

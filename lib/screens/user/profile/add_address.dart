@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import '../../../api/api_manager.dart';
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../models/location/city_model.dart';
 import '../../../models/location/state_model.dart';
+import '../../../services/location_data_cache.dart';
 import '../../../shared_preferences_util.dart';
 
 class AddAddress extends StatefulWidget {
@@ -145,16 +145,17 @@ class _AddAddressState extends State<AddAddress> {
 
   Future<void> _loadStates() async {
     if (!mounted) return;
+
     setState(() => _isLoadingStates = true);
+
     try {
-      final response = await ApiManager().client.getStates('/locations/states');
+      final states = await LocationDataCache.instance.getStates();
+
       if (!mounted) return;
-      if (response.success != true || response.data == null) {
-        throw Exception(response.error ?? 'Unable to load states.');
-      }
-      final states = response.data!;
+
       StateModel? initial;
       final wanted = (_initialStateName ?? '').trim().toLowerCase();
+
       for (final item in states) {
         if (wanted.isNotEmpty &&
             (item.stateName.trim().toLowerCase() == wanted ||
@@ -163,21 +164,25 @@ class _AddAddressState extends State<AddAddress> {
           break;
         }
       }
+
       setState(() {
         _states = states;
         _selectedState = initial;
         _isLoadingStates = false;
       });
-      if (initial != null)
+
+      if (initial != null) {
         await _loadCities(initial.stateCode, preserveInitial: true);
-    } catch (_) {
-      if (mounted) {
-        setState(() => _isLoadingStates = false);
-        _showMessage(
-          'Could not load states. Check your connection and try again.',
-          error: true,
-        );
       }
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() => _isLoadingStates = false);
+
+      _showMessage(
+        'Could not load states. Check your connection and try again.',
+        error: true,
+      );
     }
   }
 
@@ -186,7 +191,9 @@ class _AddAddressState extends State<AddAddress> {
     bool preserveInitial = false,
   }) async {
     if (!mounted) return;
+
     final cached = _citiesCache[stateCode];
+
     if (cached != null) {
       setState(() {
         _cities = cached;
@@ -197,22 +204,20 @@ class _AddAddressState extends State<AddAddress> {
       });
       return;
     }
+
     setState(() {
       _cities = [];
       _selectedCity = null;
       _isLoadingCities = true;
     });
+
     try {
-      final response = await ApiManager().client.getCities(
-        '/locations/cities',
-        stateCode,
-      );
+      final cities = await LocationDataCache.instance.getCities(stateCode);
+
       if (!mounted) return;
-      if (response.success != true || response.data == null) {
-        throw Exception(response.error ?? 'Unable to load cities.');
-      }
-      final cities = response.data!;
+
       _citiesCache[stateCode] = cities;
+
       setState(() {
         _cities = cities;
         _isLoadingCities = false;
@@ -221,14 +226,15 @@ class _AddAddressState extends State<AddAddress> {
             : null;
       });
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _cities = [];
-          _selectedCity = null;
-          _isLoadingCities = false;
-        });
-        _showMessage('Could not load cities for this state.', error: true);
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _cities = [];
+        _selectedCity = null;
+        _isLoadingCities = false;
+      });
+
+      _showMessage('Could not load cities for this state.', error: true);
     }
   }
 

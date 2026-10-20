@@ -42,6 +42,15 @@ class _MarketplaceState extends State<Marketplace> {
   double _priceCeiling = 1000;
   int? _currentArtistId;
 
+  Future<dynamic> _loadCategoriesSafely() async {
+    try {
+      return await EcoLoopApi.instance.get('/categories');
+    } catch (_) {
+      // Categories are optional for loading the product list.
+      return <dynamic>[];
+    }
+  }
+
   /// Reads the authenticated artist ID from the existing /auth/me response.
   /// The API may return the account directly or wrap it in data/account/user.
   int? _artistIdFromResponse(dynamic response) {
@@ -95,7 +104,9 @@ class _MarketplaceState extends State<Marketplace> {
   Future<void> _loadProducts() async {
     if (mounted) {
       setState(() {
-        _loadingProducts = true;
+        // Keep the current marketplace visible during refresh. Show the full
+        // loader only before the first successful product load.
+        _loadingProducts = products.isEmpty;
         _loadError = null;
       });
     }
@@ -113,17 +124,13 @@ class _MarketplaceState extends State<Marketplace> {
       _currentArtistId = artistId;
 
       // Product and category data both come from the existing Apps Script API.
-      final rawProducts = await EcoLoopApi.instance.get('/products');
+      final results = await Future.wait<dynamic>([
+        EcoLoopApi.instance.get('/products'),
+        _loadCategoriesSafely(),
+      ]);
 
-      // Category lookup is supported by the current Code.gs. If that endpoint
-      // is temporarily unavailable, still show products rather than failing
-      // the entire marketplace screen.
-      dynamic rawCategories = <dynamic>[];
-      try {
-        rawCategories = await EcoLoopApi.instance.get('/categories');
-      } catch (_) {
-        rawCategories = <dynamic>[];
-      }
+      final rawProducts = results[0];
+      final rawCategories = results[1];
 
       final categoryRows = (rawCategories is List ? rawCategories : <dynamic>[])
           .whereType<Map>()
@@ -294,11 +301,14 @@ class _MarketplaceState extends State<Marketplace> {
         }
       });
     } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _loadingProducts = false;
-        _loadError = error.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _loadingProducts = false;
+          // With no cached products, show a retry state. If products were
+          // already loaded, keep them on screen when a refresh fails.
+          _loadError = products.isEmpty ? error.toString() : null;
+        });
+      }
     }
   }
 
@@ -454,10 +464,12 @@ class _MarketplaceState extends State<Marketplace> {
         decoration: BoxDecoration(
           color: ArtistColors.surface,
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: ArtistColors.accent.withOpacity(0.45)),
+          border: Border.all(
+            color: ArtistColors.accent.withValues(alpha: 0.45),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.025),
+              color: Colors.black.withValues(alpha: 0.025),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -604,7 +616,7 @@ class _MarketplaceState extends State<Marketplace> {
         height: 32,
         padding: const EdgeInsets.only(left: 9, right: 6),
         decoration: BoxDecoration(
-          color: ArtistColors.light.withOpacity(0.55),
+          color: ArtistColors.light.withValues(alpha: 0.55),
           borderRadius: BorderRadius.circular(9),
         ),
         child: Row(
@@ -764,7 +776,7 @@ class _MarketplaceState extends State<Marketplace> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: ArtistColors.light.withOpacity(0.5),
+                color: ArtistColors.light.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -1135,7 +1147,7 @@ class _ProductCard extends StatelessWidget {
           border: Border.all(color: ArtistColors.border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.035),
+              color: Colors.black.withValues(alpha: 0.035),
               blurRadius: 9,
               offset: const Offset(0, 4),
             ),
@@ -1180,7 +1192,7 @@ class _ProductCard extends StatelessWidget {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.94),
+                        color: Colors.white.withValues(alpha: 0.94),
                         borderRadius: BorderRadius.circular(7),
                       ),
                       child: Text(
@@ -1202,7 +1214,7 @@ class _ProductCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.55),
+                        color: Colors.black.withValues(alpha: 0.55),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(

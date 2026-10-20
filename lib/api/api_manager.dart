@@ -1,212 +1,138 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import 'client.dart';
 
 class ApiManager {
-  static final ApiManager _instance = ApiManager._internal();
-
-  factory ApiManager() => _instance;
-
-  late final Dio dio;
-  late final RestClient client;
-
   ApiManager._internal() {
     dio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 20),
+        connectTimeout: const Duration(seconds: 15),
         sendTimeout: const Duration(seconds: 20),
-        receiveTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 25),
+        responseType: ResponseType.json,
 
-        // Google Apps Script returns a 302 redirect.
-        // We handle it manually in the interceptor.
+        // Google Apps Script often responds with a 302 redirect.
+        // Handle it below so the response is available to Retrofit
+        // and EcoLoopApi in the expected format.
         followRedirects: false,
         maxRedirects: 0,
 
-        contentType: Headers.jsonContentType,
-        responseType: ResponseType.json,
+        // Allow 302 through to the response interceptor.
+        validateStatus: (status) =>
+            status != null && status >= 200 && status < 400,
 
-        headers: {
-          Headers.acceptHeader: Headers.jsonContentType,
-          Headers.contentTypeHeader: Headers.jsonContentType,
-        },
-
-        // Allow 3xx responses to reach our interceptor.
-        validateStatus: (status) {
-          return status != null && status >= 200 && status < 400;
-        },
-
-        receiveDataWhenStatusError: true,
+        headers: const {'Accept': 'application/json'},
       ),
     );
 
     dio.interceptors.add(
       InterceptorsWrapper(
-        // REQUEST
         onRequest: (options, handler) {
           if (kDebugMode) {
-            debugPrint('');
-            debugPrint('========== API REQUEST ==========');
-            debugPrint('${options.method} ${options.uri}');
-
-            // Do not print passwords/tokens.
-            if (options.data != null) {
-              final data = options.data;
-
-              if (data is Map) {
-                final safeData = Map<String, dynamic>.from(data);
-
-                if (safeData.containsKey('password')) {
-                  safeData['password'] = '********';
-                }
-
-                if (safeData.containsKey('token')) {
-                  safeData['token'] = '********';
-                }
-
-                debugPrint('BODY: $safeData');
-              } else {
-                debugPrint('BODY: $data');
-              }
-            }
-
-            debugPrint('=================================');
+            debugPrint(
+              '[EcoLoop API] ${options.method} '
+              '${_safeUrl(options.uri)}',
+            );
           }
-
           handler.next(options);
         },
 
-        // RESPONSE
         onResponse: (response, handler) async {
+          final status = response.statusCode ?? 0;
+
           if (kDebugMode) {
-            debugPrint('');
-            debugPrint('========== API RESPONSE ==========');
-            debugPrint('STATUS: ${response.statusCode}');
-            debugPrint('URL: ${response.requestOptions.uri}');
-            debugPrint('==================================');
+            debugPrint(
+              '[EcoLoop API] Response: $status '
+              '${_safeUrl(response.requestOptions.uri)}',
+            );
           }
 
-          // GOOGLE APPS SCRIPT 302 REDIRECT
-
-          if (response.statusCode == 302) {
+          // Google Apps Script may redirect its response to
+          // script.googleusercontent.com. Follow that redirect
+          // manually to preserve predictable Dio/Retrofit behaviour.
+          if (status == 301 ||
+              status == 302 ||
+              status == 303 ||
+              status == 307 ||
+              status == 308) {
             final location = response.headers.value('location');
 
-            if (kDebugMode) {
-              debugPrint('');
-              debugPrint('====== APPS SCRIPT REDIRECT ======');
-              debugPrint('LOCATION: $location');
-              debugPrint('==================================');
-            }
-
-            // No redirect URL.
-            if (location == null || location.isEmpty) {
-              return handler.reject(
+            if (location == null || location.trim().isEmpty) {
+              handler.reject(
                 DioException(
                   requestOptions: response.requestOptions,
                   response: response,
                   type: DioExceptionType.badResponse,
-                  error: 'Apps Script returned 302 without Location header.',
+                  message:
+                      'Google Apps Script returned a redirect '
+                      'without a Location header.',
                 ),
               );
+              return;
             }
 
             try {
-              // Apps Script has already processed the POST request.
-              // The Location URL contains the generated response.
-              final redirectedResponse = await dio.get(
-                location,
+              final redirectUri = response.requestOptions.uri.resolve(location);
+
+              // Apps Script response redirects should be read using
+              // GET. The redirect URL contains the response payload
+              // reference; do not append the original query again.
+              final redirectedResponse = await dio.get<dynamic>(
+                redirectUri.toString(),
                 options: Options(
                   responseType: ResponseType.json,
-
-                  // Do not automatically follow another redirect.
-                  followRedirects: false,
-
-                  validateStatus: (status) {
-                    return status != null && status >= 200 && status < 400;
-                  },
-
-                  headers: {Headers.acceptHeader: Headers.jsonContentType},
-
-                  // Used to identify this request as our redirect GET.
-                  extra: {'appsScriptRedirect': true},
+                  followRedirects: true,
+                  maxRedirects: 5,
+                  extra: const {'appsScriptRedirect': true},
                 ),
               );
 
-              if (kDebugMode) {
-                debugPrint('');
-                debugPrint('======= REDIRECT RESPONSE =======');
-                debugPrint('STATUS: ${redirectedResponse.statusCode}');
-                debugPrint('URL: ${redirectedResponse.requestOptions.uri}');
-                debugPrint('DATA: ${redirectedResponse.data}');
-                debugPrint('=================================');
-              }
-
-              // --------------------------------------------------------
-              // If Dio returned the JSON as a String, decode it.
-              // --------------------------------------------------------
-              if (redirectedResponse.data is String) {
-                final raw = redirectedResponse.data as String;
-
-                if (raw.trim().isNotEmpty) {
-                  try {
-                    redirectedResponse.data = jsonDecode(raw);
-                  } catch (_) {
-                    // Leave the original response untouched.
-                  }
-                }
-              }
-
-              // Give the final 200 response to Retrofit.
-              return handler.resolve(redirectedResponse);
-            } catch (e) {
-              if (kDebugMode) {
-                debugPrint('');
-                debugPrint('===== REDIRECT REQUEST FAILED =====');
-                debugPrint('$e');
-                debugPrint('====================================');
-              }
-
-              return handler.reject(
+              handler.resolve(redirectedResponse);
+              return;
+            } on DioException catch (error) {
+              handler.reject(error);
+              return;
+            } catch (error) {
+              handler.reject(
                 DioException(
                   requestOptions: response.requestOptions,
                   response: response,
-                  type: DioExceptionType.badResponse,
-                  error: 'Failed to read Apps Script redirect.',
+                  type: DioExceptionType.unknown,
+                  message: 'Unable to follow Apps Script redirect.',
+                  error: error,
                 ),
               );
-            }
-          }
-
-          // NORMAL JSON RESPONSE
-
-          if (response.data is String) {
-            final raw = response.data as String;
-
-            if (raw.trim().isNotEmpty) {
-              try {
-                response.data = jsonDecode(raw);
-              } catch (_) {
-                // Keep original response if it isn't valid JSON.
-              }
+              return;
             }
           }
 
           handler.next(response);
         },
 
-        // ERROR
-        onError: (DioException error, handler) {
+        onError: (error, handler) {
           if (kDebugMode) {
-            debugPrint('');
-            debugPrint('============ API ERROR ============');
-            debugPrint('TYPE: ${error.type}');
-            debugPrint('MESSAGE: ${error.message}');
-            debugPrint('URL: ${error.requestOptions.uri}');
-            debugPrint('STATUS: ${error.response?.statusCode}');
-            debugPrint('DATA: ${error.response?.data}');
-            debugPrint('===================================');
+            // Do not print the full URL, query parameters, request
+            // body, or headers because they may contain auth tokens.
+            debugPrint(
+              '[EcoLoop API] Error: ${error.type} | '
+              '${_safeUrl(error.requestOptions.uri)} | '
+              'Status: ${error.response?.statusCode ?? 'N/A'}',
+            );
+
+            if (error.type == DioExceptionType.connectionTimeout ||
+                error.type == DioExceptionType.receiveTimeout ||
+                error.type == DioExceptionType.sendTimeout) {
+              debugPrint(
+                '[EcoLoop API] Request timed out. '
+                'Check network connectivity and Apps Script response time.',
+              );
+            } else if (error.type == DioExceptionType.connectionError) {
+              debugPrint(
+                '[EcoLoop API] Connection failed. '
+                'Check internet access and DNS resolution.',
+              );
+            }
           }
 
           handler.next(error);
@@ -214,20 +140,19 @@ class ApiManager {
       ),
     );
 
-    // Dio's normal logging interceptor.
-    // Sensitive request/response bodies are disabled.
-    if (kDebugMode) {
-      dio.interceptors.add(
-        LogInterceptor(
-          requestHeader: false,
-          requestBody: false,
-          responseHeader: false,
-          responseBody: false,
-        ),
-      );
-    }
-
-    // Retrofit client.
+    // Keep the existing Retrofit client compatible.
     client = RestClient(dio);
+  }
+
+  static final ApiManager _instance = ApiManager._internal();
+
+  factory ApiManager() => _instance;
+
+  late final Dio dio;
+  late final RestClient client;
+
+  /// Produces a safe URL for logs without exposing query parameters.
+  String _safeUrl(Uri uri) {
+    return '${uri.scheme}://${uri.host}${uri.path}';
   }
 }

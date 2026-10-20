@@ -128,18 +128,25 @@ class _ArtistProfileState extends State<ArtistProfile> {
             _reviews.isEmpty) {
           _loading = true;
         }
+
         _loadError = null;
       });
     }
+
+    // Keep the visible artist profile dependent only on the core content.
+    // Follow state, follower count and purchase/review eligibility load in
+    // parallel but do not hold the entire screen behind those extra requests.
+    final secondaryFuture = Future.wait<dynamic>([
+      _safeGet('/my/following', fallback: <dynamic>[]),
+      _safeGet('/artists/$_artistId/followers', fallback: <dynamic>{}),
+      _safeGet('/orders', fallback: <dynamic>[]),
+      _safeGet('/my/reviews', fallback: <dynamic>[]),
+    ]);
 
     final results = await Future.wait<dynamic>([
       _safeGet('/artists/$_artistId/portfolio', fallback: <dynamic>[]),
       _safeGet('/products', fallback: <dynamic>[]),
       _safeGet('/artists/$_artistId/reviews', fallback: <dynamic>[]),
-      _safeGet('/my/following', fallback: <dynamic>[]),
-      _safeGet('/artists/$_artistId/followers', fallback: <dynamic>{}),
-      _safeGet('/orders', fallback: <dynamic>[]),
-      _safeGet('/my/reviews', fallback: <dynamic>[]),
     ]);
 
     if (!mounted) return;
@@ -147,10 +154,6 @@ class _ArtistProfileState extends State<ArtistProfile> {
     final portfolio = _asList(results[0]);
     final allProducts = _asList(results[1]);
     final reviews = _asList(results[2]);
-    final following = _asList(results[3]);
-    final followerSummary = results[4];
-    final orders = _asList(results[5]);
-    final myReviews = _asList(results[6]);
 
     final artistProducts = allProducts.where((product) {
       final owner = _value(product, [
@@ -161,8 +164,27 @@ class _ArtistProfileState extends State<ArtistProfile> {
         'ownerId',
         'owner_id',
       ]);
+
       return owner.isNotEmpty && owner == _artistId && !_isUnavailable(product);
     }).toList();
+
+    setState(() {
+      _portfolio = portfolio.where((item) => !_isUnavailable(item)).toList();
+      _products = artistProducts;
+      _reviews = reviews;
+      _loading = false;
+    });
+
+    // The main profile is visible now. Finish the follow and review checks
+    // without holding the primary profile content in a loading state.
+    final secondaryResults = await secondaryFuture;
+
+    if (!mounted) return;
+
+    final following = _asList(secondaryResults[0]);
+    final followerSummary = secondaryResults[1];
+    final orders = _asList(secondaryResults[2]);
+    final myReviews = _asList(secondaryResults[3]);
 
     final followsArtist = following.any((item) {
       final id = _value(item, [
@@ -172,6 +194,7 @@ class _ArtistProfileState extends State<ArtistProfile> {
         'userId',
         'user_id',
       ]);
+
       return id == _artistId;
     });
 
@@ -182,22 +205,24 @@ class _ArtistProfileState extends State<ArtistProfile> {
         'sellerId',
         'seller_id',
       ]);
+
       final type = _value(item, [
         'reviewType',
         'sellerType',
         'type',
       ]).toLowerCase();
+
       return id == _artistId &&
           (type.isEmpty || type.contains('artist') || type.contains('remaker'));
     });
 
     final eligibleOrder = _findEligibleOrder(orders, artistProducts);
+
     if (!mounted) return;
+
     setState(() {
-      _portfolio = portfolio.where((item) => !_isUnavailable(item)).toList();
-      _products = artistProducts;
-      _reviews = reviews;
       _following = followsArtist;
+
       _followerCount =
           followerSummary is Map && followerSummary['count'] != null
           ? _number(followerSummary['count'])
@@ -207,11 +232,11 @@ class _ArtistProfileState extends State<ArtistProfile> {
                       _artist['followersCount'] ??
                       _artist['followers'],
                 ));
+
       _alreadyReviewed = alreadyReviewed;
       _eligibleOrderId = eligibleOrder;
       _canReview = eligibleOrder != null && !alreadyReviewed;
       _reviewEligibilityChecked = true;
-      _loading = false;
     });
   }
 

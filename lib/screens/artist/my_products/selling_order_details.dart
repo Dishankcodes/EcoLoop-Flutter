@@ -1,8 +1,12 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../services/ecoloop_api.dart';
+import '../buy_products/seller_profile.dart';
+import '../profile/artist_profile.dart';
 import 'selling_order_status.dart';
 
 class SellingOrderDetails extends StatefulWidget {
@@ -42,6 +46,90 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     return widget.order['buyerName']?.toString().trim().isNotEmpty == true
         ? widget.order['buyerName'].toString()
         : (widget.order['buyerId']?.toString() ?? '-');
+  }
+
+  String get buyerName {
+    final value =
+        (widget.order['buyerName'] ??
+                widget.order['buyerFullName'] ??
+                widget.order['customerName'] ??
+                widget.order['name'] ??
+                '')
+            .toString()
+            .trim();
+    return value.isEmpty ? 'EcoLoop Buyer' : value;
+  }
+
+  String get buyerEmail {
+    return (widget.order['buyerEmail'] ??
+            widget.order['buyer_email'] ??
+            widget.order['customerEmail'] ??
+            widget.order['email'] ??
+            '')
+        .toString()
+        .trim();
+  }
+
+  String get buyerPhone {
+    return (widget.order['buyerPhone'] ??
+            widget.order['buyerMobile'] ??
+            widget.order['customerPhone'] ??
+            widget.order['phone'] ??
+            '')
+        .toString()
+        .trim();
+  }
+
+  String get buyerImage {
+    return (widget.order['buyerProfileImage'] ??
+            widget.order['buyerPhoto'] ??
+            widget.order['buyerAvatar'] ??
+            widget.order['buyerImage'] ??
+            '')
+        .toString()
+        .trim();
+  }
+
+  String get productImage {
+    final raw =
+        widget.order['productImageUrl'] ??
+        widget.order['productImage'] ??
+        widget.order['imageUrl'] ??
+        widget.order['image'] ??
+        widget.order['imageUrls'] ??
+        widget.order['images'];
+    if (raw is List) {
+      for (final item in raw) {
+        final url = item.toString().trim();
+        if (url.startsWith('https://') || url.startsWith('http://')) return url;
+      }
+    }
+    if (raw is String) {
+      final value = raw.trim();
+      if (value.startsWith('https://') || value.startsWith('http://'))
+        return value;
+      if (value.startsWith('[') && value.endsWith(']')) {
+        try {
+          final decoded = jsonDecode(value);
+          if (decoded is List) {
+            for (final item in decoded) {
+              final url = item.toString().trim();
+              if (url.startsWith('https://') || url.startsWith('http://'))
+                return url;
+            }
+          }
+        } catch (_) {}
+      }
+      final first = value
+          .split(',')
+          .first
+          .trim()
+          .replaceAll('"', '')
+          .replaceAll("'", '');
+      if (first.startsWith('https://') || first.startsWith('http://'))
+        return first;
+    }
+    return '';
   }
 
   String get quantity {
@@ -129,33 +217,30 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
         child: Column(
           children: [
             Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.only(
-                  bottom: isCancelled || isDelivered ? 30 : 20,
-                ),
-                child: Column(
-                  children: [
-                    _buildSaleHeader(),
-
-                    if (isCancelled) _buildCancelledBanner(),
-
-                    _buildStatusSection(),
-                    _buildProductSection(),
-                    _buildBuyerSection(),
-                    _buildDeliverySection(),
-                    _buildEarningsSection(),
-                    _buildOrderInformation(),
-                    _buildSellerProtection(),
-
-                    if (isDelivered) _buildCompletedMessage(),
-
-                    _buildHelpSection(),
-                  ],
+              child: RepaintBoundary(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    bottom: isCancelled || isDelivered ? 30 : 20,
+                  ),
+                  child: Column(
+                    children: [
+                      _buildSaleHeader(),
+                      if (isCancelled) _buildCancelledBanner(),
+                      _buildStatusSection(),
+                      _buildProductSection(),
+                      _buildBuyerSection(),
+                      _buildDeliverySection(),
+                      _buildEarningsSection(),
+                      _buildOrderInformation(),
+                      _buildSellerProtection(),
+                      if (isDelivered) _buildCompletedMessage(),
+                      _buildHelpSection(),
+                    ],
+                  ),
                 ),
               ),
             ),
-
             if (!isCancelled) _buildBottomBar(),
           ],
         ),
@@ -686,17 +771,34 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
             ),
             child: Row(
               children: [
-                Container(
-                  height: 78,
-                  width: 78,
-                  decoration: BoxDecoration(
-                    color: ArtistColors.light,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: const Icon(
-                    Icons.inventory_2_outlined,
-                    size: 38,
-                    color: ArtistColors.primary,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: SizedBox(
+                    height: 78,
+                    width: 78,
+                    child: productImage.isEmpty
+                        ? Container(
+                            color: ArtistColors.light,
+                            child: const Icon(
+                              Icons.inventory_2_outlined,
+                              size: 34,
+                              color: ArtistColors.primary,
+                            ),
+                          )
+                        : Image.network(
+                            productImage,
+                            fit: BoxFit.cover,
+                            filterQuality: FilterQuality.low,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: ArtistColors.light,
+                                  child: const Icon(
+                                    Icons.broken_image_outlined,
+                                    size: 32,
+                                    color: ArtistColors.primary,
+                                  ),
+                                ),
+                          ),
                   ),
                 ),
 
@@ -766,11 +868,23 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                   color: ArtistColors.light,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  color: ArtistColors.primary,
-                  size: 28,
-                ),
+                clipBehavior: Clip.antiAlias,
+                child: buyerImage.isEmpty
+                    ? const Icon(
+                        Icons.person_rounded,
+                        color: ArtistColors.primary,
+                        size: 28,
+                      )
+                    : Image.network(
+                        buyerImage,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(
+                              Icons.person_rounded,
+                              color: ArtistColors.primary,
+                              size: 28,
+                            ),
+                      ),
               ),
 
               const SizedBox(width: 12),
@@ -780,7 +894,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Buyer #$buyerId',
+                      buyerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: ArtistTextStyles.bodyMedium.copyWith(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -790,7 +906,11 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                     const SizedBox(height: 4),
 
                     Text(
-                      'EcoLoop Buyer',
+                      buyerEmail.isNotEmpty
+                          ? buyerEmail
+                          : 'EcoLoop Buyer · #$buyerId',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: ArtistTextStyles.small.copyWith(fontSize: 10),
                     ),
                   ],
@@ -814,8 +934,26 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
             ],
           ),
 
-          const SizedBox(height: 18),
-
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _openSellerProfile,
+              icon: const Icon(Icons.storefront_outlined, size: 18),
+              label: const Text('View Seller Profile'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ArtistColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                minimumSize: const Size(double.infinity, 45),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: ArtistTextStyles.button.copyWith(fontSize: 12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 15),
           _contactRow(Icons.person_outline_rounded, 'Buyer ID', '#$buyerId'),
         ],
       ),
@@ -919,19 +1057,6 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
                     .contains('express')
                 ? 'Express'
                 : 'Standard',
-          ),
-
-          const SizedBox(height: 12),
-
-          _detailRow(
-            Icons.storefront_outlined,
-            'Delivery responsibility',
-            ('${widget.order['deliveryResponsibility'] ?? ''}').trim().isEmpty
-                ? 'Not recorded for this order'
-                : '${widget.order['deliveryResponsibility']}'.replaceAll(
-                    '_',
-                    ' ',
-                  ),
           ),
 
           const SizedBox(height: 12),
@@ -1165,14 +1290,17 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
       child: Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: ArtistColors.light,
+          color: ArtistColors.success.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: ArtistColors.success.withValues(alpha: 0.24),
+          ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Icon(
-              Icons.account_balance_wallet_outlined,
+              Icons.check_circle_rounded,
               color: ArtistColors.success,
               size: 23,
             ),
@@ -1181,12 +1309,12 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
 
             Expanded(
               child: Text(
-                'Sale completed successfully. '
-                'Your earnings will be credited according '
-                'to EcoLoop payout terms.',
-                style: ArtistTextStyles.small.copyWith(
-                  fontSize: 11,
+                'Sale completed successfully!',
+                style: ArtistTextStyles.bodyMedium.copyWith(
+                  fontSize: 13,
                   height: 1.5,
+                  fontWeight: FontWeight.w700,
+                  color: ArtistColors.success,
                 ),
               ),
             ),
@@ -1210,9 +1338,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
           const SizedBox(height: 13),
 
           InkWell(
-            onTap: () {
-              _showMessage('Seller support will be connected later.');
-            },
+            onTap: _showSupportContact,
             borderRadius: BorderRadius.circular(15),
             child: Container(
               padding: const EdgeInsets.all(15),
@@ -1348,8 +1474,310 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   // CONTACT BUYER
   // ==========================================================
 
-  void _contactBuyer() {
-    _showMessage('Buyer messaging will be connected later.');
+  Future<Map<String, dynamic>> _loadFreshOrderContact() async {
+    final merged = Map<String, dynamic>.from(widget.order);
+    final hasEmail =
+        (merged['buyerEmail'] ??
+                merged['buyer_email'] ??
+                merged['customerEmail'] ??
+                merged['email'] ??
+                '')
+            .toString()
+            .trim()
+            .isNotEmpty;
+    final hasPhone =
+        (merged['buyerPhone'] ??
+                merged['buyerMobile'] ??
+                merged['customerPhone'] ??
+                merged['phone'] ??
+                '')
+            .toString()
+            .trim()
+            .isNotEmpty;
+    if (hasEmail && hasPhone) return merged;
+
+    // Order details are returned from Code.gs using the buyer's actual Users or
+    // Artists sheet row. This avoids inventing or hardcoding contact details.
+    try {
+      final result = await EcoLoopApi.instance.get('/orders/$orderId');
+      if (result is Map) merged.addAll(Map<String, dynamic>.from(result));
+    } catch (_) {
+      // Keep the order data already on screen if this optional refresh fails.
+    }
+    return merged;
+  }
+
+  Future<void> _contactBuyer() async {
+    final contact = await _loadFreshOrderContact();
+    if (!mounted) return;
+    String first(List<String> keys) {
+      for (final key in keys) {
+        final value = contact[key]?.toString().trim() ?? '';
+        if (value.isNotEmpty) return value;
+      }
+      return '';
+    }
+
+    final email = first([
+      'buyerEmail',
+      'buyer_email',
+      'customerEmail',
+      'email',
+    ]);
+    final phone = first([
+      'buyerPhone',
+      'buyerMobile',
+      'customerPhone',
+      'phone',
+    ]);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: ArtistColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Contact Buyer',
+          style: ArtistTextStyles.title.copyWith(
+            color: ArtistColors.textPrimary,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              buyerName,
+              style: ArtistTextStyles.bodyMedium.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (email.isNotEmpty) ...[
+              Text(
+                'Email address',
+                style: ArtistTextStyles.small.copyWith(
+                  color: ArtistColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              SelectableText(
+                email,
+                style: ArtistTextStyles.bodyMedium.copyWith(
+                  color: ArtistColors.primary,
+                ),
+              ),
+            ] else
+              Text(
+                'Buyer email is not available in the order response. Check that Code.gs returns buyerEmail from the Users/Artists sheet.',
+                style: ArtistTextStyles.body.copyWith(
+                  color: ArtistColors.textSecondary,
+                ),
+              ),
+            if (phone.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Phone',
+                style: ArtistTextStyles.small.copyWith(
+                  color: ArtistColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              SelectableText(phone, style: ArtistTextStyles.bodyMedium),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('Close', style: TextStyle(color: ArtistColors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openSellerProfile() async {
+    final sellerId =
+        (widget.order['sellerId'] ??
+                widget.order['artistId'] ??
+                widget.order['seller_id'] ??
+                '')
+            .toString()
+            .trim();
+    final sellerType =
+        (widget.order['sellerType'] ?? widget.order['seller_type'] ?? 'artist')
+            .toString()
+            .trim()
+            .toLowerCase();
+    if (sellerId.isEmpty || sellerId == '0' || sellerId == '-') {
+      _showMessage(
+        'Seller profile is unavailable because the seller ID is missing from this order.',
+      );
+      return;
+    }
+
+    try {
+      final result = await EcoLoopApi.instance.get(
+        '/public/seller/$sellerType/$sellerId/profile',
+      );
+      if (!mounted) return;
+      final root = result is Map
+          ? Map<String, dynamic>.from(result)
+          : <String, dynamic>{};
+      final sellerValue = root['seller'];
+      final seller = sellerValue is Map
+          ? Map<String, dynamic>.from(sellerValue)
+          : root;
+      if (seller.isEmpty) {
+        _showMessage('Seller profile was not returned by the backend.');
+        return;
+      }
+      if (sellerType == 'artist' ||
+          sellerType == 'remaker' ||
+          sellerType == 're_maker') {
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(builder: (_) => ArtistProfile(artist: seller)),
+        );
+      } else {
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(builder: (_) => SellerProfile(seller: seller)),
+        );
+      }
+    } catch (error) {
+      if (mounted)
+        _showMessage(
+          'Could not open seller profile: ${error.toString().replaceFirst('Exception: ', '')}',
+        );
+    }
+  }
+
+  void _viewBuyerProfile() {
+    // Retained for any existing internal call sites; buyer details are shown
+    // from the order record, while the profile button opens the actual seller.
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: ArtistColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Buyer Profile',
+          style: ArtistTextStyles.title.copyWith(
+            color: ArtistColors.textPrimary,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 34,
+                backgroundColor: ArtistColors.light,
+                backgroundImage: buyerImage.isNotEmpty
+                    ? NetworkImage(buyerImage)
+                    : null,
+                child: buyerImage.isEmpty
+                    ? const Icon(
+                        Icons.person_rounded,
+                        color: ArtistColors.primary,
+                        size: 34,
+                      )
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                buyerName,
+                textAlign: TextAlign.center,
+                style: ArtistTextStyles.title.copyWith(fontSize: 17),
+              ),
+              const SizedBox(height: 16),
+              _profileInfoRow('Buyer ID', buyerId),
+              if (buyerEmail.isNotEmpty) _profileInfoRow('Email', buyerEmail),
+              if (buyerPhone.isNotEmpty) _profileInfoRow('Phone', buyerPhone),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('Close', style: TextStyle(color: ArtistColors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _profileInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 68,
+            child: Text(
+              label,
+              style: ArtistTextStyles.small.copyWith(
+                color: ArtistColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SelectableText(value, style: ArtistTextStyles.bodyMedium),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSupportContact() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: ArtistColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        icon: const Icon(
+          Icons.support_agent_rounded,
+          color: ArtistColors.primary,
+          size: 32,
+        ),
+        title: Text(
+          'Contact EcoLoop',
+          style: ArtistTextStyles.title.copyWith(
+            color: ArtistColors.textPrimary,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Need help with this sale? Reach our support team at:',
+              textAlign: TextAlign.center,
+              style: ArtistTextStyles.body.copyWith(
+                color: ArtistColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SelectableText(
+              'ecoloopp2026@gmail.com',
+              textAlign: TextAlign.center,
+              style: ArtistTextStyles.bodyMedium.copyWith(
+                color: ArtistColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   // ==========================================================
