@@ -987,7 +987,20 @@ class _ArtistProfileState extends State<ArtistProfile> {
           ),
         ),
         if (onViewAll != null)
-          TextButton(onPressed: onViewAll, child: const Text('View All')),
+          TextButton(
+            onPressed: onViewAll,
+            style: TextButton.styleFrom(
+              foregroundColor: ArtistColors.primary,
+              textStyle: ArtistTextStyles.button.copyWith(
+                color: ArtistColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('View All'),
+          ),
       ],
     );
   }
@@ -1061,6 +1074,19 @@ class _ArtistProfileState extends State<ArtistProfile> {
                       orderId: _eligibleOrderId,
                     ),
                   ),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: ArtistColors.primary,
+                  textStyle: ArtistTextStyles.button.copyWith(
+                    color: ArtistColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  minimumSize: const Size(0, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: const Text('View All'),
               ),

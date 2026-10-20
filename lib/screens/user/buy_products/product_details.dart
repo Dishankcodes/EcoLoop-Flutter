@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
@@ -10,6 +12,7 @@ import '../reviews/product_reviews.dart';
 import '../reviews/write_review.dart';
 import 'artist_profile.dart';
 import 'checkout.dart';
+import 'marketplace.dart';
 import 'seller_profile.dart';
 
 /// Screen displaying full item details, image gallery, seller info, reviews, and purchasing options.
@@ -43,6 +46,8 @@ class _ProductDetailsState extends State<ProductDetails> {
   bool _canReview = false;
   String? _eligibleOrderId;
   List<Map<String, dynamic>> _liveReviews = [];
+  List<Map<String, dynamic>> _similarProducts = <Map<String, dynamic>>[];
+  bool _similarProductsLoading = false;
   final EcoLoopApi _api = EcoLoopApi.instance;
 
   @override
@@ -56,6 +61,7 @@ class _ProductDetailsState extends State<ProductDetails> {
     _syncWishlistState();
     _loadReviews();
     _checkReviewEligibility();
+    _loadSimilarProducts();
   }
 
   /// Refreshes the selected listing from the backend so artist/user edits and
@@ -1753,10 +1759,10 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   /// Horizontal scrolling carousel of related product recommendations.
   Widget _buildSimilarProducts() {
-    // Similar items should be loaded from GET /products by the marketplace
-    // screen. Do not display hard-coded sample listings here.
     final products = _similarProducts;
-    if (products.isEmpty) return const SizedBox.shrink();
+    if (products.isEmpty && !_similarProductsLoading) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       color: AppColors.surface,
@@ -1780,7 +1786,10 @@ class _ProductDetailsState extends State<ProductDetails> {
                 ),
                 TextButton(
                   onPressed: () {
-                    _showMessage('More products will open later.');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const Marketplace()),
+                    );
                   },
                   child: const Text(
                     'See All',
@@ -1791,19 +1800,30 @@ class _ProductDetailsState extends State<ProductDetails> {
             ),
           ),
           const SizedBox(height: 10),
-          SizedBox(
-            height: 190,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.only(right: 20),
-              itemCount: products.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 11),
-              itemBuilder: (context, index) {
-                return _buildSimilarProductCard(products[index]);
-              },
+          if (_similarProductsLoading && products.isEmpty)
+            const SizedBox(
+              height: 190,
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 190,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.only(right: 20),
+                itemCount: products.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 11),
+                itemBuilder: (context, index) {
+                  return _buildSimilarProductCard(products[index]);
+                },
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -1811,6 +1831,10 @@ class _ProductDetailsState extends State<ProductDetails> {
 
   /// Card item rendered inside the similar products carousel.
   Widget _buildSimilarProductCard(Map<String, dynamic> product) {
+    final rawImages = product['imageUrls'] ?? product['images'];
+    final imageUrl = (rawImages is List && rawImages.isNotEmpty)
+        ? rawImages.first.toString()
+        : (product['image'] ?? '').toString();
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -1831,16 +1855,21 @@ class _ProductDetailsState extends State<ProductDetails> {
                     width: 135,
                     height: 125,
                     color: AppColors.light,
-                    child: Image.network(
-                      product['image'].toString(),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) {
-                        return const Icon(
-                          Icons.image_outlined,
-                          color: AppColors.primary,
-                        );
-                      },
-                    ),
+                    child: imageUrl.trim().isEmpty
+                        ? const Icon(
+                            Icons.image_outlined,
+                            color: AppColors.primary,
+                          )
+                        : Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) {
+                              return const Icon(
+                                Icons.image_outlined,
+                                color: AppColors.primary,
+                              );
+                            },
+                          ),
                   ),
                 ),
                 Positioned(
@@ -1888,9 +1917,166 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  /// Mock dataset for similar products recommendations.
-  List<Map<String, dynamic>> get _similarProducts =>
-      const <Map<String, dynamic>>[];
+  /// Loads real catalogue recommendations, preferring the current seller,
+  /// then the same category, and finally other available products to fill five.
+  Future<void> _loadSimilarProducts() async {
+    if (_similarProductsLoading) return;
+    if (mounted) {
+      setState(() => _similarProductsLoading = true);
+    }
+
+    try {
+      final response = await _api.get('/products');
+      final rows = _productRowsFromResponse(
+        response,
+      ).map(_asMap).where((row) => row.isNotEmpty).toList();
+
+      final currentId = _normaliseWishlistId(_currentProductId);
+      final currentSellerId = _normaliseWishlistId(
+        _product['sellerId'] ??
+            _product['seller_id'] ??
+            _product['artistId'] ??
+            _product['userId'],
+      );
+      final currentSellerType = _normaliseSellerType(sellerType);
+      final currentCategoryId = _normaliseWishlistId(
+        _product['categoryId'] ?? _product['category_id'],
+      );
+      final currentCategoryName = (_product['category'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase();
+
+      bool isAvailable(Map<String, dynamic> row) {
+        final id = _normaliseWishlistId(
+          row['productId'] ?? row['product_id'] ?? row['id'],
+        );
+        final status = (row['status'] ?? 'published')
+            .toString()
+            .trim()
+            .toLowerCase();
+        final quantity = row['availableQuantity'] ?? row['available_quantity'];
+        final available =
+            quantity == null || (num.tryParse(quantity.toString()) ?? 0) > 0;
+        return id.isNotEmpty &&
+            id != currentId &&
+            status == 'published' &&
+            available;
+      }
+
+      bool sameSeller(Map<String, dynamic> row) {
+        final rowSellerId = _normaliseWishlistId(
+          row['sellerId'] ??
+              row['seller_id'] ??
+              row['artistId'] ??
+              row['userId'],
+        );
+        final rowSellerType = _normaliseSellerType(
+          (row['sellerType'] ?? row['seller_type'] ?? 'user').toString(),
+        );
+        return currentSellerId.isNotEmpty &&
+            rowSellerId == currentSellerId &&
+            rowSellerType == currentSellerType;
+      }
+
+      bool sameCategory(Map<String, dynamic> row) {
+        final rowCategoryId = _normaliseWishlistId(
+          row['categoryId'] ?? row['category_id'],
+        );
+        if (currentCategoryId.isNotEmpty && rowCategoryId.isNotEmpty) {
+          return rowCategoryId == currentCategoryId;
+        }
+        return currentCategoryName.isNotEmpty &&
+            (row['category'] ?? '').toString().trim().toLowerCase() ==
+                currentCategoryName;
+      }
+
+      final available = rows.where(isAvailable).toList();
+      final sellerProducts = available.where(sameSeller).toList()
+        ..shuffle(Random());
+      final sellerIds = sellerProducts
+          .map(
+            (row) => _normaliseWishlistId(
+              row['productId'] ?? row['product_id'] ?? row['id'],
+            ),
+          )
+          .toSet();
+      final categoryProducts =
+          available
+              .where(
+                (row) => !sellerIds.contains(
+                  _normaliseWishlistId(
+                    row['productId'] ?? row['product_id'] ?? row['id'],
+                  ),
+                ),
+              )
+              .where(sameCategory)
+              .toList()
+            ..shuffle(Random());
+      final selectedIds = <String>{currentId, ...sellerIds};
+      final recommendations = <Map<String, dynamic>>[...sellerProducts.take(5)];
+
+      for (final row in categoryProducts) {
+        final id = _normaliseWishlistId(
+          row['productId'] ?? row['product_id'] ?? row['id'],
+        );
+        if (recommendations.length >= 5) break;
+        if (selectedIds.add(id)) recommendations.add(row);
+      }
+
+      if (recommendations.length < 5) {
+        final fallbackProducts =
+            available
+                .where((row) => !sameSeller(row) && !sameCategory(row))
+                .toList()
+              ..shuffle(Random());
+        for (final row in fallbackProducts) {
+          final id = _normaliseWishlistId(
+            row['productId'] ?? row['product_id'] ?? row['id'],
+          );
+          if (recommendations.length >= 5) break;
+          if (selectedIds.add(id)) recommendations.add(row);
+        }
+      }
+
+      if (mounted) {
+        setState(() => _similarProducts = recommendations.take(5).toList());
+      }
+    } catch (_) {
+      // Recommendations are optional; keep the product detail page usable.
+      if (mounted) setState(() => _similarProducts = <Map<String, dynamic>>[]);
+    } finally {
+      if (mounted) setState(() => _similarProductsLoading = false);
+    }
+  }
+
+  String _normaliseSellerType(String value) {
+    final type = value.trim().toLowerCase().replaceAll('_', '-');
+    if (type == 'artist' || type == 'remaker' || type == 're-maker') {
+      return 'artist';
+    }
+    return type.isEmpty ? 'user' : type;
+  }
+
+  List<dynamic> _productRowsFromResponse(dynamic response) {
+    if (response is List) return response;
+    final root = _asMap(response);
+    final candidates = <dynamic>[
+      root['products'],
+      root['items'],
+      root['rows'],
+      root['data'],
+    ];
+    for (final candidate in candidates) {
+      if (candidate is List) return candidate;
+    }
+    final data = _asMap(root['data']);
+    for (final key in const ['products', 'items', 'rows', 'data']) {
+      final candidate = data[key];
+      if (candidate is List) return candidate;
+    }
+    return const <dynamic>[];
+  }
 
   /// Persistent bottom purchase bar for quantity selection, cart addition, and instant checkout.
   Widget _buildBottomBar() {

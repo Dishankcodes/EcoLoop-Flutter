@@ -18,6 +18,7 @@ import '../portfolio/portfolio.dart';
 import '../reviews/review_history.dart';
 import 'aboutyou.dart';
 import 'address_list.dart';
+import 'artist_earning.dart';
 import 'edit_profile.dart';
 import 'followers.dart';
 import 'following_list.dart';
@@ -773,7 +774,10 @@ class _ProfileState extends State<Profile> {
           title: 'Earnings',
           subtitle:
               '₹${_double(_analytics['revenue']).toStringAsFixed(2)} recorded revenue',
-          onTap: () => _showComingSoon(context, 'Earnings'),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ArtistEarnings()),
+          ),
         ),
         const _ProfileDivider(),
         _ProfileTile(

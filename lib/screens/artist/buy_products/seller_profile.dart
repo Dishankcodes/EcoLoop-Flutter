@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
@@ -18,6 +20,10 @@ class SellerProfile extends StatefulWidget {
 class _SellerProfileState extends State<SellerProfile> {
   List<Map<String, dynamic>> _listings = <Map<String, dynamic>>[];
   bool _loadingListings = true;
+  bool _loadingProfile = true;
+  String? _profileError;
+  Map<String, dynamic> _profile = <String, dynamic>{};
+  Map<String, dynamic> _stats = <String, dynamic>{};
   bool _showAllListings = false;
   String? _listingError;
   Map<String, dynamic> _contactDetails = <String, dynamic>{};
@@ -49,52 +55,80 @@ class _SellerProfileState extends State<SellerProfile> {
   void initState() {
     super.initState();
 
-    _loadSellerListings();
+    _loadSellerProfile();
   }
 
-  // Load this seller's published listings from the real API.
-  Future<void> _loadSellerListings() async {
-    setState(() {
-      if (_listings.isEmpty) _loadingListings = true;
-      _listingError = null;
-    });
+  // One lightweight endpoint returns the profile, aggregate stats and only this seller's listings.
+  Future<void> _loadSellerProfile() async {
+    if (mounted) {
+      setState(() {
+        _loadingProfile = true;
+        _loadingListings = true;
+        _profileError = null;
+        _listingError = null;
+      });
+    }
     try {
-      final raw = await EcoLoopApi.instance.get('/products');
-      final sellerId = _sellerId;
-      final rows = (raw is List ? raw : <dynamic>[])
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .where((p) {
-            final id = (p['sellerId'] ?? p['userId'] ?? '').toString();
-            final type = (p['sellerType'] ?? 'user').toString().toLowerCase();
-            final status = (p['status'] ?? '').toString().toLowerCase();
-            return id == sellerId &&
-                type == sellerType &&
-                status == 'published' &&
-                (int.tryParse(
-                          '${p['availableQuantity'] ?? p['quantity'] ?? 0}',
-                        ) ??
-                        0) >
-                    0;
-          })
-          .toList();
-      rows.sort(
-        (a, b) => (b['createdAt'] ?? '').toString().compareTo(
-          (a['createdAt'] ?? '').toString(),
-        ),
+      final raw = await EcoLoopApi.instance.get(
+        '/public/seller/${isArtist ? 'artist' : 'user'}/$_sellerId/profile',
       );
+      if (raw is! Map)
+        throw const FormatException('Invalid seller profile response.');
+      final data = Map<String, dynamic>.from(raw);
+      final seller = data['seller'];
+      final stats = data['stats'];
+      final products = data['products'];
       if (!mounted) return;
       setState(() {
-        _listings = rows;
+        _profile = seller is Map
+            ? Map<String, dynamic>.from(seller)
+            : <String, dynamic>{};
+        _stats = stats is Map
+            ? Map<String, dynamic>.from(stats)
+            : <String, dynamic>{};
+        _listings = (products is List ? products : <dynamic>[])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        _loadingProfile = false;
         _loadingListings = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
+        _profileError = e.toString();
         _listingError = e.toString();
+        _loadingProfile = false;
         _loadingListings = false;
       });
     }
+  }
+
+  String _text(dynamic value, {String fallback = ''}) {
+    final result = (value ?? '').toString().trim();
+    return result.isEmpty ? fallback : result;
+  }
+
+  String _dateLabel(dynamic value) {
+    final raw = _text(value);
+    if (raw.isEmpty) return 'Member date unavailable';
+    final date = DateTime.tryParse(raw);
+    if (date == null) return raw;
+    const months = <String>[
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${months[date.month - 1]} ${date.year}';
   }
 
   String get _sellerId =>
@@ -131,21 +165,21 @@ class _SellerProfileState extends State<SellerProfile> {
 
   @override
   Widget build(BuildContext context) {
-    final sellerName =
-        widget.seller['name']?.toString() ??
-        widget.seller['userName']?.toString() ??
-        widget.seller['username']?.toString() ??
-        'Seller';
-
+    final sellerData = <String, dynamic>{...widget.seller, ..._profile};
+    final sellerName = _text(
+      sellerData['name'] ?? sellerData['userName'] ?? sellerData['username'],
+      fallback: '',
+    );
     final sellerImage = _getSellerImage();
-    final location = widget.seller['location']?.toString() ?? _buildLocation();
-    final rating = widget.seller['rating']?.toString() ?? '4.8';
-    final reviews = widget.seller['reviews']?.toString() ?? '42';
-    final listings = _listings.length.toString();
-    final sold = widget.seller['sold']?.toString() ?? '42';
-    final positive = widget.seller['positive']?.toString() ?? '98%';
-    final memberSince =
-        widget.seller['memberSince']?.toString() ?? 'January 2025';
+    final location = _text(sellerData['location'], fallback: _buildLocation());
+    final rating = _number(_stats['rating']).toStringAsFixed(1);
+    final reviews = _number(_stats['reviewCount']).toInt().toString();
+    final listings = _number(_stats['listings']).toInt().toString();
+    final sold = _number(_stats['sold']).toInt().toString();
+    final positive = '${_number(_stats['positivePercent']).toInt()}%';
+    final memberSince = _dateLabel(
+      sellerData['memberSince'] ?? sellerData['createdAt'],
+    );
 
     return Scaffold(
       backgroundColor: ArtistColors.background,
@@ -197,6 +231,14 @@ class _SellerProfileState extends State<SellerProfile> {
               const SizedBox(height: 25),
               _buildListingsHeader(),
               const SizedBox(height: 12),
+              if (_profileError != null && _listings.isEmpty)
+                Center(
+                  child: TextButton.icon(
+                    onPressed: _loadSellerProfile,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry loading seller profile'),
+                  ),
+                ),
               _buildListingsGrid(),
             ],
           ),
@@ -208,6 +250,8 @@ class _SellerProfileState extends State<SellerProfile> {
   // SELLER IMAGE
   String? _getSellerImage() {
     final image =
+        _profile['profilePhotoUrl'] ??
+        _profile['image'] ??
         widget.seller['image'] ??
         widget.seller['profilePhotoUrl'] ??
         widget.seller['profileImage'] ??
@@ -236,7 +280,12 @@ class _SellerProfileState extends State<SellerProfile> {
     if (state.isNotEmpty) {
       return state;
     }
-    return 'Ahmedabad, Gujarat';
+    return 'Location unavailable';
+  }
+
+  double _number(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   // SELLER HEADER
@@ -520,9 +569,9 @@ class _SellerProfileState extends State<SellerProfile> {
     required String rating,
     required String reviews,
   }) {
-    final ratingValue = double.tryParse(rating) ?? 4.8;
+    final ratingValue = double.tryParse(rating) ?? 0;
 
-    final reviewCount = int.tryParse(reviews) ?? 42;
+    final reviewCount = int.tryParse(reviews) ?? 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -699,7 +748,7 @@ class _SellerProfileState extends State<SellerProfile> {
             style: ArtistTextStyles.bodyMedium,
           ),
           TextButton.icon(
-            onPressed: _loadSellerListings,
+            onPressed: _loadSellerProfile,
             icon: const Icon(Icons.refresh),
             label: const Text('Try Again'),
           ),
@@ -720,9 +769,23 @@ class _SellerProfileState extends State<SellerProfile> {
       ),
       itemBuilder: (context, index) {
         final product = visible[index];
-        final images = product['imageUrls'] is List
-            ? (product['imageUrls'] as List)
-            : <dynamic>[];
+        final rawImages =
+            product['imageUrls'] ??
+            product['images'] ??
+            product['imageUrlsJson'];
+        List<dynamic> images = rawImages is List ? rawImages : <dynamic>[];
+        if (images.isEmpty &&
+            rawImages is String &&
+            rawImages.trim().isNotEmpty) {
+          try {
+            final decoded = jsonDecode(rawImages);
+            if (decoded is List) images = decoded;
+            if (decoded is String && decoded.trim().isNotEmpty)
+              images = <dynamic>[decoded];
+          } catch (_) {
+            if (rawImages.startsWith('http')) images = <dynamic>[rawImages];
+          }
+        }
         final mapped = <String, dynamic>{
           ...product,
           'id': product['productId'] ?? product['id'],
@@ -960,23 +1023,36 @@ class _SellerProductCard extends StatelessWidget {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: Image.network(
-                      product['image']?.toString() ?? '',
-                      fit: BoxFit.cover,
-                      cacheWidth: 480,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: ArtistColors.light,
-                          child: const Center(
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 32,
-                              color: ArtistColors.secondary,
+                    child:
+                        (product['image']?.toString().trim().isNotEmpty ??
+                            false)
+                        ? Image.network(
+                            product['image'].toString(),
+                            fit: BoxFit.cover,
+                            cacheWidth: 480,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: ArtistColors.light,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.image_not_supported_outlined,
+                                    size: 32,
+                                    color: ArtistColors.secondary,
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : Container(
+                            color: ArtistColors.light,
+                            child: const Center(
+                              child: Icon(
+                                Icons.image_not_supported_outlined,
+                                size: 32,
+                                color: ArtistColors.secondary,
+                              ),
                             ),
                           ),
-                        );
-                      },
-                    ),
                   ),
 
                   Positioned(
