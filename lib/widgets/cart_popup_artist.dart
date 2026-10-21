@@ -16,6 +16,9 @@ class CartPopup {
   static bool _navigationInProgress = false;
   static final Set<String> _addingProductIds = <String>{};
   static final List<Map<String, dynamic>> _cartItems = [];
+
+  // Invalidates cart refreshes that started before a newer cart mutation.
+  static int _cartMutationVersion = 0;
   static final EcoLoopApi _api = EcoLoopApi.instance;
 
   static List<Map<String, dynamic>> get items {
@@ -47,10 +50,9 @@ class CartPopup {
     return total;
   }
 
-  /// Persists the add-to-cart operation first. The server validates login,
-  /// stock, publication status, and prevents adding the seller's own listing.
-  /// Saves the item, displays the popup immediately after the save succeeds,
-  /// and refreshes the complete cart in the background.
+  /// Optimistically displays the item, then persists it to the server.
+  /// The backend still validates login, stock, publication status and ownership;
+  /// failed writes restore the previous local cart state.
   static Future<void> addItem(
     BuildContext context, {
     required Map<String, dynamic> item,
@@ -69,20 +71,42 @@ class CartPopup {
 
     if (_addingProductIds.contains(productId)) return;
     _addingProductIds.add(productId);
+    _cartMutationVersion++;
+
+    final previousIndex = _cartItems.indexWhere(
+      (cartItem) => cartItem['productId'].toString() == productId,
+    );
+    final previousItem = previousIndex >= 0
+        ? Map<String, dynamic>.from(_cartItems[previousIndex])
+        : null;
+
+    // Render the confirmation immediately; never wait for the network round trip.
+    _addWithoutShowing(normalized);
+    _showOrUpdate(context);
 
     try {
       await _api.post('/cart', <String, dynamic>{
         'productId': numericId,
         'quantity': _toInt(normalized['quantity'], fallback: 1),
       });
-
-      // Update the popup immediately without waiting for GET /cart.
-      _addWithoutShowing(normalized);
-      _showOrUpdate(context);
-
-      // Refresh the authoritative cart in the background.
+      // Refresh the authoritative cart without blocking the visible UI.
       unawaited(_refreshCartInBackground());
     } catch (error) {
+      // Roll back only this optimistic change if the backend rejects it.
+      final currentIndex = _cartItems.indexWhere(
+        (cartItem) => cartItem['productId'].toString() == productId,
+      );
+      if (previousItem == null) {
+        if (currentIndex >= 0) _cartItems.removeAt(currentIndex);
+      } else if (currentIndex >= 0) {
+        _cartItems[currentIndex] = previousItem;
+      } else {
+        _cartItems.insert(
+          previousIndex.clamp(0, _cartItems.length),
+          previousItem,
+        );
+      }
+      _currentEntry?.markNeedsBuild();
       _showMessage(context, _friendlyError(error));
     } finally {
       _addingProductIds.remove(productId);
@@ -91,8 +115,11 @@ class CartPopup {
 
   /// Refreshes saved cart data without delaying the popup.
   static Future<void> _refreshCartInBackground() async {
+    final refreshVersion = _cartMutationVersion;
     try {
       final response = await _api.get('/cart');
+      // Do not let an older GET overwrite items added/removed while it was running.
+      if (refreshVersion != _cartMutationVersion) return;
       final rows = _extractRows(response);
 
       final refreshedItems = rows
@@ -342,6 +369,7 @@ class CartPopup {
   }
 
   static void replaceItems(List<Map<String, dynamic>> items) {
+    _cartMutationVersion++;
     _cartItems
       ..clear()
       ..addAll(items.map(_normalizeItem));
@@ -353,6 +381,7 @@ class CartPopup {
   }
 
   static void clear() {
+    _cartMutationVersion++;
     _cartItems.clear();
     dismiss();
 
@@ -361,6 +390,7 @@ class CartPopup {
   }
 
   static void removeItem(String productId) {
+    _cartMutationVersion++;
     _cartItems.removeWhere(
       (item) => item['productId'].toString() == productId.toString(),
     );
@@ -373,6 +403,7 @@ class CartPopup {
   }
 
   static void updateQuantity(String productId, int quantity) {
+    _cartMutationVersion++;
     final index = _cartItems.indexWhere(
       (item) => item['productId'].toString() == productId.toString(),
     );
@@ -960,12 +991,10 @@ class _CartPopupOverlayState extends State<_CartPopupOverlay>
       buffer.write(chars[i]);
 
       final position = chars.length - i;
-
       if (position > 1 && position % 3 == 1) {
         buffer.write(',');
       }
     }
-
     return buffer.toString();
   }
 }

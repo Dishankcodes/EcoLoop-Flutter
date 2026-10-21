@@ -299,10 +299,11 @@ class _PaymentState extends State<Payment> {
         ),
       );
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         _showMessage(
           'Order could not be completed: ${error.toString().replaceFirst('Exception: ', '')}',
         );
+      }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -564,7 +565,7 @@ class _PaymentState extends State<Payment> {
 
         borderRadius: BorderRadius.circular(17),
 
-        border: Border.all(color: AppColors.accent.withOpacity(0.6)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.6)),
       ),
 
       child: Row(

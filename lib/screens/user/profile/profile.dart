@@ -38,6 +38,7 @@ class Profile extends StatefulWidget {
 class _ProfileState extends State<Profile> {
   Map<String, dynamic>? _account;
   bool _loadingProfile = true;
+  bool _loggingOut = false;
   String? _profileError;
   int _orderCount = 0;
   int _listingCount = 0;
@@ -120,10 +121,10 @@ class _ProfileState extends State<Profile> {
         _listingCount = listings
             .where(
               (p) => ![
-                'deleted',
-                'removed',
-              ].contains((p['status'] ?? '').toString().toLowerCase()),
-            )
+            'deleted',
+            'removed',
+          ].contains((p['status'] ?? '').toString().toLowerCase()),
+        )
             .length;
         _wishlistCount = wishlist.length;
       });
@@ -154,7 +155,7 @@ class _ProfileState extends State<Profile> {
           r'(?:drive\.google\.com|docs\.google\.com)/(?:file/d/|open\?id=|uc\?[^#]*?id=)([A-Za-z0-9_-]+)',
           caseSensitive: false,
         ).firstMatch(url) ??
-        RegExp(r'[?&]id=([A-Za-z0-9_-]+)').firstMatch(url);
+            RegExp(r'[?&]id=([A-Za-z0-9_-]+)').firstMatch(url);
     if (match != null &&
         (url.contains('drive.google.com') || url.contains('docs.google.com'))) {
       return 'https://drive.google.com/uc?export=view&id=${match.group(1)}';
@@ -249,30 +250,30 @@ class _ProfileState extends State<Profile> {
                 clipBehavior: Clip.antiAlias,
                 child: _loadingProfile
                     ? const Center(
-                        child: SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
                     : (_photoUrl.isNotEmpty
-                          ? Image.network(
-                              _displayableProfilePhotoUrl(_photoUrl),
-                              key: ValueKey<String>(
-                                _displayableProfilePhotoUrl(_photoUrl),
-                              ),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.person_rounded,
-                                size: 46,
-                                color: AppColors.primary,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.person_rounded,
-                              size: 46,
-                              color: AppColors.primary,
-                            )),
+                    ? Image.network(
+                  _displayableProfilePhotoUrl(_photoUrl),
+                  key: ValueKey<String>(
+                    _displayableProfilePhotoUrl(_photoUrl),
+                  ),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.person_rounded,
+                    size: 46,
+                    color: AppColors.primary,
+                  ),
+                )
+                    : const Icon(
+                  Icons.person_rounded,
+                  size: 46,
+                  color: AppColors.primary,
+                )),
               ),
             ],
           ),
@@ -811,6 +812,42 @@ class _ProfileState extends State<Profile> {
 
   // LOGOUT DIALOG
 
+  Future<void> _logoutAndClearSession() async {
+    if (_loggingOut) return;
+    _loggingOut = true;
+
+    // Revoke the server-side session while the active token is still available.
+    // Always clear local credentials even when the request cannot reach the API.
+    try {
+      await EcoLoopApi.instance.post('/auth/logout', {});
+    } catch (_) {
+      // Local logout must still complete if the network is unavailable.
+    } finally {
+      for (final key in const <String>[
+        'isLoggedIn',
+        'authToken',
+        'artistToken',
+        'artistTokenType',
+        'artistTokenExpiresAt',
+        'artistRole',
+        'artistEmail',
+        'artistName',
+        'artistPhone',
+        'userRole',
+        'userEmail',
+        'userName',
+        'profilePhotoUrl',
+      ]) {
+        try {
+          await Prefs.remove(key);
+        } catch (_) {
+          // Continue clearing the remaining credentials if one key fails.
+        }
+      }
+      EcoLoopApi.instance.invalidateCache();
+    }
+  }
+
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -840,11 +877,7 @@ class _ProfileState extends State<Profile> {
               onPressed: () async {
                 Navigator.pop(dialogContext);
 
-                await Prefs.setBool('isLoggedIn', false);
-                await Prefs.setString('authToken', '');
-                await Prefs.setString('userRole', '');
-                await Prefs.setString('userEmail', '');
-                await Prefs.setString('userName', '');
+                await _logoutAndClearSession();
                 if (!context.mounted) {
                   return;
                 }
@@ -852,7 +885,7 @@ class _ProfileState extends State<Profile> {
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-                  (route) => false,
+                      (route) => false,
                 );
               },
               style: ElevatedButton.styleFrom(

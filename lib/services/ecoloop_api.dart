@@ -92,7 +92,7 @@ class EcoLoopApi {
     };
     final requestKey = ttl != null
         ? 'cached:$cacheKey'
-        : 'fresh:$path?${jsonEncode(normalizedQuery)}#${_token}';
+        : 'fresh:$path?${jsonEncode(normalizedQuery)}#$_token';
 
     final existing = _inFlightGets[requestKey];
     if (existing != null) return _copyFutureValue(existing);
@@ -118,6 +118,24 @@ class EcoLoopApi {
 
     _inFlightGets[requestKey] = request;
     return _copyFutureValue(request);
+  }
+
+  /// Sends a message to the authenticated EcoLoop AI support endpoint.
+  /// This is intentionally not routed through [post], because an AI chat
+  /// request does not change marketplace data and should not clear GET caches.
+  Future<Map<String, dynamic>> chatWithAi({
+    required String message,
+    List<Map<String, String>> history = const <Map<String, String>>[],
+  }) async {
+    final result = await _send(
+      'POST',
+      '/ai/chat',
+      body: <String, dynamic>{'message': message, 'history': history},
+    );
+    if (result is Map) return Map<String, dynamic>.from(result);
+    throw const EcoLoopApiException(
+      'The AI response format was not recognised.',
+    );
   }
 
   Future<dynamic> post(String path, Map<String, dynamic> body) async {
@@ -287,60 +305,141 @@ class EcoLoopApi {
     Map<String, dynamic> body = const {},
     Map<String, dynamic> query = const {},
   }) async {
-    final payload = <String, dynamic>{...body};
+    final normalizedMethod = method.trim().toUpperCase();
+    const supportedMethods = <String>{'GET', 'POST', 'PUT', 'DELETE'};
 
-    if (method != 'GET') {
-      if (_token.isNotEmpty) {
-        payload['token'] = _token;
-      }
-
-      payload['_method'] = method;
+    if (!supportedMethods.contains(normalizedMethod)) {
+      throw EcoLoopApiException('Unsupported API method: $normalizedMethod');
     }
 
-    final response = await ApiManager().dio.request<dynamic>(
-      baseUrl,
-      queryParameters: {
-        'path': path,
-        ...query,
-        if ((method == 'GET' || method == 'DELETE') && _token.isNotEmpty)
-          'token': _token,
+    final normalizedPath = path.trim();
+    if (normalizedPath.isEmpty || !normalizedPath.startsWith('/')) {
+      throw const EcoLoopApiException(
+        'Invalid API path. Paths must start with "/".',
+      );
+    }
 
-        // Apps Script receives DELETE via doPost; pass method override in query
-        // because DELETE requests intentionally have no request body here.
-        if (method == 'DELETE') '_method': 'DELETE',
-      },
-      data: method == 'GET' || method == 'DELETE' ? null : payload,
-      options: Options(method: method == 'GET' ? 'GET' : 'POST'),
-    );
+    final isGet = normalizedMethod == 'GET';
+    final payload = <String, dynamic>{...body};
+
+    // Google Apps Script web apps expose doGet/doPost rather than general
+    // HTTP PUT/DELETE handlers. Send every write through doPost and tell the
+    // router the intended method in the JSON body. processRequest_ reads
+    // body._method before the query-string override, so DELETE routes work
+    // consistently without relying on a DELETE request body.
+    if (!isGet) {
+      final token = _token;
+      if (token.isNotEmpty) payload['token'] = token;
+      payload['_method'] = normalizedMethod;
+    }
+
+    final queryParameters = <String, dynamic>{
+      ...query,
+      // Keep the route and authentication values authoritative if a caller
+      // accidentally supplies keys with the same names in `query`.
+      'path': normalizedPath,
+      if (isGet && _token.isNotEmpty) 'token': _token,
+    };
+
+    late final Response<dynamic> response;
+    try {
+      response = await ApiManager().dio.request<dynamic>(
+        baseUrl,
+        queryParameters: queryParameters,
+        data: isGet ? null : payload,
+        options: Options(
+          // Apps Script supports doGet and doPost. PUT/DELETE are tunneled
+          // through POST and dispatched by the _method override above.
+          method: isGet ? 'GET' : 'POST',
+          contentType: Headers.jsonContentType,
+          responseType: ResponseType.json,
+        ),
+      );
+    } on DioException catch (error) {
+      throw EcoLoopApiException(_dioErrorMessage(error));
+    }
 
     dynamic raw = response.data;
 
     if (raw is String) {
       try {
         raw = jsonDecode(raw);
-      } catch (_) {}
+      } on FormatException {
+        throw const EcoLoopApiException(
+          'The backend returned a non-JSON response. Check the Apps Script deployment URL, permissions, and redirect handling.',
+        );
+      }
     }
 
     if (raw is! Map) {
       throw const EcoLoopApiException(
-        'The backend did not return JSON. Check the Apps Script deployment URL and access permissions.',
+        'The backend returned an unexpected response. Check the Apps Script deployment URL and access permissions.',
       );
     }
 
+    final successValue = raw['success'];
     final ok =
-        raw['success'] == true ||
-        raw['success'].toString().toLowerCase() == 'true';
+        successValue == true ||
+        successValue?.toString().toLowerCase() == 'true';
 
     if (!ok) {
       final err = raw['error'];
       final message = err is Map ? err['message']?.toString() : err?.toString();
 
       throw EcoLoopApiException(
-        (message == null || message.isEmpty) ? 'Request failed.' : message,
+        (message == null || message.trim().isEmpty)
+            ? 'The request failed. Please try again.'
+            : message.trim(),
       );
     }
 
     return raw['data'];
+  }
+
+  String _dioErrorMessage(DioException error) {
+    final statusCode = error.response?.statusCode;
+    final responseData = error.response?.data;
+
+    if (responseData is Map) {
+      final err = responseData['error'];
+      final message = err is Map ? err['message']?.toString() : err?.toString();
+
+      if (message != null && message.trim().isNotEmpty) {
+        return message.trim();
+      }
+    }
+
+    switch (error.type) {
+      case DioExceptionType.connectionTimeout:
+        return 'Connection timed out. Check your internet connection and try again.';
+      case DioExceptionType.sendTimeout:
+        return 'The request took too long to send. Please try again.';
+      case DioExceptionType.receiveTimeout:
+        return 'The server took too long to respond. Please try again.';
+      case DioExceptionType.transformTimeout:
+        return 'The response took too long to process. Please try again.';
+      case DioExceptionType.connectionError:
+        return 'Unable to connect to EcoLoop. Check your internet connection.';
+      case DioExceptionType.cancel:
+        return 'The request was cancelled.';
+      case DioExceptionType.badCertificate:
+        return 'A secure connection to EcoLoop could not be established.';
+      case DioExceptionType.badResponse:
+        if (statusCode == 401 || statusCode == 403) {
+          return 'Your session may have expired. Please log in again.';
+        }
+        if (statusCode == 404) {
+          return 'The requested API endpoint was not found.';
+        }
+        if (statusCode != null && statusCode >= 500) {
+          return 'EcoLoop server error. Please try again later.';
+        }
+        return statusCode == null
+            ? 'The server returned an invalid response.'
+            : 'Request failed (HTTP $statusCode).';
+      case DioExceptionType.unknown:
+        return 'A network error occurred. Please try again.';
+    }
   }
 
   static int categoryId(String? label) {

@@ -11,22 +11,16 @@ class CartPopup {
   CartPopup._();
 
   static OverlayEntry? _currentEntry;
-
   static NavigatorState? _navigatorState;
-
   static bool _navigationInProgress = false;
-
   static final List<Map<String, dynamic>> _cartItems = [];
-
   static List<Map<String, dynamic>> get items {
     return _cartItems.map((item) => Map<String, dynamic>.from(item)).toList();
   }
 
   static bool get isEmpty => _cartItems.isEmpty;
-
   static int get totalItems {
     var total = 0;
-
     for (final item in _cartItems) {
       total += _toInt(item['quantity'], fallback: 1);
     }
@@ -53,7 +47,6 @@ class CartPopup {
   }) {
     final normalized = _normalizeItem(item);
     final productId = normalized['productId'].toString();
-
     final existingIndex = _cartItems.indexWhere(
       (cartItem) => cartItem['productId'].toString() == productId,
     );
@@ -62,9 +55,7 @@ class CartPopup {
       _cartItems.add(normalized);
     } else {
       final existing = _cartItems[existingIndex];
-
       final currentQuantity = _toInt(existing['quantity'], fallback: 1);
-
       final incomingQuantity = _toInt(normalized['quantity'], fallback: 1);
 
       final availableQuantity = _toInt(

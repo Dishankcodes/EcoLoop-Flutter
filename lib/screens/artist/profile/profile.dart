@@ -18,13 +18,13 @@ import '../portfolio/portfolio.dart';
 import '../reviews/review_history.dart';
 import 'aboutyou.dart';
 import 'address_list.dart';
+import 'artist_custom_services.dart';
 import 'artist_earning.dart';
 import 'edit_profile.dart';
 import 'followers.dart';
 import 'following_list.dart';
 import 'notification.dart';
 import 'settings.dart';
-import 'artist_custom_services.dart';
 
 /// Artist profile backed by the live Apps Script / Google Sheets API.
 /// Profile details come from GET /profile and business numbers from
@@ -41,6 +41,7 @@ class _ProfileState extends State<Profile> {
 
   bool _loading = true;
   bool _refreshing = false;
+  bool _loggingOut = false;
   String? _error;
   Map<String, dynamic> _profile = {};
   Map<String, dynamic> _analytics = {};
@@ -929,6 +930,42 @@ class _ProfileState extends State<Profile> {
       );
   }
 
+  Future<void> _logoutAndClearSession() async {
+    if (_loggingOut) return;
+    _loggingOut = true;
+
+    // Revoke the active server session before removing the token needed by API.
+    // Local credentials are still cleared if the network/server is unavailable.
+    try {
+      await _api.post('/auth/logout', {});
+    } catch (_) {
+      // Do not keep a local session alive just because remote logout failed.
+    } finally {
+      for (final key in const <String>[
+        'isLoggedIn',
+        'authToken',
+        'artistToken',
+        'artistTokenType',
+        'artistTokenExpiresAt',
+        'artistRole',
+        'artistEmail',
+        'artistName',
+        'artistPhone',
+        'userRole',
+        'userEmail',
+        'userName',
+        'profilePhotoUrl',
+      ]) {
+        try {
+          await Prefs.remove(key);
+        } catch (_) {
+          // Continue clearing the remaining credentials if one key fails.
+        }
+      }
+      _api.invalidateCache();
+    }
+  }
+
   void _showLogoutDialog(BuildContext context) {
     showDialog<void>(
       context: context,
@@ -957,18 +994,7 @@ class _ProfileState extends State<Profile> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
-              try {
-                await _api.post('/auth/logout', {});
-              } catch (_) {
-                // Clear local session even if the network is unavailable.
-              }
-              await Prefs.setBool('isLoggedIn', false);
-              await Prefs.setString('authToken', '');
-              await Prefs.setString('artistToken', '');
-              await Prefs.setString('userRole', '');
-              await Prefs.setString('userEmail', '');
-              await Prefs.setString('userName', '');
-              await Prefs.setString('profilePhotoUrl', '');
+              await _logoutAndClearSession();
               if (!context.mounted) return;
               Navigator.pushAndRemoveUntil(
                 context,

@@ -36,6 +36,7 @@ class _ProductDetailsState extends State<ProductDetails> {
   late Map<String, dynamic> _product;
   bool _detailsLoading = false;
   String? _detailsError;
+  int _detailsLoadGeneration = 0;
 
   int _currentImage = 0;
   int _quantity = 1;
@@ -71,6 +72,7 @@ class _ProductDetailsState extends State<ProductDetails> {
   /// Refreshes the selected listing from the backend so artist/user edits and
   /// availability changes are reflected in the details page.
   Future<void> _loadProductDetails() async {
+    final generation = ++_detailsLoadGeneration;
     final id =
         (_product['productId'] ??
                 _product['product_id'] ??
@@ -90,7 +92,9 @@ class _ProductDetailsState extends State<ProductDetails> {
       final root = _asMap(response);
       final nested = _asMap(root['data']);
       final fetched = nested.isNotEmpty ? nested : root;
-      if (fetched.isNotEmpty && mounted) {
+      if (fetched.isNotEmpty &&
+          mounted &&
+          generation == _detailsLoadGeneration) {
         setState(() {
           _product = <String, dynamic>{..._product, ...fetched};
           final stock = availableQuantity;
@@ -111,14 +115,19 @@ class _ProductDetailsState extends State<ProductDetails> {
       }
     } catch (e) {
       // Keep the marketplace-provided product visible if refresh is unavailable.
-      if (mounted) setState(() => _detailsError = e.toString());
+      if (mounted && generation == _detailsLoadGeneration) {
+        setState(() => _detailsError = e.toString());
+      }
     } finally {
-      if (mounted) setState(() => _detailsLoading = false);
+      if (mounted && generation == _detailsLoadGeneration) {
+        setState(() => _detailsLoading = false);
+      }
     }
   }
 
   @override
   void dispose() {
+    _detailsLoadGeneration++;
     _imageController.dispose();
     super.dispose();
   }

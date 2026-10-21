@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
+import '../ai_chat_screen.dart';
 
 class ArtistHelpSupportScreen extends StatefulWidget {
   const ArtistHelpSupportScreen({super.key});
@@ -202,6 +203,17 @@ class _ArtistHelpSupportScreenState extends State<ArtistHelpSupportScreen> {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
         children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(color: ArtistColors.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: ArtistColors.border)),
+            child: ListTile(
+              leading: CircleAvatar(backgroundColor: ArtistColors.light, child: Icon(Icons.auto_awesome_rounded, color: ArtistColors.primary)),
+              title: Text('Chat with EcoLoop AI', style: ArtistTextStyles.title.copyWith(fontSize: 14)),
+              subtitle: Text('Get quick answers for your ReMaker account', style: ArtistTextStyles.body.copyWith(fontSize: 11, color: ArtistColors.textSecondary)),
+              trailing: Icon(Icons.chevron_right_rounded, color: ArtistColors.primary),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiChatScreen())),
+            ),
+          ),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),

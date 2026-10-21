@@ -10,7 +10,7 @@ class FAQ extends StatefulWidget {
 }
 
 class _FAQState extends State<FAQ> {
-  final List<Map<String, String>> faqs = const [
+  static const List<Map<String, String>> _faqs = [
     {
       'question': 'What is EcoLoop?',
       'answer':
@@ -22,8 +22,8 @@ class _FAQState extends State<FAQ> {
       'question': 'How do I sell an item?',
       'answer':
           'Open Add Product, upload item photos, enter accurate details, '
-          'choose the available category and condition, set the price and '
-          'quantity, and publish the listing.',
+          'choose an available category and condition, set the price and '
+          'quantity, and publish your listing.',
     },
     {
       'question': 'Can I donate an item?',
@@ -35,23 +35,23 @@ class _FAQState extends State<FAQ> {
     {
       'question': 'Is pickup available for donated items?',
       'answer':
-          'Pickup availability may depend on location, item eligibility '
+          'Pickup availability may depend on your location, item eligibility '
           'and the options offered for your donation. A pickup is not '
-          'guaranteed until it is confirmed in the app or by EcoLoop.',
+          'guaranteed until confirmed in the app or by EcoLoop.',
     },
     {
       'question': 'How do I buy an item?',
       'answer':
           'Open Marketplace, select a product, review its details and '
-          'seller information, then continue through the available '
+          'seller information, and continue through the available '
           'checkout flow.',
     },
     {
       'question': 'What payment methods are available?',
       'answer':
-          'Current arrangements are Cash on Delivery (COD) and/or offline '
-          'payment only. Online payment gateway processing is not active. '
-          'Follow the payment instructions shown in your order.',
+          'The current arrangement is Cash on Delivery (COD) and/or offline '
+          'payment. Online payment gateway processing should not be assumed '
+          'to be active. Follow the payment instructions shown for your order.',
     },
     {
       'question': 'Can I edit my listing?',
@@ -63,30 +63,30 @@ class _FAQState extends State<FAQ> {
     {
       'question': 'Can I message a seller through EcoLoop?',
       'answer':
-          'Do not assume in-app messaging is available. The previous FAQ '
-          'identified messaging as not yet connected to the backend. '
-          'Use only contact options actually provided by the app.',
+          'In-app messaging is not confirmed as available. Use only the '
+          'contact options actually provided by the app. For general '
+          'assistance, email ecoloopp2026@gmail.com.',
     },
     {
       'question': 'What happens after I place an order?',
       'answer':
-          'Your order should appear under Orders and Buying Orders where '
-          'the current workflow supports it. Open the order to see the '
-          'details and status information currently available.',
+          'Your order should appear under Orders or Buying Orders where '
+          'supported. Open the order to view its details and the status '
+          'information currently available.',
     },
     {
       'question': 'Can I cancel an order?',
       'answer':
-          'Cancellation availability may depend on order status and the '
+          'Cancellation availability may depend on the order status and '
           'available actions. The complete cancellation, return and refund '
-          'policy is Pending confirmation. Contact support for assistance.',
+          'policy is pending confirmation. Contact support for assistance.',
     },
     {
       'question': 'Can I track an order?',
       'answer':
           'Open your order and check the available tracking or status '
-          'information. The detail shown depends on the information '
-          'recorded by the current order workflow.',
+          'information. The details shown depend on information recorded '
+          'by the current order workflow.',
     },
     {
       'question': 'When can I write a review?',
@@ -105,33 +105,31 @@ class _FAQState extends State<FAQ> {
     {
       'question': 'What are ReMakers?',
       'answer':
-          'ReMakers are creators who can showcase their work and portfolios '
-          'and publish products through the platform. Custom-service '
-          'features may also allow them to respond to project requests.',
+          'ReMakers are creators who showcase their work and portfolios '
+          'and publish products through EcoLoop. Where custom-service '
+          'features are available, they may also respond to project requests.',
     },
     {
       'question': 'How do custom services work?',
       'answer':
-          'Where the custom-service feature is available, you can submit '
-          'a project brief, budget and reference material and review '
-          'proposals. Agree on scope, price, timeline, revisions and '
-          'delivery before work starts.',
+          'Where available, submit a project brief, budget and reference '
+          'material, then review proposals. Agree on the scope, price, '
+          'timeline, revisions and delivery before work starts.',
     },
     {
       'question': 'Can I delete my account?',
       'answer':
-          'Contact ecoloopp2026@gmail.com to request account assistance. '
-          'Current account closure may deactivate the account without '
-          'erasing all related orders, reviews or stored media. Complete '
-          'deletion and retention timelines are Pending.',
+          'Email ecoloopp2026@gmail.com to request account assistance. '
+          'Account closure may not immediately erase related orders, '
+          'reviews or stored media. Complete deletion and retention '
+          'timelines are pending confirmation.',
     },
     {
       'question': 'How is my information used?',
       'answer':
           'Information may be used for account access, listings, orders, '
           'donations, custom services, support and other features you use. '
-          'Read the Privacy Policy for more information and unresolved '
-          'implementation details.',
+          'Read the Privacy Policy for further information.',
     },
     {
       'question': 'How do I contact EcoLoop support?',
@@ -142,24 +140,30 @@ class _FAQState extends State<FAQ> {
     },
   ];
 
-  String searchQuery = '';
+  String _searchQuery = '';
 
-  List<Map<String, String>> get filteredFaqs {
-    final query = searchQuery.trim().toLowerCase();
+  List<Map<String, String>> get _filteredFaqs {
+    final query = _searchQuery.trim().toLowerCase();
 
     if (query.isEmpty) {
-      return faqs;
+      return _faqs;
     }
 
-    return faqs.where((faq) {
-      return faq['question']!.toLowerCase().contains(query) ||
-          faq['answer']!.toLowerCase().contains(query);
+    return _faqs.where((faq) {
+      final question = faq['question']!.toLowerCase();
+      final answer = faq['answer']!.toLowerCase();
+
+      return question.contains(query) || answer.contains(query);
     }).toList();
+  }
+
+  void _clearSearch() {
+    setState(() => _searchQuery = '');
   }
 
   @override
   Widget build(BuildContext context) {
-    final items = filteredFaqs;
+    final items = _filteredFaqs;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -184,7 +188,9 @@ class _FAQState extends State<FAQ> {
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
                     itemCount: items.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, index) => _buildQuestion(items[index]),
+                    itemBuilder: (context, index) {
+                      return _buildQuestion(items[index]);
+                    },
                   ),
           ),
         ],
@@ -247,7 +253,9 @@ class _FAQState extends State<FAQ> {
       color: AppColors.surface,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 15),
       child: TextField(
-        onChanged: (value) => setState(() => searchQuery = value),
+        onChanged: (value) {
+          setState(() => _searchQuery = value);
+        },
         style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
         decoration: InputDecoration(
           hintText: 'Search questions...',
@@ -259,11 +267,11 @@ class _FAQState extends State<FAQ> {
             Icons.search_rounded,
             color: AppColors.primary,
           ),
-          suffixIcon: searchQuery.isEmpty
+          suffixIcon: _searchQuery.isEmpty
               ? null
               : IconButton(
                   tooltip: 'Clear search',
-                  onPressed: () => setState(() => searchQuery = ''),
+                  onPressed: _clearSearch,
                   icon: const Icon(Icons.close_rounded),
                 ),
           filled: true,
@@ -334,6 +342,7 @@ class _FAQState extends State<FAQ> {
         padding: const EdgeInsets.all(30),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               height: 75,

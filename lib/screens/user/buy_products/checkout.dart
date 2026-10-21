@@ -375,10 +375,22 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Future<void> _loadCurrentAccountAndOwnProducts() async {
-    // Identity and own listing IDs are used as a second safety check in checkout,
-    // even if an owned listing slips through the marketplace API/filter.
-    try {
-      final response = _asMap(await _api.get('/auth/me'));
+    // These independent reads can run together. Both remain best-effort because
+    // the final order endpoint validates ownership and stock authoritatively.
+    final results = await Future.wait<dynamic>([
+      _api
+          .get('/auth/me')
+          .then<dynamic>((value) => value)
+          .catchError((_) => null),
+      _api
+          .get('/my/products')
+          .then<dynamic>((value) => value)
+          .catchError((_) => null),
+    ]);
+
+    final rawAccount = results[0];
+    if (rawAccount != null) {
+      final response = _asMap(rawAccount);
       final data = _asMap(response['data']);
       final account = _asMap(
         response['account'] ??
@@ -411,15 +423,17 @@ class _CheckoutState extends State<Checkout> {
             ? 'artist'
             : 'user';
       }
-    } catch (_) {}
-    try {
+    }
+
+    final rawProducts = results[1];
+    if (rawProducts != null) {
       final rows = _extractRows(
-        await _api.get('/my/products'),
+        rawProducts,
         keys: const ['products', 'items', 'data', 'results'],
       );
       _ownProductIds.addAll(
         rows
-            .map((row) => _asMap(row))
+            .map(_asMap)
             .map(
               (row) =>
                   (row['productId'] ?? row['product_id'] ?? row['id'] ?? '')
@@ -428,7 +442,7 @@ class _CheckoutState extends State<Checkout> {
             )
             .where((id) => id.isNotEmpty),
       );
-    } catch (_) {}
+    }
   }
 
   bool _isOwnProduct(Map<String, dynamic> product) {
@@ -447,8 +461,9 @@ class _CheckoutState extends State<Checkout> {
             .trim();
     if (sellerId.isEmpty ||
         _currentAccountId == null ||
-        sellerId != _currentAccountId)
+        sellerId != _currentAccountId) {
       return false;
+    }
     final sellerType =
         (product['sellerType'] ??
                 product['seller_type'] ??
@@ -483,7 +498,7 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Future<void> _loadSuggestedProducts() async {
-    if (!mounted) return;
+    if (!mounted || _loadingProducts) return;
     setState(() {
       _loadingProducts = true;
       _productsError = null;

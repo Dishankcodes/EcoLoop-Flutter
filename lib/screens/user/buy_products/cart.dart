@@ -20,6 +20,11 @@ class Cart extends StatefulWidget {
 }
 
 class _CartState extends State<Cart> {
+  // In-memory cache avoids a blank/loading cart when navigating back to it.
+  // The server remains authoritative and refreshes this cache in _loadCart().
+  static List<Map<String, dynamic>> _cachedActive = <Map<String, dynamic>>[];
+  static List<Map<String, dynamic>> _cachedSaved = <Map<String, dynamic>>[];
+
   final List<Map<String, dynamic>> _cartItems = [];
   final List<Map<String, dynamic>> _savedForLater = [];
   List<Map<String, dynamic>> _similarProducts = [];
@@ -41,6 +46,15 @@ class _CartState extends State<Cart> {
   @override
   void initState() {
     super.initState();
+    if (_cachedActive.isNotEmpty || _cachedSaved.isNotEmpty) {
+      _cartItems.addAll(
+        _cachedActive.map((item) => Map<String, dynamic>.from(item)),
+      );
+      _savedForLater.addAll(
+        _cachedSaved.map((item) => Map<String, dynamic>.from(item)),
+      );
+      _loadingCart = false;
+    }
     _loadCart();
     _loadSimilarProducts();
   }
@@ -81,7 +95,9 @@ class _CartState extends State<Cart> {
   Future<void> _loadCart() async {
     if (!mounted) return;
     setState(() {
-      _loadingCart = true;
+      // Keep existing/cached rows visible during refresh; only show the full
+      // loading state when there is nothing useful to render yet.
+      _loadingCart = _cartItems.isEmpty && _savedForLater.isEmpty;
       _cartError = null;
     });
     try {
@@ -97,19 +113,23 @@ class _CartState extends State<Cart> {
           )
           .where((id) => id.isNotEmpty)
           .toSet();
+      final migrations = <Future<dynamic>>[];
       for (final item in incoming) {
         final id = (item['productId'] ?? item['product_id'] ?? item['id'] ?? '')
             .toString();
         final numericId = int.tryParse(id);
         if (numericId == null || numericId <= 0 || knownIds.contains(id))
           continue;
-        await EcoLoopApi.instance.post('/cart', {
-          'productId': numericId,
-          'quantity': _toInt(item['quantity'], fallback: 1).clamp(1, 999),
-        });
         knownIds.add(id);
+        migrations.add(
+          EcoLoopApi.instance.post('/cart', {
+            'productId': numericId,
+            'quantity': _toInt(item['quantity'], fallback: 1).clamp(1, 999),
+          }),
+        );
       }
-      if (incoming.isNotEmpty) {
+      if (migrations.isNotEmpty) {
+        await Future.wait(migrations);
         rows = _extractCartRows(await EcoLoopApi.instance.get('/cart'));
       }
 
@@ -128,6 +148,12 @@ class _CartState extends State<Cart> {
         }
       }
       if (!mounted) return;
+      _cachedActive = active
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+      _cachedSaved = saved
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
       setState(() {
         _cartItems
           ..clear()

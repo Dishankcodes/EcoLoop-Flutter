@@ -12,13 +12,11 @@ class UserHowItWorks extends StatelessWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: AppColors.textPrimary,
-          ),
+          icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
           tooltip: 'Back',
         ),
@@ -59,7 +57,7 @@ class UserHowItWorks extends StatelessWidget {
                 icon: Icons.visibility_outlined,
                 title: 'View Product Details',
                 description:
-                    'Check the product images, description, price, condition, '
+                    'Check product images, descriptions, price, condition, '
                     'seller information and availability before ordering.',
               ),
               _buildConnector(),
@@ -68,8 +66,8 @@ class UserHowItWorks extends StatelessWidget {
                 icon: Icons.shopping_cart_outlined,
                 title: 'Checkout',
                 description:
-                    'Review the order details, quantity, delivery information '
-                    'and price summary before confirming your order.',
+                    'Review your order, quantity, delivery information '
+                    'and price summary before confirming.',
               ),
               _buildConnector(),
               _buildStep(
@@ -77,7 +75,7 @@ class UserHowItWorks extends StatelessWidget {
                 icon: Icons.local_shipping_outlined,
                 title: 'Follow Your Order',
                 description:
-                    'Open Orders and Buying Orders to view available order '
+                    'Open Orders or Buying Orders to view available order '
                     'status, tracking and delivery information.',
               ),
 
@@ -94,7 +92,7 @@ class UserHowItWorks extends StatelessWidget {
                 title: 'Create a Listing',
                 description:
                     'Open Add Product, add photos, enter the product name '
-                    'and description, choose the category, set the price '
+                    'and description, choose a category, set the price '
                     'and enter the available quantity.',
               ),
               _buildConnector(),
@@ -104,7 +102,7 @@ class UserHowItWorks extends StatelessWidget {
                 title: 'Publish and Manage',
                 description:
                     'Publish your listing and manage it through My Listings. '
-                    'Keep product information, prices and stock accurate.',
+                    'Keep product details, prices and stock accurate.',
               ),
               _buildConnector(),
               _buildStep(
@@ -112,8 +110,8 @@ class UserHowItWorks extends StatelessWidget {
                 icon: Icons.inventory_2_outlined,
                 title: 'Manage Selling Orders',
                 description:
-                    'Review incoming orders and use the available order '
-                    'status actions to reflect actual progress.',
+                    'Review incoming orders and use the available status '
+                    'actions to reflect actual progress.',
               ),
 
               const SizedBox(height: 30),
@@ -129,7 +127,7 @@ class UserHowItWorks extends StatelessWidget {
                 title: 'Submit a Donation',
                 description:
                     'Open the donation feature, provide the requested item '
-                    'details and photos, and submit the donation request.',
+                    'details and photos, and submit your donation request.',
               ),
               _buildConnector(),
               _buildStep(
@@ -156,7 +154,7 @@ class UserHowItWorks extends StatelessWidget {
                 description:
                     'Where custom services are available, describe your '
                     'project, budget and expected outcome. Add reference '
-                    'images only if you have permission to share them.',
+                    'images only when you have permission to share them.',
               ),
               _buildConnector(),
               _buildStep(
@@ -164,9 +162,9 @@ class UserHowItWorks extends StatelessWidget {
                 icon: Icons.handshake_outlined,
                 title: 'Review ReMaker Proposals',
                 description:
-                    'Review the proposals available for your request. '
-                    'Before accepting, clarify scope, price, timeline, '
-                    'revisions and delivery or collection arrangements.',
+                    'Review available proposals. Before accepting, clarify '
+                    'the scope, price, timeline, revisions and delivery '
+                    'or collection arrangements.',
               ),
               _buildConnector(),
               _buildStep(
@@ -175,7 +173,7 @@ class UserHowItWorks extends StatelessWidget {
                 title: 'Confirm Completion',
                 description:
                     'Use the available request and acceptance actions to '
-                    'record progress. Keep any agreement about completion, '
+                    'record progress. Keep agreements about completion, '
                     'ownership and disputes clear with the ReMaker.',
               ),
 
@@ -183,7 +181,7 @@ class UserHowItWorks extends StatelessWidget {
 
               _buildSectionTitle(
                 'Make the Most of EcoLoop',
-                'Use the features available in your account.',
+                'Explore the features available in your account.',
               ),
               const SizedBox(height: 14),
               _buildFeatureCard(

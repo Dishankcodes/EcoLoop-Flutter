@@ -423,7 +423,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                       images[index],
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) {
+                      errorBuilder: (_, _, _) {
                         return Container(
                           color: AppColors.light,
                           child: const Center(
@@ -454,7 +454,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                   top: 16,
                   right: 16,
                   child: Material(
-                    color: Colors.white.withOpacity(0.95),
+                    color: Colors.white.withValues(alpha: 0.95),
                     shape: const CircleBorder(),
                     elevation: 1,
                     child: InkWell(
@@ -484,7 +484,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.55),
+                      color: Colors.black.withValues(alpha: 0.55),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -634,9 +634,9 @@ class _ProductDetailsState extends State<ProductDetails> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.18)),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Row(
         children: [
@@ -722,7 +722,9 @@ class _ProductDetailsState extends State<ProductDetails> {
               decoration: BoxDecoration(
                 color: AppColors.background,
                 borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: AppColors.accent.withOpacity(0.45)),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.45),
+                ),
               ),
               child: Row(
                 children: [
@@ -814,7 +816,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
-              color: AppColors.light.withOpacity(0.55),
+              color: AppColors.light.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(11),
             ),
             child: const Row(
@@ -923,7 +925,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.accent.withOpacity(0.45)),
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.45)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1034,7 +1036,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(11),
                 decoration: BoxDecoration(
-                  color: AppColors.light.withOpacity(0.65),
+                  color: AppColors.light.withValues(alpha: 0.65),
                   borderRadius: BorderRadius.circular(11),
                 ),
                 child: const Row(
@@ -1129,7 +1131,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           Container(
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
-              color: AppColors.light.withOpacity(0.65),
+              color: AppColors.light.withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(11),
             ),
             child: const Row(
@@ -1414,11 +1416,12 @@ class _ProductDetailsState extends State<ProductDetails> {
             );
       });
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _canReview = false;
           _eligibleOrderId = null;
         });
+      }
     } finally {
       if (mounted) setState(() => _eligibilityLoading = false);
     }
@@ -1480,7 +1483,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.accent.withOpacity(0.4)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
@@ -1529,40 +1532,6 @@ class _ProductDetailsState extends State<ProductDetails> {
     );
   }
 
-  /// Helper bar widget rendering percentage distribution for individual star ratings.
-  Widget _ratingBar(int number, double percentage) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 15,
-            child: Text(
-              '$number',
-              style: const TextStyle(
-                fontSize: 9,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          const Icon(Icons.star_rounded, size: 11, color: Color(0xFFFFB300)),
-          const SizedBox(width: 5),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: LinearProgressIndicator(
-                minHeight: 5,
-                value: percentage,
-                backgroundColor: AppColors.accent.withOpacity(0.3),
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Review item card showing reviewer details, score, text, and user media.
   Widget _buildReviewCard({
     required String name,
@@ -1576,7 +1545,7 @@ class _ProductDetailsState extends State<ProductDetails> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.accent.withOpacity(0.35)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1818,7 +1787,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.only(right: 20),
                 itemCount: products.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 11),
+                separatorBuilder: (_, _) => const SizedBox(width: 11),
                 itemBuilder: (context, index) {
                   return _buildSimilarProductCard(products[index]);
                 },
@@ -1863,7 +1832,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                         : Image.network(
                             imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) {
+                            errorBuilder: (_, _, _) {
                               return const Icon(
                                 Icons.image_outlined,
                                 color: AppColors.primary,
@@ -1879,7 +1848,7 @@ class _ProductDetailsState extends State<ProductDetails> {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.94),
+                      color: Colors.white.withValues(alpha: 0.94),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -2090,7 +2059,7 @@ class _ProductDetailsState extends State<ProductDetails> {
           color: AppColors.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.10),
+              color: Colors.black.withValues(alpha: 0.10),
               blurRadius: 15,
               offset: const Offset(0, -5),
             ),
@@ -2105,7 +2074,9 @@ class _ProductDetailsState extends State<ProductDetails> {
                 decoration: BoxDecoration(
                   color: AppColors.light,
                   borderRadius: BorderRadius.circular(13),
-                  border: Border.all(color: AppColors.accent.withOpacity(0.4)),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.4),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -2288,17 +2259,11 @@ class _ProductDetailsState extends State<ProductDetails> {
       cartProduct['images'] = images;
     }
 
+    // Let the popup update optimistically on this frame. It owns the single
+    // persistent POST and rolls back the optimistic item if the server rejects it.
     setState(() => _cartAdding = true);
     try {
-      await _api.post('/cart', {'productId': productId, 'quantity': _quantity});
-      if (!mounted) return;
       CartPopup.addItem(context, item: cartProduct);
-    } catch (error) {
-      if (mounted) {
-        _showMessage(
-          'Could not add item to cart: ${error.toString().replaceFirst('Exception: ', '')}',
-        );
-      }
     } finally {
       if (mounted) setState(() => _cartAdding = false);
     }
@@ -2847,7 +2812,7 @@ Discover sustainable products with EcoLoop!
                       'details': detailsController.text.trim(),
                     });
 
-                if (!mounted) return;
+                if (!mounted || !sheetContext.mounted) return;
                 Navigator.of(sheetContext).pop();
                 final result = _asMap(response);
                 final message = result['message']?.toString().trim();
@@ -3012,7 +2977,7 @@ Discover sustainable products with EcoLoop!
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                             disabledBackgroundColor: AppColors.primary
-                                .withOpacity(0.6),
+                                .withValues(alpha: 0.6),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
