@@ -9,12 +9,14 @@ import '../../../app_theme/user/app_text_styles.dart';
 import '../../../models/auth/user/user_register_model.dart';
 import '../../../models/location/city_model.dart';
 import '../../../models/location/state_model.dart';
+import '../../../services/google_sign_in_service.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/app_message.dart';
 import '../../../widgets/back_button.dart';
 import '../../artist/artist_intro.dart';
 import '../user_main.dart';
 import 'login.dart';
+import 'user_complete_profile.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key, required this.title});
@@ -73,6 +75,7 @@ class _RegisterPageState extends State<RegisterPage> {
   // FORM CONTROLS
 
   bool _obscurePassword = true;
+  bool _isGoogleLoading = false;
 
   // INIT
 
@@ -565,6 +568,98 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
+  // GOOGLE SIGN-UP
+
+  Future<void> _continueWithGoogle() async {
+    if (_isGoogleLoading) return;
+
+    FocusScope.of(context).unfocus();
+    _clearMessage();
+    setState(() => _isGoogleLoading = true);
+
+    try {
+      final idToken = await GoogleSignInService.instance.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Google did not return an ID token. Please try again.');
+      }
+
+      final response = await ApiManager().client.googleSignInUser(
+        '/auth/google',
+        {'idToken': idToken, 'role': 'user'},
+      );
+
+      if (response.success != true || response.data == null) {
+        throw Exception(
+          response.error ?? 'Google sign-up failed. Please try again.',
+        );
+      }
+
+      final raw = response.data;
+      if (raw is! Map) {
+        throw Exception('Unexpected response from the server.');
+      }
+      final data = Map<String, dynamic>.from(raw);
+
+      if (data['profileRequired'] == true) {
+        final rawProfile = data['googleProfile'];
+        final profile = rawProfile is Map
+            ? Map<String, dynamic>.from(rawProfile)
+            : <String, dynamic>{};
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UserCompleteProfilePage(
+              idToken: idToken,
+              googleProfile: profile,
+            ),
+          ),
+        );
+        return;
+      }
+
+      final rawAccount = data['account'];
+      final account = rawAccount is Map
+          ? Map<String, dynamic>.from(rawAccount)
+          : <String, dynamic>{};
+      final token = (data['token'] ?? '').toString();
+      if (token.isEmpty) {
+        throw Exception('The server did not return a login token.');
+      }
+
+      final firstName = (account['firstName'] ?? '').toString();
+      final lastName = (account['lastName'] ?? '').toString();
+      final name = (account['name'] ?? '$firstName $lastName')
+          .toString()
+          .trim();
+
+      await Prefs.setBool('isLoggedIn', true);
+      await Prefs.setString('userRole', 'user');
+      await Prefs.setString('authToken', token);
+      await Prefs.setString(
+        'userEmail',
+        (account['email'] ?? data['email'] ?? '').toString(),
+      );
+      await Prefs.setString('userName', name);
+
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const UserMain()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(
+        title: 'Google sign-up failed',
+        message: _getReadableError(e),
+        type: AppMessageType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
+    }
+  }
+
   // BUILD
 
   @override
@@ -633,6 +728,58 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
 
                 const SizedBox(height: 28),
+
+                // GOOGLE SIGN-UP
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: OutlinedButton(
+                    onPressed: _isGoogleLoading ? null : _continueWithGoogle,
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.textPrimary,
+                      side: BorderSide(color: Colors.grey.shade300),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: _isGoogleLoading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'G',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                'Sign up with Google',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.grey.shade300)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('OR', style: AppTextStyles.body),
+                    ),
+                    Expanded(child: Divider(color: Colors.grey.shade300)),
+                  ],
+                ),
+                const SizedBox(height: 24),
 
                 // FIRST NAME
                 _buildLabel('First Name'),

@@ -14,6 +14,7 @@ import '../../artist/artist_intro.dart';
 import '../user_main.dart';
 import 'forgot_password.dart';
 import 'register.dart';
+import 'user_complete_profile.dart';
 
 class UserLogin extends StatefulWidget {
   const UserLogin({super.key, required this.title});
@@ -178,7 +179,7 @@ class _UserLoginState extends State<UserLogin> {
             errorMessage.contains('create an account')) {
           title = 'Account not found';
           message =
-          'You don\'t have an account yet. Please create an account first.';
+              'You don\'t have an account yet. Please create an account first.';
         } else if (errorMessage.contains('incorrect password') ||
             errorMessage.contains('wrong password')) {
           title = 'Incorrect password';
@@ -187,7 +188,7 @@ class _UserLoginState extends State<UserLogin> {
           title = 'Account not active';
           message =
               response.error ??
-                  'Your account is not active. Please contact support.';
+              'Your account is not active. Please contact support.';
         } else {
           message = response.error ?? 'Unable to login. Please try again.';
         }
@@ -221,10 +222,13 @@ class _UserLoginState extends State<UserLogin> {
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
+    var dialogOpen = true;
+
     try {
       final idToken = await GoogleSignInService.instance.getIdToken();
+
       if (idToken == null || idToken.isEmpty) {
-        throw Exception('Google did not return an ID token. Please try again.');
+        throw Exception('Google did not return an ID token.');
       }
 
       final response = await ApiManager().client.googleSignInUser(
@@ -233,7 +237,9 @@ class _UserLoginState extends State<UserLogin> {
       );
 
       if (!mounted) return;
+
       Navigator.of(context, rootNavigator: true).pop();
+      dialogOpen = false;
 
       if (response.success != true || response.data == null) {
         _showMessage(
@@ -244,41 +250,70 @@ class _UserLoginState extends State<UserLogin> {
         return;
       }
 
-      final data = response.data!;
-      final account = data.account;
+      final data = Map<String, dynamic>.from(response.data!);
+
+      if (data['profileRequired'] == true) {
+        final profile = data['googleProfile'] is Map
+            ? Map<String, dynamic>.from(data['googleProfile'] as Map)
+            : <String, dynamic>{};
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UserCompleteProfilePage(
+              idToken: idToken,
+              googleProfile: profile,
+            ),
+          ),
+        );
+        return;
+      }
+
+      final account = data['account'] is Map
+          ? Map<String, dynamic>.from(data['account'] as Map)
+          : <String, dynamic>{};
+
+      final token = data['token']?.toString() ?? '';
+
+      if (token.isEmpty) {
+        throw Exception('The server did not return a login token.');
+      }
 
       await Prefs.setBool('isLoggedIn', true);
-      await Prefs.setString('userRole', data.role ?? 'user');
-      await Prefs.setString('authToken', data.token ?? '');
-      await Prefs.setString('userEmail', account?.email ?? '');
+      await Prefs.setString('userRole', 'user');
+      await Prefs.setString('authToken', token);
+      await Prefs.setString(
+        'userEmail',
+        (account['email'] ?? data['email'] ?? '').toString(),
+      );
 
-      final firstName = account?.firstName ?? '';
-      final lastName = account?.lastName ?? '';
-      await Prefs.setString('userName', '$firstName $lastName'.trim());
+      final firstName = (account['firstName'] ?? '').toString();
+      final lastName = (account['lastName'] ?? '').toString();
+      final name = (account['name'] ?? '$firstName $lastName')
+          .toString()
+          .trim();
+
+      await Prefs.setString('userName', name);
 
       if (!mounted) return;
+
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const UserMain()),
-            (route) => false,
-      );
-    } on DioException catch (e) {
-      if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).maybePop();
-      _showMessage(
-        title: 'Google sign-in failed',
-        message: _getReadableError(e),
-        type: AppMessageType.error,
+        (route) => false,
       );
     } catch (e) {
       if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).maybePop();
-      final message = e.toString().replaceFirst('Exception: ', '').trim();
+
+      if (dialogOpen) {
+        Navigator.of(context, rootNavigator: true).maybePop();
+      }
+
       _showMessage(
         title: 'Google sign-in failed',
-        message: message.isEmpty
-            ? 'Unable to sign in with Google. Please try again.'
-            : message,
+        message: e is DioException
+            ? _getReadableError(e)
+            : e.toString().replaceFirst('Exception: ', ''),
         type: AppMessageType.error,
       );
     }

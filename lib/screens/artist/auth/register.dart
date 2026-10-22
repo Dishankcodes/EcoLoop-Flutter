@@ -3,6 +3,8 @@ import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 
 import '../../../api/api_manager.dart';
+import '../../../shared_preferences_util.dart';
+import '../../../services/google_sign_in_service.dart';
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../app_theme/artist/artist_theme.dart';
@@ -11,6 +13,8 @@ import '../../../models/location/city_model.dart';
 import '../../../models/location/state_model.dart';
 import '../../../widgets/app_message.dart';
 import '../../../widgets/back_button.dart';
+import '../artist_main.dart';
+import 'artist_complete_profile.dart';
 import 'artist_otp.dart';
 import 'login.dart';
 
@@ -56,6 +60,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
 
   // FORM STATE
   bool _isSendingOtp = false;
+  bool _isGoogleLoading = false;
 
   // INIT
   @override
@@ -247,9 +252,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
         } on DioException catch (error) {
           final retryable =
               error.type == DioExceptionType.connectionTimeout ||
-              error.type == DioExceptionType.receiveTimeout ||
-              error.type == DioExceptionType.sendTimeout ||
-              error.type == DioExceptionType.connectionError;
+                  error.type == DioExceptionType.receiveTimeout ||
+                  error.type == DioExceptionType.sendTimeout ||
+                  error.type == DioExceptionType.connectionError;
 
           if (attempt == 0 && retryable) {
             await Future.delayed(const Duration(milliseconds: 700));
@@ -444,7 +449,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
         _showMessage(
           title: 'Unable to continue',
           message:
-              response.error ??
+          response.error ??
               'We could not send the verification code. Please try again.',
           type: AppMessageType.error,
         );
@@ -488,6 +493,104 @@ class _ArtistRegisterState extends State<ArtistRegister> {
           _isSendingOtp = false;
         });
       }
+    }
+  }
+
+  // GOOGLE SIGN-UP
+
+  Future<void> _continueWithGoogle() async {
+    if (_isGoogleLoading || _isSendingOtp) return;
+
+    FocusScope.of(context).unfocus();
+    _clearMessage();
+    setState(() => _isGoogleLoading = true);
+
+    try {
+      final idToken = await GoogleSignInService.instance.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Google did not return an ID token. Please try again.');
+      }
+
+      final response = await ApiManager().client.googleSignInArtist(
+        '/auth/google',
+        {'idToken': idToken, 'role': 'artist'},
+      );
+
+      if (response.success != true || response.data == null) {
+        throw Exception(response.error ?? 'Google sign-up failed. Please try again.');
+      }
+
+      final raw = response.data;
+      if (raw is! Map) {
+        throw Exception('Unexpected response from the server.');
+      }
+      final data = Map<String, dynamic>.from(raw);
+
+      if (data['profileRequired'] == true) {
+        final rawProfile = data['googleProfile'];
+        final profile = rawProfile is Map
+            ? Map<String, dynamic>.from(rawProfile)
+            : <String, dynamic>{};
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ArtistCompleteProfilePage(
+              idToken: idToken,
+              googleProfile: profile,
+            ),
+          ),
+        );
+        return;
+      }
+
+      final rawAccount = data['account'];
+      final account = rawAccount is Map
+          ? Map<String, dynamic>.from(rawAccount)
+          : <String, dynamic>{};
+      final token = (data['token'] ?? '').toString();
+      if (token.isEmpty) {
+        throw Exception('The server did not return an artist login token.');
+      }
+
+      await Prefs.setBool('isLoggedIn', true);
+      await Prefs.setString('userRole', 'artist');
+      await Prefs.setString('artistToken', token);
+      await Prefs.setString('artistTokenType', (data['tokenType'] ?? 'Bearer').toString());
+      final expiry = data['expiresAt'];
+      if (expiry is int) {
+        await Prefs.setInt('artistTokenExpiresAt', expiry);
+      } else if (expiry != null) {
+        await Prefs.setString('artistTokenExpiresAt', expiry.toString());
+      }
+      await Prefs.setString('artistRole', 'artist');
+      await Prefs.setString(
+        'artistId',
+        (account['artistId'] ?? account['id'] ?? data['accountId'] ?? '').toString(),
+      );
+      await Prefs.setString(
+        'artistName',
+        (account['userName'] ?? account['artistName'] ?? account['name'] ?? '').toString(),
+      );
+      await Prefs.setString('artistEmail', (account['email'] ?? data['email'] ?? '').toString());
+      await Prefs.setString('artistPhone', (account['phone'] ?? '').toString());
+      await Prefs.setObject('artistData', account);
+
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const ArtistMain()),
+            (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(
+        title: 'Google sign-up failed',
+        message: _getReadableError(e),
+        type: AppMessageType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
 
@@ -552,6 +655,51 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                       ),
 
                       const SizedBox(height: 28),
+
+                      // GOOGLE SIGN-UP
+                      SizedBox(
+                        width: double.infinity,
+                        height: 54,
+                        child: OutlinedButton(
+                          onPressed: (_isGoogleLoading || _isSendingOtp)
+                              ? null
+                              : _continueWithGoogle,
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: ArtistColors.textPrimary,
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: _isGoogleLoading
+                              ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                              : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text('G', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                              SizedBox(width: 12),
+                              Text('Sign up with Google', style: TextStyle(fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: Colors.grey.shade300)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text('OR', style: ArtistTextStyles.body),
+                          ),
+                          Expanded(child: Divider(color: Colors.grey.shade300)),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
 
                       // NAME
                       _buildLabel('Your Name'),
@@ -621,7 +769,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                         items: (filter, loadProps) => _states,
                         itemAsString: (StateModel state) => state.stateName,
                         compareFn: (StateModel a, StateModel b) =>
-                            a.stateCode == b.stateCode,
+                        a.stateCode == b.stateCode,
                         onSelected: (StateModel? value) {
                           if (value == null) {
                             return;
@@ -659,16 +807,16 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                             prefixIcon: const Icon(Icons.map_outlined),
                             suffixIcon: _isLoadingStates
                                 ? const Padding(
-                                    padding: EdgeInsets.all(12),
-                                    child: SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: ArtistColors.primary,
-                                      ),
-                                    ),
-                                  )
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: ArtistColors.primary,
+                                ),
+                              ),
+                            )
                                 : null,
                           ),
                         ),
@@ -694,30 +842,30 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           ),
                           itemBuilder:
                               (context, state, isDisabled, isSelected) {
-                                return ListTile(
-                                  leading: Icon(
-                                    Icons.map_outlined,
-                                    color: isSelected
-                                        ? ArtistColors.primary
-                                        : ArtistColors.textSecondary,
-                                  ),
-                                  title: Text(
-                                    state.stateName,
-                                    style: ArtistTextStyles.body.copyWith(
-                                      color: ArtistColors.textPrimary,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w600
-                                          : FontWeight.w400,
-                                    ),
-                                  ),
-                                  trailing: isSelected
-                                      ? const Icon(
-                                          Icons.check_rounded,
-                                          color: ArtistColors.primary,
-                                        )
-                                      : null,
-                                );
-                              },
+                            return ListTile(
+                              leading: Icon(
+                                Icons.map_outlined,
+                                color: isSelected
+                                    ? ArtistColors.primary
+                                    : ArtistColors.textSecondary,
+                              ),
+                              title: Text(
+                                state.stateName,
+                                style: ArtistTextStyles.body.copyWith(
+                                  color: ArtistColors.textPrimary,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                              trailing: isSelected
+                                  ? const Icon(
+                                Icons.check_rounded,
+                                color: ArtistColors.primary,
+                              )
+                                  : null,
+                            );
+                          },
                         ),
                       ),
 
@@ -731,13 +879,13 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                       DropdownSearch<CityModel>(
                         selectedItem: _selectedCity,
                         enabled:
-                            _selectedState != null &&
+                        _selectedState != null &&
                             !_isLoadingCities &&
                             _cities.isNotEmpty,
                         items: (filter, loadProps) => _cities,
                         itemAsString: (CityModel city) => city.cityName,
                         compareFn: (CityModel a, CityModel b) =>
-                            a.cityId == b.cityId,
+                        a.cityId == b.cityId,
                         onSelected: (CityModel? value) {
                           setState(() {
                             _selectedCity = value;
@@ -764,16 +912,16 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                             ),
                             suffixIcon: _isLoadingCities
                                 ? const Padding(
-                                    padding: EdgeInsets.all(12),
-                                    child: SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: ArtistColors.primary,
-                                      ),
-                                    ),
-                                  )
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: ArtistColors.primary,
+                                ),
+                              ),
+                            )
                                 : null,
                           ),
                         ),
@@ -818,9 +966,9 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                               ),
                               trailing: isSelected
                                   ? const Icon(
-                                      Icons.check_rounded,
-                                      color: ArtistColors.primary,
-                                    )
+                                Icons.check_rounded,
+                                color: ArtistColors.primary,
+                              )
                                   : null,
                             );
                           },
@@ -840,7 +988,7 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                         textCapitalization: TextCapitalization.sentences,
                         decoration: const InputDecoration(
                           hintText:
-                              'Tell us about yourself and your creativity',
+                          'Tell us about yourself and your creativity',
                           prefixIcon: Padding(
                             padding: EdgeInsets.only(bottom: 55),
                             child: Icon(Icons.description_outlined),
@@ -906,17 +1054,17 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                           ),
                           child: _isSendingOtp
                               ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.white,
-                                  ),
-                                )
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
                               : Text(
-                                  'Continue & Send OTP',
-                                  style: ArtistTextStyles.button,
-                                ),
+                            'Continue & Send OTP',
+                            style: ArtistTextStyles.button,
+                          ),
                         ),
                       ),
 
@@ -957,15 +1105,15 @@ class _ArtistRegisterState extends State<ArtistRegister> {
                               onPressed: _isSendingOtp
                                   ? null
                                   : () {
-                                      Navigator.pushReplacement(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => const ArtistLogin(
-                                            title: 'Artist Login',
-                                          ),
-                                        ),
-                                      );
-                                    },
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const ArtistLogin(
+                                      title: 'Artist Login',
+                                    ),
+                                  ),
+                                );
+                              },
                               style: TextButton.styleFrom(
                                 foregroundColor: ArtistColors.primary,
                                 padding: const EdgeInsets.symmetric(

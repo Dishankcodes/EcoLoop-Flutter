@@ -5,13 +5,13 @@ import '../../../api/api_manager.dart';
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../app_theme/artist/artist_theme.dart';
-import '../../../models/auth/artist/artist_auth_response.dart';
 import '../../../models/auth/artist/artist_send_otp_request.dart';
 import '../../../services/google_sign_in_service.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/artist_before_more_menu.dart';
 import '../../../widgets/back_button.dart';
 import '../artist_main.dart';
+import 'artist_complete_profile.dart';
 import 'artist_otp.dart';
 import 'register.dart';
 
@@ -245,6 +245,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
     if (_isLoading) return;
 
     FocusScope.of(context).unfocus();
+
     setState(() {
       _errorMessage = null;
       _successMessage = null;
@@ -253,8 +254,9 @@ class _ArtistLoginState extends State<ArtistLogin> {
 
     try {
       final idToken = await GoogleSignInService.instance.getIdToken();
+
       if (idToken == null || idToken.isEmpty) {
-        throw Exception('Google did not return an ID token. Please try again.');
+        throw Exception('Google did not return an ID token.');
       }
 
       final response = await ApiManager().client.googleSignInArtist(
@@ -266,69 +268,91 @@ class _ArtistLoginState extends State<ArtistLogin> {
         throw Exception(response.error ?? 'Google sign-in failed.');
       }
 
-      final auth = response.data!;
-      await _saveGoogleArtistSession(auth);
+      final data = Map<String, dynamic>.from(response.data!);
+
+      if (data['profileRequired'] == true) {
+        final profile = data['googleProfile'] is Map
+            ? Map<String, dynamic>.from(data['googleProfile'] as Map)
+            : <String, dynamic>{};
+
+        if (!mounted) return;
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ArtistCompleteProfilePage(
+              idToken: idToken,
+              googleProfile: profile,
+            ),
+          ),
+        );
+        return;
+      }
+
+      final account = data['account'] is Map
+          ? Map<String, dynamic>.from(data['account'] as Map)
+          : <String, dynamic>{};
+
+      final token = data['token']?.toString() ?? '';
+
+      if (token.isEmpty) {
+        throw Exception('The server did not return an artist login token.');
+      }
+
+      final artistName =
+          (account['userName'] ??
+                  account['artistName'] ??
+                  account['name'] ??
+                  '')
+              .toString();
+
+      final artistEmail = (account['email'] ?? data['email'] ?? '').toString();
+
+      await Prefs.setBool('isLoggedIn', true);
+      await Prefs.setString('userRole', 'artist');
+      await Prefs.setString('artistToken', token);
+      await Prefs.setString(
+        'artistTokenType',
+        data['tokenType']?.toString() ?? 'Bearer',
+      );
+
+      final expiry = data['expiresAt'];
+      if (expiry is int) {
+        await Prefs.setInt('artistTokenExpiresAt', expiry);
+      } else if (expiry != null) {
+        await Prefs.setString('artistTokenExpiresAt', expiry.toString());
+      }
+
+      await Prefs.setString('artistRole', 'artist');
+      await Prefs.setString(
+        'artistId',
+        (account['artistId'] ?? account['id'] ?? data['accountId'] ?? '')
+            .toString(),
+      );
+      await Prefs.setString('artistName', artistName);
+      await Prefs.setString('artistEmail', artistEmail);
+      await Prefs.setString('artistPhone', (account['phone'] ?? '').toString());
+      await Prefs.setObject('artistData', account);
 
       if (!mounted) return;
+
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const ArtistMain()),
         (route) => false,
       );
-    } on DioException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = _getDioErrorMessage(e);
-      });
     } catch (e) {
       if (!mounted) return;
-      final message = e.toString().replaceFirst('Exception: ', '').trim();
+
       setState(() {
-        _errorMessage = message.isEmpty
-            ? 'Google sign-in failed. Please try again.'
-            : message;
+        _errorMessage = e is DioException
+            ? _getDioErrorMessage(e)
+            : _getGeneralErrorMessage(e);
       });
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
-    }
-  }
-
-  Future<void> _saveGoogleArtistSession(ArtistAuthResponse auth) async {
-    await Prefs.setBool('isLoggedIn', true);
-    await Prefs.setString('userRole', 'artist');
-
-    if (auth.token != null) {
-      await Prefs.setString('artistToken', auth.token!);
-    }
-    if (auth.tokenType != null) {
-      await Prefs.setString('artistTokenType', auth.tokenType!);
-    }
-    if (auth.expiresAt != null) {
-      await Prefs.setString('artistTokenExpiresAt', auth.expiresAt!);
-    }
-    if (auth.role != null) {
-      await Prefs.setString('artistRole', auth.role!);
-    }
-    if (auth.accountId != null) {
-      await Prefs.setInt('artistId', auth.accountId!.toInt());
-    }
-
-    final artist = auth.account;
-    if (artist != null) {
-      if (artist.userName != null) {
-        await Prefs.setString('artistName', artist.userName!);
-      }
-      if (artist.email != null) {
-        await Prefs.setString('artistEmail', artist.email!);
-      }
-      if (artist.phone != null) {
-        await Prefs.setString('artistPhone', artist.phone!);
-      }
-      await Prefs.setObject('artistData', artist.toJson());
     }
   }
 

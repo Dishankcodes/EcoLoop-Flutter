@@ -205,13 +205,37 @@ class _ArtistHelpSupportScreenState extends State<ArtistHelpSupportScreen> {
         children: [
           Container(
             margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(color: ArtistColors.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: ArtistColors.border)),
+            decoration: BoxDecoration(
+              color: ArtistColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: ArtistColors.border),
+            ),
             child: ListTile(
-              leading: CircleAvatar(backgroundColor: ArtistColors.light, child: Icon(Icons.auto_awesome_rounded, color: ArtistColors.primary)),
-              title: Text('Chat with EcoLoop AI', style: ArtistTextStyles.title.copyWith(fontSize: 14)),
-              subtitle: Text('Get quick answers for your ReMaker account', style: ArtistTextStyles.body.copyWith(fontSize: 11, color: ArtistColors.textSecondary)),
-              trailing: Icon(Icons.chevron_right_rounded, color: ArtistColors.primary),
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiChatScreen())),
+              leading: CircleAvatar(
+                backgroundColor: ArtistColors.light,
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  color: ArtistColors.primary,
+                ),
+              ),
+              title: Text(
+                'Chat with EcoLoop AI',
+                style: ArtistTextStyles.title.copyWith(fontSize: 14),
+              ),
+              subtitle: Text(
+                'Get quick answers for your ReMaker account',
+                style: ArtistTextStyles.body.copyWith(
+                  fontSize: 11,
+                  color: ArtistColors.textSecondary,
+                ),
+              ),
+              trailing: Icon(
+                Icons.chevron_right_rounded,
+                color: ArtistColors.primary,
+              ),
+              onTap: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const AiChatScreen())),
             ),
           ),
           Container(

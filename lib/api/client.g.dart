@@ -446,7 +446,7 @@ class _RestClient implements RestClient {
   }
 
   @override
-  Future<BaseResponse<UserData>> googleSignIn(
+  Future<BaseResponse<dynamic>> googleSignIn(
     String path,
     Map<String, dynamic> request,
   ) async {
@@ -455,7 +455,7 @@ class _RestClient implements RestClient {
     final _headers = <String, dynamic>{};
     final _data = <String, dynamic>{};
     _data.addAll(request);
-    final _options = _setStreamType<BaseResponse<UserData>>(
+    final _options = _setStreamType<BaseResponse<dynamic>>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
@@ -466,11 +466,11 @@ class _RestClient implements RestClient {
           .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
     );
     final _result = await _dio.fetch<Map<String, dynamic>>(_options);
-    late BaseResponse<UserData> _value;
+    late BaseResponse<dynamic> _value;
     try {
-      _value = BaseResponse<UserData>.fromJson(
+      _value = BaseResponse<dynamic>.fromJson(
         _result.data!,
-        (json) => UserData.fromJson(json as Map<String, dynamic>),
+        (json) => json as dynamic,
       );
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);
@@ -480,7 +480,7 @@ class _RestClient implements RestClient {
   }
 
   @override
-  Future<BaseResponse<UserData>> googleSignInUser(
+  Future<BaseResponse<dynamic>> googleSignInUser(
     String path,
     Map<String, dynamic> request,
   ) async {
@@ -489,7 +489,7 @@ class _RestClient implements RestClient {
     final _headers = <String, dynamic>{};
     final _data = <String, dynamic>{};
     _data.addAll(request);
-    final _options = _setStreamType<BaseResponse<UserData>>(
+    final _options = _setStreamType<BaseResponse<dynamic>>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
@@ -500,11 +500,11 @@ class _RestClient implements RestClient {
           .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
     );
     final _result = await _dio.fetch<Map<String, dynamic>>(_options);
-    late BaseResponse<UserData> _value;
+    late BaseResponse<dynamic> _value;
     try {
-      _value = BaseResponse<UserData>.fromJson(
+      _value = BaseResponse<dynamic>.fromJson(
         _result.data!,
-        (json) => UserData.fromJson(json as Map<String, dynamic>),
+        (json) => json as dynamic,
       );
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);
@@ -514,7 +514,7 @@ class _RestClient implements RestClient {
   }
 
   @override
-  Future<BaseResponse<ArtistAuthResponse>> googleSignInArtist(
+  Future<BaseResponse<dynamic>> googleSignInArtist(
     String path,
     Map<String, dynamic> request,
   ) async {
@@ -523,7 +523,7 @@ class _RestClient implements RestClient {
     final _headers = <String, dynamic>{};
     final _data = <String, dynamic>{};
     _data.addAll(request);
-    final _options = _setStreamType<BaseResponse<ArtistAuthResponse>>(
+    final _options = _setStreamType<BaseResponse<dynamic>>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
@@ -534,11 +534,45 @@ class _RestClient implements RestClient {
           .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
     );
     final _result = await _dio.fetch<Map<String, dynamic>>(_options);
-    late BaseResponse<ArtistAuthResponse> _value;
+    late BaseResponse<dynamic> _value;
     try {
-      _value = BaseResponse<ArtistAuthResponse>.fromJson(
+      _value = BaseResponse<dynamic>.fromJson(
         _result.data!,
-        (json) => ArtistAuthResponse.fromJson(json as Map<String, dynamic>),
+        (json) => json as dynamic,
+      );
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<BaseResponse<dynamic>> googleCompleteProfile(
+    String path,
+    Map<String, dynamic> request,
+  ) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{r'path': path};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(request);
+    final _options = _setStreamType<BaseResponse<dynamic>>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, dynamic>>(_options);
+    late BaseResponse<dynamic> _value;
+    try {
+      _value = BaseResponse<dynamic>.fromJson(
+        _result.data!,
+        (json) => json as dynamic,
       );
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);

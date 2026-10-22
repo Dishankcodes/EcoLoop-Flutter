@@ -113,24 +113,26 @@ abstract class RestClient {
   );
 
   @POST('')
-  Future<BaseResponse<UserData>> googleSignIn(
-      @Query('path') String path,
-      @Body() Map<String, dynamic> request,
-      );
-
-  // GOOGLE SIGN-IN — USER
+  Future<BaseResponse<dynamic>> googleSignIn(
+    @Query('path') String path,
+    @Body() Map<String, dynamic> request,
+  );
 
   @POST('')
-  Future<BaseResponse<UserData>> googleSignInUser(
-      @Query('path') String path,
-      @Body() Map<String, dynamic> request,
-      );
-
-  // GOOGLE SIGN-IN — ARTIST / REMAKER
+  Future<BaseResponse<dynamic>> googleSignInUser(
+    @Query('path') String path,
+    @Body() Map<String, dynamic> request,
+  );
 
   @POST('')
-  Future<BaseResponse<ArtistAuthResponse>> googleSignInArtist(
-      @Query('path') String path,
-      @Body() Map<String, dynamic> request,
-      );
+  Future<BaseResponse<dynamic>> googleSignInArtist(
+    @Query('path') String path,
+    @Body() Map<String, dynamic> request,
+  );
+
+  @POST('')
+  Future<BaseResponse<dynamic>> googleCompleteProfile(
+    @Query('path') String path,
+    @Body() Map<String, dynamic> request,
+  );
 }

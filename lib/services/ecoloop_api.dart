@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../api/api_manager.dart';
 import '../shared_preferences_util.dart';
 import 'package:flutter/foundation.dart';
+
 class EcoLoopApiException implements Exception {
   final String message;
 

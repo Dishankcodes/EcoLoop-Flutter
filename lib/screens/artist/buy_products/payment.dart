@@ -240,7 +240,10 @@ class _PaymentState extends State<Payment> {
       normalizedItems.add({'productId': numericId, 'quantity': quantity});
     }
 
+    // Paint the loading state before starting network work so the tap feels immediate.
     setState(() => _isProcessing = true);
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
     try {
       final isOnlinePayment =
           _selectedMethod == 'razorpay' || _selectedMethod == 'upi';
@@ -319,7 +322,7 @@ class _PaymentState extends State<Payment> {
         'name': 'EcoLoop',
         'description': 'EcoLoop marketplace order',
         'theme': {'color': '#270809'},
-        if (_selectedMethod == 'upi') 'method': {'upi': true},
+        if (_selectedMethod == 'upi') 'method': 'upi',
         'retry': {'enabled': true, 'max_count': 2},
       });
       _razorpayCheckoutLaunched = true;
@@ -429,20 +432,26 @@ class _PaymentState extends State<Payment> {
   }
 
   Future<void> _cancelPendingOrders({required bool resetAttempt}) async {
-    // The backend cancellation route restores stock only for unpaid orders.
-    for (final order in _pendingOrders) {
-      final id = int.tryParse('${order['orderId'] ?? ''}');
-      if (id == null) continue;
-      try {
-        await EcoLoopApi.instance.post(
-          '/orders/$id/cancel',
-          <String, dynamic>{},
-        );
-      } catch (_) {
-        // A cancellation may fail if payment status changed concurrently.
-        // Never show success or assume stock was restored in that case.
-      }
-    }
+    // Cancel independent unpaid orders concurrently instead of waiting for each
+    // network round-trip one by one. The backend still decides whether each
+    // cancellation is valid and whether reserved stock can be restored.
+    final orderIds = _pendingOrders
+        .map((order) => int.tryParse('${order['orderId'] ?? ''}'))
+        .whereType<int>()
+        .toSet();
+    await Future.wait(
+      orderIds.map((id) async {
+        try {
+          await EcoLoopApi.instance.post(
+            '/orders/$id/cancel',
+            <String, dynamic>{},
+          );
+        } catch (_) {
+          // A cancellation may fail if payment status changed concurrently.
+          // Never show success or assume stock was restored in that case.
+        }
+      }),
+    );
     if (resetAttempt) {
       _pendingOrders = <Map<String, dynamic>>[];
       _pendingPaymentIds = <int>[];
