@@ -111,4 +111,26 @@ abstract class RestClient {
     @Query('path') String path,
     @Body() ResetPasswordRequest request,
   );
+
+  @POST('')
+  Future<BaseResponse<UserData>> googleSignIn(
+      @Query('path') String path,
+      @Body() Map<String, dynamic> request,
+      );
+
+  // GOOGLE SIGN-IN — USER
+
+  @POST('')
+  Future<BaseResponse<UserData>> googleSignInUser(
+      @Query('path') String path,
+      @Body() Map<String, dynamic> request,
+      );
+
+  // GOOGLE SIGN-IN — ARTIST / REMAKER
+
+  @POST('')
+  Future<BaseResponse<ArtistAuthResponse>> googleSignInArtist(
+      @Query('path') String path,
+      @Body() Map<String, dynamic> request,
+      );
 }

@@ -5,6 +5,7 @@ import '../../../api/api_manager.dart';
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../models/auth/user/user_login_model.dart';
+import '../../../services/google_sign_in_service.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/app_message.dart';
 import '../../../widgets/back_button.dart';
@@ -177,7 +178,7 @@ class _UserLoginState extends State<UserLogin> {
             errorMessage.contains('create an account')) {
           title = 'Account not found';
           message =
-              'You don\'t have an account yet. Please create an account first.';
+          'You don\'t have an account yet. Please create an account first.';
         } else if (errorMessage.contains('incorrect password') ||
             errorMessage.contains('wrong password')) {
           title = 'Incorrect password';
@@ -186,7 +187,7 @@ class _UserLoginState extends State<UserLogin> {
           title = 'Account not active';
           message =
               response.error ??
-              'Your account is not active. Please contact support.';
+                  'Your account is not active. Please contact support.';
         } else {
           message = response.error ?? 'Unable to login. Please try again.';
         }
@@ -205,6 +206,79 @@ class _UserLoginState extends State<UserLogin> {
       _showMessage(
         title: 'Something went wrong',
         message: _getReadableError(e),
+        type: AppMessageType.error,
+      );
+    }
+  }
+
+  Future<void> _continueWithGoogle() async {
+    FocusScope.of(context).unfocus();
+    _clearMessage();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final idToken = await GoogleSignInService.instance.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Google did not return an ID token. Please try again.');
+      }
+
+      final response = await ApiManager().client.googleSignInUser(
+        '/auth/google',
+        {'idToken': idToken, 'role': 'user'},
+      );
+
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+
+      if (response.success != true || response.data == null) {
+        _showMessage(
+          title: 'Google sign-in failed',
+          message: response.error ?? 'Unable to sign in with Google.',
+          type: AppMessageType.error,
+        );
+        return;
+      }
+
+      final data = response.data!;
+      final account = data.account;
+
+      await Prefs.setBool('isLoggedIn', true);
+      await Prefs.setString('userRole', data.role ?? 'user');
+      await Prefs.setString('authToken', data.token ?? '');
+      await Prefs.setString('userEmail', account?.email ?? '');
+
+      final firstName = account?.firstName ?? '';
+      final lastName = account?.lastName ?? '';
+      await Prefs.setString('userName', '$firstName $lastName'.trim());
+
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const UserMain()),
+            (route) => false,
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).maybePop();
+      _showMessage(
+        title: 'Google sign-in failed',
+        message: _getReadableError(e),
+        type: AppMessageType.error,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).maybePop();
+      final message = e.toString().replaceFirst('Exception: ', '').trim();
+      _showMessage(
+        title: 'Google sign-in failed',
+        message: message.isEmpty
+            ? 'Unable to sign in with Google. Please try again.'
+            : message,
         type: AppMessageType.error,
       );
     }
@@ -360,7 +434,7 @@ class _UserLoginState extends State<UserLogin> {
                       width: double.infinity,
                       height: 56,
                       child: OutlinedButton(
-                        onPressed: () {},
+                        onPressed: _continueWithGoogle,
                         style: OutlinedButton.styleFrom(
                           backgroundColor: AppColors.surface,
                           foregroundColor: Colors.black87,

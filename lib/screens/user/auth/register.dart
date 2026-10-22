@@ -26,9 +26,7 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  // ─────────────────────────────────────────────
   // FORM KEY & TEXT CONTROLLERS
-  // ─────────────────────────────────────────────
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
@@ -42,17 +40,13 @@ class _RegisterPageState extends State<RegisterPage> {
 
   final TextEditingController _passwordController = TextEditingController();
 
-  // ─────────────────────────────────────────────
   // APPLICATION MESSAGE
-  // ─────────────────────────────────────────────
 
   String? _message;
   String? _messageTitle;
   AppMessageType? _messageType;
 
-  // ─────────────────────────────────────────────
   // SELECTED FORM FIELDS
-  // ─────────────────────────────────────────────
 
   String? _selectedGender;
 
@@ -60,9 +54,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   CityModel? _selectedCity;
 
-  // ─────────────────────────────────────────────
   // LOCATION DATA
-  // ─────────────────────────────────────────────
 
   List<StateModel> _states = [];
 
@@ -72,23 +64,17 @@ class _RegisterPageState extends State<RegisterPage> {
 
   bool _isLoadingCities = false;
 
-  // ─────────────────────────────────────────────
   // CITY CACHE & CONCURRENCY
-  // ─────────────────────────────────────────────
 
   final Map<String, List<CityModel>> _citiesCache = {};
 
   final Map<String, Future<List<CityModel>>> _cityLoadingFutures = {};
 
-  // ─────────────────────────────────────────────
   // FORM CONTROLS
-  // ─────────────────────────────────────────────
 
   bool _obscurePassword = true;
 
-  // ─────────────────────────────────────────────
   // INIT
-  // ─────────────────────────────────────────────
 
   @override
   void initState() {
@@ -97,9 +83,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _loadStates();
   }
 
-  // ─────────────────────────────────────────────
   // DISPOSE
-  // ─────────────────────────────────────────────
 
   @override
   void dispose() {
@@ -112,9 +96,7 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  // ─────────────────────────────────────────────
   // SHOW MESSAGE
-  // ─────────────────────────────────────────────
 
   void _showMessage({
     required String title,
@@ -130,9 +112,7 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
-  // ─────────────────────────────────────────────
   // CLEAR MESSAGE
-  // ─────────────────────────────────────────────
 
   void _clearMessage() {
     if (!mounted) return;
@@ -144,9 +124,7 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
-  // ─────────────────────────────────────────────
   // READABLE ERROR
-  // ─────────────────────────────────────────────
 
   String _getReadableError(Object error) {
     if (error is DioException) {
@@ -195,9 +173,7 @@ class _RegisterPageState extends State<RegisterPage> {
     return 'Something went wrong. Please try again.';
   }
 
-  // ─────────────────────────────────────────────
   // LOAD STATES
-  // ─────────────────────────────────────────────
 
   Future<void> _loadStates() async {
     if (!mounted) return;
@@ -242,9 +218,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  // ─────────────────────────────────────────────
   // FETCH CITIES
-  // ─────────────────────────────────────────────
 
   Future<List<CityModel>> _fetchCitiesForState(String stateCode) {
     if (_citiesCache.containsKey(stateCode)) {
@@ -262,9 +236,7 @@ class _RegisterPageState extends State<RegisterPage> {
     return future;
   }
 
-  // ─────────────────────────────────────────────
   // REQUEST CITIES
-  // ─────────────────────────────────────────────
 
   Future<List<CityModel>> _requestCities(String stateCode) async {
     try {
@@ -311,9 +283,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  // ─────────────────────────────────────────────
   // PREFETCH CITIES
-  // ─────────────────────────────────────────────
 
   Future<void> _prefetchCitiesInBackground() async {
     if (_states.isEmpty) return;
@@ -343,9 +313,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  // ─────────────────────────────────────────────
   // LOAD CITIES
-  // ─────────────────────────────────────────────
 
   Future<void> _loadCities(String stateCode) async {
     if (!mounted) return;
@@ -409,9 +377,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  // ─────────────────────────────────────────────
   // VALIDATION
-  // ─────────────────────────────────────────────
 
   String? _validateRequired(String? value, String fieldName) {
     if (value == null || value.trim().isEmpty) {
@@ -433,9 +399,7 @@ class _RegisterPageState extends State<RegisterPage> {
     return _selectedCity == null ? 'Please select your city' : null;
   }
 
-  // ─────────────────────────────────────────────
   // CREATE ACCOUNT
-  // ─────────────────────────────────────────────
 
   Future<void> _createAccount() async {
     FocusScope.of(context).unfocus();
@@ -601,9 +565,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  // ─────────────────────────────────────────────
   // BUILD
-  // ─────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -618,16 +580,12 @@ class _RegisterPageState extends State<RegisterPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ─────────────────────────────
                 // BACK BUTTON
-                // ─────────────────────────────
                 const AppBackButton(),
 
                 const SizedBox(height: 16),
 
-                // ─────────────────────────────
                 // TITLE
-                // ─────────────────────────────
                 Center(
                   child: Text(
                     'Create Account',
@@ -646,9 +604,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
 
-                // ─────────────────────────────
                 // MESSAGE
-                // ─────────────────────────────
                 if (_message != null &&
                     _messageTitle != null &&
                     _messageType != null) ...[
@@ -664,9 +620,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 28),
 
-                // ─────────────────────────────
                 // ECOLOOP LOGO
-                // ─────────────────────────────
                 Center(
                   child: Image.asset(
                     'assets/logo/ecoloop_logo.png',
@@ -680,9 +634,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 28),
 
-                // ─────────────────────────────
                 // FIRST NAME
-                // ─────────────────────────────
                 _buildLabel('First Name'),
 
                 const SizedBox(height: 8),
@@ -699,9 +651,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 20),
 
-                // ─────────────────────────────
                 // LAST NAME
-                // ─────────────────────────────
                 _buildLabel('Last Name'),
 
                 const SizedBox(height: 8),
@@ -718,9 +668,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 20),
 
-                // ─────────────────────────────
                 // EMAIL
-                // ─────────────────────────────
                 _buildLabel('Email'),
 
                 const SizedBox(height: 8),
@@ -737,9 +685,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 20),
 
-                // ─────────────────────────────
                 // PHONE
-                // ─────────────────────────────
                 _buildLabel('Phone Number'),
 
                 const SizedBox(height: 8),
@@ -772,9 +718,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 24),
 
-                // ─────────────────────────────
                 // GENDER
-                // ─────────────────────────────
                 _buildLabel('Gender'),
 
                 const SizedBox(height: 6),
@@ -787,9 +731,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 20),
 
-                // ─────────────────────────────
                 // STATE
-                // ─────────────────────────────
                 _buildLabel('State'),
 
                 const SizedBox(height: 8),
@@ -897,9 +839,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 20),
 
-                // ─────────────────────────────
                 // CITY
-                // ─────────────────────────────
                 _buildLabel('City'),
 
                 const SizedBox(height: 8),
@@ -995,9 +935,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 20),
 
-                // ─────────────────────────────
                 // PASSWORD
-                // ─────────────────────────────
                 _buildLabel('Password'),
 
                 const SizedBox(height: 8),
@@ -1026,9 +964,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 30),
 
-                // ─────────────────────────────
                 // CREATE ACCOUNT
-                // ─────────────────────────────
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -1049,9 +985,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 18),
 
-                // ─────────────────────────────
                 // LOGIN
-                // ─────────────────────────────
                 Center(
                   child: Wrap(
                     alignment: WrapAlignment.center,
@@ -1093,9 +1027,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 8),
 
-                // ─────────────────────────────
                 // BECOME AN ARTIST
-                // ─────────────────────────────
                 Center(
                   child: TextButton(
                     onPressed: () {
@@ -1132,9 +1064,7 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  // ─────────────────────────────────────────────
   // LABEL
-  // ─────────────────────────────────────────────
 
   Widget _buildLabel(String text) {
     return Text(
@@ -1147,9 +1077,7 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  // ─────────────────────────────────────────────
   // GENDER OPTION
-  // ─────────────────────────────────────────────
 
   Widget _buildGenderOption(String value) {
     return SizedBox(

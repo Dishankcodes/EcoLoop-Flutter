@@ -5,9 +5,13 @@ import '../../../api/api_manager.dart';
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../app_theme/artist/artist_theme.dart';
+import '../../../models/auth/artist/artist_auth_response.dart';
 import '../../../models/auth/artist/artist_send_otp_request.dart';
+import '../../../services/google_sign_in_service.dart';
+import '../../../shared_preferences_util.dart';
 import '../../../widgets/artist_before_more_menu.dart';
 import '../../../widgets/back_button.dart';
+import '../artist_main.dart';
 import 'artist_otp.dart';
 import 'register.dart';
 
@@ -236,14 +240,96 @@ class _ArtistLoginState extends State<ArtistLogin> {
     );
   }
 
-  // Google Button
-  void _continueWithGoogle() {
+  // Google Sign-In. The existing email OTP flow remains unchanged.
+  Future<void> _continueWithGoogle() async {
     if (_isLoading) return;
 
+    FocusScope.of(context).unfocus();
     setState(() {
       _errorMessage = null;
-      _successMessage = 'Google sign-in will be available soon.';
+      _successMessage = null;
+      _isLoading = true;
     });
+
+    try {
+      final idToken = await GoogleSignInService.instance.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Google did not return an ID token. Please try again.');
+      }
+
+      final response = await ApiManager().client.googleSignInArtist(
+        '/auth/google',
+        {'idToken': idToken, 'role': 'artist'},
+      );
+
+      if (response.success != true || response.data == null) {
+        throw Exception(response.error ?? 'Google sign-in failed.');
+      }
+
+      final auth = response.data!;
+      await _saveGoogleArtistSession(auth);
+
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const ArtistMain()),
+        (route) => false,
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = _getDioErrorMessage(e);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      final message = e.toString().replaceFirst('Exception: ', '').trim();
+      setState(() {
+        _errorMessage = message.isEmpty
+            ? 'Google sign-in failed. Please try again.'
+            : message;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveGoogleArtistSession(ArtistAuthResponse auth) async {
+    await Prefs.setBool('isLoggedIn', true);
+    await Prefs.setString('userRole', 'artist');
+
+    if (auth.token != null) {
+      await Prefs.setString('artistToken', auth.token!);
+    }
+    if (auth.tokenType != null) {
+      await Prefs.setString('artistTokenType', auth.tokenType!);
+    }
+    if (auth.expiresAt != null) {
+      await Prefs.setString('artistTokenExpiresAt', auth.expiresAt!);
+    }
+    if (auth.role != null) {
+      await Prefs.setString('artistRole', auth.role!);
+    }
+    if (auth.accountId != null) {
+      await Prefs.setInt('artistId', auth.accountId!.toInt());
+    }
+
+    final artist = auth.account;
+    if (artist != null) {
+      if (artist.userName != null) {
+        await Prefs.setString('artistName', artist.userName!);
+      }
+      if (artist.email != null) {
+        await Prefs.setString('artistEmail', artist.email!);
+      }
+      if (artist.phone != null) {
+        await Prefs.setString('artistPhone', artist.phone!);
+      }
+      await Prefs.setObject('artistData', artist.toJson());
+    }
   }
 
   // Build
