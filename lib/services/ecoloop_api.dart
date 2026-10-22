@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../api/api_manager.dart';
 import '../shared_preferences_util.dart';
-
+import 'package:flutter/foundation.dart';
 class EcoLoopApiException implements Exception {
   final String message;
 
@@ -127,15 +127,40 @@ class EcoLoopApi {
     required String message,
     List<Map<String, String>> history = const <Map<String, String>>[],
   }) async {
-    final result = await _send(
-      'POST',
-      '/ai/chat',
-      body: <String, dynamic>{'message': message, 'history': history},
-    );
-    if (result is Map) return Map<String, dynamic>.from(result);
-    throw const EcoLoopApiException(
-      'The AI response format was not recognised.',
-    );
+    debugPrint('[EcoLoop AI] Sending chat request.');
+
+    try {
+      final result = await _send(
+        'POST',
+        '/ai/chat',
+        body: <String, dynamic>{'message': message, 'history': history},
+      );
+
+      if (result is Map) {
+        final response = Map<String, dynamic>.from(result);
+
+        debugPrint('[EcoLoop AI] Response keys: ${response.keys.toList()}');
+        debugPrint(
+          '[EcoLoop AI] Reply received: '
+          '${(response['reply']?.toString().isNotEmpty ?? false)}',
+        );
+        debugPrint(
+          '[EcoLoop AI] Model: ${response['model'] ?? 'not provided'}',
+        );
+
+        return response;
+      }
+
+      debugPrint('[EcoLoop AI] Unexpected result type: ${result.runtimeType}');
+
+      throw const EcoLoopApiException(
+        'The AI response format was not recognised.',
+      );
+    } catch (error) {
+      debugPrint('[EcoLoop AI] Chat request failed: ${error.runtimeType}');
+      debugPrint('[EcoLoop AI] Error: $error');
+      rethrow;
+    }
   }
 
   Future<dynamic> post(String path, Map<String, dynamic> body) async {

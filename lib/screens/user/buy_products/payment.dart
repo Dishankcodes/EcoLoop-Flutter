@@ -1,5 +1,6 @@
 import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
@@ -42,15 +43,20 @@ class Payment extends StatefulWidget {
 }
 
 class _PaymentState extends State<Payment> {
+  late final Razorpay _razorpay;
   String _selectedMethod = 'cod';
+  List<Map<String, dynamic>> _pendingOrders = <Map<String, dynamic>>[];
+  List<int> _pendingPaymentIds = <int>[];
+  String? _gatewayOrderId;
+  bool _gatewayCallbackHandled = false;
 
   String? _selectedUpiApp;
 
   String? _selectedBank;
 
   bool _isProcessing = false;
-  final String _checkoutRequestId = DateTime.now().microsecondsSinceEpoch
-      .toString();
+  String _checkoutRequestId = DateTime.now().microsecondsSinceEpoch.toString();
+  bool _razorpayCheckoutLaunched = false;
 
   final TextEditingController _upiController = TextEditingController();
 
@@ -63,7 +69,17 @@ class _PaymentState extends State<Payment> {
   final TextEditingController _cvvController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handleRazorpaySuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handleRazorpayError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  @override
   void dispose() {
+    _razorpay.clear();
     _upiController.dispose();
 
     _cardNumberController.dispose();
@@ -164,30 +180,81 @@ class _PaymentState extends State<Payment> {
   }
 
   /// Updates active payment mode selection.
-
   void _selectMethod(String method) {
-    if (method != 'cod') {
-      _showMessage(
-        'Online payments are paused for now. Please use Cash on Delivery.',
-      );
-      return;
-    }
+    if (method != 'cod' && method != 'razorpay' && method != 'upi') return;
     setState(() {
-      _selectedMethod = 'cod';
+      _selectedMethod = method;
       _selectedUpiApp = null;
     });
   }
 
-  /// Validates selected payment option inputs and initiates processing simulation.
+  Map<String, dynamic> _asMap(dynamic value) =>
+      value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+
+  dynamic _responseData(dynamic response) {
+    final root = _asMap(response);
+    return root['data'] is Map ? root['data'] : root;
+  }
+
+  Future<Map<String, dynamic>> _createOrderBatch(
+    List<Map<String, dynamic>> normalizedItems,
+    String paymentMethod,
+  ) async {
+    final response = await EcoLoopApi.instance.post('/orders/batch', {
+      'items': normalizedItems,
+      'shippingAddress': widget.address,
+      'paymentMethod': paymentMethod,
+      'deliveryMethod': 'standard',
+      if (widget.couponCode != null && widget.couponCode!.isNotEmpty)
+        'couponCode': widget.couponCode,
+      'clearCartAfterSuccess': widget.clearCartAfterSuccess,
+      'requestId': '${_checkoutRequestId}_$paymentMethod',
+    });
+    final root = _asMap(response);
+    if (root['success'] == false) {
+      throw Exception(
+        root['message'] ?? root['error'] ?? 'Order was rejected.',
+      );
+    }
+    final data = _asMap(_responseData(response));
+    final rawOrders = data['orders'];
+    if (rawOrders is! List || rawOrders.isEmpty) {
+      throw Exception('The backend did not confirm the order batch.');
+    }
+    final orders = rawOrders
+        .whereType<Map>()
+        .map((order) => Map<String, dynamic>.from(order))
+        .toList();
+    final requestedQuantity = normalizedItems.fold<int>(
+      0,
+      (sum, item) => sum + (item['quantity'] as int),
+    );
+    final returnedQuantity = data['itemCount'] is num
+        ? (data['itemCount'] as num).toInt()
+        : orders.fold<int>(0, (sum, order) => sum + _productQuantity(order));
+    if (returnedQuantity != requestedQuantity) {
+      throw Exception(
+        'The backend returned an incomplete order confirmation. Check Order History before retrying.',
+      );
+    }
+    data['orders'] = orders;
+    return data;
+  }
+
+  List<int> _readPaymentIds(dynamic rawPayments) {
+    if (rawPayments is! List) return <int>[];
+    return rawPayments
+        .whereType<Map>()
+        .map((payment) {
+          final map = Map<String, dynamic>.from(payment);
+          return int.tryParse('${map['paymentId'] ?? map['id'] ?? ''}') ?? 0;
+        })
+        .where((id) => id > 0)
+        .toList();
+  }
 
   Future<void> _payNow() async {
     if (_isProcessing) return;
-    if (_selectedMethod != 'cod') {
-      _showMessage(
-        'This payment option is a UI preview for now. Choose Cash on Delivery until the payment gateway is integrated.',
-      );
-      return;
-    }
     final items = widget.items ?? const <Map<String, dynamic>>[];
     if (items.isEmpty) {
       _showMessage('No items to order.');
@@ -197,280 +264,238 @@ class _PaymentState extends State<Payment> {
       _showMessage('Delivery address is missing. Return to checkout.');
       return;
     }
+
+    final normalizedItems = <Map<String, dynamic>>[];
+    for (final item in items) {
+      final id = (item['productId'] ?? item['product_id'] ?? item['id'] ?? '')
+          .toString();
+      final quantity = _productQuantity(item);
+      final numericId = int.tryParse(id);
+      if (numericId == null || numericId <= 0 || quantity < 1) {
+        _showMessage('A cart item has an invalid product ID or quantity.');
+        return;
+      }
+      normalizedItems.add({'productId': numericId, 'quantity': quantity});
+    }
+
     setState(() => _isProcessing = true);
     try {
-      final normalizedItems = <Map<String, dynamic>>[];
-      for (final item in items) {
-        final id = (item['productId'] ?? item['product_id'] ?? item['id'] ?? '')
-            .toString();
-        final quantity = _productQuantity(item);
-        final numericId = int.tryParse(id);
-        if (numericId == null || numericId <= 0 || quantity < 1) {
-          throw Exception('A cart item has an invalid product ID or quantity.');
-        }
-        normalizedItems.add({'productId': numericId, 'quantity': quantity});
-      }
-
-      // One server-side batch validates the whole basket, reserves stock and
-      // rolls back on failure. It also avoids partially created multi-item orders.
-      final response = await EcoLoopApi.instance.post('/orders/batch', {
-        'items': normalizedItems,
-        'shippingAddress': widget.address,
-        'paymentMethod': 'cod',
-        'deliveryMethod': 'standard',
-        if (widget.couponCode != null && widget.couponCode!.isNotEmpty)
-          'couponCode': widget.couponCode,
-        'clearCartAfterSuccess': widget.clearCartAfterSuccess,
-        'requestId': _checkoutRequestId,
-      });
-      final root = response is Map
-          ? Map<String, dynamic>.from(response)
-          : <String, dynamic>{};
-      if (root['success'] == false) {
-        throw Exception(
-          root['message'] ?? root['error'] ?? 'Order was rejected.',
-        );
-      }
-      final data = root['data'] is Map
-          ? Map<String, dynamic>.from(root['data'] as Map)
-          : root;
-      final rawOrders = data['orders'];
-      if (rawOrders is! List || rawOrders.isEmpty) {
-        throw Exception('The backend did not confirm the order batch.');
-      }
-      final createdOrders = rawOrders
-          .whereType<Map>()
-          .map((order) => Map<String, dynamic>.from(order))
-          .toList();
-      final requestedQuantity = normalizedItems.fold<int>(
-        0,
-        (sum, item) => sum + (item['quantity'] as int),
-      );
-      final returnedQuantity = data['itemCount'] is num
-          ? (data['itemCount'] as num).toInt()
-          : createdOrders.fold<int>(
-              0,
-              (sum, order) => sum + _productQuantity(order),
-            );
-      if (returnedQuantity != requestedQuantity) {
-        throw Exception(
-          'The backend returned an incomplete order confirmation. Check Order History before retrying.',
-        );
-      }
-      if (!mounted) return;
-
-      if (widget.clearCartAfterSuccess) CartPopup.clear();
-      final serverTotal = data['totalAmount'];
-      final total = serverTotal is num
-          ? serverTotal.toDouble()
-          : double.tryParse('$serverTotal') ??
-                createdOrders.fold<double>(0, (sum, order) {
-                  final value = order['totalAmount'];
-                  return sum +
-                      (value is num
-                          ? value.toDouble()
-                          : double.tryParse('$value') ?? 0);
-                });
-      final orderIds = createdOrders
+      final isOnlinePayment =
+          _selectedMethod == 'razorpay' || _selectedMethod == 'upi';
+      final paymentMethod = isOnlinePayment ? 'razorpay' : 'cod';
+      final data = await _createOrderBatch(normalizedItems, paymentMethod);
+      final orders = (data['orders'] as List).cast<Map<String, dynamic>>();
+      final totalRaw = data['totalAmount'];
+      final total = totalRaw is num
+          ? totalRaw.toDouble()
+          : double.tryParse('$totalRaw') ?? widget.totalAmount;
+      final orderIds = orders
           .map((order) => '${order['orderId'] ?? ''}')
           .where((id) => id.isNotEmpty && id != 'null')
           .join(', ');
-      if (orderIds.isEmpty) {
+      if (orderIds.isEmpty)
         throw Exception(
           'The server did not return order IDs. Check Order History before retrying.',
         );
+
+      if (paymentMethod == 'cod') {
+        if (widget.clearCartAfterSuccess) {
+          CartPopup.clear();
+        }
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OrderSuccess(
+              orderId: orderIds,
+              totalAmount: total,
+              itemCount: data['itemCount'] is num
+                  ? (data['itemCount'] as num).toInt()
+                  : normalizedItems.fold<int>(
+                      0,
+                      (sum, item) => sum + (item['quantity'] as int),
+                    ),
+              paymentMethod: 'Cash on Delivery',
+              address: widget.address,
+              deliveryMethod: widget.deliveryMethod,
+            ),
+          ),
+        );
+        return;
       }
+
+      _pendingOrders = orders;
+      final paymentIds = _readPaymentIds(data['payments']);
+      if (paymentIds.isEmpty) {
+        throw Exception('The backend did not return payment IDs for Razorpay.');
+      }
+      _pendingPaymentIds = paymentIds;
+      _gatewayCallbackHandled = false;
+      _razorpayCheckoutLaunched = false;
+
+      final gatewayResponse = await EcoLoopApi.instance.post(
+        '/payments/razorpay/create-order',
+        {'paymentIds': paymentIds},
+      );
+      final gateway = _asMap(_responseData(gatewayResponse));
+      final keyId = '${gateway['keyId'] ?? ''}'.trim();
+      _gatewayOrderId = '${gateway['razorpayOrderId'] ?? ''}'.trim();
+      final amount = gateway['amount'];
+      if (keyId.isEmpty ||
+          (_gatewayOrderId ?? '').isEmpty ||
+          amount is! num ||
+          amount <= 0) {
+        throw Exception('Razorpay did not return a valid checkout order.');
+      }
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+      _razorpay.open({
+        'key': keyId,
+        'order_id': _gatewayOrderId,
+        'amount': amount.toInt(),
+        'currency': '${gateway['currency'] ?? 'INR'}',
+        'name': 'EcoLoop',
+        'description': 'EcoLoop marketplace order',
+        'theme': {'color': '#2A4D3A'},
+        if (_selectedMethod == 'upi') 'method': {'upi': true},
+        'retry': {'enabled': true, 'max_count': 2},
+      });
+      _razorpayCheckoutLaunched = true;
+    } catch (error) {
+      if ((_selectedMethod == 'razorpay' || _selectedMethod == 'upi') &&
+          _pendingOrders.isNotEmpty &&
+          !_razorpayCheckoutLaunched) {
+        await _cancelPendingOrders(resetAttempt: true);
+      }
+      if (mounted) {
+        _showMessage(
+          'Could not start payment: ${error.toString().replaceFirst('Exception: ', '')}',
+        );
+      }
+    } finally {
+      if (mounted && _isProcessing) setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<void> _handleRazorpaySuccess(PaymentSuccessResponse response) async {
+    if (_gatewayCallbackHandled) return;
+    _gatewayCallbackHandled = true;
+    final gatewayOrderId = (response.orderId?.trim().isNotEmpty ?? false)
+        ? response.orderId!.trim()
+        : (_gatewayOrderId ?? '');
+    final paymentId = response.paymentId?.trim() ?? '';
+    final signature = response.signature?.trim() ?? '';
+    if (gatewayOrderId.isEmpty ||
+        paymentId.isEmpty ||
+        signature.isEmpty ||
+        _pendingPaymentIds.isEmpty) {
+      if (mounted)
+        _showMessage(
+          'Payment response was incomplete. Do not retry immediately; check Order History first.',
+        );
+      return;
+    }
+    if (mounted) setState(() => _isProcessing = true);
+    try {
+      final result = await EcoLoopApi.instance
+          .post('/payments/razorpay/verify', {
+            'paymentId': _pendingPaymentIds.first,
+            'razorpayOrderId': gatewayOrderId,
+            'razorpayPaymentId': paymentId,
+            'razorpaySignature': signature,
+          });
+      final verified = _asMap(_responseData(result));
+      if (verified['verified'] != true ||
+          '${verified['status']}'.toLowerCase() != 'paid') {
+        throw Exception(
+          'The server has not confirmed this payment yet. Check Order History before retrying.',
+        );
+      }
+      final confirmedIds = verified['orderIds'] is List
+          ? (verified['orderIds'] as List).map((id) => '$id').join(', ')
+          : _pendingOrders
+                .map((order) => '${order['orderId'] ?? ''}')
+                .where((id) => id != 'null' && id.isNotEmpty)
+                .join(', ');
+      final total = _pendingOrders.fold<double>(0, (sum, order) {
+        final value = order['totalAmount'];
+        return sum +
+            (value is num ? value.toDouble() : double.tryParse('$value') ?? 0);
+      });
+      final count = _pendingOrders.fold<int>(
+        0,
+        (sum, order) => sum + _productQuantity(order),
+      );
+      if (widget.clearCartAfterSuccess) {
+        CartPopup.clear();
+      }
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => OrderSuccess(
-            orderId: orderIds,
-            totalAmount: total,
-            itemCount: data['itemCount'] is num
-                ? (data['itemCount'] as num).toInt()
-                : items.fold<int>(
-                    0,
-                    (sum, item) => sum + _productQuantity(item),
-                  ),
-            paymentMethod: 'Cash on Delivery',
+            orderId: confirmedIds,
+            totalAmount: total > 0 ? total : widget.totalAmount,
+            itemCount: count,
+            paymentMethod: 'Razorpay',
             address: widget.address,
             deliveryMethod: widget.deliveryMethod,
           ),
         ),
       );
     } catch (error) {
-      if (mounted) {
+      if (mounted)
         _showMessage(
-          'Order could not be completed: ${error.toString().replaceFirst('Exception: ', '')}',
+          'Payment was submitted but verification is not confirmed. Do not pay again yet; check Order History or contact support.',
         );
-      }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
   }
 
-  /// Displays payment confirmation modal sheet upon success.
+  Future<void> _handleRazorpayError(PaymentFailureResponse response) async {
+    if (_gatewayCallbackHandled) return;
+    _gatewayCallbackHandled = true;
+    if (mounted) setState(() => _isProcessing = true);
+    await _cancelPendingOrders(resetAttempt: true);
+    if (mounted) {
+      _showMessage(
+        'Payment was not completed. If an order still appears pending, check Order History before trying again.',
+      );
+      setState(() => _isProcessing = false);
+    }
+  }
 
-  void _showPaymentSuccess() {
-    showModalBottomSheet(
-      context: context,
-
-      isDismissible: false,
-
-      enableDrag: false,
-
-      backgroundColor: AppColors.surface,
-
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-
-              children: [
-                Container(
-                  width: 74,
-
-                  height: 74,
-
-                  decoration: const BoxDecoration(
-                    color: AppColors.light,
-
-                    shape: BoxShape.circle,
-                  ),
-
-                  child: const Icon(
-                    Icons.check_rounded,
-
-                    size: 44,
-
-                    color: AppColors.success,
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-
-                Text(
-                  'Payment Successful',
-
-                  style: AppTextStyles.title.copyWith(fontSize: 21),
-                ),
-
-                const SizedBox(height: 7),
-
-                Text(
-                  'Your payment of ${_formatIndianPrice(widget.totalAmount)} has been received.',
-
-                  textAlign: TextAlign.center,
-
-                  style: AppTextStyles.body,
-                ),
-
-                const SizedBox(height: 18),
-
-                Container(
-                  width: double.infinity,
-
-                  padding: const EdgeInsets.all(14),
-
-                  decoration: BoxDecoration(
-                    color: AppColors.background,
-
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.receipt_long_outlined,
-
-                        color: AppColors.primary,
-                      ),
-
-                      const SizedBox(width: 12),
-
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-
-                          children: [
-                            const Text(
-                              'Order payment',
-
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-
-                            const SizedBox(height: 3),
-
-                            Text(
-                              'EcoLoop order • Payment completed',
-
-                              style: AppTextStyles.caption,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                SizedBox(
-                  width: double.infinity,
-
-                  height: 52,
-
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(sheetContext);
-
-                      Navigator.pushReplacement(
-                        context,
-
-                        MaterialPageRoute(
-                          builder: (_) => OrderSuccess(
-                            totalAmount: widget.totalAmount,
-
-                            itemCount: widget.items?.length ?? 1,
-
-                            paymentMethod: _selectedMethod == 'upi'
-                                ? 'UPI'
-                                : _selectedMethod == 'card'
-                                ? 'Credit / Debit Card'
-                                : _selectedMethod == 'netbanking'
-                                ? 'Net Banking'
-                                : _selectedMethod == 'wallet'
-                                ? 'Wallet'
-                                : 'Cash on Delivery',
-
-                            address: widget.address,
-
-                            deliveryMethod: widget.deliveryMethod,
-                          ),
-                        ),
-                      );
-                    },
-
-                    child: const Text('Done'),
-                  ),
-                ),
-              ],
-            ),
-          ),
+  Future<void> _cancelPendingOrders({required bool resetAttempt}) async {
+    // The backend cancellation route restores stock only for unpaid orders.
+    for (final order in _pendingOrders) {
+      final id = int.tryParse('${order['orderId'] ?? ''}');
+      if (id == null) continue;
+      try {
+        await EcoLoopApi.instance.post(
+          '/orders/$id/cancel',
+          <String, dynamic>{},
         );
-      },
-    );
+      } catch (_) {
+        // A cancellation may fail if payment status changed concurrently.
+        // Never show success or assume stock was restored in that case.
+      }
+    }
+    if (resetAttempt) {
+      _pendingOrders = <Map<String, dynamic>>[];
+      _pendingPaymentIds = <int>[];
+      _gatewayOrderId = null;
+      _gatewayCallbackHandled = false;
+      _razorpayCheckoutLaunched = false;
+      _checkoutRequestId = DateTime.now().microsecondsSinceEpoch.toString();
+    }
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (mounted)
+      _showMessage(
+        'External wallet selected: ${response.walletName ?? 'wallet'}. Complete the payment in the opened flow.',
+      );
   }
 
   /// Displays a floating snackbar feedback message.
@@ -782,7 +807,7 @@ class _PaymentState extends State<Payment> {
 
                     fit: BoxFit.cover,
 
-                    errorBuilder: (_, __, ___) {
+                    errorBuilder: (_, _, _) {
                       return const Icon(
                         Icons.eco_outlined,
 
@@ -852,59 +877,22 @@ class _PaymentState extends State<Payment> {
       children: [
         _paymentMethodTile(
           value: 'upi',
-
-          icon: Icons.account_balance_wallet_outlined,
-
+          icon: Icons.qr_code_2_rounded,
           title: 'UPI',
-
-          subtitle: 'Google Pay, PhonePe, Paytm & more',
+          subtitle: 'Google Pay, PhonePe, Paytm and other UPI apps',
         ),
-
         const SizedBox(height: 9),
-
         _paymentMethodTile(
-          value: 'card',
-
-          icon: Icons.credit_card_outlined,
-
-          title: 'Credit / Debit Card',
-
-          subtitle: 'Visa, Mastercard, RuPay & more',
+          value: 'razorpay',
+          icon: Icons.account_balance_wallet_outlined,
+          title: 'Cards, Netbanking & Wallets',
+          subtitle: 'Secure online payment with Razorpay',
         ),
-
         const SizedBox(height: 9),
-
-        _paymentMethodTile(
-          value: 'netbanking',
-
-          icon: Icons.account_balance_outlined,
-
-          title: 'Net Banking',
-
-          subtitle: 'Pay directly from your bank account',
-        ),
-
-        const SizedBox(height: 9),
-
-        _paymentMethodTile(
-          value: 'wallet',
-
-          icon: Icons.account_balance_wallet_rounded,
-
-          title: 'Wallets',
-
-          subtitle: 'Use your preferred digital wallet',
-        ),
-
-        const SizedBox(height: 9),
-
         _paymentMethodTile(
           value: 'cod',
-
           icon: Icons.local_shipping_outlined,
-
           title: 'Cash on Delivery',
-
           subtitle: 'Pay when your order arrives',
         ),
       ],
@@ -1006,7 +994,21 @@ class _PaymentState extends State<Payment> {
   Widget _buildPaymentDetails() {
     switch (_selectedMethod) {
       case 'upi':
-        return _buildUpiSection();
+        return _sectionCard(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.qr_code_2_rounded, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Continue to Razorpay to pay securely using UPI. Your order is confirmed only after the server verifies the payment.',
+                  style: AppTextStyles.body,
+                ),
+              ),
+            ],
+          ),
+        );
 
       case 'card':
         return _buildCardSection();
@@ -1016,6 +1018,23 @@ class _PaymentState extends State<Payment> {
 
       case 'wallet':
         return _buildWalletSection();
+
+      case 'razorpay':
+        return _sectionCard(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.lock_outline_rounded, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'You will securely choose UPI, card, net banking or an available wallet in Razorpay Checkout. EcoLoop confirms your order only after server-side payment verification.',
+                  style: AppTextStyles.body,
+                ),
+              ),
+            ],
+          ),
+        );
 
       case 'cod':
         return _buildCodSection();
@@ -1674,7 +1693,7 @@ class _PaymentState extends State<Payment> {
 
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
 
             blurRadius: 15,
 
