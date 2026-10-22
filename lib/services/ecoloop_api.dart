@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../api/api_manager.dart';
 import '../shared_preferences_util.dart';
-import 'package:flutter/foundation.dart';
 
 class EcoLoopApiException implements Exception {
   final String message;
@@ -162,6 +162,48 @@ class EcoLoopApi {
       debugPrint('[EcoLoop AI] Error: $error');
       rethrow;
     }
+  }
+
+  /// Loads the current account's saved AI chat history from Code.gs.
+  /// The backend must scope /ai/history to the authenticated session.
+  Future<List<Map<String, dynamic>>> getAiChatHistory() async {
+    final result = await get('/ai/history');
+
+    dynamic messages;
+    if (result is List) {
+      messages = result;
+    } else if (result is Map) {
+      messages = result['messages'];
+    }
+
+    if (messages is List) {
+      return messages
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    }
+
+    throw const EcoLoopApiException(
+      'The saved chat history response was not recognised.',
+    );
+  }
+
+  /// Clears only the authenticated account's saved AI conversation.
+  Future<void> clearAiChatHistory() async {
+    final result = await delete('/ai/history');
+
+    if (result == null) return;
+
+    if (result is Map) {
+      final response = Map<String, dynamic>.from(result);
+      if (response['cleared'] == true ||
+          response['success'] == true ||
+          response['deletedCount'] != null) {
+        return;
+      }
+    }
+
+    throw const EcoLoopApiException('The chat history could not be cleared.');
   }
 
   Future<dynamic> post(String path, Map<String, dynamic> body) async {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../app_theme/user/app_colors.dart';
@@ -816,36 +818,42 @@ class _ProfileState extends State<Profile> {
     if (_loggingOut) return;
     _loggingOut = true;
 
-    // Revoke the server-side session while the active token is still available.
-    // Always clear local credentials even when the request cannot reach the API.
-    try {
-      await EcoLoopApi.instance.post('/auth/logout', {});
-    } catch (_) {
-      // Local logout must still complete if the network is unavailable.
-    } finally {
-      for (final key in const <String>[
-        'isLoggedIn',
-        'authToken',
-        'artistToken',
-        'artistTokenType',
-        'artistTokenExpiresAt',
-        'artistRole',
-        'artistEmail',
-        'artistName',
-        'artistPhone',
-        'userRole',
-        'userEmail',
-        'userName',
-        'profilePhotoUrl',
-      ]) {
+    // Start server revocation, but never make the user wait for network latency.
+    // Local credentials are cleared immediately even if the request fails.
+    unawaited(
+      EcoLoopApi.instance
+          .post('/auth/logout', {})
+          .then<void>((_) {}, onError: (Object _, StackTrace __) {}),
+    );
+
+    const keys = <String>[
+      'isLoggedIn',
+      'authToken',
+      'artistToken',
+      'artistTokenType',
+      'artistTokenExpiresAt',
+      'artistRole',
+      'artistEmail',
+      'artistName',
+      'artistPhone',
+      'userRole',
+      'userEmail',
+      'userName',
+      'profilePhotoUrl',
+    ];
+
+    // Remove preferences concurrently rather than awaiting each disk operation.
+    await Future.wait(
+      keys.map((key) async {
         try {
           await Prefs.remove(key);
         } catch (_) {
           // Continue clearing the remaining credentials if one key fails.
         }
-      }
-      EcoLoopApi.instance.invalidateCache();
-    }
+      }),
+    );
+
+    EcoLoopApi.instance.invalidateCache();
   }
 
   void _showLogoutDialog(BuildContext context) {

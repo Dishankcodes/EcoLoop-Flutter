@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import '../../../app_theme/artist/artist_colors.dart';
-import '../../../app_theme/artist/artist_text_styles.dart';
+import '../../../app_theme/user/app_colors.dart';
+import '../../../app_theme/user/app_text_styles.dart';
 import '../../../models/location/city_model.dart';
 import '../../../models/location/state_model.dart';
 import '../../../services/location_data_cache.dart';
@@ -44,7 +44,7 @@ class _AddAddressState extends State<AddAddress> {
   String? _initialStateName;
   String? _initialCityName;
 
-  String _addressType = 'Studio';
+  String _addressType = 'Home';
   bool _isDefault = false;
   bool _isSaving = false;
 
@@ -62,9 +62,17 @@ class _AddAddressState extends State<AddAddress> {
     final a = widget.address;
     _nameController = TextEditingController(text: _value(a, 'name'));
     _phoneController = TextEditingController(text: _value(a, 'phone'));
-    _houseController = TextEditingController(text: _value(a, 'house'));
+    final hasSplitAddress =
+        _value(a, 'house').isNotEmpty || _value(a, 'street').isNotEmpty;
+    _houseController = TextEditingController(
+      text: _value(a, 'house').isNotEmpty
+          ? _value(a, 'house')
+          : (hasSplitAddress ? '' : _value(a, 'addressLine')),
+    );
     _streetController = TextEditingController(text: _value(a, 'street'));
-    _areaController = TextEditingController(text: _value(a, 'area'));
+    _areaController = TextEditingController(
+      text: hasSplitAddress ? _value(a, 'area') : '',
+    );
     _landmarkController = TextEditingController(text: _value(a, 'landmark'));
     _initialStateName = _value(a, 'state').isNotEmpty
         ? _value(a, 'state')
@@ -72,15 +80,20 @@ class _AddAddressState extends State<AddAddress> {
     _initialCityName = _value(a, 'city').isNotEmpty ? _value(a, 'city') : null;
     _loadLocationAndProfile();
     _pincodeController = TextEditingController(text: _value(a, 'pincode'));
-    _addressType = _value(a, 'type').isEmpty ? 'Studio' : _value(a, 'type');
+    final savedLabel = _value(a, 'type').isNotEmpty
+        ? _value(a, 'type')
+        : _value(a, 'label');
+    _addressType = savedLabel.isEmpty ? 'Home' : savedLabel;
     _isDefault =
         a?['isDefault'] == true ||
         a?['isDefault']?.toString().toLowerCase() == 'true';
   }
 
   Future<void> _loadLocationAndProfile() async {
-    // Prefill the saved account details first, then resolve state/city IDs
-    // against the location API. If profile lookup fails, the form still works.
+    // Start location loading immediately instead of waiting for /profile.
+    // This lets the state dropdown become usable while account details refresh.
+    final statesFuture = _loadStates();
+
     if (_token.isNotEmpty && !widget.isEditing) {
       final dio = _dio();
       try {
@@ -128,8 +141,25 @@ class _AddAddressState extends State<AddAddress> {
         dio.close(force: true);
       }
     }
-    // Always load states, even when no token is available.
-    await _loadStates();
+
+    await statesFuture;
+
+    // If profile location arrived after states, resolve it without blocking the
+    // initial form render. Existing address values remain higher priority.
+    if (!mounted || _selectedState != null || _initialStateName == null) return;
+    final wanted = _initialStateName!.trim().toLowerCase();
+    StateModel? matched;
+    for (final item in _states) {
+      if (item.stateName.trim().toLowerCase() == wanted ||
+          item.stateCode.trim().toLowerCase() == wanted) {
+        matched = item;
+        break;
+      }
+    }
+    if (matched != null && mounted) {
+      setState(() => _selectedState = matched);
+      await _loadCities(matched.stateCode, preserveInitial: true);
+    }
   }
 
   Future<void> _loadStates() async {
@@ -427,7 +457,7 @@ class _AddAddressState extends State<AddAddress> {
           SnackBar(
             content: Text(message),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: error ? ArtistColors.error : ArtistColors.success,
+            backgroundColor: error ? AppColors.error : AppColors.success,
           ),
         );
     });
@@ -578,7 +608,7 @@ class _AddAddressState extends State<AddAddress> {
                     bottom: MediaQuery.of(context).viewInsets.bottom,
                   ),
                   child: Material(
-                    color: ArtistColors.surface,
+                    color: AppColors.surface,
                     clipBehavior: Clip.antiAlias,
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(24),
@@ -594,8 +624,8 @@ class _AddAddressState extends State<AddAddress> {
                                 Expanded(
                                   child: Text(
                                     title,
-                                    style: ArtistTextStyles.title.copyWith(
-                                      color: ArtistColors.textPrimary,
+                                    style: AppTextStyles.title.copyWith(
+                                      color: AppColors.textPrimary,
                                       fontSize: 19,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -619,7 +649,7 @@ class _AddAddressState extends State<AddAddress> {
                                 hintText: searchHint,
                                 prefixIcon: const Icon(Icons.search_rounded),
                                 filled: true,
-                                fillColor: ArtistColors.background,
+                                fillColor: AppColors.background,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(14),
                                   borderSide: BorderSide.none,
@@ -633,8 +663,8 @@ class _AddAddressState extends State<AddAddress> {
                                 ? Center(
                                     child: Text(
                                       'No matching results',
-                                      style: ArtistTextStyles.body.copyWith(
-                                        color: ArtistColors.textSecondary,
+                                      style: AppTextStyles.body.copyWith(
+                                        color: AppColors.textSecondary,
                                       ),
                                     ),
                                   )
@@ -655,8 +685,8 @@ class _AddAddressState extends State<AddAddress> {
                                           item == selectedItem;
                                       return Material(
                                         color: isSelected
-                                            ? ArtistColors.light
-                                            : ArtistColors.surface,
+                                            ? AppColors.light
+                                            : AppColors.surface,
                                         borderRadius: BorderRadius.circular(12),
                                         child: ListTile(
                                           shape: RoundedRectangleBorder(
@@ -668,7 +698,7 @@ class _AddAddressState extends State<AddAddress> {
                                           trailing: isSelected
                                               ? const Icon(
                                                   Icons.check_circle_rounded,
-                                                  color: ArtistColors.primary,
+                                                  color: AppColors.primary,
                                                 )
                                               : null,
                                           onTap: () => Navigator.of(
@@ -715,34 +745,30 @@ class _AddAddressState extends State<AddAddress> {
   }) => InputDecoration(
     labelText: label,
     hintText: hint,
-    prefixIcon: Icon(icon, color: ArtistColors.primary),
+    prefixIcon: Icon(icon, color: AppColors.primary),
     filled: true,
-    fillColor: ArtistColors.surface,
-    labelStyle: ArtistTextStyles.caption.copyWith(
-      color: ArtistColors.textSecondary,
-    ),
-    hintStyle: ArtistTextStyles.body.copyWith(
-      color: ArtistColors.textSecondary,
-    ),
+    fillColor: AppColors.surface,
+    labelStyle: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+    hintStyle: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: ArtistColors.light),
+      borderSide: const BorderSide(color: AppColors.light),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: ArtistColors.light),
+      borderSide: const BorderSide(color: AppColors.light),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: ArtistColors.primary, width: 1.5),
+      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
     ),
     errorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: ArtistColors.error),
+      borderSide: const BorderSide(color: AppColors.error),
     ),
     focusedErrorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: ArtistColors.error, width: 1.5),
+      borderSide: const BorderSide(color: AppColors.error, width: 1.5),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
   );
@@ -750,17 +776,17 @@ class _AddAddressState extends State<AddAddress> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ArtistColors.background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: ArtistColors.background,
+        backgroundColor: AppColors.background,
         elevation: 0,
-        foregroundColor: ArtistColors.textPrimary,
+        foregroundColor: AppColors.textPrimary,
         toolbarHeight: 56,
         titleSpacing: 4,
         title: Text(
           widget.isEditing ? 'Edit Address' : 'Add Address',
-          style: ArtistTextStyles.title.copyWith(
-            color: ArtistColors.textPrimary,
+          style: AppTextStyles.title.copyWith(
+            color: AppColors.textPrimary,
             fontSize: 20,
             fontWeight: FontWeight.w700,
           ),
@@ -778,8 +804,8 @@ class _AddAddressState extends State<AddAddress> {
                   widget.isEditing
                       ? 'Update your address'
                       : 'Add a new address',
-                  style: ArtistTextStyles.title.copyWith(
-                    color: ArtistColors.textPrimary,
+                  style: AppTextStyles.title.copyWith(
+                    color: AppColors.textPrimary,
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                   ),
@@ -787,8 +813,8 @@ class _AddAddressState extends State<AddAddress> {
                 const SizedBox(height: 6),
                 Text(
                   'Use accurate details for delivery and order updates.',
-                  style: ArtistTextStyles.body.copyWith(
-                    color: ArtistColors.textSecondary,
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 22),
@@ -892,26 +918,25 @@ class _AddAddressState extends State<AddAddress> {
                   children: [
                     Text(
                       'Choose a label for this address',
-                      style: ArtistTextStyles.body.copyWith(
-                        color: ArtistColors.textSecondary,
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 14),
                     Row(
                       children: [
                         _TypeOption(
-                          label: 'Studio',
+                          label: 'Home',
                           icon: Icons.home_outlined,
-                          selected: _addressType == 'Studio',
-                          onTap: () => setState(() => _addressType = 'Studio'),
+                          selected: _addressType == 'Home',
+                          onTap: () => setState(() => _addressType = 'Home'),
                         ),
                         const SizedBox(width: 10),
                         _TypeOption(
-                          label: 'Workshop',
+                          label: 'Work',
                           icon: Icons.work_outline_rounded,
-                          selected: _addressType == 'Workshop',
-                          onTap: () =>
-                              setState(() => _addressType = 'Workshop'),
+                          selected: _addressType == 'Work',
+                          onTap: () => setState(() => _addressType = 'Work'),
                         ),
                         const SizedBox(width: 10),
                         _TypeOption(
@@ -931,25 +956,25 @@ class _AddAddressState extends State<AddAddress> {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: ArtistColors.surface,
+                    color: AppColors.surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: ArtistColors.light),
+                    border: Border.all(color: AppColors.light),
                   ),
                   child: SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     value: _isDefault,
-                    activeColor: ArtistColors.primary,
+                    activeColor: AppColors.primary,
                     onChanged: (value) => setState(() => _isDefault = value),
                     title: Text(
                       'Set as default address',
-                      style: ArtistTextStyles.body.copyWith(
-                        color: ArtistColors.textPrimary,
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     subtitle: Text(
                       'Use this address automatically for orders.',
-                      style: ArtistTextStyles.caption.copyWith(
-                        color: ArtistColors.textSecondary,
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ),
@@ -963,8 +988,8 @@ class _AddAddressState extends State<AddAddress> {
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
           decoration: const BoxDecoration(
-            color: ArtistColors.background,
-            border: Border(top: BorderSide(color: ArtistColors.light)),
+            color: AppColors.background,
+            border: Border(top: BorderSide(color: AppColors.light)),
           ),
           child: SizedBox(
             height: 54,
@@ -972,8 +997,8 @@ class _AddAddressState extends State<AddAddress> {
             child: ElevatedButton(
               onPressed: _isSaving ? null : _saveAddress,
               style: ElevatedButton.styleFrom(
-                backgroundColor: ArtistColors.primary,
-                foregroundColor: ArtistColors.surface,
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.surface,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -985,7 +1010,7 @@ class _AddAddressState extends State<AddAddress> {
                       height: 22,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        color: ArtistColors.surface,
+                        color: AppColors.surface,
                       ),
                     )
                   : Row(
@@ -999,8 +1024,8 @@ class _AddAddressState extends State<AddAddress> {
                         const SizedBox(width: 8),
                         Text(
                           widget.isEditing ? 'Update Address' : 'Save Address',
-                          style: ArtistTextStyles.body.copyWith(
-                            color: ArtistColors.surface,
+                          style: AppTextStyles.body.copyWith(
+                            color: AppColors.surface,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1031,9 +1056,9 @@ class _SectionCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: ArtistColors.surface,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ArtistColors.light),
+        border: Border.all(color: AppColors.light),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1044,17 +1069,17 @@ class _SectionCard extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: ArtistColors.light,
+                  color: AppColors.light,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: ArtistColors.primary, size: 21),
+                child: Icon(icon, color: AppColors.primary, size: 21),
               ),
               const SizedBox(width: 11),
               Expanded(
                 child: Text(
                   title,
-                  style: ArtistTextStyles.title.copyWith(
-                    color: ArtistColors.textPrimary,
+                  style: AppTextStyles.title.copyWith(
+                    color: AppColors.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1093,10 +1118,10 @@ class _TypeOption extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
           decoration: BoxDecoration(
-            color: selected ? ArtistColors.light : ArtistColors.background,
+            color: selected ? AppColors.light : AppColors.background,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: selected ? ArtistColors.primary : ArtistColors.light,
+              color: selected ? AppColors.primary : AppColors.light,
               width: selected ? 1.5 : 1,
             ),
           ),
@@ -1104,17 +1129,13 @@ class _TypeOption extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color: selected
-                    ? ArtistColors.primary
-                    : ArtistColors.textSecondary,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
               ),
               const SizedBox(height: 6),
               Text(
                 label,
-                style: ArtistTextStyles.caption.copyWith(
-                  color: selected
-                      ? ArtistColors.primary
-                      : ArtistColors.textSecondary,
+                style: AppTextStyles.caption.copyWith(
+                  color: selected ? AppColors.primary : AppColors.textSecondary,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),

@@ -19,6 +19,10 @@ class _AddressListState extends State<AddressList> {
   static const String _baseUrl =
       'https://script.google.com/macros/s/AKfycbzvHq06GwL_I8qH2IPyQP36dRlESN62PYF4Ak5WkRE2VjHL5a-tr0Yk_KEtSvU_ZL6IbQ/exec';
 
+  // Account-scoped in-memory cache: reopening this page shows saved addresses
+  // immediately while the server refresh runs in the background.
+  static final Map<String, List<AddressItem>> _addressCache = {};
+
   List<AddressItem> _addresses = [];
   bool _isLoading = true;
   bool _isMutating = false;
@@ -123,12 +127,9 @@ class _AddressListState extends State<AddressList> {
 
   Future<void> _loadAddresses() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
 
-    if (_token.isEmpty) {
+    final token = _token;
+    if (token.isEmpty) {
       setState(() {
         _isLoading = false;
         _error = 'Please sign in to view your saved addresses.';
@@ -136,10 +137,24 @@ class _AddressListState extends State<AddressList> {
       return;
     }
 
+    final cached = _addressCache[token];
+    if (cached != null) {
+      setState(() {
+        _addresses = List<AddressItem>.of(cached);
+        _isLoading = false;
+        _error = null;
+      });
+    } else {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+
     final dio = _dio();
     try {
       final response = await dio.get<dynamic>(
-        _uri('/addresses', {'token': _token}).toString(),
+        _uri('/addresses', {'token': token}).toString(),
         options: Options(followRedirects: false, maxRedirects: 0),
       );
       final raw = await _unwrapRedirect(dio, response);
@@ -162,7 +177,8 @@ class _AddressListState extends State<AddressList> {
         if (map.isNotEmpty) parsed.add(AddressItem.fromMap(map));
       }
 
-      if (!mounted) return;
+      _addressCache[token] = List<AddressItem>.unmodifiable(parsed);
+      if (!mounted || token != _token) return;
       setState(() {
         _addresses = parsed;
         _isLoading = false;
@@ -172,7 +188,7 @@ class _AddressListState extends State<AddressList> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _error = _errorMessage(error);
+        _error = _addresses.isNotEmpty ? null : _errorMessage(error);
       });
     } finally {
       dio.close(force: true);
@@ -260,6 +276,12 @@ class _AddressListState extends State<AddressList> {
         method: 'DELETE',
       );
       if (!mounted) return;
+      _addresses = _addresses.where((item) => item.id != address.id).toList();
+      final token = _token;
+      if (token.isNotEmpty) {
+        _addressCache[token] = List<AddressItem>.unmodifiable(_addresses);
+      }
+      setState(() {});
       _showMessage('Address deleted.');
       await _loadAddresses();
     } catch (error) {
@@ -279,6 +301,29 @@ class _AddressListState extends State<AddressList> {
         body: <String, dynamic>{'isDefault': true},
       );
       if (!mounted) return;
+      _addresses = _addresses
+          .map(
+            (item) => AddressItem(
+              id: item.id,
+              name: item.name,
+              phone: item.phone,
+              house: item.house,
+              street: item.street,
+              area: item.area,
+              landmark: item.landmark,
+              city: item.city,
+              state: item.state,
+              pincode: item.pincode,
+              type: item.type,
+              isDefault: item.id == address.id,
+            ),
+          )
+          .toList();
+      final token = _token;
+      if (token.isNotEmpty) {
+        _addressCache[token] = List<AddressItem>.unmodifiable(_addresses);
+      }
+      setState(() {});
       _showMessage('Default address updated.');
       await _loadAddresses();
     } catch (error) {
