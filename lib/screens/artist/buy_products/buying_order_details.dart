@@ -37,9 +37,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     _order = Map<String, dynamic>.from(widget.order);
     _status = (_order['status'] ?? _order['orderStatus'] ?? 'pending')
         .toString();
-    _refreshOrder(showErrors: false);
+    _refreshOrderAndPaymentState();
     _loadReviewStatus();
-    _loadPaymentRetryAvailability();
   }
 
   // GETTERS
@@ -1162,6 +1161,16 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
           _billRow('Order total', _formatCurrency(totalAmount), bold: true),
 
+          const SizedBox(height: 12),
+
+          _billRow(
+            'Payment method',
+            '${_order['paymentMethod'] ?? _order['method'] ?? 'Not specified'}'
+                .toString()
+                .replaceAll('_', ' ')
+                .toUpperCase(),
+          ),
+
           const SizedBox(height: 5),
 
           Row(
@@ -1184,6 +1193,29 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
               ),
             ],
           ),
+
+          if (_canRetryPayment && !isCancelled) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _checkingPaymentRetry ? null : _completePayment,
+                icon: const Icon(Icons.payment_rounded, size: 18),
+                label: const Text('Complete Payment'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ArtistColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ] else if (_checkingPaymentRetry) ...[
+            const SizedBox(height: 10),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
         ],
       ),
     );
@@ -1811,6 +1843,12 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   // CANCEL ORDER
 
+  Future<void> _refreshOrderAndPaymentState() async {
+    await _refreshOrder(showErrors: false);
+    if (!mounted) return;
+    await _loadPaymentRetryAvailability();
+  }
+
   Future<void> _refreshOrder({bool showErrors = true}) async {
     if (_refreshingOrder) return;
     _refreshingOrder = true;
@@ -1848,39 +1886,70 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   }
 
   Future<void> _loadPaymentRetryAvailability() async {
-    final id = int.tryParse('${_order['orderId'] ?? _order['id'] ?? ''}');
-    if (id == null || id <= 0) {
-      if (mounted)
+    final requestedOrderId = int.tryParse(
+      '${_order['orderId'] ?? _order['id'] ?? ''}',
+    );
+    if (requestedOrderId == null || requestedOrderId <= 0) {
+      if (mounted) {
         setState(() {
           _canRetryPayment = false;
           _checkingPaymentRetry = false;
         });
+      }
       return;
     }
+
+    if (mounted) setState(() => _checkingPaymentRetry = true);
     try {
       final response = await EcoLoopApi.instance.get('/payments');
       final dynamic rows = response is Map
           ? (response['payments'] ?? response['data'] ?? [])
           : response;
       final payments = rows is List ? rows.whereType<Map>().toList() : <Map>[];
-      final eligible = payments.any(
-        (payment) =>
-            int.tryParse('${payment['orderId'] ?? ''}') == id &&
-            '${payment['method'] ?? ''}'.toLowerCase() == 'razorpay' &&
-            '${payment['status'] ?? ''}'.toLowerCase() != 'paid',
+      final eligible = payments.any((payment) {
+        final status = '${payment['status'] ?? ''}'.trim().toLowerCase();
+        return int.tryParse('${payment['orderId'] ?? ''}') ==
+                requestedOrderId &&
+            '${payment['method'] ?? ''}'.trim().toLowerCase() == 'razorpay' &&
+            !const {
+              'paid',
+              'cancelled',
+              'failed',
+              'refund_required',
+            }.contains(status);
+      });
+
+      if (!mounted) return;
+      // Never apply a result to a different order if this State was reused.
+      final currentOrderId = int.tryParse(
+        '${_order['orderId'] ?? _order['id'] ?? ''}',
       );
-      if (mounted)
-        setState(() {
-          _canRetryPayment =
-              eligible && paymentStatus.toLowerCase() != 'paid' && !isCancelled;
-          _checkingPaymentRetry = false;
-        });
+      if (currentOrderId != requestedOrderId) return;
+      final currentStatus =
+          (_order['status'] ?? _order['orderStatus'] ?? _status)
+              .toString()
+              .trim()
+              .toLowerCase();
+      final currentPaymentStatus = paymentStatus.trim().toLowerCase();
+      setState(() {
+        _canRetryPayment =
+            eligible &&
+            currentPaymentStatus != 'paid' &&
+            !const {
+              'cancelled',
+              'delivered',
+              'shipped',
+              'out_for_delivery',
+            }.contains(currentStatus);
+        _checkingPaymentRetry = false;
+      });
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _canRetryPayment = false;
           _checkingPaymentRetry = false;
         });
+      }
     }
   }
 
@@ -1909,8 +1978,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       ),
     );
     if (!mounted) return;
-    await _refreshOrder(showErrors: false);
-    await _loadPaymentRetryAvailability();
+    await _refreshOrderAndPaymentState();
   }
 
   Future<void> _cancelOrder() async {

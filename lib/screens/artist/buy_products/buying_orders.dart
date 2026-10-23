@@ -71,6 +71,9 @@ class _BuyingOrdersState extends State<BuyingOrders> {
       final paymentStatus = '${order['paymentStatus'] ?? ''}'
           .trim()
           .toLowerCase();
+      final paymentRecordStatus = '${order['paymentRecordStatus'] ?? ''}'
+          .trim()
+          .toLowerCase();
       final paymentMethod = '${order['paymentMethod'] ?? ''}'
           .trim()
           .toLowerCase();
@@ -79,7 +82,9 @@ class _BuyingOrdersState extends State<BuyingOrders> {
           paymentMethod == 'razorpay' &&
           (paymentStatus == 'unpaid' ||
               paymentStatus == 'failed' ||
-              paymentStatus == 'cancelled');
+              paymentStatus == 'cancelled' ||
+              paymentRecordStatus == 'cancelled' ||
+              paymentRecordStatus == 'failed');
       return !abandonedRazorpayAttempt;
     }).toList();
 
@@ -916,15 +921,58 @@ class _BuyingOrdersState extends State<BuyingOrders> {
       });
     }
     try {
-      final response = await EcoLoopApi.instance.get('/orders');
+      final responses = await Future.wait<dynamic>([
+        EcoLoopApi.instance.get('/orders'),
+        EcoLoopApi.instance.get('/payments'),
+      ]);
+      final response = responses[0];
+      final paymentResponse = responses[1];
       final dynamic rows = response is Map
           ? (response['orders'] ?? response['items'] ?? response['data'] ?? [])
           : response;
+      final dynamic paymentRows = paymentResponse is Map
+          ? (paymentResponse['payments'] ?? paymentResponse['data'] ?? [])
+          : paymentResponse;
+      final paymentList = paymentRows is List
+          ? paymentRows
+                .whereType<Map>()
+                .map((row) => Map<String, dynamic>.from(row))
+                .toList()
+          : <Map<String, dynamic>>[];
+      final methodByOrder = <String, String>{};
+      final paymentStatusByOrder = <String, String>{};
+      for (final payment in paymentList) {
+        final id = '${payment['orderId'] ?? ''}'.trim();
+        if (id.isEmpty) continue;
+        final method = '${payment['method'] ?? ''}'.trim().toLowerCase();
+        final status = '${payment['status'] ?? ''}'.trim().toLowerCase();
+        if (method.isNotEmpty) methodByOrder[id] = method;
+        // Prefer a non-pending terminal payment status if multiple attempts exist.
+        if (status.isNotEmpty &&
+            (!paymentStatusByOrder.containsKey(id) ||
+                !const {
+                  'pending',
+                  'created',
+                }.contains(paymentStatusByOrder[id]))) {
+          paymentStatusByOrder[id] = status;
+        }
+      }
       final list = rows is List ? rows : <dynamic>[];
-      final parsed = list
-          .whereType<Map>()
-          .map((row) => _normalizeOrder(Map<String, dynamic>.from(row)))
-          .toList();
+      final parsed = list.whereType<Map>().map((row) {
+        final order = _normalizeOrder(Map<String, dynamic>.from(row));
+        final id = '${order['orderId'] ?? ''}';
+        if ((order['paymentMethod'] as String).isEmpty &&
+            methodByOrder.containsKey(id)) {
+          order['paymentMethod'] = methodByOrder[id]!;
+        }
+        final paymentStatus = paymentStatusByOrder[id];
+        if (paymentStatus != null &&
+            (order['paymentStatus'] == 'pending' ||
+                order['paymentStatus'] == 'unpaid')) {
+          order['paymentRecordStatus'] = paymentStatus;
+        }
+        return order;
+      }).toList();
       if (!mounted) return;
       setState(() {
         _orders = parsed;

@@ -519,7 +519,7 @@ class _PaymentState extends State<Payment> {
       // UI-test placeholder, matching the User-side app-launch behaviour.
       // Replace this with EcoLoop's verified merchant UPI ID before production.
       await UpiPaymentPlugin.initiateUPIPayment(
-        payeeUpiId: 'ecoloop-ui-test@invalid',
+        payeeUpiId: 'dishankprajapati@ptyes',
         payeeName: 'EcoLoop',
         amount: widget.totalAmount,
         transactionId: 'ECO${DateTime.now().millisecondsSinceEpoch}',
@@ -634,17 +634,10 @@ class _PaymentState extends State<Payment> {
   }
 
   Future<void> _handleRazorpayError(PaymentFailureResponse response) async {
-    if (_gatewayCallbackHandled) {
-      return;
-    }
+    if (_gatewayCallbackHandled) return;
     _gatewayCallbackHandled = true;
-    if (mounted) {
-      setState(() => _isProcessing = true);
-    }
+    if (mounted) setState(() => _isProcessing = true);
 
-    // Checkout currently creates pending order/payment rows before opening
-    // Razorpay. If the gateway is dismissed or payment fails, cancel those
-    // pending orders on the server so they cannot remain active in Buying Orders.
     var cancellationConfirmed = true;
     final orderIds = _pendingOrders
         .map(
@@ -654,43 +647,60 @@ class _PaymentState extends State<Payment> {
         .where((id) => id > 0)
         .toSet();
 
+    // Retry cancellation on transient API/network failures. The server endpoint
+    // cancels the order and its unpaid payment record together.
     for (final orderId in orderIds) {
-      try {
-        final result = await EcoLoopApi.instance.post(
-          '/orders/$orderId/cancel',
-          <String, dynamic>{},
-        );
-        final root = _asMap(result);
-        if (root['success'] == false) {
-          cancellationConfirmed = false;
+      var orderCancelled = false;
+      for (var attempt = 0; attempt < 3 && !orderCancelled; attempt++) {
+        try {
+          final result = await EcoLoopApi.instance.post(
+            '/orders/$orderId/cancel',
+            <String, dynamic>{},
+          );
+          final root = _asMap(result);
+          final data = _asMap(_responseData(result));
+          final status = '${data['status'] ?? data['orderStatus'] ?? ''}'
+              .trim()
+              .toLowerCase();
+          orderCancelled =
+              root['success'] != false &&
+              (status == 'cancelled' ||
+                  root['success'] == true ||
+                  data['cancelled'] == true);
+        } catch (_) {
+          orderCancelled = false;
         }
-      } catch (_) {
-        cancellationConfirmed = false;
+        if (!orderCancelled && attempt < 2) {
+          await Future<void>.delayed(
+            Duration(milliseconds: 350 * (attempt + 1)),
+          );
+        }
       }
+      if (!orderCancelled) cancellationConfirmed = false;
     }
 
-    // Do not retain cancelled order/payment IDs for an accidental retry.
-    _pendingOrders = <Map<String, dynamic>>[];
-    _pendingPaymentIds = <int>[];
-    _gatewayOrderId = null;
+    // Clear retry state only when the backend confirms cancellation. If the
+    // server is unreachable, keep IDs so a user can retry instead of losing
+    // the reference to the pending checkout.
+    if (cancellationConfirmed) {
+      _pendingOrders = <Map<String, dynamic>>[];
+      _pendingPaymentIds = <int>[];
+      _gatewayOrderId = null;
+    }
 
     if (!mounted) return;
     setState(() => _isProcessing = false);
 
     final userCancelled = response.code == 0;
-    if (cancellationConfirmed) {
-      _showMessage(
-        userCancelled
-            ? 'Payment cancelled. No order has been placed.'
-            : 'Payment failed. No order has been placed.',
-      );
-    } else {
-      _showMessage(
-        userCancelled
-            ? 'Payment cancelled. We could not confirm order cancellation with the server. Refresh Buying Orders before trying again.'
-            : 'Payment failed. We could not confirm order cancellation with the server. Refresh Buying Orders before trying again.',
-      );
-    }
+    _showMessage(
+      cancellationConfirmed
+          ? (userCancelled
+                ? 'Payment cancelled. The unpaid order was cancelled.'
+                : 'Payment failed. The unpaid order was cancelled.')
+          : (userCancelled
+                ? 'Payment cancelled, but the server has not confirmed order cancellation. Please refresh Buying Orders and retry cancellation before paying again.'
+                : 'Payment failed, but the server has not confirmed order cancellation. Please refresh Buying Orders and retry cancellation before paying again.'),
+    );
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {

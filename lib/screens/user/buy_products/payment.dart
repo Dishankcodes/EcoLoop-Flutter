@@ -1497,7 +1497,7 @@ class _PaymentState extends State<Payment> {
   /// This placeholder VPA is not a real merchant account; do not treat any
   /// response from this flow as payment confirmation.
   Future<void> _launchUpiAppForUiTest(String selectedApp) async {
-    const demoUpiId = 'ecoloop-ui-test@invalid';
+    const demoUpiId = 'dishankprajapati@ptyes';
     const packageNames = <String, String>{
       'gpay': 'com.google.android.apps.nbu.paisa.user',
       'phonepe': 'com.phonepe.app',
