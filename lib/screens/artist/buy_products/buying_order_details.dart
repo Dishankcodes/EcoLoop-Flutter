@@ -8,6 +8,7 @@ import '../../../app_theme/artist/artist_text_styles.dart';
 import '../reviews/write_review.dart';
 import '../reviews/write_seller_review.dart';
 import 'buying_order_track.dart';
+import 'payment.dart';
 
 class BuyingOrderDetails extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -26,6 +27,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   bool _reviewRequestInProgress = false;
   bool _productReviewed = false;
   bool _sellerReviewed = false;
+  bool _canRetryPayment = false;
+  bool _checkingPaymentRetry = true;
 
   @override
   void initState() {
@@ -36,6 +39,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         .toString();
     _refreshOrder(showErrors: false);
     _loadReviewStatus();
+    _loadPaymentRetryAvailability();
   }
 
   // GETTERS
@@ -94,17 +98,17 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     }
     if (value is Map) {
       final parts =
-          <String>[
-                value['name'],
-                value['addressLine'],
-                value['area'],
-                value['city'],
-                value['state'],
-                value['pincode'],
-              ]
-              .map((part) => (part ?? '').toString().trim())
-              .where((part) => part.isNotEmpty)
-              .toList();
+      <String>[
+        value['name'],
+        value['addressLine'],
+        value['area'],
+        value['city'],
+        value['state'],
+        value['pincode'],
+      ]
+          .map((part) => (part ?? '').toString().trim())
+          .where((part) => part.isNotEmpty)
+          .toList();
       return parts.isEmpty ? 'Address not available' : parts.toSet().join(', ');
     }
     return value.toString();
@@ -572,28 +576,28 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child:
-                      (_order['productImage'] ?? _order['imageUrl'] ?? '')
-                          .toString()
-                          .trim()
-                          .isNotEmpty
+                  (_order['productImage'] ?? _order['imageUrl'] ?? '')
+                      .toString()
+                      .trim()
+                      .isNotEmpty
                       ? ClipRRect(
-                          borderRadius: BorderRadius.circular(15),
-                          child: Image.network(
-                            (_order['productImage'] ?? _order['imageUrl'])
-                                .toString(),
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Icon(
-                              productIcon,
-                              size: 38,
-                              color: ArtistColors.primary,
-                            ),
-                          ),
-                        )
+                    borderRadius: BorderRadius.circular(15),
+                    child: Image.network(
+                      (_order['productImage'] ?? _order['imageUrl'])
+                          .toString(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        productIcon,
+                        size: 38,
+                        color: ArtistColors.primary,
+                      ),
+                    ),
+                  )
                       : Icon(
-                          productIcon,
-                          size: 38,
-                          color: ArtistColors.primary,
-                        ),
+                    productIcon,
+                    size: 38,
+                    color: ArtistColors.primary,
+                  ),
                 ),
 
                 const SizedBox(width: 13),
@@ -683,8 +687,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
                         Text(
                           (_order['sellerType']?.toString() ?? '')
-                                      .toLowerCase() ==
-                                  'artist'
+                              .toLowerCase() ==
+                              'artist'
                               ? 'Artist seller'
                               : 'Seller',
                           style: ArtistTextStyles.small.copyWith(fontSize: 10),
@@ -762,28 +766,28 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       clipBehavior: Clip.antiAlias,
       child: imageUrl == null
           ? const Icon(
-              Icons.person_rounded,
-              color: ArtistColors.primary,
-              size: 27,
-            )
+        Icons.person_rounded,
+        color: ArtistColors.primary,
+        size: 27,
+      )
           : Image.network(
-              imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => const Icon(
-                Icons.person_rounded,
-                color: ArtistColors.primary,
-                size: 27,
-              ),
-            ),
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const Icon(
+          Icons.person_rounded,
+          color: ArtistColors.primary,
+          size: 27,
+        ),
+      ),
     );
   }
 
   Future<void> _showSellerContact() async {
     final sellerIdRaw =
         _order['sellerId'] ??
-        _order['artistId'] ??
-        _order['seller_id'] ??
-        _order['artist_id'];
+            _order['artistId'] ??
+            _order['seller_id'] ??
+            _order['artist_id'];
     final sellerId = sellerIdRaw is num
         ? sellerIdRaw.toInt()
         : int.tryParse('${sellerIdRaw ?? ''}') ?? 0;
@@ -792,12 +796,12 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     Map<String, dynamic> contact = <String, dynamic>{
       'name': sellerName,
       'email':
-          _order['sellerEmail'] ??
+      _order['sellerEmail'] ??
           _order['artistEmail'] ??
           _order['email'] ??
           '',
       'phone':
-          _order['sellerPhone'] ??
+      _order['sellerPhone'] ??
           _order['artistPhone'] ??
           _order['phone'] ??
           '',
@@ -1086,9 +1090,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             Icons.local_shipping_outlined,
             'Delivery speed',
             (_order['deliveryMethod'] ?? 'standard')
-                    .toString()
-                    .toLowerCase()
-                    .contains('express')
+                .toString()
+                .toLowerCase()
+                .contains('express')
                 ? 'Express'
                 : 'Standard',
           ),
@@ -1101,9 +1105,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             isDelivered
                 ? 'Delivered successfully'
                 : (_order['expectedDelivery'] ??
-                          _order['estimatedDelivery'] ??
-                          'Not provided by seller')
-                      .toString(),
+                _order['estimatedDelivery'] ??
+                'Not provided by seller')
+                .toString(),
           ),
         ],
       ),
@@ -1364,10 +1368,10 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       if (response is Map) {
         rows =
             response['reviews'] ??
-            response['data'] ??
-            response['items'] ??
-            response['results'] ??
-            const <dynamic>[];
+                response['data'] ??
+                response['items'] ??
+                response['results'] ??
+                const <dynamic>[];
       }
 
       bool productDone = false;
@@ -1397,12 +1401,12 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           final reviewSellerType = _reviewString(review['sellerType']);
           final matchesSeller =
               currentSellerId > 0 &&
-              (reviewArtistId == currentSellerId ||
-                  (reviewSellerId == currentSellerId &&
-                      reviewSellerType == currentSellerType) ||
-                  (reviewSellerId == currentSellerId &&
-                      currentSellerType == 'user' &&
-                      reviewSellerType.isEmpty));
+                  (reviewArtistId == currentSellerId ||
+                      (reviewSellerId == currentSellerId &&
+                          reviewSellerType == currentSellerType) ||
+                      (reviewSellerId == currentSellerId &&
+                          currentSellerType == 'user' &&
+                          reviewSellerType.isEmpty));
           if (reviewProductId == 0 &&
               matchesSeller &&
               (reviewType.isEmpty ||
@@ -1436,8 +1440,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     final sellerType = _reviewString(_order['sellerType'] ?? 'user');
     final isArtist =
         sellerType == 'artist' ||
-        sellerType == 'remaker' ||
-        sellerType == 're maker';
+            sellerType == 'remaker' ||
+            sellerType == 're maker';
     final payment = _reviewString(_order['paymentStatus'] ?? _order['payment']);
     final isPaid = const {
       'paid',
@@ -1464,30 +1468,30 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed:
-                  !_checkingReviews &&
-                      eligible &&
-                      productId > 0 &&
-                      !_productReviewed
+              !_checkingReviews &&
+                  eligible &&
+                  productId > 0 &&
+                  !_productReviewed
                   ? () async {
-                      final result = await Navigator.push<dynamic>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => WriteReview(
-                            product: {
-                              ..._order,
-                              'productId': productId,
-                              'id': productId,
-                              'title': productName,
-                              'reviewOrderId': currentOrderId,
-                            },
-                            orderId: currentOrderId,
-                          ),
-                        ),
-                      );
-                      if (result != null && mounted) {
-                        await _loadReviewStatus();
-                      }
-                    }
+                final result = await Navigator.push<dynamic>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => WriteReview(
+                      product: {
+                        ..._order,
+                        'productId': productId,
+                        'id': productId,
+                        'title': productName,
+                        'reviewOrderId': currentOrderId,
+                      },
+                      orderId: currentOrderId,
+                    ),
+                  ),
+                );
+                if (result != null && mounted) {
+                  await _loadReviewStatus();
+                }
+              }
                   : null,
               icon: const Icon(Icons.inventory_2_outlined),
               label: Text(
@@ -1504,31 +1508,31 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed:
-                  !_checkingReviews &&
-                      eligible &&
-                      sellerId > 0 &&
-                      !_sellerReviewed
+              !_checkingReviews &&
+                  eligible &&
+                  sellerId > 0 &&
+                  !_sellerReviewed
                   ? () async {
-                      final result = await Navigator.push<dynamic>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => WriteSellerReview(
-                            sellerName: sellerName,
-                            sellerImage:
-                                (_order['sellerProfilePhotoUrl'] ??
-                                        _order['sellerImage'] ??
-                                        _order['profilePhotoUrl'])
-                                    ?.toString(),
-                            sellerId: '$sellerId',
-                            sellerType: sellerType,
-                            orderId: '$currentOrderId',
-                          ),
-                        ),
-                      );
-                      if (result != null && mounted) {
-                        await _loadReviewStatus();
-                      }
-                    }
+                final result = await Navigator.push<dynamic>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => WriteSellerReview(
+                      sellerName: sellerName,
+                      sellerImage:
+                      (_order['sellerProfilePhotoUrl'] ??
+                          _order['sellerImage'] ??
+                          _order['profilePhotoUrl'])
+                          ?.toString(),
+                      sellerId: '$sellerId',
+                      sellerType: sellerType,
+                      orderId: '$currentOrderId',
+                    ),
+                  ),
+                );
+                if (result != null && mounted) {
+                  await _loadReviewStatus();
+                }
+              }
                   : null,
               icon: const Icon(Icons.storefront_outlined),
               label: Text(
@@ -1537,8 +1541,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                     : _sellerReviewed
                     ? (isArtist ? 'Artist Reviewed' : 'Seller Reviewed')
                     : (isArtist
-                          ? 'Write Artist Review'
-                          : 'Write Seller Review'),
+                    ? 'Write Artist Review'
+                    : 'Write Seller Review'),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: ArtistColors.primary,
@@ -1646,43 +1650,28 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: isDelivered ? _buyAgain : _cancelOrder,
-                icon: Icon(
-                  isDelivered ? Icons.refresh_rounded : Icons.cancel_outlined,
-                  size: 17,
-                ),
+                icon: Icon(isDelivered ? Icons.refresh_rounded : Icons.cancel_outlined, size: 17),
                 label: Text(isDelivered ? 'Buy Again' : 'Cancel Order'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: isDelivered
-                      ? ArtistColors.primary
-                      : ArtistColors.error,
-                  side: BorderSide(
-                    color: isDelivered
-                        ? ArtistColors.primary
-                        : ArtistColors.error,
-                  ),
+                  foregroundColor: isDelivered ? ArtistColors.primary : ArtistColors.error,
+                  side: BorderSide(color: isDelivered ? ArtistColors.primary : ArtistColors.error),
                   minimumSize: const Size(0, 48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(13),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
                 ),
               ),
             ),
-
             const SizedBox(width: 10),
-
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: _trackOrder,
-                icon: const Icon(Icons.local_shipping_outlined, size: 17),
-                label: const Text('Track Order'),
+                onPressed: _canRetryPayment && !_checkingPaymentRetry ? _completePayment : _trackOrder,
+                icon: Icon(_canRetryPayment ? Icons.payment_rounded : Icons.local_shipping_outlined, size: 17),
+                label: Text(_canRetryPayment ? 'Complete Payment' : 'Track Order'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: ArtistColors.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   minimumSize: const Size(0, 48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(13),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
                 ),
               ),
             ),
@@ -1836,6 +1825,50 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     }
   }
 
+  Future<void> _loadPaymentRetryAvailability() async {
+    final id = int.tryParse('${_order['orderId'] ?? _order['id'] ?? ''}');
+    if (id == null || id <= 0) {
+      if (mounted) setState(() { _canRetryPayment = false; _checkingPaymentRetry = false; });
+      return;
+    }
+    try {
+      final response = await EcoLoopApi.instance.get('/payments');
+      final dynamic rows = response is Map ? (response['payments'] ?? response['data'] ?? []) : response;
+      final payments = rows is List ? rows.whereType<Map>().toList() : <Map>[];
+      final eligible = payments.any((payment) =>
+      int.tryParse('${payment['orderId'] ?? ''}') == id &&
+          '${payment['method'] ?? ''}'.toLowerCase() == 'razorpay' &&
+          '${payment['status'] ?? ''}'.toLowerCase() != 'paid');
+      if (mounted) setState(() { _canRetryPayment = eligible && paymentStatus.toLowerCase() != 'paid' && !isCancelled; _checkingPaymentRetry = false; });
+    } catch (_) {
+      if (mounted) setState(() { _canRetryPayment = false; _checkingPaymentRetry = false; });
+    }
+  }
+
+  Future<void> _completePayment() async {
+    if (!_canRetryPayment || _checkingPaymentRetry || _refreshingOrder) return;
+    final rawAddress = _order['shippingAddress'] ?? _order['address'];
+    Map<String, dynamic>? address;
+    if (rawAddress is Map) {
+      address = Map<String, dynamic>.from(rawAddress);
+    } else if (rawAddress is String && rawAddress.trim().startsWith('{')) {
+      try {
+        final decoded = jsonDecode(rawAddress);
+        if (decoded is Map) address = Map<String, dynamic>.from(decoded);
+      } catch (_) {}
+    }
+    await Navigator.push<void>(context, MaterialPageRoute<void>(builder: (_) => Payment(
+      totalAmount: totalAmount,
+      items: const <Map<String, dynamic>>[],
+      address: address,
+      existingOrder: Map<String, dynamic>.from(_order),
+      clearCartAfterSuccess: false,
+    )));
+    if (!mounted) return;
+    await _refreshOrder(showErrors: false);
+    await _loadPaymentRetryAvailability();
+  }
+
   Future<void> _cancelOrder() async {
     if ([
       'shipped',
@@ -1889,10 +1922,10 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
                 await _refreshOrder(showErrors: false);
                 if (mounted) {
                   setState(
-                    () => _status =
+                        () => _status =
                         (_order['status'] ??
-                                _order['orderStatus'] ??
-                                'cancelled')
+                            _order['orderStatus'] ??
+                            'cancelled')
                             .toString(),
                   );
                   _showMessage('Order cancellation confirmed by the server.');
@@ -2109,3 +2142,4 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 }
+

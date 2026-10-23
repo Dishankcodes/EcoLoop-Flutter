@@ -315,63 +315,125 @@ class _CheckoutState extends State<Checkout> {
     return '${groups.join(',')},$lastThree';
   }
 
-  Future<void> _loadAddresses() async {
+  Future<void> _loadAddresses({
+    bool showLoading = true,
+    int attempts = 1,
+  }) async {
     if (!mounted) return;
-    setState(() {
-      _loadingAddresses = true;
-      _addressError = null;
-    });
-    try {
-      final response = await _api.get('/addresses');
-      final rows = _extractRows(response);
-      final addresses = rows
-          .map((raw) {
-            final address = Map<String, dynamic>.from(raw);
-            address['addressId'] =
-                address['addressId'] ?? address['address_id'] ?? address['id'];
-            address['label'] = address['label'] ?? address['type'] ?? 'Address';
-            address['addressLine'] =
-                address['addressLine'] ??
-                address['address_line'] ??
-                [address['house'], address['street']]
-                    .where((v) => v != null && v.toString().trim().isNotEmpty)
-                    .join(', ');
-            address['area'] = address['area'] ?? address['landmark'] ?? '';
-            return address;
-          })
-          .where((a) => (a['addressId'] ?? '').toString().isNotEmpty)
-          .toList();
-
-      if (!mounted) return;
-      Map<String, dynamic>? defaultAddress;
-      for (final address in addresses) {
-        if (_isTrue(address['isDefault'] ?? address['is_default'])) {
-          defaultAddress = address;
-          break;
-        }
-      }
+    if (showLoading) {
       setState(() {
-        _addresses = addresses;
-        final currentExists = addresses.any(
-          (a) => a['addressId'].toString() == _selectedAddressId,
-        );
-        if (!currentExists) {
-          _selectedAddressId =
-              (defaultAddress?['addressId'] ??
-                      (addresses.isNotEmpty
-                          ? addresses.first['addressId']
-                          : null))
-                  ?.toString();
-        }
-        _loadingAddresses = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _loadingAddresses = false;
-        _addressError = error.toString();
+        _loadingAddresses = _addresses.isEmpty;
+        _addressError = null;
       });
     }
+
+    Object? lastError;
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      try {
+        final response = await _api.get('/addresses');
+        final rows = _extractRows(
+          response,
+          keys: const ['addresses', 'items', 'data', 'results'],
+        );
+
+        final addresses = rows
+            .map((raw) {
+              final address = Map<String, dynamic>.from(raw);
+              address['addressId'] =
+                  address['addressId'] ??
+                  address['address_id'] ??
+                  address['id'] ??
+                  address['ID'];
+              address['label'] =
+                  address['label'] ??
+                  address['type'] ??
+                  address['addressType'] ??
+                  'Address';
+              address['name'] =
+                  address['name'] ??
+                  address['recipientName'] ??
+                  address['recipient_name'] ??
+                  '';
+              address['phone'] =
+                  address['phone'] ??
+                  address['phoneNumber'] ??
+                  address['phone_number'] ??
+                  '';
+              address['addressLine'] =
+                  address['addressLine'] ??
+                  address['address_line'] ??
+                  address['fullAddress'] ??
+                  address['full_address'] ??
+                  address['address'] ??
+                  [address['house'], address['street']]
+                      .where((v) => v != null && v.toString().trim().isNotEmpty)
+                      .join(', ');
+              address['area'] =
+                  address['area'] ??
+                  address['landmark'] ??
+                  address['locality'] ??
+                  '';
+              address['city'] = address['city'] ?? address['town'] ?? '';
+              address['state'] = address['state'] ?? address['region'] ?? '';
+              address['pincode'] =
+                  address['pincode'] ??
+                  address['postalCode'] ??
+                  address['postal_code'] ??
+                  address['zipCode'] ??
+                  address['zip_code'] ??
+                  '';
+              return address;
+            })
+            .where((a) {
+              final id = a['addressId'];
+              return id != null && id.toString().trim().isNotEmpty;
+            })
+            .toList();
+
+        if (!mounted) return;
+        Map<String, dynamic>? defaultAddress;
+        for (final address in addresses) {
+          if (_isTrue(address['isDefault'] ?? address['is_default'])) {
+            defaultAddress = address;
+            break;
+          }
+        }
+
+        setState(() {
+          _addresses = addresses;
+          final currentExists = addresses.any(
+            (a) => a['addressId'].toString() == _selectedAddressId,
+          );
+          if (!currentExists) {
+            _selectedAddressId =
+                (defaultAddress?['addressId'] ??
+                        (addresses.isNotEmpty
+                            ? addresses.first['addressId']
+                            : null))
+                    ?.toString();
+          }
+          _loadingAddresses = false;
+          _addressError = null;
+        });
+        if (addresses.isNotEmpty || attempt == attempts - 1) return;
+      } catch (error) {
+        lastError = error;
+        if (attempt == attempts - 1) break;
+      }
+
+      // Apps Script/Sheets may briefly take a moment to expose a just-saved row.
+      if (attempt < attempts - 1) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _loadingAddresses = false;
+      _addressError =
+          lastError?.toString() ??
+          'No saved addresses were returned. Please refresh and try again.';
+    });
   }
 
   Future<void> _loadCurrentAccountAndOwnProducts() async {
@@ -544,7 +606,8 @@ class _CheckoutState extends State<Checkout> {
 
   Map<String, dynamic>? get _selectedAddress {
     for (final address in _addresses) {
-      if (address['addressId'].toString() == _selectedAddressId) return address;
+      final id = address['addressId'] ?? address['address_id'] ?? address['id'];
+      if (id != null && id.toString() == _selectedAddressId) return address;
     }
     return null;
   }
@@ -552,35 +615,91 @@ class _CheckoutState extends State<Checkout> {
   Future<void> _addAddress() async {
     if (_savingAddress) return;
     setState(() => _savingAddress = true);
+    final previousAddressIds = _addresses
+        .map(
+          (address) =>
+              (address['addressId'] ?? address['address_id'] ?? address['id'])
+                  .toString(),
+        )
+        .toSet();
     try {
-      final result = await Navigator.push<Map<String, dynamic>>(
+      // AddAddress returns `true` after a successful save, not an address map.
+      // Accept dynamic here so the route result cannot fail a Map type cast.
+      final dynamic result = await Navigator.push<dynamic>(
         context,
-        MaterialPageRoute(builder: (_) => const AddAddress()),
+        MaterialPageRoute<dynamic>(builder: (_) => const AddAddress()),
       );
-      await _loadAddresses();
       if (!mounted) return;
-      if (result != null) {
-        final resultId =
-            result['addressId'] ?? result['address_id'] ?? result['id'];
-        if (resultId != null &&
-            _addresses.any(
-              (a) => a['addressId'].toString() == resultId.toString(),
-            )) {
-          setState(() => _selectedAddressId = resultId.toString());
-        } else if (_addresses.isNotEmpty) {
-          final match = _addresses.where(
-            (a) =>
-                (a['name'] ?? '').toString().trim() ==
-                    (result['name'] ?? '').toString().trim() &&
-                (a['phone'] ?? '').toString().trim() ==
-                    (result['phone'] ?? '').toString().trim() &&
-                (a['city'] ?? '').toString().trim() ==
-                    (result['city'] ?? '').toString().trim(),
-          );
-          if (match.isNotEmpty)
+
+      if (result == true) {
+        // Refresh from the API after saving. Retry briefly until the newly
+        // created row appears, rather than accepting an old/stale list.
+        for (var attempt = 0; attempt < 4; attempt++) {
+          await _loadAddresses(showLoading: true, attempts: 1);
+          if (!mounted) return;
+          final newlyAdded = _addresses.where((address) {
+            final id =
+                (address['addressId'] ?? address['address_id'] ?? address['id'])
+                    .toString();
+            return !previousAddressIds.contains(id);
+          }).toList();
+          if (newlyAdded.isNotEmpty) {
             setState(
-              () => _selectedAddressId = match.last['addressId'].toString(),
+              () =>
+                  _selectedAddressId = newlyAdded.first['addressId'].toString(),
             );
+            _message('Address saved and selected.');
+            return;
+          }
+          if (attempt < 3) {
+            await Future<void>.delayed(const Duration(milliseconds: 300));
+          }
+        }
+        if (_addresses.isNotEmpty) {
+          _message(
+            'Address saved. Choose your address below or refresh the list.',
+          );
+        } else {
+          _message(
+            'Address saved, but the list has not refreshed yet. Tap refresh to reload addresses.',
+          );
+        }
+        return;
+      }
+
+      // Also support older AddAddress pages that return the saved address map.
+      if (result is Map) {
+        final returned = _asMap(result);
+        await _loadAddresses(showLoading: true, attempts: 3);
+        if (!mounted) return;
+        final returnedId =
+            returned['addressId'] ?? returned['address_id'] ?? returned['id'];
+        Map<String, dynamic>? match;
+        if (returnedId != null) {
+          for (final address in _addresses) {
+            if (address['addressId'].toString() == returnedId.toString()) {
+              match = address;
+              break;
+            }
+          }
+        }
+        match ??= _addresses.cast<Map<String, dynamic>?>().firstWhere(
+          (address) =>
+              address != null &&
+              (address['name'] ?? '').toString().trim() ==
+                  (returned['name'] ?? returned['recipientName'] ?? '')
+                      .toString()
+                      .trim() &&
+              (address['phone'] ?? '').toString().trim() ==
+                  (returned['phone'] ?? returned['phoneNumber'] ?? '')
+                      .toString()
+                      .trim() &&
+              (address['city'] ?? '').toString().trim().toLowerCase() ==
+                  (returned['city'] ?? '').toString().trim().toLowerCase(),
+          orElse: () => null,
+        );
+        if (match != null && mounted) {
+          setState(() => _selectedAddressId = match!['addressId'].toString());
         }
       }
     } catch (error) {
@@ -1115,7 +1234,10 @@ class _CheckoutState extends State<Checkout> {
 
     final address = Map<String, dynamic>.from(_selectedAddress!);
     final addressId =
-        address['addressId'] ?? address['address_id'] ?? address['id'];
+        address['addressId'] ??
+        address['address_id'] ??
+        address['id'] ??
+        address['ID'];
     if (addressId == null || addressId.toString().trim().isEmpty) {
       _message('Please select a saved address again before continuing.');
       return;
@@ -1225,6 +1347,8 @@ class _CheckoutState extends State<Checkout> {
       address['addressLine'] ??
           address['address_line'] ??
           address['house'] ??
+          address['fullAddress'] ??
+          address['full_address'] ??
           address['address'],
     );
     addIfMissing(address['area'] ?? address['landmark']);

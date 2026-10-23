@@ -1,7 +1,7 @@
 import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:upi_payment_plugin/upi_payment_plugin.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
@@ -25,6 +25,7 @@ class Payment extends StatefulWidget {
     this.savings = 0,
     this.couponCode,
     this.clearCartAfterSuccess = false,
+    this.existingOrder,
   });
 
   final double totalAmount;
@@ -38,6 +39,11 @@ class Payment extends StatefulWidget {
   final double savings;
   final String? couponCode;
   final bool clearCartAfterSuccess;
+
+  /// When set, this screen pays an existing unpaid order instead of creating a new order.
+  final Map<String, dynamic>? existingOrder;
+
+  bool get isExistingOrderPayment => existingOrder != null;
 
   @override
   State<Payment> createState() => _PaymentState();
@@ -257,12 +263,14 @@ class _PaymentState extends State<Payment> {
   Future<void> _payNow() async {
     if (_isProcessing) return;
 
-    // Direct UPI-app launch is kept separate from order creation and Razorpay
-    // verification. Opening an app is not evidence that a payment succeeded.
-    if (_selectedMethod == 'upi') {
-      await _chooseAndLaunchUpiApp();
+    // Existing orders must never pass through checkout's order-batch creation.
+    if (widget.isExistingOrderPayment) {
+      await _payExistingOrder();
       return;
     }
+
+    // UPI is processed through Razorpay Checkout so payment can be verified
+    // server-side; opening an arbitrary UPI app is not proof of payment.
     final items = widget.items ?? const <Map<String, dynamic>>[];
     if (items.isEmpty) {
       _showMessage('No items to order.');
@@ -388,6 +396,101 @@ class _PaymentState extends State<Payment> {
     }
   }
 
+  Future<void> _payExistingOrder() async {
+    final order = widget.existingOrder!;
+    final orderId = int.tryParse('${order['orderId'] ?? order['id'] ?? ''}');
+    if (orderId == null || orderId <= 0) {
+      _showMessage(
+        'This order has an invalid ID. Refresh My Orders and try again.',
+      );
+      return;
+    }
+
+    final paymentStatus = '${order['paymentStatus'] ?? ''}'
+        .trim()
+        .toLowerCase();
+    if (const {
+      'paid',
+      'completed',
+      'success',
+      'successful',
+      'captured',
+    }.contains(paymentStatus)) {
+      _showMessage(
+        'This order is already paid. Refresh My Orders to see the latest status.',
+      );
+      return;
+    }
+
+    if (_selectedMethod == 'cod') {
+      _showMessage(
+        'This order is already placed. Cash on Delivery will be collected when it arrives; no extra order is needed.',
+      );
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+    try {
+      // Backend derives buyer, seller and amount from the authenticated order.
+      final createdResponse = await EcoLoopApi.instance.post(
+        '/payments/create',
+        {'orderId': orderId, 'method': 'razorpay'},
+      );
+      final created = _asMap(_responseData(createdResponse));
+      final paymentId = int.tryParse(
+        '${created['paymentId'] ?? created['id'] ?? ''}',
+      );
+      if (paymentId == null || paymentId <= 0) {
+        throw Exception(
+          'The server did not return a valid payment record for this order.',
+        );
+      }
+
+      _pendingOrders = <Map<String, dynamic>>[order];
+      _pendingPaymentIds = <int>[paymentId];
+      _gatewayCallbackHandled = false;
+      _razorpayCheckoutLaunched = false;
+
+      final gatewayResponse = await EcoLoopApi.instance.post(
+        '/payments/razorpay/create-order',
+        {'paymentIds': _pendingPaymentIds},
+      );
+      final gateway = _asMap(_responseData(gatewayResponse));
+      final keyId = '${gateway['keyId'] ?? ''}'.trim();
+      _gatewayOrderId = '${gateway['razorpayOrderId'] ?? ''}'.trim();
+      final amount = gateway['amount'];
+      if (keyId.isEmpty ||
+          (_gatewayOrderId ?? '').isEmpty ||
+          amount is! num ||
+          amount <= 0) {
+        throw Exception('Razorpay did not return a valid checkout order.');
+      }
+
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+      _razorpay.open({
+        'key': keyId,
+        'order_id': _gatewayOrderId,
+        'amount': amount.toInt(),
+        'currency': '${gateway['currency'] ?? 'INR'}',
+        'name': 'EcoLoop',
+        'description': 'Payment for order #$orderId',
+        'theme': {'color': '#2A4D3A'},
+        if (_selectedMethod == 'upi') 'method': 'upi',
+        'retry': {'enabled': true, 'max_count': 2},
+      });
+      _razorpayCheckoutLaunched = true;
+    } catch (error) {
+      if (mounted) {
+        _showMessage(
+          'Could not start payment: ${error.toString().replaceFirst('Exception: ', '')}',
+        );
+      }
+    } finally {
+      if (mounted && _isProcessing) setState(() => _isProcessing = false);
+    }
+  }
+
   Future<void> _handleRazorpaySuccess(PaymentSuccessResponse response) async {
     if (_gatewayCallbackHandled) return;
     _gatewayCallbackHandled = true;
@@ -481,6 +584,18 @@ class _PaymentState extends State<Payment> {
     // Cancel independent unpaid orders concurrently instead of waiting for each
     // network round-trip one by one. The backend still decides whether each
     // cancellation is valid and whether reserved stock can be restored.
+    if (widget.isExistingOrderPayment) {
+      // A failed retry must not cancel the user's already-existing order.
+      if (resetAttempt) {
+        _pendingOrders = <Map<String, dynamic>>[];
+        _pendingPaymentIds = <int>[];
+        _gatewayOrderId = null;
+        _gatewayCallbackHandled = false;
+        _razorpayCheckoutLaunched = false;
+        _checkoutRequestId = DateTime.now().microsecondsSinceEpoch.toString();
+      }
+      return;
+    }
     final orderIds = _pendingOrders
         .map((order) => int.tryParse('${order['orderId'] ?? ''}'))
         .whereType<int>()
@@ -1011,7 +1126,21 @@ class _PaymentState extends State<Payment> {
   Widget _buildPaymentDetails() {
     switch (_selectedMethod) {
       case 'upi':
-        return _buildUpiSection();
+        return _sectionCard(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.qr_code_2_rounded, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Continue to Razorpay Checkout to complete your UPI payment securely. EcoLoop updates the order only after server-side verification.',
+                  style: AppTextStyles.body,
+                ),
+              ),
+            ],
+          ),
+        );
 
       case 'card':
         return _buildCardSection();
@@ -1047,7 +1176,7 @@ class _PaymentState extends State<Payment> {
     }
   }
 
-  /// Select a UPI app to open externally. This launcher does not process payment.
+  /// UI-only UPI selector. No real payment or external app is launched in test mode.
   Widget _buildUpiSection() {
     return _sectionCard(
       child: Column(
@@ -1062,8 +1191,45 @@ class _PaymentState extends State<Payment> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Choose an app to open it on this device. This is an app-launch test only; EcoLoop cannot confirm or record a UPI payment from this screen.',
+            'Continue securely with UPI through Razorpay Checkout. Payment is confirmed only after server verification.',
             style: AppTextStyles.caption,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.science_outlined, color: AppColors.primary),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Demo UPI ID',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'ecoloop-ui-test@invalid',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Placeholder only — not a real payment address',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           Row(
@@ -1302,14 +1468,14 @@ class _PaymentState extends State<Payment> {
                           ),
                         ),
                         child: const Text(
-                          'Continue to selected app',
+                          'Open selected app',
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'This opens the selected app only. It does not initiate or verify a payment.',
+                      'For real payments, use the secure Razorpay Checkout flow. Do not use demo UPI details.',
                       textAlign: TextAlign.center,
                       style: AppTextStyles.caption,
                     ),
@@ -1324,50 +1490,44 @@ class _PaymentState extends State<Payment> {
 
     if (!mounted || selectedApp == null) return;
     setState(() => _selectedUpiApp = selectedApp);
-    await _launchSelectedUpiApp();
+    await _launchUpiAppForUiTest(selectedApp);
   }
 
-  Future<void> _launchSelectedUpiApp() async {
-    final selected = _selectedUpiApp;
-    if (selected == null) {
-      _showMessage('Please select Google Pay, PhonePe, or Paytm first.');
-      return;
-    }
-
-    // App-specific schemes open the installed app where the OS/app supports it.
-    // No payment URI or amount is sent, so this cannot accidentally initiate a payment.
-    final scheme = switch (selected) {
-      'gpay' => 'tez://',
-      'phonepe' => 'phonepe://',
-      'paytm' => 'paytmmp://',
-      _ => '',
+  /// Opens the selected UPI app with demo details for app-launch testing only.
+  /// This placeholder VPA is not a real merchant account; do not treat any
+  /// response from this flow as payment confirmation.
+  Future<void> _launchUpiAppForUiTest(String selectedApp) async {
+    const demoUpiId = 'ecoloop-ui-test@invalid';
+    const packageNames = <String, String>{
+      'gpay': 'com.google.android.apps.nbu.paisa.user',
+      'phonepe': 'com.phonepe.app',
+      'paytm': 'net.one97.paytm',
     };
-    if (scheme.isEmpty) {
-      _showMessage('Unsupported UPI app selection.');
-      return;
-    }
-
     try {
-      final launched = await launchUrl(
-        Uri.parse(scheme),
-        mode: LaunchMode.externalApplication,
-      );
-      if (!mounted) return;
-      if (!launched) {
-        _showMessage(
-          '${_upiAppLabel(selected)} could not be opened. Make sure it is installed and try again.',
-        );
+      final packageName = packageNames[selectedApp];
+      if (packageName == null) {
+        _showMessage('Please select a supported UPI app.');
         return;
       }
-      _showMessage(
-        '${_upiAppLabel(selected)} opened. No payment was initiated and no order was placed.',
+      UpiPaymentPlugin.initiateUPIPayment(
+        payeeUpiId: demoUpiId,
+        payeeName: 'EcoLoop UI Test',
+        amount: widget.totalAmount > 0 ? widget.totalAmount : 1.0,
+        transactionId: 'ui_${DateTime.now().millisecondsSinceEpoch}',
+        transactionNote: 'EcoLoop UPI app launch test — do not pay',
+        merchantCode: '0000',
+        link: '',
+        transactionRefId: 'ui_ref_${DateTime.now().millisecondsSinceEpoch}',
+        packageName: packageName,
+        secretKey: '',
       );
-    } catch (_) {
-      if (mounted) {
-        _showMessage(
-          'Could not open ${_upiAppLabel(selected)}. Check that the app is installed on this Android device.',
-        );
-      }
+      _showMessage(
+        'Opening ${_upiAppLabel(selectedApp)} with demo details. This is not a real payment; do not complete or approve any payment.',
+      );
+    } catch (error) {
+      _showMessage(
+        'Could not open ${_upiAppLabel(selectedApp)}. Check that it is installed and that Android UPI app visibility is configured. ${error.toString()}',
+      );
     }
   }
 

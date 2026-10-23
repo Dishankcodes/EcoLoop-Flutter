@@ -7,6 +7,7 @@ import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import 'buying_order_details.dart';
 import 'order_tracking.dart';
+import 'payment.dart';
 
 class Orders extends StatefulWidget {
   const Orders({super.key});
@@ -45,9 +46,9 @@ class _OrdersState extends State<Orders> {
       final dynamic data = await EcoLoopApi.instance.get('/orders');
       final List<Map<String, dynamic>> rows = data is List
           ? data
-                .whereType<Map>()
-                .map((row) => Map<String, dynamic>.from(row))
-                .toList()
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList()
           : <Map<String, dynamic>>[];
 
       if (!mounted || generation != _loadGeneration) return;
@@ -112,9 +113,9 @@ class _OrdersState extends State<Orders> {
         .split(' ')
         .map(
           (word) => word.isEmpty
-              ? word
-              : '${word[0].toUpperCase()}${word.substring(1)}',
-        )
+          ? word
+          : '${word[0].toUpperCase()}${word.substring(1)}',
+    )
         .join(' ');
   }
 
@@ -154,27 +155,43 @@ class _OrdersState extends State<Orders> {
         value == 'payment pending';
   }
 
-  void _showPaymentNotReady() {
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Payment gateway required'),
-          content: const Text(
-            'This order is still unpaid. The current backend supports order '
-            'creation with Cash on Delivery, but it does not yet provide an '
-            'order-specific online payment endpoint or verified payment '
-            'gateway. No payment will be collected or marked as paid from '
-            'this screen yet.',
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
+  Future<void> _completePayment(Map<String, dynamic> order) async {
+    final orderId = int.tryParse('${order['orderId'] ?? order['id'] ?? ''}');
+    if (orderId == null || orderId <= 0) {
+      _showMessage('This order has an invalid ID. Refresh My Orders and try again.');
+      return;
+    }
+
+    dynamic rawAddress = order['shippingAddress'] ?? order['address'];
+    if (rawAddress is String && rawAddress.trim().isNotEmpty) {
+      try {
+        rawAddress = jsonDecode(rawAddress);
+      } catch (_) {
+        rawAddress = <String, dynamic>{'addressLine': rawAddress};
+      }
+    }
+    final address = rawAddress is Map
+        ? Map<String, dynamic>.from(rawAddress)
+        : <String, dynamic>{};
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => Payment(
+          totalAmount: _number(order['totalAmount']),
+          items: <Map<String, dynamic>>[],
+          address: address,
+          existingOrder: Map<String, dynamic>.from(order),
+          clearCartAfterSuccess: false,
+        ),
+      ),
+    );
+    if (mounted) await _load();
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 
@@ -318,7 +335,7 @@ class _OrdersState extends State<Orders> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
       itemCount: _orders.length,
       separatorBuilder: (BuildContext context, int index) =>
-          const SizedBox(height: 12),
+      const SizedBox(height: 12),
       itemBuilder: (BuildContext context, int index) =>
           _orderCard(_orders[index]),
     );
@@ -460,7 +477,7 @@ class _OrdersState extends State<Orders> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _showPaymentNotReady,
+                onPressed: () => _completePayment(order),
                 icon: const Icon(Icons.payment_rounded),
                 label: const Text('Complete Payment'),
                 style: FilledButton.styleFrom(

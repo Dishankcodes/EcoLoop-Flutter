@@ -126,16 +126,17 @@ class _CheckoutState extends State<Checkout> {
           ..clear()
           ..addAll(rows);
         final selectedStillExists = rows.any(
-          (a) => (a['addressId'] ?? a['id']).toString() == _selectedAddressId,
+              (a) => (a['addressId'] ?? a['address_id'] ?? a['id']).toString() == _selectedAddressId,
         );
         _selectedAddressId = selectedStillExists
             ? _selectedAddressId
             : (defaultAddress?['addressId'] ??
-                      defaultAddress?['id'] ??
-                      (rows.isNotEmpty
-                          ? rows.first['addressId'] ?? rows.first['id']
-                          : null))
-                  ?.toString();
+            defaultAddress?['address_id'] ??
+            defaultAddress?['id'] ??
+            (rows.isNotEmpty
+                ? rows.first['addressId'] ?? rows.first['address_id'] ?? rows.first['id']
+                : null))
+            ?.toString();
         _isLoadingAddresses = false;
       });
     } catch (error) {
@@ -173,7 +174,7 @@ class _CheckoutState extends State<Checkout> {
           if (id == null || id <= 0) {
             throw Exception(
               'A product has an invalid ID. '
-              'Remove it and add it again.',
+                  'Remove it and add it again.',
             );
           }
 
@@ -192,7 +193,7 @@ class _CheckoutState extends State<Checkout> {
           if ((live['status'] ?? '').toString().toLowerCase() != 'published') {
             throw Exception(
               '${live['title'] ?? item['title'] ?? 'A product'} '
-              'is no longer available.',
+                  'is no longer available.',
             );
           }
 
@@ -206,7 +207,7 @@ class _CheckoutState extends State<Checkout> {
           if (available < quantity) {
             throw Exception(
               'Only $available item(s) remain for '
-              '${live['title'] ?? item['title'] ?? 'this product'}.',
+                  '${live['title'] ?? item['title'] ?? 'this product'}.',
             );
           }
 
@@ -280,45 +281,45 @@ class _CheckoutState extends State<Checkout> {
       final products = raw
           .whereType<Map>()
           .map((row) {
-            final item = Map<String, dynamic>.from(row);
-            item['productId'] = item['productId'] ?? item['id'];
-            item['id'] = item['productId'] ?? item['id'];
-            item['title'] = item['title'] ?? item['name'] ?? 'EcoLoop Product';
-            item['price'] = _toDouble(item['price']);
-            item['availableQuantity'] = _toInt(
-              item['availableQuantity'] ?? item['stock'],
-              fallback: 0,
-            );
-            item['seller'] =
-                item['sellerName'] ?? item['seller'] ?? 'EcoLoop Seller';
-            item['image'] = _productImage(item);
-            item['location'] = item['sellerCity'] ?? item['city'] ?? '';
-            return item;
-          })
+        final item = Map<String, dynamic>.from(row);
+        item['productId'] = item['productId'] ?? item['id'];
+        item['id'] = item['productId'] ?? item['id'];
+        item['title'] = item['title'] ?? item['name'] ?? 'EcoLoop Product';
+        item['price'] = _toDouble(item['price']);
+        item['availableQuantity'] = _toInt(
+          item['availableQuantity'] ?? item['stock'],
+          fallback: 0,
+        );
+        item['seller'] =
+            item['sellerName'] ?? item['seller'] ?? 'EcoLoop Seller';
+        item['image'] = _productImage(item);
+        item['location'] = item['sellerCity'] ?? item['city'] ?? '';
+        return item;
+      })
           .where((item) {
-            final id = (item['productId'] ?? item['id']).toString();
-            final available = _toInt(item['availableQuantity'], fallback: 0);
-            final status = (item['status'] ?? 'published')
-                .toString()
-                .toLowerCase();
-            final sellerId = _toInt(item['sellerId'], fallback: -2);
-            final sellerType = (item['sellerType'] ?? 'user')
-                .toString()
-                .toLowerCase();
-            final ownProduct =
-                _currentAccountId != null &&
+        final id = (item['productId'] ?? item['id']).toString();
+        final available = _toInt(item['availableQuantity'], fallback: 0);
+        final status = (item['status'] ?? 'published')
+            .toString()
+            .toLowerCase();
+        final sellerId = _toInt(item['sellerId'], fallback: -2);
+        final sellerType = (item['sellerType'] ?? 'user')
+            .toString()
+            .toLowerCase();
+        final ownProduct =
+            _currentAccountId != null &&
                 sellerId == _currentAccountId &&
                 sellerType == _currentAccountType;
-            return id.isNotEmpty &&
-                available > 0 &&
-                status == 'published' &&
-                !ownProduct &&
-                !_items.any(
+        return id.isNotEmpty &&
+            available > 0 &&
+            status == 'published' &&
+            !ownProduct &&
+            !_items.any(
                   (cartItem) =>
-                      (cartItem['productId'] ?? cartItem['id']).toString() ==
-                      id,
-                );
-          })
+              (cartItem['productId'] ?? cartItem['id']).toString() ==
+                  id,
+            );
+      })
           .toList();
       if (!mounted) return;
       setState(() {
@@ -570,47 +571,91 @@ class _CheckoutState extends State<Checkout> {
         : 'product:${item['productId'] ?? item['id'] ?? ''}';
   }
 
-  double get _standardDeliveryFee {
+  bool _isFreeDeliveryProduct(Map<String, dynamic> item) {
+    final method =
+    (item['deliveryMethod'] ??
+        item['delivery_method'] ??
+        item['shippingMethod'] ??
+        item['shipping_method'] ??
+        '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ');
+    return method == 'free delivery' ||
+        method == 'free' ||
+        method == 'free shipping';
+  }
+
+  bool _sellerHasPaidDelivery(String sellerKey) {
+    final sellerItems = _items.where((item) => _sellerKey(item) == sellerKey);
+    return sellerItems.isNotEmpty &&
+        sellerItems.any((item) => !_isFreeDeliveryProduct(item));
+  }
+
+  double _deliveryRateForSeller({
+    required String buyerCity,
+    required String sellerCity,
+    required bool express,
+  }) {
+    final sameCity =
+        buyerCity.isNotEmpty &&
+            sellerCity.isNotEmpty &&
+            buyerCity == sellerCity;
+    if (express) return sameCity ? 69.0 : 99.0;
+    return sameCity ? 40.0 : 59.0;
+  }
+
+  double _calculateDeliveryFee({required bool express}) {
     final buyerCity = (_selectedAddress?['city'] ?? '')
         .toString()
         .trim()
         .toLowerCase();
     final chargedSellers = <String>{};
     var fee = 0.0;
+
     for (final item in _items) {
       final key = _sellerKey(item);
-      if (!chargedSellers.add(key)) continue;
+      if (!chargedSellers.add(key) || !_sellerHasPaidDelivery(key)) continue;
+
       final sellerCity =
-          (item['sellerCity'] ??
-                  item['seller_city'] ??
-                  (item['seller'] is Map
-                      ? (item['seller'] as Map)['city']
-                      : null) ??
-                  item['city'] ??
-                  '')
-              .toString()
-              .trim()
-              .toLowerCase();
-      if (buyerCity.isNotEmpty &&
-          sellerCity.isNotEmpty &&
-          sellerCity != buyerCity) {
-        fee += 40;
-      }
+      (item['sellerCity'] ??
+          item['seller_city'] ??
+          (item['seller'] is Map
+              ? (item['seller'] as Map)['city']
+              : null) ??
+          item['city'] ??
+          '')
+          .toString()
+          .trim()
+          .toLowerCase();
+
+      // If city data is missing, use the out-of-city rate instead of
+      // showing a zero charge that may disagree with the backend.
+      fee += _deliveryRateForSeller(
+        buyerCity: buyerCity,
+        sellerCity: sellerCity,
+        express: express,
+      );
     }
     return fee;
   }
 
+  // One delivery fee per seller. Multiple products from one seller are
+  // never charged individually; Free Delivery listings add no seller fee.
+  double get _standardDeliveryFee => _calculateDeliveryFee(express: false);
+
+  double get _expressDeliveryFee => _calculateDeliveryFee(express: true);
+
   int get _uniqueSellerCount => _items.map(_sellerKey).toSet().length;
 
   double get _deliveryFee => _selectedDelivery == 'express'
-      ? 99.0 * _uniqueSellerCount
+      ? _expressDeliveryFee
       : _standardDeliveryFee;
 
-  // Matches the checkout policy: 4% below ₹499, ₹30 from ₹499,
-  // and ₹60 from ₹999. Fee is based on the complete basket subtotal.
+  // Platform fee remains a constant 4% of the basket subtotal.
   double _calculatePlatformFee(double subtotal) {
-    if (subtotal >= 999) return 60.0;
-    if (subtotal >= 499) return 30.0;
     return (subtotal * 0.04).roundToDouble();
   }
 
@@ -620,10 +665,10 @@ class _CheckoutState extends State<Checkout> {
 
   double get _grandTotal =>
       (_subtotal +
-              _platformFee.roundToDouble() +
-              _taxAmount +
-              _deliveryFee -
-              _couponDiscount)
+          _platformFee.roundToDouble() +
+          _taxAmount +
+          _deliveryFee -
+          _couponDiscount)
           .clamp(0, double.infinity)
           .toDouble();
 
@@ -715,7 +760,7 @@ class _CheckoutState extends State<Checkout> {
                               final addressId =
                                   (address['addressId'] ?? address['id'])
                                       ?.toString() ??
-                                  '';
+                                      '';
                               final selected = addressId == _selectedAddressId;
 
                               return Padding(
@@ -723,11 +768,11 @@ class _CheckoutState extends State<Checkout> {
                                 child: _buildAddressOption(
                                   address,
                                   selected,
-                                  () {
+                                      () {
                                     setSheetState(() {
                                       _selectedAddressId =
                                           (address['addressId'] ??
-                                                  address['id'])
+                                              address['id'])
                                               .toString();
                                     });
 
@@ -753,10 +798,10 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _buildAddressOption(
-    Map<String, dynamic> address,
-    bool selected,
-    VoidCallback onTap,
-  ) {
+      Map<String, dynamic> address,
+      bool selected,
+      VoidCallback onTap,
+      ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -875,100 +920,132 @@ class _CheckoutState extends State<Checkout> {
   // ADD ADDRESS
 
   Future<void> _openAddAddress() async {
-    final result = await Navigator.push(
+    // Keep the IDs already present so we can identify the newly saved address
+    // even when AddAddress returns `true` instead of the address map.
+    final existingIds = _addresses
+        .map((a) => (a['addressId'] ?? a['id'])?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    final result = await Navigator.push<dynamic>(
       context,
       MaterialPageRoute(builder: (_) => const AddAddress()),
     );
 
-    if (!mounted || result is! Map) return;
-    final returned = Map<String, dynamic>.from(result);
+    if (!mounted || result == null || result == false) return;
 
-    try {
-      // AddAddress may already persist the address. Refresh first to avoid
-      // accidentally creating a duplicate record.
+    // The current AddAddress screen returns `true` after a successful save.
+    // Refresh a few times to allow the Apps Script/Sheets read to catch up.
+    Map<String, dynamic>? newlySaved;
+    for (var attempt = 0; attempt < 3; attempt++) {
       await _loadAddresses();
       if (!mounted) return;
-      final returnedId = (returned['addressId'] ?? returned['id'])?.toString();
-      if (returnedId != null &&
-          _addresses.any(
-            (a) => (a['addressId'] ?? a['id']).toString() == returnedId,
-          )) {
-        setState(() => _selectedAddressId = returnedId);
-        _showMessage('Delivery address selected.');
-        return;
+
+      final returnedId = result is Map
+          ? (result['addressId'] ?? result['address_id'] ?? result['id'])
+          ?.toString()
+          : null;
+
+      if (returnedId != null && returnedId.isNotEmpty) {
+        for (final address in _addresses) {
+          final id =
+          (address['addressId'] ?? address['address_id'] ?? address['id'])
+              ?.toString();
+          if (id == returnedId) {
+            newlySaved = address;
+            break;
+          }
+        }
       }
 
-      final addressLine =
-          (returned['addressLine'] ??
-                  returned['house'] ??
-                  returned['address'] ??
-                  '')
-              .toString()
-              .trim();
+      newlySaved ??= _addresses.cast<Map<String, dynamic>?>().firstWhere((
+          address,
+          ) {
+        if (address == null) return false;
+        final id =
+            (address['addressId'] ?? address['address_id'] ?? address['id'])
+                ?.toString() ??
+                '';
+        return id.isNotEmpty && !existingIds.contains(id);
+      }, orElse: () => null);
+
+      if (newlySaved != null) break;
+      if (attempt < 2) {
+        await Future<void>.delayed(
+          Duration(milliseconds: attempt == 0 ? 250 : 500),
+        );
+      }
+    }
+
+    if (!mounted) return;
+
+    if (newlySaved != null) {
+      final id =
+      (newlySaved!['addressId'] ??
+          newlySaved!['address_id'] ??
+          newlySaved!['id'])
+          ?.toString();
+      if (id != null && id.isNotEmpty) {
+        setState(() => _selectedAddressId = id);
+        _showMessage('New delivery address selected.');
+      }
+      return;
+    }
+
+    // Compatibility with a future AddAddress version that returns the
+    // complete address map rather than `true`.
+    if (result is Map) {
+      final returned = Map<String, dynamic>.from(result);
       final phone = (returned['phone'] ?? '').toString().trim();
       final name = (returned['name'] ?? '').toString().trim();
       final city = (returned['city'] ?? '').toString().trim();
-      final state = (returned['state'] ?? '').toString().trim();
+      final addressLine =
+      (returned['addressLine'] ??
+          returned['house'] ??
+          returned['address'] ??
+          '')
+          .toString()
+          .trim();
       final pincode = (returned['pincode'] ?? returned['postalCode'] ?? '')
           .toString()
           .trim();
 
-      // If the address screen returned a form result but did not persist it,
-      // save it using the authenticated backend endpoint.
-      final duplicate = _addresses.any(
-        (a) =>
-            (a['phone'] ?? '').toString() == phone &&
-            (a['addressLine'] ?? a['address'] ?? '').toString() ==
-                addressLine &&
-            (a['pincode'] ?? '').toString() == pincode,
-      );
-      if (duplicate) {
-        final match = _addresses.firstWhere(
-          (a) =>
-              (a['phone'] ?? '').toString() == phone &&
-              (a['addressLine'] ?? a['address'] ?? '').toString() ==
-                  addressLine &&
-              (a['pincode'] ?? '').toString() == pincode,
-        );
-        setState(
-          () => _selectedAddressId = (match['addressId'] ?? match['id'])
-              .toString(),
-        );
-        return;
-      }
-      if (name.isEmpty ||
-          phone.isEmpty ||
-          addressLine.isEmpty ||
-          city.isEmpty ||
-          state.isEmpty ||
-          pincode.isEmpty) {
-        _showMessage('The address was not saved. Please add it again.');
-        return;
+      Map<String, dynamic>? match;
+      for (final address in _addresses) {
+        final sameAddress =
+            phone.isNotEmpty &&
+                (address['phone'] ?? '').toString().trim() == phone &&
+                (address['name'] ?? '').toString().trim() == name &&
+                (address['city'] ?? '').toString().trim() == city &&
+                (address['addressLine'] ??
+                    address['address'] ??
+                    address['house'] ??
+                    '')
+                    .toString()
+                    .trim() ==
+                    addressLine &&
+                (address['pincode'] ?? '').toString().trim() == pincode;
+        if (sameAddress) {
+          match = address;
+          break;
+        }
       }
 
-      final saved = await EcoLoopApi.instance.post('/addresses', {
-        'label': (returned['label'] ?? returned['type'] ?? 'Home').toString(),
-        'name': name,
-        'phone': phone,
-        'addressLine': addressLine,
-        'area': (returned['area'] ?? returned['landmark'] ?? '').toString(),
-        'city': city,
-        'state': state,
-        'pincode': pincode,
-        'isDefault': returned['isDefault'] == true,
-      });
-      await _loadAddresses();
-      if (saved is Map &&
-          (saved['addressId'] ?? saved['id']) != null &&
-          mounted) {
-        setState(
-          () => _selectedAddressId = (saved['addressId'] ?? saved['id'])
-              .toString(),
-        );
+      if (match != null) {
+        final id = (match['addressId'] ?? match['address_id'] ?? match['id'])
+            ?.toString();
+        if (id != null && id.isNotEmpty) {
+          setState(() => _selectedAddressId = id);
+          return;
+        }
       }
-    } catch (error) {
-      if (mounted) _showMessage('Could not load/save address: $error');
     }
+
+    // Do not POST the address a second time here: AddAddress already saves it.
+    // If the API still doesn't return it, show a clear recoverable message.
+    _showMessage(
+      'Address saved, but it is not visible yet. Tap refresh and select it again.',
+    );
   }
 
   String _formatCheckoutAddress(Map<String, dynamic> address) {
@@ -978,7 +1055,7 @@ class _CheckoutState extends State<Checkout> {
         (address['addressLine'] ?? address['address'] ?? address['house'])
             ?.toString()
             .trim() ??
-        '';
+            '';
     final street = address['street']?.toString().trim() ?? '';
     final area = address['area']?.toString().trim() ?? '';
     final landmark = address['landmark']?.toString().trim() ?? '';
@@ -1036,7 +1113,7 @@ class _CheckoutState extends State<Checkout> {
                   sheetContext,
                   id: 'standard',
                   title: 'Standard Delivery',
-                  subtitle: 'Delivery in 3–5 business days',
+                  subtitle: 'Same city ₹40 • Other city ₹59 per seller',
                   price: _standardDeliveryFee == 0
                       ? 'FREE'
                       : _formatPrice(_standardDeliveryFee),
@@ -1049,10 +1126,10 @@ class _CheckoutState extends State<Checkout> {
                   sheetContext,
                   id: 'express',
                   title: 'Express Delivery',
-                  subtitle: 'Delivery in 1–2 business days',
-                  price: _formatPrice(
-                    99.0 * (_uniqueSellerCount == 0 ? 1 : _uniqueSellerCount),
-                  ),
+                  subtitle: 'Same city ₹69 • Other city ₹99 per seller',
+                  price: _expressDeliveryFee == 0
+                      ? 'FREE'
+                      : _formatPrice(_expressDeliveryFee),
                   icon: Icons.speed_outlined,
                 ),
               ],
@@ -1064,13 +1141,13 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _deliveryOption(
-    BuildContext sheetContext, {
-    required String id,
-    required String title,
-    required String subtitle,
-    required String price,
-    required IconData icon,
-  }) {
+      BuildContext sheetContext, {
+        required String id,
+        required String title,
+        required String subtitle,
+        required String price,
+        required IconData icon,
+      }) {
     final selected = _selectedDelivery == id;
 
     return InkWell(
@@ -1222,14 +1299,14 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _checkoutCouponTile(
-    BuildContext sheetContext, {
-    required String code,
-    required String title,
-    required String subtitle,
-    required double minimumOrder,
-    double? discount,
-    double? percentage,
-  }) {
+      BuildContext sheetContext, {
+        required String code,
+        required String title,
+        required String subtitle,
+        required double minimumOrder,
+        double? discount,
+        double? percentage,
+      }) {
     final applied = _couponCode == code;
 
     return Container(
@@ -1312,24 +1389,24 @@ class _CheckoutState extends State<Checkout> {
             onPressed: applied
                 ? null
                 : () {
-                    if (_subtotal < minimumOrder) {
-                      _showMessage(
-                        'Add items worth ${_formatPrice(minimumOrder)} to use $code.',
-                      );
-                      return;
-                    }
-                    final amount = discount != null
-                        ? discount
-                        : (_subtotal * (percentage ?? 0)).roundToDouble();
-                    setState(() {
-                      _couponCode = code;
-                      _couponDiscount = amount.clamp(0, _subtotal).toDouble();
-                    });
-                    Navigator.pop(sheetContext);
-                    _showMessage(
-                      '$code applied. You save ${_formatPrice(_couponDiscount)}.',
-                    );
-                  },
+              if (_subtotal < minimumOrder) {
+                _showMessage(
+                  'Add items worth ${_formatPrice(minimumOrder)} to use $code.',
+                );
+                return;
+              }
+              final amount = discount != null
+                  ? discount
+                  : (_subtotal * (percentage ?? 0)).roundToDouble();
+              setState(() {
+                _couponCode = code;
+                _couponDiscount = amount.clamp(0, _subtotal).toDouble();
+              });
+              Navigator.pop(sheetContext);
+              _showMessage(
+                '$code applied. You save ${_formatPrice(_couponDiscount)}.',
+              );
+            },
             child: Text(
               applied
                   ? 'Applied'
@@ -1392,7 +1469,7 @@ class _CheckoutState extends State<Checkout> {
       _removeItem(
         index,
         message:
-            'This is the last item in your cart. Removing it will clear your cart. Are you sure?',
+        'This is the last item in your cart. Removing it will clear your cart. Are you sure?',
       );
       return;
     }
@@ -1405,21 +1482,21 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Future<void> _removeItem(
-    int index, {
-    String? message,
-    bool confirm = true,
-  }) async {
+      int index, {
+        String? message,
+        bool confirm = true,
+      }) async {
     if (index < 0 || index >= _items.length) return;
     final title = _items[index]['title'].toString();
     final confirmed =
         !confirm ||
-        await _confirmAction(
-          title: 'Remove item?',
-          message:
+            await _confirmAction(
+              title: 'Remove item?',
+              message:
               message ??
-              'Are you sure you want to remove "$title" from your cart?',
-          confirmLabel: 'Remove',
-        );
+                  'Are you sure you want to remove "$title" from your cart?',
+              confirmLabel: 'Remove',
+            );
     if (!confirmed || !mounted || index >= _items.length) return;
     setState(() {
       _items.removeAt(index);
@@ -1540,7 +1617,7 @@ class _CheckoutState extends State<Checkout> {
                               final confirmed = await _confirmAction(
                                 title: 'Remove last item?',
                                 message:
-                                    'Quantity is 1. Removing this item will clear your cart. Are you sure?',
+                                'Quantity is 1. Removing this item will clear your cart. Are you sure?',
                                 confirmLabel: 'Remove item',
                               );
                               if (confirmed && mounted) {
@@ -1769,7 +1846,7 @@ class _CheckoutState extends State<Checkout> {
     final productId = product['productId'] ?? product['id'];
 
     final existingIndex = _items.indexWhere(
-      (item) => item['productId'].toString() == productId.toString(),
+          (item) => item['productId'].toString() == productId.toString(),
     );
 
     if (existingIndex != -1) {
@@ -1891,77 +1968,77 @@ class _CheckoutState extends State<Checkout> {
                         ? const Center(child: CircularProgressIndicator())
                         : _moreItemsError != null
                         ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _moreItemsError!,
-                                    textAlign: TextAlign.center,
-                                    style: ArtistTextStyles.body,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  OutlinedButton.icon(
-                                    onPressed: _loadMoreItems,
-                                    icon: const Icon(Icons.refresh_rounded),
-                                    label: const Text('Retry'),
-                                  ),
-                                ],
-                              ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _moreItemsError!,
+                              textAlign: TextAlign.center,
+                              style: ArtistTextStyles.body,
                             ),
-                          )
+                            const SizedBox(height: 10),
+                            OutlinedButton.icon(
+                              onPressed: _loadMoreItems,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                         : _moreItems.isEmpty
                         ? Center(
-                            child: Text(
-                              'No other in-stock listings available right now.',
-                              style: ArtistTextStyles.body,
-                              textAlign: TextAlign.center,
-                            ),
-                          )
+                      child: Text(
+                        'No other in-stock listings available right now.',
+                        style: ArtistTextStyles.body,
+                        textAlign: TextAlign.center,
+                      ),
+                    )
                         : ListView.separated(
-                            itemCount: _moreItems.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, index) {
-                              // The available-products list can refresh while this
-                              // bottom sheet is open. A sliver may briefly request
-                              // an old index, so guard against a stale index.
-                              if (index < 0 || index >= _moreItems.length) {
-                                return const SizedBox.shrink();
-                              }
+                      itemCount: _moreItems.length,
+                      separatorBuilder: (_, __) =>
+                      const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        // The available-products list can refresh while this
+                        // bottom sheet is open. A sliver may briefly request
+                        // an old index, so guard against a stale index.
+                        if (index < 0 || index >= _moreItems.length) {
+                          return const SizedBox.shrink();
+                        }
 
-                              final product = _moreItems[index];
+                        final product = _moreItems[index];
 
-                              final productId =
-                                  (product['productId'] ?? product['id'] ?? '')
-                                      .toString();
+                        final productId =
+                        (product['productId'] ?? product['id'] ?? '')
+                            .toString();
 
-                              final existingIndex = _items.indexWhere(
-                                (item) =>
-                                    item['productId'].toString() == productId,
-                              );
+                        final existingIndex = _items.indexWhere(
+                              (item) =>
+                          item['productId'].toString() == productId,
+                        );
 
-                              final alreadyAdded = existingIndex != -1;
+                        final alreadyAdded = existingIndex != -1;
 
-                              final existingQuantity = alreadyAdded
-                                  ? _toInt(
-                                      _items[existingIndex]['quantity'],
-                                      fallback: 1,
-                                    )
-                                  : 0;
+                        final existingQuantity = alreadyAdded
+                            ? _toInt(
+                          _items[existingIndex]['quantity'],
+                          fallback: 1,
+                        )
+                            : 0;
 
-                              return _buildAddMoreProductTile(
-                                product,
-                                alreadyAdded,
-                                existingQuantity,
-                                onAdd: () {
-                                  _addProductToCheckout(product);
-                                  setState(() {});
-                                },
-                              );
-                            },
-                          ),
+                        return _buildAddMoreProductTile(
+                          product,
+                          alreadyAdded,
+                          existingQuantity,
+                          onAdd: () {
+                            _addProductToCheckout(product);
+                            setState(() {});
+                          },
+                        );
+                      },
+                    ),
                   ),
 
                   const SizedBox(height: 10),
@@ -1998,11 +2075,11 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _buildAddMoreProductTile(
-    Map<String, dynamic> product,
-    bool alreadyAdded,
-    int existingQuantity, {
-    required VoidCallback onAdd,
-  }) {
+      Map<String, dynamic> product,
+      bool alreadyAdded,
+      int existingQuantity, {
+        required VoidCallback onAdd,
+      }) {
     final price = _toDouble(product['price']);
     final availableQuantity = _toInt(
       product['availableQuantity'] ?? product['stock'],
@@ -2559,12 +2636,12 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _priceRow(
-    String label,
-    String value, {
-    Color? valueColor,
-    bool bold = false,
-    double valueSize = 13,
-  }) {
+      String label,
+      String value, {
+        Color? valueColor,
+        bool bold = false,
+        double valueSize = 13,
+      }) {
     return Row(
       children: [
         Expanded(
@@ -2708,7 +2785,7 @@ class _CheckoutState extends State<Checkout> {
             savings: _couponDiscount,
             couponCode: _couponCode,
             clearCartAfterSuccess:
-                widget.product == null && widget.items != null,
+            widget.product == null && widget.items != null,
           ),
         ),
       );
@@ -3268,6 +3345,13 @@ class _CheckoutState extends State<Checkout> {
               ],
             ),
           ),
+          const SizedBox(height: 8),
+          Text(
+            _items.isNotEmpty && _items.every(_isFreeDeliveryProduct)
+                ? 'Free Delivery selected on all products in this order.'
+                : 'Delivery is charged once per seller. Free Delivery listings add no delivery charge.',
+            style: ArtistTextStyles.caption,
+          ),
         ],
       ),
     );
@@ -3349,34 +3433,34 @@ class _CheckoutState extends State<Checkout> {
                     ),
                     child: _isProcessing
                         ? const SizedBox(
-                            width: 21,
-                            height: 21,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
+                      width: 21,
+                      height: 21,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                         : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  'Continue to Payment',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: ArtistTextStyles.button.copyWith(
-                                    fontSize: 14.5,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 7),
-                              const Icon(
-                                Icons.arrow_forward_rounded,
-                                size: 18,
-                                color: Colors.white,
-                              ),
-                            ],
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Continue to Payment',
+                            overflow: TextOverflow.ellipsis,
+                            style: ArtistTextStyles.button.copyWith(
+                              fontSize: 14.5,
+                            ),
                           ),
+                        ),
+                        const SizedBox(width: 7),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -3456,10 +3540,10 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _imagePlaceholder(
-    double width,
-    double height, {
-    bool loading = false,
-  }) {
+      double width,
+      double height, {
+        bool loading = false,
+      }) {
     return Container(
       width: width,
       height: height,
@@ -3470,19 +3554,20 @@ class _CheckoutState extends State<Checkout> {
       child: Center(
         child: loading
             ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: ArtistColors.primary,
-                ),
-              )
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: ArtistColors.primary,
+          ),
+        )
             : const Icon(
-                Icons.image_outlined,
-                size: 31,
-                color: ArtistColors.secondary,
-              ),
+          Icons.image_outlined,
+          size: 31,
+          color: ArtistColors.secondary,
+        ),
       ),
     );
   }
 }
+
