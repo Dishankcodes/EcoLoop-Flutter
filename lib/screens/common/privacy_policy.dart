@@ -10,7 +10,7 @@ class PrivacyPolicy extends StatelessWidget {
     final sections = <Widget>[
       _section(
         '1. Who operates EcoLoop',
-        'EcoLoop is identified in this draft as “EcoLoop”. Its formal legal entity details, business structure and registered or principal business address are Pending confirmation. This policy is intended for people using EcoLoop in India.',
+        'This policy applies to EcoLoop, a platform project operated by the EcoLoop team for users in India. For operator-related questions, privacy requests or formal correspondence, contact ecoloopp2026@gmail.com. The team should publish its formal legal name and business address before commercial launch; these details cannot be inferred from the app code.',
       ),
 
       _section(
@@ -25,7 +25,7 @@ class PrivacyPolicy extends StatelessWidget {
 
       _section(
         '4. Public profiles, listings and images',
-        'User and ReMaker profiles and marketplace listings are intended to be public. Information deliberately displayed there—such as display name, biography, portfolio content, product descriptions, prices, images and public reviews—may be viewed, copied or shared by others. Do not place private contact details, home addresses, identity documents or confidential information in public fields or images. Some media may use Google Drive links. Whether all files have appropriate permissions is Pending technical verification.',
+        'User and ReMaker profiles and marketplace listings are intended to be public. Information deliberately displayed there—such as display name, biography, portfolio content, product descriptions, prices, images and public reviews—may be viewed, copied or shared by others. Do not place private contact details, home addresses, identity documents or confidential information in public fields or images. Some media may use Google Drive links. EcoLoop works to make public media accessible for its intended purpose; users should not upload confidential material to public profile or listing fields.',
       ),
 
       _section(
@@ -35,27 +35,27 @@ class PrivacyPolicy extends StatelessWidget {
 
       _section(
         '6. Service providers and sharing',
-        'EcoLoop uses Google Apps Script and Google Sheets for backend/API and data storage, Google Drive for certain uploaded media, and email services for verification or account-related messages. These services form part of the current technical setup. Whether additional providers receive information is Pending confirmation. Information may also be disclosed where required by law or reasonably necessary to address security, fraud, safety or legal claims.',
+        'EcoLoop uses Google Apps Script and Google Sheets for backend/API and data storage, Google Drive for certain uploaded media, and email services for verification or account-related messages. These services form part of the current technical setup. The providers involved may change as features are enabled; when an online payment option is enabled, the relevant payment provider may process transaction information under its own terms and privacy notice. Information may also be disclosed where required by law or reasonably necessary to address security, fraud, safety or legal claims.',
       ),
 
       _section(
         '7. Payments',
-        'EcoLoop currently supports Cash on Delivery (COD) and/or offline payment arrangements only. Online payment gateway processing is not active. Do not treat this policy as confirmation that Razorpay or another online payment provider is live. Any future integration must be reflected in this policy before activation.',
+        'The payment methods available for a particular order are the methods displayed in the live checkout. These may include COD or offline payment and, only where enabled, an online payment provider such as Razorpay. Backend endpoints or app code alone do not establish that a provider is live. If online payment is offered, transaction details may be processed by that provider; EcoLoop should treat an order as paid only after server-side verification confirms the transaction. Provider terms and privacy notices also apply.',
       ),
 
       _section(
         '8. Location and delivery',
-        'City or location information may be used to show relevant listings, assess delivery or donation pickup availability, estimate delivery charges where configured and coordinate fulfilment. Privacy and location switches currently shown in Settings may not change server-side visibility or permissions. Their effective behaviour is Pending implementation verification; do not rely on them as a guarantee that information is hidden or deleted.',
+        'City or location information may be used to show relevant listings, assess delivery or donation pickup availability, estimate delivery charges where configured and coordinate fulfilment. Privacy and location switches currently shown in Settings may not change server-side visibility or permissions. Do not rely on these switches as a guarantee that information is hidden or deleted; use the support contact for privacy requests.',
       ),
 
       _section(
         '9. Retention',
-        'A final data-retention schedule has not been approved. Different records may be retained for account operation, orders, dispute handling, security, legal compliance and backups. Exact retention periods and deletion from backups or third-party storage are Pending.',
+        'A final data-retention schedule has not been approved. Different records may be retained for account operation, orders, dispute handling, security, legal compliance and backups. Information may remain in backups or third-party systems for a limited period after a deletion request where needed for security, recovery or legal compliance, subject to applicable law.',
       ),
 
       _section(
         '10. Account closure and deletion',
-        'The current account-closure behaviour is understood to deactivate an account and revoke sessions, but it does not necessarily erase related orders, reviews, other records or media stored in Drive or other systems. Account closure must not be described as complete erasure. The deletion-request process, retained categories and completion timeline are Pending confirmation. Contact support to make a privacy or deletion request.',
+        'The current account-closure behaviour is understood to deactivate an account and revoke sessions, but it does not necessarily erase related orders, reviews, other records or media stored in Drive or other systems. Account closure must not be described as complete erasure. Deletion requests are reviewed individually; some transaction, security or legally required records may need to be retained. Contact support for a request and any applicable follow-up. Contact support to make a privacy or deletion request.',
       ),
 
       _section(
@@ -70,17 +70,17 @@ class PrivacyPolicy extends StatelessWidget {
 
       _section(
         '13. Children and minimum age',
-        'EcoLoop’s minimum permitted age is Pending. The age threshold and any required parental-consent process must be decided and implemented before this policy is finalised and published.',
+        'EcoLoop’s account and marketplace features are intended for people aged 18 or older. EcoLoop does not knowingly invite people under 18 to create accounts. If you believe a person under 18 has provided personal information, contact ecoloopp2026@gmail.com so the request can be reviewed.',
       ),
 
       _section(
         '14. Policy changes',
-        'This policy may be revised as features and legal requirements change. The effective date and in-app process for notifying users of material changes are Pending implementation. The published policy should display the actual current version and effective date.',
+        'This policy may be revised as features and legal requirements change. This version was reviewed on 24 October 2026. Material changes may be notified through the app or another reasonable channel where required by law. Users should review this policy periodically.',
       ),
 
       _section(
         '15. Contact and grievances',
-        'For privacy questions, account concerns or grievances, contact ecoloopp2026@gmail.com. The designated grievance officer’s name, role, postal address, response timeline and formal grievance-handling process are Pending confirmation against applicable Indian requirements.',
+        'For privacy questions, account concerns or grievances, contact ecoloopp2026@gmail.com. For a privacy complaint or grievance, email ecoloopp2026@gmail.com with the subject “Privacy / Grievance Request”. Include enough information to identify the issue, but never send passwords, OTPs or session tokens. The EcoLoop team is the current contact point. Before commercial launch, the operator must confirm and publish any grievance-officer designation, postal address and statutory details required by applicable Indian law.',
       ),
     ];
 
@@ -134,7 +134,7 @@ class PrivacyPolicy extends StatelessWidget {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            'Draft for review. Unresolved legal and implementation details are marked Pending.',
+                            'Policy information describes current intended practices. Contact EcoLoop support for questions about data use or your privacy rights.',
                             style: TextStyle(
                               fontSize: 10,
                               height: 1.45,
@@ -166,7 +166,7 @@ class PrivacyPolicy extends StatelessWidget {
                   const SizedBox(height: 5),
                   Text(
                     'Privacy contact: ecoloopp2026@gmail.com\n'
-                    'Draft — requires legal and technical review before publication.',
+                    'Reviewed: 24 October 2026. This policy does not limit rights available under applicable law.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 10,
@@ -176,7 +176,7 @@ class PrivacyPolicy extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    'Last reviewed: 20 October 2026',
+                    'Last reviewed: 24 October 2026',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 9,

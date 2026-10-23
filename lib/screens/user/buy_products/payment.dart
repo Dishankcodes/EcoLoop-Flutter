@@ -431,23 +431,58 @@ class _PaymentState extends State<Payment> {
 
     setState(() => _isProcessing = true);
     try {
-      // Backend derives buyer, seller and amount from the authenticated order.
-      final createdResponse = await EcoLoopApi.instance.post(
-        '/payments/create',
-        {'orderId': orderId, 'method': 'razorpay'},
-      );
-      final created = _asMap(_responseData(createdResponse));
-      final paymentId = int.tryParse(
-        '${created['paymentId'] ?? created['id'] ?? ''}',
-      );
+      // Reuse an existing unpaid Razorpay payment for this order when possible.
+      // The backend also enforces this idempotently for concurrent/repeated taps.
+      final dynamic paymentsResponse = await EcoLoopApi.instance.get('/payments');
+      final dynamic rawPayments = paymentsResponse is Map
+          ? (paymentsResponse['payments'] ??
+                paymentsResponse['data'] ??
+                paymentsResponse['items'] ??
+                paymentsResponse['results'] ??
+                const <dynamic>[])
+          : paymentsResponse;
+      int? paymentId;
+      if (rawPayments is List) {
+        for (final rawPayment in rawPayments) {
+          if (rawPayment is! Map) continue;
+          final payment = Map<String, dynamic>.from(rawPayment);
+          final paymentOrderId = int.tryParse(
+            '${payment['orderId'] ?? payment['order_id'] ?? ''}',
+          );
+          final status = '${payment['status'] ?? ''}'.trim().toLowerCase();
+          final method = '${payment['method'] ?? ''}'.trim().toLowerCase();
+          final gateway = '${payment['gateway'] ?? ''}'.trim().toLowerCase();
+          if (paymentOrderId == orderId &&
+              method == 'razorpay' &&
+              (status == 'pending' || status == 'unpaid') &&
+              (gateway.isEmpty || gateway.contains('razorpay'))) {
+            paymentId = int.tryParse(
+              '${payment['paymentId'] ?? payment['id'] ?? ''}',
+            );
+            if (paymentId != null && paymentId! > 0) break;
+            paymentId = null;
+          }
+        }
+      }
+      if (paymentId == null) {
+        final createdResponse = await EcoLoopApi.instance.post(
+          '/payments/create',
+          {'orderId': orderId, 'method': 'razorpay'},
+        );
+        final created = _asMap(_responseData(createdResponse));
+        paymentId = int.tryParse(
+          '${created['paymentId'] ?? created['id'] ?? ''}',
+        );
+      }
       if (paymentId == null || paymentId <= 0) {
         throw Exception(
           'The server did not return a valid payment record for this order.',
         );
       }
+      final reusablePaymentId = paymentId;
 
       _pendingOrders = <Map<String, dynamic>>[order];
-      _pendingPaymentIds = <int>[paymentId];
+      _pendingPaymentIds = <int>[reusablePaymentId];
       _gatewayCallbackHandled = false;
       _razorpayCheckoutLaunched = false;
 
@@ -581,11 +616,8 @@ class _PaymentState extends State<Payment> {
   }
 
   Future<void> _cancelPendingOrders({required bool resetAttempt}) async {
-    // Cancel independent unpaid orders concurrently instead of waiting for each
-    // network round-trip one by one. The backend still decides whether each
-    // cancellation is valid and whether reserved stock can be restored.
+    // A retry failure must never cancel the existing order being paid.
     if (widget.isExistingOrderPayment) {
-      // A failed retry must not cancel the user's already-existing order.
       if (resetAttempt) {
         _pendingOrders = <Map<String, dynamic>>[];
         _pendingPaymentIds = <int>[];
@@ -596,30 +628,63 @@ class _PaymentState extends State<Payment> {
       }
       return;
     }
+
+    final unresolvedOrders = <Map<String, dynamic>>[];
     final orderIds = _pendingOrders
-        .map((order) => int.tryParse('${order['orderId'] ?? ''}'))
+        .map((order) => int.tryParse('${order['orderId'] ?? order['id'] ?? ''}'))
         .whereType<int>()
         .toSet();
-    await Future.wait(
-      orderIds.map((id) async {
-        try {
-          await EcoLoopApi.instance.post(
-            '/orders/$id/cancel',
-            <String, dynamic>{},
+
+    await Future.wait(orderIds.map((id) async {
+      try {
+        final dynamic response = await EcoLoopApi.instance.post(
+          '/orders/$id/cancel',
+          <String, dynamic>{},
+        );
+        final root = _asMap(response);
+        final data = _asMap(_responseData(response));
+        final successFlag = root.containsKey('success')
+            ? root['success']
+            : data['success'];
+        final status = '${data['status'] ?? root['status'] ?? ''}'
+            .trim()
+            .toLowerCase()
+            .replaceAll('_', ' ');
+        final confirmed = successFlag != false &&
+            (status == 'cancelled' || status == 'canceled');
+        if (!confirmed) {
+          unresolvedOrders.add(
+            _pendingOrders.firstWhere(
+              (order) => int.tryParse('${order['orderId'] ?? order['id'] ?? ''}') == id,
+              orElse: () => <String, dynamic>{'orderId': id},
+            ),
           );
-        } catch (_) {
-          // A cancellation may fail if payment status changed concurrently.
-          // Never show success or assume stock was restored in that case.
         }
-      }),
-    );
+      } catch (_) {
+        unresolvedOrders.add(
+          _pendingOrders.firstWhere(
+            (order) => int.tryParse('${order['orderId'] ?? order['id'] ?? ''}') == id,
+            orElse: () => <String, dynamic>{'orderId': id},
+          ),
+        );
+      }
+    }));
+
     if (resetAttempt) {
-      _pendingOrders = <Map<String, dynamic>>[];
-      _pendingPaymentIds = <int>[];
-      _gatewayOrderId = null;
-      _gatewayCallbackHandled = false;
-      _razorpayCheckoutLaunched = false;
-      _checkoutRequestId = DateTime.now().microsecondsSinceEpoch.toString();
+      _pendingOrders = unresolvedOrders;
+      // Keep unresolved IDs visible to this state; don't claim cancellation worked.
+      if (unresolvedOrders.isEmpty) {
+        _pendingPaymentIds = <int>[];
+        _gatewayOrderId = null;
+        _gatewayCallbackHandled = false;
+        _razorpayCheckoutLaunched = false;
+        _checkoutRequestId = DateTime.now().microsecondsSinceEpoch.toString();
+      }
+    }
+    if (unresolvedOrders.isNotEmpty && mounted) {
+      _showMessage(
+        'Payment was not completed. We could not confirm cancellation for ${unresolvedOrders.length} order(s). Refresh My Orders before retrying.',
+      );
     }
   }
 

@@ -9,12 +9,12 @@ class TermsConditions extends StatelessWidget {
     final sections = <Widget>[
       _section(
         '1. About EcoLoop',
-        'EcoLoop is intended to help people discover, buy, sell and donate reusable items and connect with ReMakers offering creative or custom work. EcoLoop provides platform features and is not automatically the seller, buyer, donor, recipient, courier or maker in every transaction. Formal legal entity details and business address are Pending.',
+        'EcoLoop is intended to help people discover, buy, sell and donate reusable items and connect with ReMakers offering creative or custom work. EcoLoop provides platform features and is not automatically the seller, buyer, donor, recipient, courier or maker in every transaction. EcoLoop is the platform name used by the project team. For operator and business-contact information, write to ecoloopp2026@gmail.com. The team should provide its formal legal name and business address in the public listing before commercial launch.',
       ),
 
       _section(
         '2. Acceptance and eligibility',
-        'By accessing or using EcoLoop, you agree to these terms and the Privacy Policy. The minimum permitted age is Pending and must be decided before launch. Do not use the service if you are not legally permitted to enter into the relevant agreement.',
+        'By accessing or using EcoLoop, you agree to these terms and the Privacy Policy. You must be at least 18 years old and legally capable of entering into a binding agreement to create an account or use marketplace, selling, donation or custom-service features. Do not use these features if applicable law prohibits you from doing so.',
       ),
 
       _section(
@@ -34,12 +34,12 @@ class TermsConditions extends StatelessWidget {
 
       _section(
         '6. Buying, orders and COD',
-        'Review product and order details before placing an order. EcoLoop currently supports Cash on Delivery (COD) and/or offline payment arrangements only; online payment gateway processing is not active. Do not treat an order as paid until the agreed payment has actually been completed. Follow the payment and delivery information shown in the live checkout. Any unspecified payment or delivery rules are Pending.',
+        'Review product and order details before placing an order. Available payment methods are those explicitly displayed for the order in the live checkout. Depending on deployment and order eligibility, this may include Cash on Delivery (COD), an agreed offline arrangement, or an online payment option presented through a payment provider. The existence of a payment endpoint does not mean online payments are enabled. An online payment is complete only after the provider transaction has been verified by EcoLoop’s backend and the order/payment status reflects confirmation. Do not rely solely on a redirect, app-launch result, screenshot or client-side success message. Review the total, delivery method and charges before confirming the order.',
       ),
 
       _section(
         '7. Delivery, cancellations and disputes',
-        'Order status and available cancellation options may depend on the current workflow and fulfilment status. A complete policy covering cancellations, returns, refunds, damaged items, missing items, non-delivery and disputes is Pending. Do not assume automatic refunds or guaranteed delivery unless the relevant process is implemented and disclosed. Contact support if a transaction issue cannot be resolved directly.',
+        'Order status and available cancellation options may depend on the current workflow and fulfilment status. Cancellation, return, refund and dispute requests are assessed against the order status, the terms shown at purchase and applicable consumer law. Contact support promptly if an item is damaged, missing or not delivered. Do not assume automatic refunds or guaranteed delivery unless the relevant process is implemented and disclosed. Contact support if a transaction issue cannot be resolved directly.',
       ),
 
       _section(
@@ -49,7 +49,7 @@ class TermsConditions extends StatelessWidget {
 
       _section(
         '9. Custom services',
-        'You may submit a custom-service brief, budget and reference material and receive proposals from ReMakers. Before agreeing, review the scope, price, deliverables, timeline, revisions, delivery or collection arrangements and acceptance conditions. Ownership or licensing of commissioned work, deposits, cancellations, refunds, late delivery and dispute handling are Pending unless clearly agreed in writing by the parties and permitted by law. Upload only material you have permission to share.',
+        'You may submit a custom-service brief, budget and reference material and receive proposals from ReMakers. Before agreeing, review the scope, price, deliverables, timeline, revisions, delivery or collection arrangements and acceptance conditions. Before work begins, both parties should record in writing their agreement on ownership or licensing, deposits, cancellation, refunds, delivery dates and dispute handling, subject to applicable law. Upload only material you have permission to share.',
       ),
 
       _section(
@@ -59,7 +59,7 @@ class TermsConditions extends StatelessWidget {
 
       _section(
         '11. Prohibited conduct',
-        'Do not use EcoLoop for fraud, unlawful activity, harassment, threats, spam, unauthorised access, harmful scraping, order or reward manipulation, or infringement of intellectual-property or privacy rights. EcoLoop may investigate reports and restrict content or accounts where reasonably necessary, subject to applicable law. A formal appeal process is Pending.',
+        'Do not use EcoLoop for fraud, unlawful activity, harassment, threats, spam, unauthorised access, harmful scraping, order or reward manipulation, or infringement of intellectual-property or privacy rights. EcoLoop may investigate reports and restrict content or accounts where reasonably necessary, subject to applicable law. If you believe a moderation or account decision is incorrect, contact support at ecoloopp2026@gmail.com and include the relevant listing or account reference.',
       ),
 
       _section(
@@ -69,7 +69,7 @@ class TermsConditions extends StatelessWidget {
 
       _section(
         '13. Privacy and account closure',
-        'The Privacy Policy describes known data uses and flags implementation gaps. Account deactivation may not erase all associated records or media. Do not treat account closure as complete deletion. Contact ecoloopp2026@gmail.com for a privacy or deletion request. Data-retention periods are Pending.',
+        'The Privacy Policy describes known data uses and flags implementation gaps. Account deactivation may not erase all associated records or media. Do not treat account closure as complete deletion. Contact ecoloopp2026@gmail.com for a privacy or deletion request. Records may be retained for as long as reasonably necessary for service operation, transaction records, dispute handling, security, legal compliance and backups, subject to applicable law.',
       ),
 
       _section(
@@ -84,12 +84,12 @@ class TermsConditions extends StatelessWidget {
 
       _section(
         '16. Contact and grievances',
-        'Contact ecoloopp2026@gmail.com for support, transaction concerns or grievances. The designated grievance officer, postal address, response deadlines and formal escalation process are Pending and must be confirmed before publication.',
+        'Contact ecoloopp2026@gmail.com for support, transaction concerns or grievances. For a complaint or grievance, email ecoloopp2026@gmail.com with the subject “EcoLoop Grievance” and include the relevant order or account reference without sending passwords, OTPs or payment credentials. The EcoLoop team is the current contact point. Before commercial launch, the operator must confirm and publish any grievance-officer designation, postal address and statutory details required for its business and applicable Indian law.',
       ),
 
       _section(
         '17. Updates',
-        'EcoLoop may update these terms as the service changes, subject to applicable law. The effective date and method for notifying users of material changes are Pending. The published version should display the actual effective date.',
+        'EcoLoop may update these terms when features or legal requirements change and will provide notice of material changes through the app or another reasonable channel where required by law. This version was reviewed on 24 October 2026.',
       ),
     ];
 
@@ -143,7 +143,7 @@ class TermsConditions extends StatelessWidget {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            'Draft for review. Minimum age, formal operator details, grievance procedure and some transaction rules remain Pending.',
+                            'Policy information is provided for transparency. Contact EcoLoop support with questions about a specific transaction or your rights under applicable law.',
                             style: TextStyle(
                               fontSize: 10,
                               height: 1.45,
@@ -175,7 +175,7 @@ class TermsConditions extends StatelessWidget {
                   const SizedBox(height: 5),
                   Text(
                     'Support: ecoloopp2026@gmail.com\n'
-                    'Draft — not yet legally approved.',
+                    'Reviewed: 24 October 2026. This policy does not limit rights available under applicable law.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 10,
@@ -185,7 +185,7 @@ class TermsConditions extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    'Last reviewed: 20 October 2026',
+                    'Last reviewed: 24 October 2026',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 9,

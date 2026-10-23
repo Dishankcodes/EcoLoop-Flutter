@@ -7,6 +7,7 @@ import '../../../app_theme/user/app_colors.dart';
 import '../reviews/write_review.dart';
 import '../reviews/write_seller_review.dart';
 import 'order_tracking.dart';
+import 'payment.dart';
 
 /// Screen displaying comprehensive details and status tracking for a purchased order.
 class BuyingOrderDetails extends StatefulWidget {
@@ -19,6 +20,7 @@ class BuyingOrderDetails extends StatefulWidget {
 }
 
 class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
+  late Map<String, dynamic> _orderData;
   late String _status;
   bool _productReviewSubmitted = false;
   bool _sellerReviewSubmitted = false;
@@ -30,26 +32,108 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   @override
   void initState() {
     super.initState();
-    _status = widget.order['status']?.toString() ?? 'Status unavailable';
+    _orderData = Map<String, dynamic>.from(widget.order);
+    _status = _orderData['status']?.toString() ?? 'Status unavailable';
     _refundExpected = _isPaidPaymentStatus(
-      widget.order['paymentStatus'] ?? widget.order['payment'],
+      _orderData['paymentStatus'] ?? _orderData['payment'],
     );
     _loadExistingReviewStatus();
+    _refreshOrderData();
+  }
+
+  bool _refreshingOrder = false;
+  bool _lastOrderRefreshSucceeded = false;
+
+  Future<void> _refreshOrderData() async {
+    final id = _safeId(_orderData['orderId'] ?? _orderData['id']);
+    if (id <= 0) return;
+    _refreshingOrder = true;
+    _lastOrderRefreshSucceeded = false;
+    try {
+      final dynamic response = await EcoLoopApi.instance.get('/orders/$id');
+      dynamic raw = response;
+      if (response is Map) {
+        raw = response['order'] ?? response['data'] ?? response['result'] ?? response;
+        if (raw is Map && raw['order'] is Map) raw = raw['order'];
+      }
+      if (!mounted || raw is! Map) return;
+      final latest = Map<String, dynamic>.from(raw);
+      _lastOrderRefreshSucceeded = true;
+      // Preserve presentation-only fields passed by My Orders while replacing
+      // mutable order/payment fields with the server's current values.
+      final merged = <String, dynamic>{..._orderData, ...latest};
+      setState(() {
+        _orderData = merged;
+        _status = (merged['status'] ?? 'Status unavailable').toString();
+        _refundExpected = _isPaidPaymentStatus(
+          merged['paymentStatus'] ?? merged['payment'],
+        );
+      });
+    } catch (_) {
+      _lastOrderRefreshSucceeded = false;
+      // Keep the existing snapshot visible if refresh is temporarily unavailable.
+    } finally {
+      _refreshingOrder = false;
+    }
+  }
+
+  Future<void> _startPaymentForExistingOrder() async {
+    await _refreshOrderData();
+    if (!mounted) return;
+    if (!_lastOrderRefreshSucceeded) {
+      _showMessage('Could not refresh this order. Please refresh and try again before paying.');
+      return;
+    }
+    if (_isPaidPaymentStatus(_orderData['paymentStatus'] ?? _orderData['payment'])) {
+      _showMessage('This order is already paid. The latest status has been refreshed.');
+      return;
+    }
+    final id = _safeId(_orderData['orderId'] ?? _orderData['id']);
+    if (id <= 0) {
+      _showMessage('This order has an invalid ID. Refresh My Orders and try again.');
+      return;
+    }
+    final rawAddress = _orderData['shippingAddress'] ?? _orderData['address'] ?? _orderData['deliveryAddress'];
+    Map<String, dynamic> address = <String, dynamic>{};
+    if (rawAddress is Map) {
+      address = Map<String, dynamic>.from(rawAddress);
+    } else if (rawAddress is String && rawAddress.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawAddress);
+        if (decoded is Map) address = Map<String, dynamic>.from(decoded);
+        else address = <String, dynamic>{'addressLine': rawAddress};
+      } catch (_) {
+        address = <String, dynamic>{'addressLine': rawAddress};
+      }
+    }
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => Payment(
+          totalAmount: _amount(_orderData['totalAmount'] ?? _orderData['grandTotal'] ?? _orderData['total']),
+          items: const <Map<String, dynamic>>[],
+          address: address,
+          existingOrder: Map<String, dynamic>.from(_orderData),
+          clearCartAfterSuccess: false,
+        ),
+      ),
+    );
+    if (mounted) await _refreshOrderData();
   }
 
   String get productName =>
-      (widget.order['productName'] ??
-              widget.order['productTitle'] ??
-              widget.order['product'] ??
-              widget.order['title'] ??
+      (_orderData['productName'] ??
+              _orderData['productTitle'] ??
+              _orderData['product'] ??
+              _orderData['title'] ??
               'Product details unavailable')
           .toString();
 
   String get price {
     final value =
-        widget.order['price'] ??
-        widget.order['unitPrice'] ??
-        widget.order['totalAmount'];
+        _orderData['price'] ??
+        _orderData['unitPrice'] ??
+        _orderData['totalAmount'];
     if (value == null) return 'Price unavailable';
     if (value.toString().trim().startsWith('₹')) return value.toString();
     final amount = value is num ? value : num.tryParse('$value');
@@ -58,17 +142,17 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   String get orderId {
     final value =
-        widget.order['displayOrderId'] ??
-        widget.order['orderId'] ??
-        widget.order['id'];
+        _orderData['displayOrderId'] ??
+        _orderData['orderId'] ??
+        _orderData['id'];
     return value == null ? 'Order ID unavailable' : value.toString();
   }
 
   String get orderDate {
     final value =
-        widget.order['createdAt'] ??
-        widget.order['created_at'] ??
-        widget.order['date'];
+        _orderData['createdAt'] ??
+        _orderData['created_at'] ??
+        _orderData['date'];
     if (value == null || value.toString().trim().isEmpty)
       return 'Date unavailable';
     final parsed = DateTime.tryParse(value.toString());
@@ -92,21 +176,21 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   }
 
   String get sellerName =>
-      (widget.order['sellerName'] ??
-              widget.order['seller'] ??
+      (_orderData['sellerName'] ??
+              _orderData['seller'] ??
               'Seller details unavailable')
           .toString();
 
   String get quantity =>
-      widget.order['quantity']?.toString() ?? 'Quantity unavailable';
+      _orderData['quantity']?.toString() ?? 'Quantity unavailable';
 
   String get payment =>
-      widget.order['payment']?.toString() ??
-      widget.order['paymentStatus']?.toString() ??
+      _orderData['payment']?.toString() ??
+      _orderData['paymentStatus']?.toString() ??
       'Payment status unavailable';
 
   bool get isPaymentPending {
-    final value = (widget.order['paymentStatus'] ?? widget.order['payment'])
+    final value = (_orderData['paymentStatus'] ?? _orderData['payment'])
         ?.toString()
         .trim()
         .toLowerCase()
@@ -129,9 +213,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   Map<String, dynamic> get _shippingAddress {
     final raw =
-        widget.order['address'] ??
-        widget.order['shippingAddress'] ??
-        widget.order['deliveryAddress'];
+        _orderData['address'] ??
+        _orderData['shippingAddress'] ??
+        _orderData['deliveryAddress'];
     if (raw is Map) return Map<String, dynamic>.from(raw);
     if (raw is String && raw.trim().isNotEmpty) {
       try {
@@ -158,52 +242,52 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           .join(', ');
 
   double get _quantityValue =>
-      _amount(widget.order['quantity'] ?? 1).clamp(1, 999).toDouble();
+      _amount(_orderData['quantity'] ?? 1).clamp(1, 999).toDouble();
 
   double get _itemSubtotal {
     final saved =
-        widget.order['subtotal'] ??
-        widget.order['itemSubtotal'] ??
-        widget.order['productSubtotal'] ??
-        widget.order['lineSubtotal'];
+        _orderData['subtotal'] ??
+        _orderData['itemSubtotal'] ??
+        _orderData['productSubtotal'] ??
+        _orderData['lineSubtotal'];
     if (saved != null) return _amount(saved);
-    final unit = widget.order['unitPrice'] ?? widget.order['productPrice'];
+    final unit = _orderData['unitPrice'] ?? _orderData['productPrice'];
     if (unit != null) return _amount(unit) * _quantityValue;
     return _amount(
-      widget.order['totalAmount'] ??
-          widget.order['grandTotal'] ??
-          widget.order['total'],
+      _orderData['totalAmount'] ??
+          _orderData['grandTotal'] ??
+          _orderData['total'],
     );
   }
 
   double get _couponDiscount => _amount(
-    widget.order['couponDiscount'] ??
-        widget.order['discountAmount'] ??
-        widget.order['discount'],
+    _orderData['couponDiscount'] ??
+        _orderData['discountAmount'] ??
+        _orderData['discount'],
   );
 
   double get _platformFee =>
-      _amount(widget.order['platformFee'] ?? widget.order['platform_fee']);
+      _amount(_orderData['platformFee'] ?? _orderData['platform_fee']);
 
   double get _taxAmount => _amount(
-    widget.order['taxAmount'] ??
-        widget.order['gstAmount'] ??
-        widget.order['tax'],
+    _orderData['taxAmount'] ??
+        _orderData['gstAmount'] ??
+        _orderData['tax'],
   );
 
   double get _deliveryCharge => _amount(
-    widget.order['deliveryCharge'] ??
-        widget.order['deliveryFee'] ??
-        widget.order['shippingCharge'],
+    _orderData['deliveryCharge'] ??
+        _orderData['deliveryFee'] ??
+        _orderData['shippingCharge'],
   );
 
   double get _savedGrandTotal {
     final saved =
-        widget.order['grandTotal'] ??
-        widget.order['orderTotal'] ??
-        widget.order['finalAmount'] ??
-        widget.order['totalAmount'] ??
-        widget.order['total'];
+        _orderData['grandTotal'] ??
+        _orderData['orderTotal'] ??
+        _orderData['finalAmount'] ??
+        _orderData['totalAmount'] ??
+        _orderData['total'];
     if (saved != null) return _amount(saved);
     return (_itemSubtotal -
             _couponDiscount +
@@ -215,7 +299,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   }
 
   String get deliveryMethod {
-    final raw = (widget.order['deliveryMethod'] ?? 'Standard')
+    final raw = (_orderData['deliveryMethod'] ?? 'Standard')
         .toString()
         .trim();
     if (raw.isEmpty) return 'Standard';
@@ -227,7 +311,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   String get expectedDate {
     final value =
-        widget.order['expectedDelivery'] ?? widget.order['expected_delivery'];
+        _orderData['expectedDelivery'] ?? _orderData['expected_delivery'];
     return value == null || value.toString().trim().isEmpty
         ? 'Not available'
         : value.toString();
@@ -235,12 +319,12 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   String? get _productImageUrl {
     dynamic value =
-        widget.order['productImageUrl'] ??
-        widget.order['imageUrl'] ??
-        widget.order['image'] ??
-        widget.order['productImage'] ??
-        widget.order['imageUrls'] ??
-        widget.order['productImageUrls'];
+        _orderData['productImageUrl'] ??
+        _orderData['imageUrl'] ??
+        _orderData['image'] ??
+        _orderData['productImage'] ??
+        _orderData['imageUrls'] ??
+        _orderData['productImageUrls'];
     if (value is List) {
       value = value.firstWhere(
         (item) => item != null && item.toString().trim().isNotEmpty,
@@ -260,7 +344,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   }
 
   bool get _isArtistSeller {
-    final type = (widget.order['sellerType'] ?? 'user')
+    final type = (_orderData['sellerType'] ?? 'user')
         .toString()
         .trim()
         .toLowerCase();
@@ -270,7 +354,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   IconData get productIcon {
     // Orders arrive from the API as JSON, so `icon` may be a String.
     // Never cast an API value directly to IconData.
-    final dynamic value = widget.order['icon'];
+    final dynamic value = _orderData['icon'];
     if (value is IconData) return value;
 
     // Keep a stable fallback for API-backed orders that have no local icon.
@@ -324,7 +408,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
   bool get _paymentPaid {
     final value =
-        (widget.order['paymentStatus'] ?? widget.order['payment'] ?? '')
+        (_orderData['paymentStatus'] ?? _orderData['payment'] ?? '')
             .toString()
             .trim()
             .toLowerCase()
@@ -378,9 +462,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
             const <dynamic>[];
       }
       final reviews = rows is List ? rows : const <dynamic>[];
-      final productId = _safeId(widget.order['productId']);
-      final sellerId = _safeId(widget.order['sellerId']);
-      final sellerType = _reviewText(widget.order['sellerType'] ?? 'user');
+      final productId = _safeId(_orderData['productId']);
+      final sellerId = _safeId(_orderData['sellerId']);
+      final sellerType = _reviewText(_orderData['sellerType'] ?? 'user');
       var productReviewed = false;
       var sellerReviewed = false;
 
@@ -438,12 +522,12 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   }
 
   Widget _buildReviewActions() {
-    final productId = _safeId(widget.order['productId']);
-    final sellerId = _safeId(widget.order['sellerId']);
-    final sellerType = (widget.order['sellerType'] ?? 'user')
+    final productId = _safeId(_orderData['productId']);
+    final sellerId = _safeId(_orderData['sellerId']);
+    final sellerType = (_orderData['sellerType'] ?? 'user')
         .toString()
         .toLowerCase();
-    final orderNumericId = _safeId(widget.order['orderId']);
+    final orderNumericId = _safeId(_orderData['orderId']);
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -560,8 +644,8 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       return;
     }
 
-    final productId = _safeId(widget.order['productId']);
-    final orderNumericId = _safeId(widget.order['orderId']);
+    final productId = _safeId(_orderData['productId']);
+    final orderNumericId = _safeId(_orderData['orderId']);
     if (orderNumericId <= 0) {
       _showMessage('Order information is missing. Please reopen this order.');
       return;
@@ -573,14 +657,14 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         return;
       }
       final product = <String, dynamic>{
-        ...widget.order,
+        ..._orderData,
         'productId': productId,
         'id': productId,
         'title': productName,
         'name': productName,
         'imageUrls':
-            widget.order['imageUrls'] ?? widget.order['productImageUrls'],
-        'imageUrl': widget.order['productImageUrl'] ?? widget.order['imageUrl'],
+            _orderData['imageUrls'] ?? _orderData['productImageUrls'],
+        'imageUrl': _orderData['productImageUrl'] ?? _orderData['imageUrl'],
       };
       final submitted = await Navigator.push<bool>(
         context,
@@ -597,13 +681,13 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       return;
     }
 
-    final sellerId = _safeId(widget.order['sellerId']);
+    final sellerId = _safeId(_orderData['sellerId']);
     if (sellerId <= 0) {
       _showMessage('Seller information is missing for this order.');
       return;
     }
 
-    final sellerType = (widget.order['sellerType'] ?? 'user')
+    final sellerType = (_orderData['sellerType'] ?? 'user')
         .toString()
         .trim()
         .toLowerCase();
@@ -613,9 +697,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         builder: (_) => WriteSellerReview(
           sellerName: sellerName,
           sellerImage:
-              (widget.order['sellerImage'] ??
-                      widget.order['sellerPhotoUrl'] ??
-                      widget.order['profilePhotoUrl'])
+              (_orderData['sellerImage'] ??
+                      _orderData['sellerPhotoUrl'] ??
+                      _orderData['profilePhotoUrl'])
                   ?.toString(),
           sellerId: sellerId.toString(),
           sellerType: sellerType,
@@ -1342,7 +1426,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       'grandTotal',
       'orderTotal',
       'finalAmount',
-    ].any(widget.order.containsKey);
+    ].any(_orderData.containsKey);
     return _section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1352,16 +1436,16 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           _billRow('Item subtotal', _money(_itemSubtotal)),
           if (_couponDiscount > 0)
             _billRow('Coupon discount', '− ${_money(_couponDiscount)}'),
-          if (widget.order.containsKey('platformFee') ||
-              widget.order.containsKey('platform_fee'))
+          if (_orderData.containsKey('platformFee') ||
+              _orderData.containsKey('platform_fee'))
             _billRow('Platform fee', _money(_platformFee)),
-          if (widget.order.containsKey('taxAmount') ||
-              widget.order.containsKey('gstAmount') ||
-              widget.order.containsKey('tax'))
+          if (_orderData.containsKey('taxAmount') ||
+              _orderData.containsKey('gstAmount') ||
+              _orderData.containsKey('tax'))
             _billRow('GST on platform fee', _money(_taxAmount)),
-          if (widget.order.containsKey('deliveryCharge') ||
-              widget.order.containsKey('deliveryFee') ||
-              widget.order.containsKey('shippingCharge'))
+          if (_orderData.containsKey('deliveryCharge') ||
+              _orderData.containsKey('deliveryFee') ||
+              _orderData.containsKey('shippingCharge'))
             _billRow(
               'Delivery charge',
               _deliveryCharge == 0 ? 'FREE' : _money(_deliveryCharge),
@@ -1661,14 +1745,14 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           ),
           const SizedBox(height: 7),
           const Text(
-            'This order has not been marked as paid. Complete payment only after a payment gateway is connected.',
+            'This order has not been marked as paid. Continue securely to complete payment for this existing order.',
             style: TextStyle(height: 1.4, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _showPaymentNotReady,
+              onPressed: _refreshingOrder ? null : _startPaymentForExistingOrder,
               icon: const Icon(Icons.payment_rounded),
               label: const Text('Complete Payment'),
               style: ElevatedButton.styleFrom(
@@ -1686,25 +1770,6 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     );
   }
 
-  void _showPaymentNotReady() {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Online payment is not connected'),
-        content: const Text(
-          'Your order is pending payment, but the current backend has no order-specific payment initiation or payment verification endpoint. The existing payment page places a new Cash on Delivery order, so opening it here could create a duplicate order. No payment has been taken and this order will remain pending until a real gateway flow is integrated.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Got it'),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Bottom action bar: cancellation is available only until Packed.
   Widget _buildBottomBar() {
@@ -1794,7 +1859,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   void _trackOrder() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => OrderTracking(order: widget.order)),
+      MaterialPageRoute(builder: (_) => OrderTracking(order: _orderData)),
     );
   }
 
@@ -1813,7 +1878,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         ),
         content: Text(
           _isPaidPaymentStatus(
-                widget.order['paymentStatus'] ?? widget.order['payment'],
+                _orderData['paymentStatus'] ?? _orderData['payment'],
               )
               ? 'Are you sure you want to cancel this order? Your payment refund should arrive within 5–7 days. If it has not arrived after 7 days, contact EcoLoop.'
               : 'Are you sure you want to cancel this order? This action cannot be undone.',
@@ -1840,7 +1905,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
 
     if (confirmed != true || !mounted) return;
 
-    final id = _safeId(widget.order['orderId'] ?? widget.order['id']);
+    final id = _safeId(_orderData['orderId'] ?? _orderData['id']);
     if (id <= 0) {
       _showMessage(
         'Could not cancel this order because its order ID is missing.',
@@ -1871,7 +1936,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         _refundExpected =
             _refundExpected ||
             _isPaidPaymentStatus(
-              widget.order['paymentStatus'] ?? widget.order['payment'],
+              _orderData['paymentStatus'] ?? _orderData['payment'],
             ) ||
             returnedPaymentStatus == 'refund_required';
         _cancellingOrder = false;
@@ -1940,14 +2005,14 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   }
 
   Future<void> _showSellerContact() async {
-    final sellerId = _safeId(widget.order['sellerId']);
+    final sellerId = _safeId(_orderData['sellerId']);
     final isArtist = _isArtistSeller;
     Map<String, dynamic> contact = <String, dynamic>{
       'name': sellerName,
-      'phone': widget.order['sellerPhone'] ?? widget.order['phone'] ?? '',
-      'email': widget.order['sellerEmail'] ?? widget.order['email'] ?? '',
-      'city': widget.order['sellerCity'] ?? '',
-      'state': widget.order['sellerState'] ?? '',
+      'phone': _orderData['sellerPhone'] ?? _orderData['phone'] ?? '',
+      'email': _orderData['sellerEmail'] ?? _orderData['email'] ?? '',
+      'city': _orderData['sellerCity'] ?? '',
+      'state': _orderData['sellerState'] ?? '',
     };
 
     if (sellerId > 0) {

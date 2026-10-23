@@ -20,11 +20,6 @@ class Cart extends StatefulWidget {
 }
 
 class _CartState extends State<Cart> {
-  // In-memory cache avoids a blank/loading cart when navigating back to it.
-  // The server remains authoritative and refreshes this cache in _loadCart().
-  static List<Map<String, dynamic>> _cachedActive = <Map<String, dynamic>>[];
-  static List<Map<String, dynamic>> _cachedSaved = <Map<String, dynamic>>[];
-
   final List<Map<String, dynamic>> _cartItems = [];
   final List<Map<String, dynamic>> _savedForLater = [];
   List<Map<String, dynamic>> _similarProducts = [];
@@ -46,15 +41,10 @@ class _CartState extends State<Cart> {
   @override
   void initState() {
     super.initState();
-    if (_cachedActive.isNotEmpty || _cachedSaved.isNotEmpty) {
-      _cartItems.addAll(
-        _cachedActive.map((item) => Map<String, dynamic>.from(item)),
-      );
-      _savedForLater.addAll(
-        _cachedSaved.map((item) => Map<String, dynamic>.from(item)),
-      );
-      _loadingCart = false;
-    }
+
+    // Never seed this screen from process-wide cart rows. The authenticated
+    // server response is the only source used to render the cart.
+    _loadingCart = true;
     _loadCart();
     _loadSimilarProducts();
   }
@@ -95,9 +85,12 @@ class _CartState extends State<Cart> {
   Future<void> _loadCart() async {
     if (!mounted) return;
     setState(() {
-      // Keep existing/cached rows visible during refresh; only show the full
-      // loading state when there is nothing useful to render yet.
-      _loadingCart = _cartItems.isEmpty && _savedForLater.isEmpty;
+      // Clear local rows before each load. If authentication changed while
+      // this State remained mounted, the previous account's rows must never
+      // remain visible while the current account is being fetched.
+      _cartItems.clear();
+      _savedForLater.clear();
+      _loadingCart = true;
       _cartError = null;
     });
     try {
@@ -148,12 +141,6 @@ class _CartState extends State<Cart> {
         }
       }
       if (!mounted) return;
-      _cachedActive = active
-          .map((item) => Map<String, dynamic>.from(item))
-          .toList();
-      _cachedSaved = saved
-          .map((item) => Map<String, dynamic>.from(item))
-          .toList();
       setState(() {
         _cartItems
           ..clear()

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app_theme/user/app_colors.dart';
 import '../app_theme/user/app_text_styles.dart';
+import '../shared_preferences_util.dart';
 import '../screens/user/buy_products/cart.dart';
 import '../screens/user/buy_products/checkout.dart';
 
@@ -14,12 +15,41 @@ class CartPopup {
   static NavigatorState? _navigatorState;
   static bool _navigationInProgress = false;
   static final List<Map<String, dynamic>> _cartItems = [];
+  static String? _ownerAccountKey;
+
+  // Match EcoLoopApi's account selection so popup memory cannot cross user or
+  // artist sessions. The raw token is used only in-memory and is never logged.
+  static String _currentAccountKey() {
+    final role = Prefs.getString('userRole').trim().toLowerCase();
+    final token = role == 'artist'
+        ? Prefs.getString('artistToken').trim()
+        : Prefs.getString('authToken').trim();
+    return '$role|$token';
+  }
+
+  static void _ensureAccountScope() {
+    final currentKey = _currentAccountKey();
+    if (_ownerAccountKey == currentKey) return;
+
+    _cartItems.clear();
+    dismiss();
+    _navigatorState = null;
+    _navigationInProgress = false;
+    _ownerAccountKey = currentKey;
+  }
+
   static List<Map<String, dynamic>> get items {
+    _ensureAccountScope();
     return _cartItems.map((item) => Map<String, dynamic>.from(item)).toList();
   }
 
-  static bool get isEmpty => _cartItems.isEmpty;
+  static bool get isEmpty {
+    _ensureAccountScope();
+    return _cartItems.isEmpty;
+  }
+
   static int get totalItems {
+    _ensureAccountScope();
     var total = 0;
     for (final item in _cartItems) {
       total += _toInt(item['quantity'], fallback: 1);
@@ -29,6 +59,7 @@ class CartPopup {
   }
 
   static double get totalAmount {
+    _ensureAccountScope();
     var total = 0.0;
 
     for (final item in _cartItems) {
@@ -45,6 +76,7 @@ class CartPopup {
     BuildContext context, {
     required Map<String, dynamic> item,
   }) {
+    _ensureAccountScope();
     final normalized = _normalizeItem(item);
     final productId = normalized['productId'].toString();
     final existingIndex = _cartItems.indexWhere(
@@ -76,6 +108,7 @@ class CartPopup {
     BuildContext context, {
     required List<Map<String, dynamic>> items,
   }) {
+    _ensureAccountScope();
     if (items.isEmpty) {
       return;
     }
@@ -259,6 +292,7 @@ class CartPopup {
 
   static void clear() {
     _cartItems.clear();
+    _ownerAccountKey = _currentAccountKey();
     dismiss();
 
     _navigatorState = null;
@@ -266,6 +300,7 @@ class CartPopup {
   }
 
   static void removeItem(String productId) {
+    _ensureAccountScope();
     _cartItems.removeWhere(
       (item) => item['productId'].toString() == productId.toString(),
     );
@@ -278,6 +313,7 @@ class CartPopup {
   }
 
   static void updateQuantity(String productId, int quantity) {
+    _ensureAccountScope();
     final index = _cartItems.indexWhere(
       (item) => item['productId'].toString() == productId.toString(),
     );

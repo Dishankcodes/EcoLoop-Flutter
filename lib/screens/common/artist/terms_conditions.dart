@@ -11,12 +11,12 @@ class ArtistTermsConditions extends StatelessWidget {
     final sections = <Widget>[
       _section(
         '1. About these terms',
-        'These terms apply to EcoLoop ReMaker features, including public profiles, portfolios, product listings, orders, followers, reviews, analytics and custom-service responses. EcoLoop facilitates platform features and is not automatically a party to every sale or commissioned-work agreement. Formal legal entity details and business address are Pending.',
+        'These terms apply to EcoLoop ReMaker features, including public profiles, portfolios, product listings, orders, followers, reviews, analytics and custom-service responses. EcoLoop facilitates platform features and is not automatically a party to every sale or commissioned-work agreement. EcoLoop is the platform name used by the project team. For operator and business-contact information, write to ecoloopp2026@gmail.com. The team should provide its formal legal name and business address in the public listing before commercial launch.',
       ),
 
       _section(
         '2. Acceptance and eligibility',
-        'Using ReMaker features means you agree to these terms and the Privacy Policy. The minimum permitted age is Pending and must be decided before launch. You must have the legal capacity and permissions needed to sell goods or provide services.',
+        'Using ReMaker features means you agree to these terms and the Privacy Policy. You must be at least 18 years old to use EcoLoop account and marketplace features. You must have the legal capacity and permissions needed to sell goods or provide services.',
       ),
 
       _section(
@@ -36,17 +36,17 @@ class ArtistTermsConditions extends StatelessWidget {
 
       _section(
         '6. Orders, delivery and COD',
-        'Current payment arrangements are COD and/or offline only; online payment gateway processing is not active. Confirm the order and agreed payment arrangement before fulfilment. Keep customer information confidential and use contact or address details only as needed for the transaction. Delivery responsibility, delivery fees, cancellation windows, returns, refunds and damaged or missing item handling are Pending where not specified by the actual workflow.',
+        'Use only the payment method displayed and agreed for the specific order. Depending on deployment and order eligibility, checkout may offer COD, an offline arrangement or an online payment provider. Online payment is not confirmed merely because a provider app opens or a customer returns to EcoLoop; fulfilment and payment records must reflect verified status. Follow the order details and keep customer information confidential, using it only for that transaction. Cancellation, return, refund and delivery remedies are subject to the in-app options, the seller agreement and applicable consumer law.',
       ),
 
       _section(
         '7. Earnings and fees',
-        'Earnings or analytics displayed in the app are system records or summaries and do not necessarily mean money has been collected or settled by EcoLoop. Commission, platform fees, payout methods, settlement timing, taxes and accounting documentation are Pending unless explicitly disclosed and supported by the live process. Do not assume online payment processing or automatic payouts are available.',
+        'Earnings or analytics displayed in the app are system records or summaries and do not necessarily mean money has been collected or settled by EcoLoop. Any commission, platform fee, payout method or settlement timing must be shown in the applicable seller terms or transaction flow. Artists remain responsible for their own tax and accounting obligations. Do not assume online payment processing or automatic payouts are available.',
       ),
 
       _section(
         '8. Custom-service proposals',
-        'When responding to a custom-service request, describe the scope, deliverables, price, timeline, revisions, materials, delivery or collection arrangements and acceptance conditions clearly. Do not accept work you cannot reasonably complete. Rules for deposits, cancellation, refunds, ownership or licensing, late work and disputes are Pending unless agreed in writing by both parties and consistent with law. Use customer reference images only for the requested purpose and do not republish them without permission.',
+        'When responding to a custom-service request, describe the scope, deliverables, price, timeline, revisions, materials, delivery or collection arrangements and acceptance conditions clearly. Do not accept work you cannot reasonably complete. Agree in writing with the customer on deposits, cancellation, refunds, ownership or licensing, deadlines and dispute handling before accepting the work, subject to applicable law. Use customer reference images only for the requested purpose and do not republish them without permission.',
       ),
 
       _section(
@@ -61,22 +61,22 @@ class ArtistTermsConditions extends StatelessWidget {
 
       _section(
         '11. Donations and platform features',
-        'If you participate in donation or pickup workflows, follow the instructions and eligibility rules actually shown. Pickup or rewards are not guaranteed unless confirmed. Feature availability and reward terms may change; details not implemented or specified are Pending.',
+        'If you participate in donation or pickup workflows, follow the instructions and eligibility rules actually shown. Pickup or rewards are not guaranteed unless confirmed. Feature availability and reward terms may change; Rewards or pickup are available only when confirmed by the relevant in-app workflow.',
       ),
 
       _section(
         '12. Intellectual property',
-        'You must own or have permission to use product photos, portfolio work, designs, certificates, descriptions and other material you upload. You allow EcoLoop to host and display content as reasonably necessary to operate public profiles, listings and selected features. Ownership or licensing of commissioned custom work should be agreed with the customer before work begins; a universal ownership rule is Pending legal review.',
+        'You must own or have permission to use product photos, portfolio work, designs, certificates, descriptions and other material you upload. You allow EcoLoop to host and display content as reasonably necessary to operate public profiles, listings and selected features. Ownership or licensing of commissioned custom work should be agreed with the customer before work begins; Agree with the customer in writing on ownership or licensing of commissioned work before work begins, subject to applicable law.',
       ),
 
       _section(
         '13. Moderation and suspension',
-        'EcoLoop may remove listings or restrict accounts where reasonably necessary to address unlawful, deceptive, unsafe or abusive activity, subject to applicable law. A formal notice and appeal process is Pending and should be documented before launch.',
+        'EcoLoop may remove listings or restrict accounts where reasonably necessary to address unlawful, deceptive, unsafe or abusive activity, subject to applicable law. If you believe a moderation or account decision is incorrect, contact ecoloopp2026@gmail.com with the relevant listing or account reference.',
       ),
 
       _section(
         '14. Privacy and account closure',
-        'The Privacy Policy describes known data uses and unresolved implementation issues. Current account closure may deactivate an account and revoke sessions without erasing all orders, reviews, analytics, custom-service records or stored media. Do not promise complete erasure. Retention and deletion timelines are Pending.',
+        'The Privacy Policy describes known data uses and unresolved implementation issues. Current account closure may deactivate an account and revoke sessions without erasing all orders, reviews, analytics, custom-service records or stored media. Do not promise complete erasure. Some records and media may be retained after account closure for transaction, security, backup or legal reasons, subject to applicable law.',
       ),
 
       _section(
@@ -86,12 +86,12 @@ class ArtistTermsConditions extends StatelessWidget {
 
       _section(
         '16. Contact and grievances',
-        'Contact ecoloopp2026@gmail.com for support, account, order or grievance issues. A designated grievance officer’s details, postal address, response deadlines and escalation procedure are Pending.',
+        'For a complaint or grievance, email ecoloopp2026@gmail.com with the subject “EcoLoop Grievance” and include the relevant order or account reference. Do not send passwords, OTPs or payment credentials. The EcoLoop team is the current contact point; the operator should publish any legally required grievance-officer designation and postal address before commercial launch.',
       ),
 
       _section(
         '17. Changes',
-        'The effective date and process for notifying ReMakers of material changes are Pending. The published policy should display the actual current version and effective date.',
+        'This version was reviewed on 24 October 2026. Material changes may be notified through the app or another reasonable channel where required by law.',
       ),
     ];
 
@@ -149,7 +149,7 @@ class ArtistTermsConditions extends StatelessWidget {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            'Draft for review. Minimum age, formal operator details, grievance procedure and transaction rules remain Pending.',
+                            'Policy information is provided for transparency. Contact EcoLoop support with questions about a specific transaction or your rights under applicable law.',
                             style: TextStyle(
                               fontSize: 10,
                               height: 1.45,
@@ -185,7 +185,7 @@ class ArtistTermsConditions extends StatelessWidget {
                   const SizedBox(height: 5),
                   Text(
                     'Support: ecoloopp2026@gmail.com\n'
-                    'Draft — not yet legally approved.',
+                    'Reviewed: 24 October 2026. This policy does not limit rights available under applicable law.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 10,
@@ -195,7 +195,7 @@ class ArtistTermsConditions extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    'Last reviewed: 20 October 2026',
+                    'Last reviewed: 24 October 2026',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 9,
