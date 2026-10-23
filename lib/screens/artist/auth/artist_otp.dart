@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../api/api_manager.dart';
@@ -347,13 +348,37 @@ class _ArtistOtpScreenState extends State<ArtistOtpScreen> {
   // ERROR MESSAGE
 
   String _cleanErrorMessage(Object error) {
-    final message = error.toString();
-
-    if (message.startsWith('Exception: ')) {
-      return message.substring(11);
+    if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map) {
+        final backendError = data['error'];
+        if (backendError is Map) {
+          final message = backendError['message']?.toString().trim();
+          if (message != null && message.isNotEmpty) return message;
+        } else if (backendError is String && backendError.trim().isNotEmpty) {
+          return backendError.trim();
+        }
+        final direct = data['message']?.toString().trim();
+        if (direct != null && direct.isNotEmpty) return direct;
+      }
+      if (error.type == DioExceptionType.connectionError) {
+        return 'No internet connection. Please check your network.';
+      }
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.sendTimeout ||
+          error.type == DioExceptionType.receiveTimeout) {
+        return 'The request timed out. Please try again.';
+      }
+      return 'Unable to verify the OTP. Please try again.';
     }
 
-    return message;
+    final message = error.toString().trim();
+    if (message.startsWith('Exception: ')) {
+      return message.substring('Exception: '.length).trim();
+    }
+    return message.isNotEmpty
+        ? message
+        : 'Something went wrong. Please try again.';
   }
 
   // UI

@@ -12,6 +12,7 @@ import '../../../models/location/state_model.dart';
 import '../../../services/ecoloop_api.dart';
 import '../../../services/image_picker_service.dart';
 import '../../../services/location_data_cache.dart';
+import '../../../services/profile_snapshot.dart';
 import '../../../shared_preferences_util.dart';
 
 class EditProfile extends StatefulWidget {
@@ -363,6 +364,21 @@ class _EditProfileState extends State<EditProfile> {
         Prefs.setString('userState', state),
         Prefs.setString('userCity', city),
       ]);
+
+      // The updateProfile service uses its own Dio request, so explicitly
+      // invalidate EcoLoopApi's cached /auth/me and /profile responses.
+      EcoLoopApi.instance.invalidateCache();
+
+      // Notify every mounted screen now; don't wait for a new GET request.
+      ProfileSnapshot.publish(<String, dynamic>{
+        'firstName': firstName,
+        'lastName': lastName,
+        'userName': name,
+        'name': name,
+        'city': city,
+        'state': state,
+        'stateCode': stateCode,
+      });
 
       if (!mounted) return;
 

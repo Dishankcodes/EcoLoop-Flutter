@@ -517,9 +517,25 @@ class _ArtistRegisterState extends State<ArtistRegister> {
       );
 
       if (response.success != true || response.data == null) {
-        throw Exception(
-          response.error ?? 'Google sign-up failed. Please try again.',
+        final error = (response.error ?? '').trim();
+        final lowerError = error.toLowerCase();
+        final isExistingEmail =
+            lowerError.contains('already exists') ||
+            lowerError.contains('already registered') ||
+            lowerError.contains('existing method');
+        if (!mounted) return;
+        _showMessage(
+          title: isExistingEmail
+              ? 'Email already registered'
+              : 'Google sign-up failed',
+          message: isExistingEmail
+              ? 'This email is already registered using your existing login method. Please sign in with that method.'
+              : error.isNotEmpty
+              ? error
+              : 'Google sign-up failed. Please try again.',
+          type: AppMessageType.error,
         );
+        return;
       }
 
       final raw = response.data;

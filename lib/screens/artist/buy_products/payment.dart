@@ -217,6 +217,13 @@ class _PaymentState extends State<Payment> {
 
   Future<void> _payNow() async {
     if (_isProcessing) return;
+
+    // Let the artist choose a preferred UPI app before starting Razorpay Checkout.
+    if (_selectedMethod == 'upi') {
+      final selectedApp = await _chooseUpiApp();
+      if (!mounted || selectedApp == null) return;
+      setState(() => _selectedUpiApp = selectedApp);
+    }
     final items = widget.items ?? const <Map<String, dynamic>>[];
     if (items.isEmpty) {
       _showMessage('No items to order.');
@@ -340,6 +347,177 @@ class _PaymentState extends State<Payment> {
     } finally {
       if (mounted && _isProcessing) setState(() => _isProcessing = false);
     }
+  }
+
+  Future<String?> _chooseUpiApp() {
+    String selectedApp = _selectedUpiApp ?? 'gpay';
+
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Widget appOption({
+              required String value,
+              required IconData icon,
+              required String title,
+              required String subtitle,
+            }) {
+              final selected = selectedApp == value;
+              return InkWell(
+                onTap: () => setSheetState(() => selectedApp = value),
+                borderRadius: BorderRadius.circular(15),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: selected ? ArtistColors.light : ArtistColors.surface,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(
+                      color: selected
+                          ? ArtistColors.primary
+                          : Colors.grey.shade300,
+                      width: selected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: ArtistColors.background,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          icon,
+                          color: ArtistColors.primary,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                color: ArtistColors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(subtitle, style: ArtistTextStyles.caption),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        selected
+                            ? Icons.radio_button_checked_rounded
+                            : Icons.radio_button_off_rounded,
+                        color: selected
+                            ? ArtistColors.primary
+                            : Colors.grey.shade400,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return SafeArea(
+              top: false,
+              child: Container(
+                padding: EdgeInsets.fromLTRB(
+                  18,
+                  12,
+                  18,
+                  18 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                decoration: BoxDecoration(
+                  color: ArtistColors.background,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(25),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade400,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Choose your UPI app',
+                      style: ArtistTextStyles.title.copyWith(fontSize: 19),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'Select your preferred app, then continue to secure Razorpay Checkout.',
+                      style: ArtistTextStyles.caption.copyWith(height: 1.4),
+                    ),
+                    const SizedBox(height: 16),
+                    appOption(
+                      value: 'gpay',
+                      icon: Icons.g_mobiledata_rounded,
+                      title: 'Google Pay',
+                      subtitle: 'Pay with Google Pay',
+                    ),
+                    const SizedBox(height: 9),
+                    appOption(
+                      value: 'phonepe',
+                      icon: Icons.phone_android_rounded,
+                      title: 'PhonePe',
+                      subtitle: 'Pay with PhonePe',
+                    ),
+                    const SizedBox(height: 9),
+                    appOption(
+                      value: 'paytm',
+                      icon: Icons.account_balance_wallet_outlined,
+                      title: 'Paytm',
+                      subtitle: 'Pay with Paytm',
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () =>
+                            Navigator.of(sheetContext).pop(selectedApp),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ArtistColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Continue to payment',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _handleRazorpaySuccess(PaymentSuccessResponse response) async {

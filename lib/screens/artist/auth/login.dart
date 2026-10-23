@@ -215,7 +215,7 @@ class _ArtistLoginState extends State<ArtistLogin> {
 
   // General Error
   String _getGeneralErrorMessage(dynamic error) {
-    final message = error.toString();
+    final message = error.toString().trim();
 
     if (message.contains('SocketException')) {
       return 'No internet connection. Please check your network.';
@@ -223,6 +223,11 @@ class _ArtistLoginState extends State<ArtistLogin> {
 
     if (message.contains('TimeoutException')) {
       return 'The request timed out. Please try again.';
+    }
+
+    if (message.startsWith('Exception: ')) {
+      final readable = message.substring('Exception: '.length).trim();
+      if (readable.isNotEmpty) return readable;
     }
 
     return 'Something went wrong. Please try again.';
@@ -265,7 +270,22 @@ class _ArtistLoginState extends State<ArtistLogin> {
       );
 
       if (response.success != true || response.data == null) {
-        throw Exception(response.error ?? 'Google sign-in failed.');
+        final error = (response.error ?? '').trim();
+        final lowerError = error.toLowerCase();
+        final isExistingEmail =
+            lowerError.contains('already exists') ||
+            lowerError.contains('already registered') ||
+            lowerError.contains('existing method');
+
+        if (!mounted) return;
+        setState(() {
+          _errorMessage = isExistingEmail
+              ? 'This email is already registered using another login method. Please sign in using your existing method.'
+              : error.isNotEmpty
+              ? error
+              : 'Unable to sign in with Google. Please try again.';
+        });
+        return;
       }
 
       final data = Map<String, dynamic>.from(response.data!);

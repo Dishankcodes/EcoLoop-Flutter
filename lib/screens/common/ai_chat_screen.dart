@@ -18,9 +18,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
   final List<_ChatMessage> _messages = <_ChatMessage>[];
 
   bool _sending = false;
-  bool _loadingHistory = true;
+  bool _loadingHistory = false;
   bool _clearingHistory = false;
   String? _historyError;
+  String? _lastFailedMessage;
+  int _conversationRevision = 0;
+
+  // In-memory only; keyed by the signed-in role and that account's token.
+  // This never writes chat content to local storage.
+  static final Map<String, List<_ChatMessage>> _historyCache = {};
 
   static const _welcomeMessage =
       'Hi! I’m EcoLoop AI Support. Ask me about your account, products, orders, donations, custom services, or ReMaker features.';
@@ -30,21 +36,51 @@ class _AiChatScreenState extends State<AiChatScreen> {
   bool get _isArtist =>
       _role == 'artist' || _role == 'remaker' || _role == 're_maker';
 
+  String get _cacheKey {
+    final token = Prefs.getString(
+      _isArtist ? 'artistToken' : 'authToken',
+    ).trim();
+    if (token.isEmpty) return '';
+    return '$_role:$token';
+  }
+
+  void _cacheCurrentHistory() {
+    final key = _cacheKey;
+    if (key.isEmpty) return;
+    _historyCache[key] = List<_ChatMessage>.unmodifiable(
+      _messages.where((message) => !message.isError).toList(),
+    );
+  }
+
   Color get _primary => _isArtist ? ArtistColors.primary : AppColors.primary;
+
   Color get _background =>
       _isArtist ? ArtistColors.background : AppColors.background;
+
   Color get _surface => _isArtist ? ArtistColors.surface : AppColors.surface;
+
   Color get _text =>
       _isArtist ? ArtistColors.textPrimary : AppColors.textPrimary;
+
   Color get _muted =>
       _isArtist ? ArtistColors.textSecondary : AppColors.textSecondary;
+
   Color get _border =>
       _isArtist ? ArtistColors.border : AppColors.accent.withValues(alpha: .45);
+
   Color get _error => _isArtist ? ArtistColors.error : AppColors.error;
 
   @override
   void initState() {
     super.initState();
+    final key = _cacheKey;
+    final cached = key.isEmpty ? null : _historyCache[key];
+    if (cached != null && cached.isNotEmpty) {
+      _messages.addAll(cached);
+    } else {
+      _messages.add(const _ChatMessage(text: _welcomeMessage, isUser: false));
+    }
+    // Render cached messages immediately; refresh them from the backend.
     _loadHistory();
   }
 
@@ -56,6 +92,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   Future<void> _loadHistory({bool showError = false}) async {
+    if (_loadingHistory || _sending || _clearingHistory) return;
+
+    final revisionAtRequestStart = _conversationRevision;
     if (mounted) {
       setState(() {
         _loadingHistory = true;
@@ -78,22 +117,28 @@ class _AiChatScreenState extends State<AiChatScreen> {
       }
 
       if (!mounted) return;
-      setState(() {
-        _messages
-          ..clear()
-          ..addAll(loaded);
-        if (_messages.isEmpty) {
-          _messages.add(
-            const _ChatMessage(text: _welcomeMessage, isUser: false),
-          );
-        }
-        _loadingHistory = false;
-      });
-      _scrollToBottom(jump: true);
+
+      // Avoid overwriting messages sent while this request was in flight.
+      if (revisionAtRequestStart == _conversationRevision) {
+        setState(() {
+          _messages
+            ..clear()
+            ..addAll(loaded);
+          if (_messages.isEmpty) {
+            _messages.add(
+              const _ChatMessage(text: _welcomeMessage, isUser: false),
+            );
+          }
+          _historyError = null;
+        });
+        _cacheCurrentHistory();
+        _scrollToBottom(jump: true);
+      } else {
+        _cacheCurrentHistory();
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _loadingHistory = false;
         _historyError = showError ? _errorMessage(error) : null;
         if (_messages.isEmpty) {
           _messages.add(
@@ -101,6 +146,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
           );
         }
       });
+    } finally {
+      if (mounted) setState(() => _loadingHistory = false);
     }
   }
 
@@ -130,12 +177,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
         )
         .toList();
 
+    _conversationRevision++;
     setState(() {
       _messages.add(_ChatMessage(text: message, isUser: true));
       _sending = true;
       _controller.clear();
       _historyError = null;
+      _lastFailedMessage = null;
     });
+    _cacheCurrentHistory();
     _scrollToBottom();
 
     try {
@@ -154,15 +204,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
       if (!mounted) return;
       setState(() {
         _messages.add(_ChatMessage(text: reply, isUser: false));
+        _lastFailedMessage = null;
       });
+      _cacheCurrentHistory();
       _scrollToBottom();
     } catch (error) {
       if (!mounted) return;
       setState(() {
+        _lastFailedMessage = message;
         _messages.add(
           _ChatMessage(
-            text:
-                'Sorry, I couldn’t get a response just now. ${_errorMessage(error)}',
+            text: _errorMessage(error),
             isUser: false,
             isError: true,
           ),
@@ -174,8 +226,29 @@ class _AiChatScreenState extends State<AiChatScreen> {
     }
   }
 
+  Future<void> _retryLastMessage() async {
+    final failed = _lastFailedMessage;
+    if (failed == null || _sending || _clearingHistory) return;
+
+    setState(() {
+      final errorIndex = _messages.lastIndexWhere((item) => item.isError);
+      if (errorIndex >= 0) _messages.removeAt(errorIndex);
+
+      final userIndex = _messages.lastIndexWhere(
+        (item) => item.isUser && item.text == failed,
+      );
+      if (userIndex >= 0) _messages.removeAt(userIndex);
+
+      _lastFailedMessage = null;
+      _conversationRevision++;
+    });
+    _cacheCurrentHistory();
+
+    await _sendMessage(failed);
+  }
+
   Future<void> _clearHistory() async {
-    if (_clearingHistory || _sending) return;
+    if (_clearingHistory || _sending || _loadingHistory) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -201,16 +274,24 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     if (confirmed != true || !mounted) return;
 
-    setState(() => _clearingHistory = true);
+    _conversationRevision++;
+    setState(() {
+      _clearingHistory = true;
+      _historyError = null;
+    });
+
     try {
       await EcoLoopApi.instance.clearAiChatHistory();
+      final key = _cacheKey;
+      if (key.isNotEmpty) _historyCache.remove(key);
       if (!mounted) return;
       setState(() {
         _messages
           ..clear()
           ..add(const _ChatMessage(text: _welcomeMessage, isUser: false));
-        _historyError = null;
+        _lastFailedMessage = null;
       });
+      _cacheCurrentHistory();
       _showSnack('Chat history cleared.');
       _scrollToBottom(jump: true);
     } catch (error) {
@@ -221,8 +302,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   String _errorMessage(Object error) {
-    if (error is EcoLoopApiException) return error.message;
-    return 'Please check your connection and try again.';
+    if (error is EcoLoopApiException) {
+      final message = error.message.trim();
+      if (message.isNotEmpty) return message;
+    }
+    return 'Unable to reach EcoLoop AI right now. Check your connection and try again.';
   }
 
   void _showSnack(String message) {
@@ -236,7 +320,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   void _scrollToBottom({bool jump = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
+      if (!mounted || !_scrollController.hasClients) return;
       final end = _scrollController.position.maxScrollExtent;
       if (jump) {
         _scrollController.jumpTo(end);
@@ -252,6 +336,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canReload = !_loadingHistory && !_sending && !_clearingHistory;
+
     return Scaffold(
       backgroundColor: _background,
       appBar: AppBar(
@@ -284,7 +370,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     ),
                   ),
                   Text(
-                    'Ask us anything about EcoLoop',
+                    _sending
+                        ? 'Preparing your answer…'
+                        : 'Ask us anything about EcoLoop',
                     style: TextStyle(
                       fontSize: 11,
                       color: _muted,
@@ -302,12 +390,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
             icon: Icon(Icons.more_vert_rounded, color: _text),
             onSelected: (value) {
               if (value == 'clear') _clearHistory();
-              if (value == 'reload') _loadHistory(showError: true);
+              if (value == 'reload' && canReload) {
+                _loadHistory(showError: true);
+              }
             },
-            itemBuilder: (_) => const [
+            itemBuilder: (_) => [
               PopupMenuItem(
                 value: 'reload',
-                child: ListTile(
+                enabled: canReload,
+                child: const ListTile(
                   dense: true,
                   leading: Icon(Icons.refresh_rounded),
                   title: Text('Reload history'),
@@ -315,7 +406,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
               ),
               PopupMenuItem(
                 value: 'clear',
-                child: ListTile(
+                enabled: canReload,
+                child: const ListTile(
                   dense: true,
                   leading: Icon(Icons.delete_outline_rounded),
                   title: Text('Clear history'),
@@ -348,7 +440,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             Material(
               color: _error.withValues(alpha: .08),
               child: InkWell(
-                onTap: () => _loadHistory(showError: true),
+                onTap: canReload ? () => _loadHistory(showError: true) : null,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -360,7 +452,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Could not load saved history. Tap to retry.',
+                          'Could not load saved history: $_historyError',
                           style: TextStyle(fontSize: 11, color: _error),
                         ),
                       ),
@@ -376,8 +468,23 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(14, 18, 14, 14),
-                  itemCount: _messages.length + (_sending ? 1 : 0),
+                  itemCount:
+                      _messages.length +
+                      (_sending ? 1 : 0) +
+                      (_lastFailedMessage != null ? 1 : 0),
                   itemBuilder: (context, index) {
+                    if (index < _messages.length) {
+                      return _MessageBubble(
+                        message: _messages[index],
+                        isArtist: _isArtist,
+                        primary: _primary,
+                        surface: _surface,
+                        text: _text,
+                        border: _border,
+                        error: _error,
+                      );
+                    }
+
                     if (_sending && index == _messages.length) {
                       return _TypingIndicator(
                         primary: _primary,
@@ -386,14 +493,24 @@ class _AiChatScreenState extends State<AiChatScreen> {
                         muted: _muted,
                       );
                     }
-                    return _MessageBubble(
-                      message: _messages[index],
-                      isArtist: _isArtist,
-                      primary: _primary,
-                      surface: _surface,
-                      text: _text,
-                      border: _border,
-                      error: _error,
+
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: OutlinedButton.icon(
+                          onPressed: (_sending || _clearingHistory)
+                              ? null
+                              : _retryLastMessage,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _primary,
+                            side: BorderSide(color: _border),
+                            backgroundColor: _surface,
+                          ),
+                          icon: const Icon(Icons.refresh_rounded, size: 17),
+                          label: const Text('Retry response'),
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -469,6 +586,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       maxLines: 5,
                       maxLength: 1200,
                       textCapitalization: TextCapitalization.sentences,
+                      enabled: !_clearingHistory,
                       onSubmitted: (_) => _sendMessage(),
                       decoration: InputDecoration(
                         hintText: 'Write your message…',
@@ -508,8 +626,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
                         foregroundColor: Colors.white,
                         disabledBackgroundColor: _primary.withValues(alpha: .4),
                       ),
-                      icon: const Icon(Icons.send_rounded, size: 20),
-                      tooltip: 'Send message',
+                      icon: _sending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.send_rounded, size: 20),
+                      tooltip: _sending ? 'Sending message' : 'Send message',
                     ),
                   ),
                 ],
@@ -528,7 +655,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
         label: Text(text, style: TextStyle(fontSize: 10.5, color: _primary)),
         backgroundColor: _surface,
         side: BorderSide(color: _border),
-        onPressed: _sending ? null : () => _sendMessage(text),
+        onPressed: (_sending || _clearingHistory || _loadingHistory)
+            ? null
+            : () => _sendMessage(text),
       ),
     );
   }

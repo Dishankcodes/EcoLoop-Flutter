@@ -1,7 +1,9 @@
 import 'package:ecoloop/services/ecoloop_api.dart';
+import 'package:ecoloop/services/profile_snapshot.dart';
 import 'package:flutter/material.dart';
 
 import '../../app_theme/user/app_text_styles.dart';
+import '../../shared_preferences_util.dart';
 import '../../widgets/user_more_menu.dart';
 import 'buy_products/marketplace.dart';
 import 'buy_products/product_details.dart';
@@ -60,11 +62,44 @@ class _UserHomeState extends State<UserHome> {
   @override
   void initState() {
     super.initState();
+    ProfileSnapshot.account.addListener(_onSharedProfileChanged);
+    final cachedProfile = ProfileSnapshot.account.value;
+    if (cachedProfile != null && cachedProfile.isNotEmpty) {
+      _profile = Map<String, dynamic>.from(cachedProfile);
+    } else {
+      // Paint the greeting from local preferences immediately. Do not wait
+      // for the network profile request just to display the user's name.
+      final savedName = Prefs.getString('userName').trim();
+      final savedEmail = Prefs.getString('userEmail').trim();
+      final savedPhoto = Prefs.getString('profilePhotoUrl').trim();
+      if (savedName.isNotEmpty ||
+          savedEmail.isNotEmpty ||
+          savedPhoto.isNotEmpty) {
+        final nameParts = savedName.split(RegExp(r'\s+'));
+        _profile = <String, dynamic>{
+          if (nameParts.isNotEmpty && nameParts.first.isNotEmpty)
+            'firstName': nameParts.first,
+          if (nameParts.length > 1) 'lastName': nameParts.skip(1).join(' '),
+          if (savedName.isNotEmpty) 'name': savedName,
+          if (savedEmail.isNotEmpty) 'email': savedEmail,
+          if (savedPhoto.isNotEmpty) 'profilePhotoUrl': savedPhoto,
+        };
+      }
+    }
     _loadDashboard();
+  }
+
+  void _onSharedProfileChanged() {
+    final updated = ProfileSnapshot.account.value;
+    if (!mounted || updated == null || updated.isEmpty) return;
+    setState(() {
+      _profile = <String, dynamic>{..._profile, ...updated};
+    });
   }
 
   @override
   void dispose() {
+    ProfileSnapshot.account.removeListener(_onSharedProfileChanged);
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -188,6 +223,7 @@ class _UserHomeState extends State<UserHome> {
   }
 
   Future<void> _loadSecondaryDashboard(int generation) async {
+    final profileRevisionAtStart = ProfileSnapshot.revision;
     final results = await Future.wait<dynamic>([
       _safeGet('/auth/me'),
       _safeGet('/eco-impact'),
@@ -196,13 +232,16 @@ class _UserHomeState extends State<UserHome> {
 
     if (!mounted || generation != _loadGeneration) return;
 
-    setState(() {
-      final profileResult = results[0];
-      final impactResult = results[1];
-      final rewardResult = results[2];
+    final profileResult = results[0];
+    final impactResult = results[1];
+    final rewardResult = results[2];
+    Map<String, dynamic>? loadedProfile;
 
-      if (profileResult is Map) {
-        _profile = Map<String, dynamic>.from(profileResult);
+    setState(() {
+      if (profileResult is Map &&
+          profileRevisionAtStart == ProfileSnapshot.revision) {
+        loadedProfile = Map<String, dynamic>.from(profileResult);
+        _profile = <String, dynamic>{..._profile, ...loadedProfile!};
       }
       if (impactResult is Map) {
         _impact = Map<String, dynamic>.from(impactResult);
@@ -211,6 +250,11 @@ class _UserHomeState extends State<UserHome> {
         _rewards = Map<String, dynamic>.from(rewardResult);
       }
     });
+
+    // Notify other screens only after setState has completed.
+    if (loadedProfile != null) {
+      ProfileSnapshot.publish(loadedProfile!);
+    }
   }
 
   Future<dynamic> _safeGet(String path) async {

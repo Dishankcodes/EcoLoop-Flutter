@@ -242,9 +242,22 @@ class _UserLoginState extends State<UserLogin> {
       dialogOpen = false;
 
       if (response.success != true || response.data == null) {
+        final error = (response.error ?? '').trim();
+
+        final isExistingEmail =
+            error.toLowerCase().contains('already exists') ||
+            error.toLowerCase().contains('already registered') ||
+            error.toLowerCase().contains('existing method');
+
         _showMessage(
-          title: 'Google sign-in failed',
-          message: response.error ?? 'Unable to sign in with Google.',
+          title: isExistingEmail
+              ? 'Email already registered'
+              : 'Google sign-in failed',
+          message: isExistingEmail
+              ? 'This email is already registered using another login method. Please sign in with your existing method.'
+              : error.isNotEmpty
+              ? error
+              : 'Unable to sign in with Google. Please try again.',
           type: AppMessageType.error,
         );
         return;

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
+import '../../../services/profile_snapshot.dart';
 import '../../../shared_preferences_util.dart';
 import '../../../widgets/cart_popup_user.dart';
 import '../../../widgets/user_more_menu.dart';
@@ -19,16 +20,16 @@ import '../reviews/review_history.dart';
 import '../sell_products/my_listings.dart';
 import '../sell_products/selling_orders.dart';
 import 'address_list.dart';
+import 'all_artist.dart';
+import 'custom_service.dart';
+import 'custom_service_history.dart';
 import 'eco_impact.dart';
 import 'edit_profile.dart';
 import 'following_list.dart';
-import 'all_artist.dart';
 import 'notifications.dart';
 import 'rewards.dart';
 import 'sellers_earning.dart';
 import 'settings.dart';
-import 'custom_service.dart';
-import 'custom_service_history.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -49,20 +50,68 @@ class _ProfileState extends State<Profile> {
   @override
   void initState() {
     super.initState();
+    ProfileSnapshot.account.addListener(_onSharedProfileChanged);
+    final cached = ProfileSnapshot.account.value;
+    if (cached != null && cached.isNotEmpty) {
+      _account = Map<String, dynamic>.from(cached);
+      _loadingProfile = false;
+    } else {
+      final savedName = Prefs.getString('userName').trim();
+      final savedEmail = Prefs.getString('userEmail').trim();
+      final savedPhone = Prefs.getString('userPhone').trim();
+      final savedState = Prefs.getString('userState').trim();
+      final savedCity = Prefs.getString('userCity').trim();
+      final savedPhoto = Prefs.getString('profilePhotoUrl').trim();
+      if (savedName.isNotEmpty ||
+          savedEmail.isNotEmpty ||
+          savedPhoto.isNotEmpty) {
+        final parts = savedName.split(RegExp(r'\s+'));
+        _account = <String, dynamic>{
+          if (parts.isNotEmpty && parts.first.isNotEmpty)
+            'firstName': parts.first,
+          if (parts.length > 1) 'lastName': parts.skip(1).join(' '),
+          if (savedName.isNotEmpty) 'userName': savedName,
+          if (savedEmail.isNotEmpty) 'email': savedEmail,
+          if (savedPhone.isNotEmpty) 'phone': savedPhone,
+          if (savedState.isNotEmpty) 'state': savedState,
+          if (savedCity.isNotEmpty) 'city': savedCity,
+          if (savedPhoto.isNotEmpty) 'profilePhotoUrl': savedPhoto,
+        };
+        _loadingProfile = false;
+      }
+    }
     // Independent account and count requests run concurrently so profile
     // content does not wait for order/listing/wishlist counts.
     _loadProfile();
     _loadProfileCounts();
   }
 
+  void _onSharedProfileChanged() {
+    final updated = ProfileSnapshot.account.value;
+    if (!mounted || updated == null || updated.isEmpty) return;
+    setState(() {
+      _account = <String, dynamic>{...?_account, ...updated};
+      _loadingProfile = false;
+      _profileError = null;
+    });
+  }
+
+  @override
+  void dispose() {
+    ProfileSnapshot.account.removeListener(_onSharedProfileChanged);
+    super.dispose();
+  }
+
   Future<void> _loadProfile() async {
     try {
       final result = await EcoLoopApi.instance.get('/auth/me');
       if (!mounted) return;
+      final loadedAccount = result is Map
+          ? Map<String, dynamic>.from(result)
+          : <String, dynamic>{};
+      ProfileSnapshot.publish(loadedAccount);
       setState(() {
-        _account = result is Map
-            ? Map<String, dynamic>.from(result)
-            : <String, dynamic>{};
+        _account = <String, dynamic>{...?_account, ...loadedAccount};
         _loadingProfile = false;
         _profileError = null;
       });
@@ -137,12 +186,12 @@ class _ProfileState extends State<Profile> {
 
   String get _displayName {
     final account = _account ?? const <String, dynamic>{};
-    final artistName = (account['userName'] ?? '').toString().trim();
-    if (artistName.isNotEmpty) return artistName;
     final first = (account['firstName'] ?? '').toString().trim();
     final last = (account['lastName'] ?? '').toString().trim();
     final full = '$first $last'.trim();
-    return full.isNotEmpty ? full : 'Your profile';
+    if (full.isNotEmpty) return full;
+    final artistName = (account['userName'] ?? '').toString().trim();
+    return artistName.isNotEmpty ? artistName : 'Your profile';
   }
 
   String get _email => (_account?['email'] ?? '').toString();

@@ -1,6 +1,7 @@
 import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app_theme/user/app_colors.dart';
 import '../../../app_theme/user/app_text_styles.dart';
@@ -255,6 +256,13 @@ class _PaymentState extends State<Payment> {
 
   Future<void> _payNow() async {
     if (_isProcessing) return;
+
+    // Direct UPI-app launch is kept separate from order creation and Razorpay
+    // verification. Opening an app is not evidence that a payment succeeded.
+    if (_selectedMethod == 'upi') {
+      await _chooseAndLaunchUpiApp();
+      return;
+    }
     final items = widget.items ?? const <Map<String, dynamic>>[];
     if (items.isEmpty) {
       _showMessage('No items to order.');
@@ -1003,21 +1011,7 @@ class _PaymentState extends State<Payment> {
   Widget _buildPaymentDetails() {
     switch (_selectedMethod) {
       case 'upi':
-        return _sectionCard(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.qr_code_2_rounded, color: AppColors.primary),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Continue to Razorpay to pay securely using UPI. Your order is confirmed only after the server verifies the payment.',
-                  style: AppTextStyles.body,
-                ),
-              ),
-            ],
-          ),
-        );
+        return _buildUpiSection();
 
       case 'card':
         return _buildCardSection();
@@ -1053,98 +1047,328 @@ class _PaymentState extends State<Payment> {
     }
   }
 
-  /// Render UPI app selector options and manual UPI ID text field.
-
+  /// Select a UPI app to open externally. This launcher does not process payment.
   Widget _buildUpiSection() {
     return _sectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-
         children: [
           Text(
-            'Pay using UPI',
-
+            'Open a UPI app',
             style: AppTextStyles.body.copyWith(
               color: AppColors.textPrimary,
-
               fontWeight: FontWeight.w700,
             ),
           ),
-
-          const SizedBox(height: 12),
-
+          const SizedBox(height: 8),
+          Text(
+            'Choose an app to open it on this device. This is an app-launch test only; EcoLoop cannot confirm or record a UPI payment from this screen.',
+            style: AppTextStyles.caption,
+          ),
+          const SizedBox(height: 14),
           Row(
             children: [
               _upiApp(
                 icon: Icons.g_mobiledata_rounded,
-
                 title: 'Google Pay',
-
                 value: 'gpay',
               ),
-
               const SizedBox(width: 10),
-
               _upiApp(
                 icon: Icons.phone_android_rounded,
-
                 title: 'PhonePe',
-
                 value: 'phonepe',
               ),
-
               const SizedBox(width: 10),
-
               _upiApp(
                 icon: Icons.account_balance_wallet_outlined,
-
                 title: 'Paytm',
-
                 value: 'paytm',
               ),
             ],
           ),
-
-          const SizedBox(height: 14),
-
-          Row(
-            children: [
-              Expanded(child: Divider(color: Colors.grey.shade300)),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-
-                child: Text('OR', style: AppTextStyles.caption),
-              ),
-
-              Expanded(child: Divider(color: Colors.grey.shade300)),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          TextField(
-            controller: _upiController,
-
-            keyboardType: TextInputType.emailAddress,
-
-            decoration: const InputDecoration(
-              labelText: 'UPI ID',
-
-              hintText: 'example@upi',
-
-              prefixIcon: Icon(Icons.alternate_email_rounded),
-
-              suffixIcon: Icon(
-                Icons.verified_outlined,
-
-                color: AppColors.success,
+          const SizedBox(height: 12),
+          if (_selectedUpiApp == null)
+            Text(
+              'Select Google Pay, PhonePe, or Paytm, then tap Open UPI App.',
+              style: AppTextStyles.caption,
+            )
+          else
+            Text(
+              'Selected: ${_upiAppLabel(_selectedUpiApp!)}',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
               ),
             ),
-          ),
         ],
       ),
     );
+  }
+
+  String _upiAppLabel(String value) {
+    switch (value) {
+      case 'gpay':
+        return 'Google Pay';
+      case 'phonepe':
+        return 'PhonePe';
+      case 'paytm':
+        return 'Paytm';
+      default:
+        return 'UPI app';
+    }
+  }
+
+  /// Show an explicit app chooser before opening any external UPI application.
+  /// No app is launched merely by selecting UPI as the payment method.
+  Future<void> _chooseAndLaunchUpiApp() async {
+    String? choice = _selectedUpiApp;
+
+    final selectedApp = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Widget appOption({
+              required String value,
+              required String title,
+              required String subtitle,
+              required IconData icon,
+            }) {
+              final selected = choice == value;
+              return InkWell(
+                onTap: () => setSheetState(() => choice = value),
+                borderRadius: BorderRadius.circular(16),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.light : AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: selected
+                          ? AppColors.primary
+                          : Colors.grey.shade300,
+                      width: selected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppColors.surface
+                              : AppColors.background,
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                        child: Icon(icon, color: AppColors.primary, size: 27),
+                      ),
+                      const SizedBox(width: 13),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: AppTextStyles.body.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(subtitle, style: AppTextStyles.caption),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        selected
+                            ? Icons.radio_button_checked_rounded
+                            : Icons.radio_button_off_rounded,
+                        color: selected
+                            ? AppColors.primary
+                            : Colors.grey.shade400,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return SafeArea(
+              top: false,
+              child: Container(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  12,
+                  20,
+                  20 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                decoration: const BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade400,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppColors.light,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.account_balance_wallet_outlined,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Choose UPI app',
+                                style: AppTextStyles.title.copyWith(
+                                  fontSize: 19,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Select where you want to continue.',
+                                style: AppTextStyles.caption,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(sheetContext),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    appOption(
+                      value: 'gpay',
+                      title: 'Google Pay',
+                      subtitle: 'Open Google Pay on this device',
+                      icon: Icons.g_mobiledata_rounded,
+                    ),
+                    appOption(
+                      value: 'phonepe',
+                      title: 'PhonePe',
+                      subtitle: 'Open PhonePe on this device',
+                      icon: Icons.phone_android_rounded,
+                    ),
+                    appOption(
+                      value: 'paytm',
+                      title: 'Paytm',
+                      subtitle: 'Open Paytm on this device',
+                      icon: Icons.account_balance_wallet_outlined,
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: choice == null
+                            ? null
+                            : () => Navigator.pop(sheetContext, choice),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        child: const Text(
+                          'Continue to selected app',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'This opens the selected app only. It does not initiate or verify a payment.',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.caption,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (!mounted || selectedApp == null) return;
+    setState(() => _selectedUpiApp = selectedApp);
+    await _launchSelectedUpiApp();
+  }
+
+  Future<void> _launchSelectedUpiApp() async {
+    final selected = _selectedUpiApp;
+    if (selected == null) {
+      _showMessage('Please select Google Pay, PhonePe, or Paytm first.');
+      return;
+    }
+
+    // App-specific schemes open the installed app where the OS/app supports it.
+    // No payment URI or amount is sent, so this cannot accidentally initiate a payment.
+    final scheme = switch (selected) {
+      'gpay' => 'tez://',
+      'phonepe' => 'phonepe://',
+      'paytm' => 'paytmmp://',
+      _ => '',
+    };
+    if (scheme.isEmpty) {
+      _showMessage('Unsupported UPI app selection.');
+      return;
+    }
+
+    try {
+      final launched = await launchUrl(
+        Uri.parse(scheme),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!mounted) return;
+      if (!launched) {
+        _showMessage(
+          '${_upiAppLabel(selected)} could not be opened. Make sure it is installed and try again.',
+        );
+        return;
+      }
+      _showMessage(
+        '${_upiAppLabel(selected)} opened. No payment was initiated and no order was placed.',
+      );
+    } catch (_) {
+      if (mounted) {
+        _showMessage(
+          'Could not open ${_upiAppLabel(selected)}. Check that the app is installed on this Android device.',
+        );
+      }
+    }
   }
 
   /// App icon selector tile component for UPI applications.
@@ -1770,6 +1994,8 @@ class _PaymentState extends State<Payment> {
                             Text(
                               _selectedMethod == 'cod'
                                   ? 'Place Order'
+                                  : _selectedMethod == 'upi'
+                                  ? 'Choose UPI App'
                                   : 'Pay ${_formatPrice(widget.totalAmount)}',
                             ),
 

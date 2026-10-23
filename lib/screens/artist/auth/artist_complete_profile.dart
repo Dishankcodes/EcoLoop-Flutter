@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../api/api_manager.dart';
@@ -99,6 +100,47 @@ class _ArtistCompleteProfilePageState extends State<ArtistCompleteProfilePage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  String _getReadableError(Object error) {
+    if (error is DioException) {
+      final responseData = error.response?.data;
+
+      if (responseData is Map) {
+        final backendError = responseData['error'];
+
+        if (backendError is Map) {
+          final message = backendError['message']?.toString().trim();
+          if (message != null && message.isNotEmpty) return message;
+        } else if (backendError is String && backendError.trim().isNotEmpty) {
+          return backendError.trim();
+        }
+
+        final directMessage = responseData['message']?.toString().trim();
+        if (directMessage != null && directMessage.isNotEmpty) {
+          return directMessage;
+        }
+      }
+
+      if (error.type == DioExceptionType.connectionError) {
+        return 'Unable to connect to the server. Please check your internet connection.';
+      }
+
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.sendTimeout ||
+          error.type == DioExceptionType.receiveTimeout) {
+        return 'The request timed out. Please try again.';
+      }
+
+      return 'Unable to complete the request. Please try again.';
+    }
+
+    final message = error.toString().trim();
+    if (message.startsWith('Exception: ')) {
+      return message.substring('Exception: '.length);
+    }
+    if (message.isNotEmpty && message != 'null') return message;
+    return 'Unable to complete registration. Please try again.';
+  }
+
   Future<void> _completeProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -129,7 +171,11 @@ class _ArtistCompleteProfilePageState extends State<ArtistCompleteProfilePage> {
       final data = response.data;
 
       if (response.success != true || data == null) {
-        _showMessage(response.error ?? 'Unable to complete your profile.');
+        _showMessage(
+          _getReadableError(
+            Exception(response.error ?? 'Unable to complete your profile.'),
+          ),
+        );
         return;
       }
 
@@ -193,9 +239,9 @@ class _ArtistCompleteProfilePageState extends State<ArtistCompleteProfilePage> {
         MaterialPageRoute(builder: (_) => const ArtistMain()),
         (route) => false,
       );
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
-        _showMessage('Unable to complete registration. Please try again.');
+        _showMessage(_getReadableError(error));
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
