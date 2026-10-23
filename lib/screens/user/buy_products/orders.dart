@@ -46,9 +46,9 @@ class _OrdersState extends State<Orders> {
       final dynamic data = await EcoLoopApi.instance.get('/orders');
       final List<Map<String, dynamic>> rows = data is List
           ? data
-          .whereType<Map>()
-          .map((row) => Map<String, dynamic>.from(row))
-          .toList()
+                .whereType<Map>()
+                .map((row) => Map<String, dynamic>.from(row))
+                .toList()
           : <Map<String, dynamic>>[];
 
       if (!mounted || generation != _loadGeneration) return;
@@ -113,9 +113,9 @@ class _OrdersState extends State<Orders> {
         .split(' ')
         .map(
           (word) => word.isEmpty
-          ? word
-          : '${word[0].toUpperCase()}${word.substring(1)}',
-    )
+              ? word
+              : '${word[0].toUpperCase()}${word.substring(1)}',
+        )
         .join(' ');
   }
 
@@ -158,7 +158,9 @@ class _OrdersState extends State<Orders> {
   Future<void> _completePayment(Map<String, dynamic> order) async {
     final orderId = int.tryParse('${order['orderId'] ?? order['id'] ?? ''}');
     if (orderId == null || orderId <= 0) {
-      _showMessage('This order has an invalid ID. Refresh My Orders and try again.');
+      _showMessage(
+        'This order has an invalid ID. Refresh My Orders and try again.',
+      );
       return;
     }
 
@@ -335,7 +337,7 @@ class _OrdersState extends State<Orders> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
       itemCount: _orders.length,
       separatorBuilder: (BuildContext context, int index) =>
-      const SizedBox(height: 12),
+          const SizedBox(height: 12),
       itemBuilder: (BuildContext context, int index) =>
           _orderCard(_orders[index]),
     );

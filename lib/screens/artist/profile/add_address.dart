@@ -78,58 +78,111 @@ class _AddAddressState extends State<AddAddress> {
         a?['isDefault']?.toString().toLowerCase() == 'true';
   }
 
-  Future<void> _loadLocationAndProfile() async {
-    // Prefill the saved account details first, then resolve state/city IDs
-    // against the location API. If profile lookup fails, the form still works.
-    if (_token.isNotEmpty && !widget.isEditing) {
-      final dio = _dio();
-      try {
-        final response = await dio.get<dynamic>(
-          _uri('/profile', {'token': _token}).toString(),
-          options: Options(followRedirects: false, maxRedirects: 0),
-        );
-        final raw = await _unwrapRedirect(dio, response);
-        final outer = _map(raw);
-        final data = outer['data'] is Map
-            ? Map<String, dynamic>.from(outer['data'])
-            : outer;
-        if (mounted) {
-          final profileName =
-              (data['name'] ??
-                      data['fullName'] ??
-                      data['displayName'] ??
-                      data['userName'] ??
-                      '')
-                  .toString()
-                  .trim();
-          final profilePhone =
-              (data['phone'] ?? data['mobile'] ?? data['phoneNumber'] ?? '')
-                  .toString()
-                  .trim();
+  String _firstNonEmpty(Iterable<dynamic> values) {
+    for (final value in values) {
+      final text = value?.toString().trim() ?? '';
+      if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+    }
+    return '';
+  }
 
-          if (_nameController.text.trim().isEmpty && profileName.isNotEmpty) {
-            _nameController.text = profileName;
-          }
-          if (_phoneController.text.trim().isEmpty && profilePhone.isNotEmpty) {
-            _phoneController.text = profilePhone;
-          }
-          final state = (data['state'] ?? data['stateName'] ?? '')
-              .toString()
-              .trim();
-          final city = (data['city'] ?? data['cityName'] ?? '')
-              .toString()
-              .trim();
-          if (state.isNotEmpty) _initialStateName = state;
-          if (city.isNotEmpty) _initialCityName = city;
-        }
-      } catch (_) {
-        // Keep the form usable if account prefill fails.
-      } finally {
-        dio.close(force: true);
+  Future<void> _loadLocationAndProfile() async {
+    // Start the cached location lookup immediately; profile networking must
+    // never block the state dropdown from becoming usable.
+    _loadStates();
+
+    // Fill from locally saved session/profile values first so the name appears
+    // immediately, then refresh it from the server in the background.
+    if (!widget.isEditing) {
+      final savedName = _firstNonEmpty([
+        Prefs.getString('fullName'),
+        Prefs.getString('userName'),
+        Prefs.getString('name'),
+        Prefs.getString('artistName'),
+        Prefs.getString('displayName'),
+      ]);
+      final savedPhone = _firstNonEmpty([
+        Prefs.getString('phone'),
+        Prefs.getString('mobile'),
+        Prefs.getString('phoneNumber'),
+      ]);
+      if (_nameController.text.trim().isEmpty && savedName.isNotEmpty) {
+        _nameController.text = savedName;
+      }
+      if (_phoneController.text.trim().isEmpty && savedPhone.isNotEmpty) {
+        _phoneController.text = savedPhone;
       }
     }
-    // Always load states, even when no token is available.
-    await _loadStates();
+
+    if (_token.isEmpty || widget.isEditing) return;
+
+    final dio = _dio();
+    try {
+      final response = await dio.get<dynamic>(
+        _uri('/profile', {'token': _token}).toString(),
+        options: Options(followRedirects: false, maxRedirects: 0),
+      );
+      final raw = await _unwrapRedirect(dio, response);
+      final outer = _map(raw);
+      final data = outer['data'] is Map
+          ? Map<String, dynamic>.from(outer['data'])
+          : outer;
+      final user = data['user'] is Map
+          ? Map<String, dynamic>.from(data['user'])
+          : (data['profile'] is Map
+                ? Map<String, dynamic>.from(data['profile'])
+                : (data['artist'] is Map
+                      ? Map<String, dynamic>.from(data['artist'])
+                      : data));
+
+      if (!mounted) return;
+      final profileName = _firstNonEmpty([
+        user['name'],
+        user['fullName'],
+        user['full_name'],
+        user['displayName'],
+        user['display_name'],
+        user['userName'],
+        user['username'],
+        user['artistName'],
+        user['artist_name'],
+        data['name'],
+        data['fullName'],
+        outer['name'],
+      ]);
+      final profilePhone = _firstNonEmpty([
+        user['phone'],
+        user['mobile'],
+        user['phoneNumber'],
+        user['phone_number'],
+        data['phone'],
+        outer['phone'],
+      ]);
+
+      if (_nameController.text.trim().isEmpty && profileName.isNotEmpty) {
+        _nameController.text = profileName;
+      }
+      if (_phoneController.text.trim().isEmpty && profilePhone.isNotEmpty) {
+        _phoneController.text = profilePhone;
+      }
+
+      final state = _firstNonEmpty([
+        user['state'],
+        user['stateName'],
+        data['state'],
+      ]);
+      final city = _firstNonEmpty([
+        user['city'],
+        user['cityName'],
+        data['city'],
+      ]);
+      if (state.isNotEmpty) _initialStateName = state;
+      if (city.isNotEmpty) _initialCityName = city;
+    } catch (_) {
+      // Profile prefill is best-effort; address entry remains available.
+    } finally {
+      dio.close(force: true);
+    }
   }
 
   Future<void> _loadStates() async {
@@ -399,8 +452,6 @@ class _AddAddressState extends State<AddAddress> {
 
       if (!mounted) return;
       _showMessage(widget.isEditing ? 'Address updated.' : 'Address saved.');
-      await Future.delayed(const Duration(milliseconds: 250));
-      if (!mounted) return;
       Navigator.pop(context, {
         ...payload,
         ...data,
@@ -557,141 +608,20 @@ class _AddAddressState extends State<AddAddress> {
     required T? selectedItem,
   }) async {
     if (!mounted) return null;
-    final searchController = TextEditingController();
-    try {
-      return await showModalBottomSheet<T>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (sheetContext) {
-          return StatefulBuilder(
-            builder: (context, setSheetState) {
-              final query = searchController.text.trim().toLowerCase();
-              final filtered = items
-                  .where(
-                    (item) => itemLabel(item).toLowerCase().contains(query),
-                  )
-                  .toList();
-              return SafeArea(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewInsets.bottom,
-                  ),
-                  child: Material(
-                    color: ArtistColors.surface,
-                    clipBehavior: Clip.antiAlias,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(24),
-                    ),
-                    child: SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.72,
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 18, 12, 12),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    title,
-                                    style: ArtistTextStyles.title.copyWith(
-                                      color: ArtistColors.textPrimary,
-                                      fontSize: 19,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: () =>
-                                      Navigator.of(sheetContext).pop(),
-                                  icon: const Icon(Icons.close_rounded),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: TextField(
-                              controller: searchController,
-                              autofocus: true,
-                              onChanged: (_) => setSheetState(() {}),
-                              decoration: InputDecoration(
-                                hintText: searchHint,
-                                prefixIcon: const Icon(Icons.search_rounded),
-                                filled: true,
-                                fillColor: ArtistColors.background,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide.none,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Expanded(
-                            child: filtered.isEmpty
-                                ? Center(
-                                    child: Text(
-                                      'No matching results',
-                                      style: ArtistTextStyles.body.copyWith(
-                                        color: ArtistColors.textSecondary,
-                                      ),
-                                    ),
-                                  )
-                                : ListView.separated(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      12,
-                                      4,
-                                      12,
-                                      16,
-                                    ),
-                                    itemCount: filtered.length,
-                                    separatorBuilder: (_, index) =>
-                                        const Divider(height: 1),
-                                    itemBuilder: (context, index) {
-                                      final item = filtered[index];
-                                      final isSelected =
-                                          selectedItem != null &&
-                                          item == selectedItem;
-                                      return Material(
-                                        color: isSelected
-                                            ? ArtistColors.light
-                                            : ArtistColors.surface,
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: ListTile(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          title: Text(itemLabel(item)),
-                                          trailing: isSelected
-                                              ? const Icon(
-                                                  Icons.check_circle_rounded,
-                                                  color: ArtistColors.primary,
-                                                )
-                                              : null,
-                                          onTap: () => Navigator.of(
-                                            sheetContext,
-                                          ).pop(item),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      );
-    } finally {
-      searchController.dispose();
-    }
+
+    return showModalBottomSheet<T>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      useSafeArea: true,
+      builder: (sheetContext) => _SearchPickerSheet<T>(
+        title: title,
+        searchHint: searchHint,
+        items: items,
+        itemLabel: itemLabel,
+        selectedItem: selectedItem,
+      ),
+    );
   }
 
   String? _phoneValidator(String? value) {
@@ -1006,6 +936,153 @@ class _AddAddressState extends State<AddAddress> {
                         ),
                       ],
                     ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchPickerSheet<T> extends StatefulWidget {
+  const _SearchPickerSheet({
+    required this.title,
+    required this.searchHint,
+    required this.items,
+    required this.itemLabel,
+    required this.selectedItem,
+  });
+
+  final String title;
+  final String searchHint;
+  final List<T> items;
+  final String Function(T) itemLabel;
+  final T? selectedItem;
+
+  @override
+  State<_SearchPickerSheet<T>> createState() => _SearchPickerSheetState<T>();
+}
+
+class _SearchPickerSheetState<T> extends State<_SearchPickerSheet<T>> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _searchController.text.trim().toLowerCase();
+    final filtered = widget.items
+        .where((item) => widget.itemLabel(item).toLowerCase().contains(query))
+        .toList();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Material(
+          color: ArtistColors.surface,
+          clipBehavior: Clip.antiAlias,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.72,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 12, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.title,
+                          style: ArtistTextStyles.title.copyWith(
+                            color: ArtistColors.textPrimary,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: _searchController,
+                    autofocus: true,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: widget.searchHint,
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      filled: true,
+                      fillColor: ArtistColors.background,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No matching results',
+                            style: ArtistTextStyles.body.copyWith(
+                              color: ArtistColors.textSecondary,
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, index) =>
+                              const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final item = filtered[index];
+                            final isSelected =
+                                widget.selectedItem != null &&
+                                item == widget.selectedItem;
+                            return Material(
+                              color: isSelected
+                                  ? ArtistColors.light
+                                  : ArtistColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              child: ListTile(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                title: Text(widget.itemLabel(item)),
+                                trailing: isSelected
+                                    ? const Icon(
+                                        Icons.check_circle_rounded,
+                                        color: ArtistColors.primary,
+                                      )
+                                    : null,
+                                onTap: () => Navigator.of(context).pop(item),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
           ),
         ),

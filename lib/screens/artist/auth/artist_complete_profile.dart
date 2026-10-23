@@ -648,7 +648,11 @@ class _ArtistCompleteProfilePageState extends State<ArtistCompleteProfilePage> {
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: controller,
-        keyboardType: keyboardType,
+        // Flutter requires a multiline keyboard when a multiline field uses
+        // TextInputAction.newline. Preserve explicitly requested keyboard types.
+        keyboardType: maxLines > 1 && keyboardType == TextInputType.text
+            ? TextInputType.multiline
+            : keyboardType,
         textCapitalization: textCapitalization,
         inputFormatters: inputFormatters,
         maxLines: maxLines,

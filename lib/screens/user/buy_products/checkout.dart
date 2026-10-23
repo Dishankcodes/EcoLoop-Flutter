@@ -43,6 +43,7 @@ class _CheckoutState extends State<Checkout> {
   String _currentAccountType = 'user';
 
   String? _selectedAddressId;
+  String _selectedDelivery = 'standard';
   String? _couponCode;
   double _couponDiscount = 0;
 
@@ -236,26 +237,84 @@ class _CheckoutState extends State<Checkout> {
         : 'name:$sellerName';
   }
 
-  double get _deliveryCharges {
+  bool _isFreeDeliveryProduct(Map<String, dynamic> item) {
+    final method =
+        (item['deliveryMethod'] ??
+                item['delivery_method'] ??
+                item['shippingMethod'] ??
+                item['shipping_method'] ??
+                '')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replaceAll('_', ' ')
+            .replaceAll('-', ' ');
+    return method == 'free delivery' ||
+        method == 'free' ||
+        method == 'free shipping';
+  }
+
+  bool _sellerHasPaidDelivery(String sellerKey) {
+    final sellerItems = _items.where((item) => _sellerKey(item) == sellerKey);
+    return sellerItems.isNotEmpty &&
+        sellerItems.any((item) => !_isFreeDeliveryProduct(item));
+  }
+
+  double _deliveryRateForSeller({
+    required String buyerCity,
+    required String sellerCity,
+    required bool express,
+  }) {
+    final sameCity =
+        buyerCity.isNotEmpty &&
+        sellerCity.isNotEmpty &&
+        buyerCity == sellerCity;
+    if (express) return sameCity ? 69.0 : 99.0;
+    return sameCity ? 40.0 : 59.0;
+  }
+
+  double _calculateDeliveryFee({required bool express}) {
     final buyerCity = (_selectedAddress?['city'] ?? '')
         .toString()
         .trim()
         .toLowerCase();
-    if (buyerCity.isEmpty) return 0;
     final chargedSellers = <String>{};
-    var total = 0.0;
+    var fee = 0.0;
+
     for (final item in _items) {
-      final sellerKey = _sellerKey(item);
-      if (!chargedSellers.add(sellerKey)) continue;
+      final key = _sellerKey(item);
+      if (!chargedSellers.add(key) || !_sellerHasPaidDelivery(key)) continue;
+
       final sellerCity =
-          (item['sellerCity'] ?? item['seller_city'] ?? item['city'] ?? '')
+          (item['sellerCity'] ??
+                  item['seller_city'] ??
+                  (item['seller'] is Map
+                      ? (item['seller'] as Map)['city']
+                      : null) ??
+                  item['city'] ??
+                  '')
               .toString()
               .trim()
               .toLowerCase();
-      if (sellerCity.isNotEmpty && sellerCity != buyerCity) total += 40;
+
+      // Missing city data uses the out-of-city rate rather than silently
+      // showing zero delivery charges.
+      fee += _deliveryRateForSeller(
+        buyerCity: buyerCity,
+        sellerCity: sellerCity,
+        express: express,
+      );
     }
-    return total;
+    return fee;
   }
+
+  double get _standardDeliveryFee => _calculateDeliveryFee(express: false);
+
+  double get _expressDeliveryFee => _calculateDeliveryFee(express: true);
+
+  double get _deliveryFee => _selectedDelivery == 'express'
+      ? _expressDeliveryFee
+      : _standardDeliveryFee;
 
   int _couponMinimum(String code) {
     switch (code.toUpperCase()) {
@@ -292,7 +351,7 @@ class _CheckoutState extends State<Checkout> {
 
   double get _grandTotal {
     final value =
-        _subtotal + _platformFee + _taxes + _deliveryCharges - _couponSavings;
+        _subtotal + _platformFee + _taxes + _deliveryFee - _couponSavings;
     return value < 0 ? 0 : value;
   }
 
@@ -1310,7 +1369,9 @@ class _CheckoutState extends State<Checkout> {
                 .map((item) => Map<String, dynamic>.from(item))
                 .toList(),
             address: address,
-            deliveryMethod: 'Standard Delivery',
+            deliveryMethod: _selectedDelivery == 'express'
+                ? 'Express Delivery'
+                : 'Standard Delivery',
             savings: _couponSavings,
             couponCode: _couponCode,
             clearCartAfterSuccess: widget.clearCartAfterOrder,
@@ -1738,58 +1799,229 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
+  void _openDeliveryOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _sheetHandle(),
+                const SizedBox(height: 18),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Delivery Options', style: AppTextStyles.title),
+                ),
+                const SizedBox(height: 12),
+                _deliveryOption(
+                  sheetContext,
+                  id: 'standard',
+                  title: 'Standard Delivery',
+                  subtitle: 'Same city ₹40 • Other city ₹59 per seller',
+                  price: _standardDeliveryFee == 0
+                      ? 'FREE'
+                      : _money(_standardDeliveryFee),
+                  icon: Icons.local_shipping_outlined,
+                ),
+                const SizedBox(height: 10),
+                _deliveryOption(
+                  sheetContext,
+                  id: 'express',
+                  title: 'Express Delivery',
+                  subtitle: 'Same city ₹69 • Other city ₹99 per seller',
+                  price: _expressDeliveryFee == 0
+                      ? 'FREE'
+                      : _money(_expressDeliveryFee),
+                  icon: Icons.speed_outlined,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _deliveryOption(
+    BuildContext sheetContext, {
+    required String id,
+    required String title,
+    required String subtitle,
+    required String price,
+    required IconData icon,
+  }) {
+    final selected = _selectedDelivery == id;
+
+    return InkWell(
+      onTap: () {
+        setState(() => _selectedDelivery = id);
+        Navigator.pop(sheetContext);
+      },
+      borderRadius: BorderRadius.circular(17),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.light : AppColors.surface,
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(
+            color: selected ? AppColors.primary : Colors.grey.shade200,
+            width: selected ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 43,
+              height: 43,
+              decoration: BoxDecoration(
+                color: selected ? AppColors.surface : AppColors.background,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: AppColors.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: AppTextStyles.caption),
+                ],
+              ),
+            ),
+            Text(
+              price,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: price == 'FREE'
+                    ? AppColors.primary
+                    : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_off_rounded,
+              color: selected ? AppColors.primary : Colors.grey.shade400,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDeliverySection() {
-    final city = (_selectedAddress?['city'] ?? '').toString();
+    final isFree = _deliveryFee == 0;
+
     return _sectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeading(Icons.local_shipping_outlined, 'Delivery details'),
+          Row(
+            children: [
+              _sectionIcon(Icons.local_shipping_outlined),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Delivery',
+                  style: AppTextStyles.title.copyWith(fontSize: 18),
+                ),
+              ),
+              TextButton(
+                onPressed: _openDeliveryOptions,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'Change',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(13),
             decoration: BoxDecoration(
-              color: AppColors.light.withValues(alpha: 0.55),
+              color: AppColors.background,
               borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: Colors.grey.shade200),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.light,
+                    borderRadius: BorderRadius.circular(11),
                   ),
-                  child: const Icon(
-                    Icons.local_shipping_outlined,
+                  child: Icon(
+                    _selectedDelivery == 'express'
+                        ? Icons.speed_outlined
+                        : Icons.local_shipping_outlined,
+                    size: 20,
                     color: AppColors.primary,
                   ),
                 ),
-                const SizedBox(width: 11),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Standard delivery',
-                        style: TextStyle(fontWeight: FontWeight.w800),
+                      Text(
+                        _selectedDelivery == 'express'
+                            ? 'Express Delivery'
+                            : 'Standard Delivery',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        'Delivery fee is calculated using the saved address and seller city.',
-                        style: AppTextStyles.caption.copyWith(height: 1.35),
+                        _selectedDelivery == 'express'
+                            ? '1–2 business days'
+                            : '3–5 business days',
+                        style: AppTextStyles.caption,
                       ),
                     ],
                   ),
                 ),
                 Text(
-                  _deliveryCharges == 0 ? 'FREE' : _money(_deliveryCharges),
+                  isFree ? 'FREE' : _money(_deliveryFee),
                   style: TextStyle(
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: _deliveryCharges == 0
-                        ? AppColors.primary
-                        : AppColors.textPrimary,
+                    color: isFree ? AppColors.primary : AppColors.textPrimary,
                   ),
                 ),
               ],
@@ -1797,10 +2029,10 @@ class _CheckoutState extends State<Checkout> {
           ),
           const SizedBox(height: 8),
           Text(
-            city.isEmpty
-                ? 'Select a delivery address to calculate delivery charges.'
-                : '₹40 per seller applies when the buyer and seller are in different cities. Multiple products from one seller share one delivery charge.',
-            style: AppTextStyles.caption.copyWith(height: 1.35),
+            _items.isNotEmpty && _items.every(_isFreeDeliveryProduct)
+                ? 'Free Delivery selected on all products in this order.'
+                : 'Delivery is charged once per seller. Free Delivery listings add no delivery charge.',
+            style: AppTextStyles.caption,
           ),
         ],
       ),
@@ -1915,8 +2147,8 @@ class _CheckoutState extends State<Checkout> {
           const SizedBox(height: 10),
           _priceRow(
             'Delivery charges',
-            _deliveryCharges == 0 ? 'FREE' : _money(_deliveryCharges),
-            valueColor: _deliveryCharges == 0 ? AppColors.primary : null,
+            _deliveryFee == 0 ? 'FREE' : _money(_deliveryFee),
+            valueColor: _deliveryFee == 0 ? AppColors.primary : null,
           ),
           if (_couponSavings > 0) ...[
             const SizedBox(height: 10),

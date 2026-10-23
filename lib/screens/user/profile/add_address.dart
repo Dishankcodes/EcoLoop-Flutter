@@ -106,19 +106,52 @@ class _AddAddressState extends State<AddAddress> {
         final data = outer['data'] is Map
             ? Map<String, dynamic>.from(outer['data'])
             : outer;
+        // APIs may return profile details directly or under user/profile/artist.
+        // Read common key variants without overwriting values already being edited.
+        final profileMaps = <Map<String, dynamic>>[data];
+        for (final key in const ['profile', 'user', 'artist', 'account']) {
+          final nested = data[key];
+          if (nested is Map) {
+            profileMaps.add(Map<String, dynamic>.from(nested));
+          }
+        }
+        String profileField(List<String> keys) {
+          for (final source in profileMaps) {
+            for (final key in keys) {
+              final value = source[key]?.toString().trim() ?? '';
+              if (value.isNotEmpty && value.toLowerCase() != 'null') {
+                return value;
+              }
+            }
+          }
+          return '';
+        }
+
         if (mounted) {
-          final profileName =
-              (data['name'] ??
-                      data['fullName'] ??
-                      data['displayName'] ??
-                      data['userName'] ??
-                      '')
-                  .toString()
-                  .trim();
-          final profilePhone =
-              (data['phone'] ?? data['mobile'] ?? data['phoneNumber'] ?? '')
-                  .toString()
-                  .trim();
+          final profileName = profileField(const [
+            'name',
+            'fullName',
+            'full_name',
+            'displayName',
+            'display_name',
+            'userName',
+            'username',
+            'artistName',
+            'artist_name',
+            'customerName',
+            'customer_name',
+            'firstName',
+            'first_name',
+          ]);
+          final profilePhone = profileField(const [
+            'phone',
+            'mobile',
+            'phoneNumber',
+            'phone_number',
+            'mobileNumber',
+            'mobile_number',
+            'contactNumber',
+          ]);
 
           if (_nameController.text.trim().isEmpty && profileName.isNotEmpty) {
             _nameController.text = profileName;
@@ -126,12 +159,12 @@ class _AddAddressState extends State<AddAddress> {
           if (_phoneController.text.trim().isEmpty && profilePhone.isNotEmpty) {
             _phoneController.text = profilePhone;
           }
-          final state = (data['state'] ?? data['stateName'] ?? '')
-              .toString()
-              .trim();
-          final city = (data['city'] ?? data['cityName'] ?? '')
-              .toString()
-              .trim();
+          final state = profileField(const [
+            'state',
+            'stateName',
+            'state_name',
+          ]);
+          final city = profileField(const ['city', 'cityName', 'city_name']);
           if (state.isNotEmpty) _initialStateName = state;
           if (city.isNotEmpty) _initialCityName = city;
         }
@@ -429,8 +462,6 @@ class _AddAddressState extends State<AddAddress> {
 
       if (!mounted) return;
       _showMessage(widget.isEditing ? 'Address updated.' : 'Address saved.');
-      await Future.delayed(const Duration(milliseconds: 250));
-      if (!mounted) return;
       Navigator.pop(context, {
         ...payload,
         ...data,

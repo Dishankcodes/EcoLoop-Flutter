@@ -63,6 +63,26 @@ class _BuyingOrdersState extends State<BuyingOrders> {
       _orders,
     );
 
+    // Razorpay checkout attempts are staged as pending orders by the current
+    // backend. Once cancellation is confirmed, do not show those abandoned,
+    // unpaid attempts as purchases. Keep ordinary cancelled orders visible.
+    orders = orders.where((order) {
+      final status = '${order['status'] ?? ''}'.trim().toLowerCase();
+      final paymentStatus = '${order['paymentStatus'] ?? ''}'
+          .trim()
+          .toLowerCase();
+      final paymentMethod = '${order['paymentMethod'] ?? ''}'
+          .trim()
+          .toLowerCase();
+      final abandonedRazorpayAttempt =
+          status == 'cancelled' &&
+          paymentMethod == 'razorpay' &&
+          (paymentStatus == 'unpaid' ||
+              paymentStatus == 'failed' ||
+              paymentStatus == 'cancelled');
+      return !abandonedRazorpayAttempt;
+    }).toList();
+
     final query = _searchController.text.trim().toLowerCase();
 
     if (query.isNotEmpty) {
@@ -95,21 +115,21 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     switch (_selectedSort) {
       case 'Newest':
         orders.sort(
-              (a, b) =>
+          (a, b) =>
               _dateValue(b['createdAt']).compareTo(_dateValue(a['createdAt'])),
         );
         break;
 
       case 'Oldest':
         orders.sort(
-              (a, b) =>
+          (a, b) =>
               _dateValue(a['createdAt']).compareTo(_dateValue(b['createdAt'])),
         );
         break;
 
       case 'Amount: Low to High':
         orders.sort(
-              (a, b) => _amountValue(
+          (a, b) => _amountValue(
             a['totalAmount'],
           ).compareTo(_amountValue(b['totalAmount'])),
         );
@@ -117,7 +137,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
 
       case 'Amount: High to Low':
         orders.sort(
-              (a, b) => _amountValue(
+          (a, b) => _amountValue(
             b['totalAmount'],
           ).compareTo(_amountValue(a['totalAmount'])),
         );
@@ -187,19 +207,19 @@ class _BuyingOrdersState extends State<BuyingOrders> {
                 : orders.isEmpty
                 ? _buildEmptyState()
                 : RefreshIndicator(
-              color: ArtistColors.primary,
-              onRefresh: _refreshOrders,
-              child: ListView.separated(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
-                itemCount: orders.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 14),
-                itemBuilder: (context, index) =>
-                    _buildOrderCard(orders[index]),
-              ),
-            ),
+                    color: ArtistColors.primary,
+                    onRefresh: _refreshOrders,
+                    child: ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
+                      itemCount: orders.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 14),
+                      itemBuilder: (context, index) =>
+                          _buildOrderCard(orders[index]),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -233,16 +253,16 @@ class _BuyingOrdersState extends State<BuyingOrders> {
 
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-            onPressed: () {
-              _searchController.clear();
+                  onPressed: () {
+                    _searchController.clear();
 
-              setState(() {});
-            },
-            icon: const Icon(
-              Icons.close_rounded,
-              color: ArtistColors.textSecondary,
-            ),
-          )
+                    setState(() {});
+                  },
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: ArtistColors.textSecondary,
+                  ),
+                )
               : null,
 
           filled: true,
@@ -287,12 +307,12 @@ class _BuyingOrdersState extends State<BuyingOrders> {
 
     final totalSpent = _orders
         .where((order) {
-      return order['status'] != 'cancelled';
-    })
+          return order['status'] != 'cancelled';
+        })
         .fold<double>(
-      0,
+          0,
           (sum, order) => sum + _amountValue(order['totalAmount']),
-    );
+        );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
@@ -418,15 +438,15 @@ class _BuyingOrdersState extends State<BuyingOrders> {
                   filter,
                   style: selected
                       ? ArtistTextStyles.bodyMedium.copyWith(
-                    color: Colors.white,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                  )
+                          color: Colors.white,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        )
                       : ArtistTextStyles.small.copyWith(
-                    color: ArtistColors.textSecondary,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                  ),
+                          color: ArtistColors.textSecondary,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                        ),
                 ),
               ),
             ),
@@ -481,30 +501,30 @@ class _BuyingOrdersState extends State<BuyingOrders> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child:
-                  (order['productImage'] ?? order['imageUrl'] ?? '')
-                      .toString()
-                      .trim()
-                      .isNotEmpty
+                      (order['productImage'] ?? order['imageUrl'] ?? '')
+                          .toString()
+                          .trim()
+                          .isNotEmpty
                       ? ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: Image.network(
-                      (order['productImage'] ?? order['imageUrl'])
-                          .toString(),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.shopping_bag_outlined,
-                        size: 30,
-                        color: ArtistColors.primary,
-                      ),
-                    ),
-                  )
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.network(
+                            (order['productImage'] ?? order['imageUrl'])
+                                .toString(),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.shopping_bag_outlined,
+                              size: 30,
+                              color: ArtistColors.primary,
+                            ),
+                          ),
+                        )
                       : Icon(
-                    order['icon'] is IconData
-                        ? order['icon'] as IconData
-                        : Icons.shopping_bag_outlined,
-                    size: 30,
-                    color: ArtistColors.primary,
-                  ),
+                          order['icon'] is IconData
+                              ? order['icon'] as IconData
+                              : Icons.shopping_bag_outlined,
+                          size: 30,
+                          color: ArtistColors.primary,
+                        ),
                 ),
 
                 const SizedBox(width: 13),
@@ -618,7 +638,7 @@ class _BuyingOrdersState extends State<BuyingOrders> {
 
                 Text(
                   '$quantity '
-                      '${quantity == 1 ? 'item' : 'items'}',
+                  '${quantity == 1 ? 'item' : 'items'}',
                   style: ArtistTextStyles.small,
                 ),
               ],
@@ -926,9 +946,9 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     final result = Map<String, dynamic>.from(order);
     result['productTitle'] =
         (result['productTitle'] ??
-            result['productName'] ??
-            result['title'] ??
-            'Product unavailable')
+                result['productName'] ??
+                result['title'] ??
+                'Product unavailable')
             .toString();
     result['sellerName'] =
         (result['sellerName'] ?? result['seller'] ?? 'Seller unavailable')
@@ -937,10 +957,14 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     result['status'] = (result['status'] ?? result['orderStatus'] ?? 'pending')
         .toString()
         .toLowerCase();
-    result['paymentStatus'] = (result['paymentStatus'] ?? result['payment_status'] ?? 'pending')
-        .toString()
-        .toLowerCase();
-    result['paymentMethod'] = (result['paymentMethod'] ?? result['method'] ?? '').toString().toLowerCase();
+    result['paymentStatus'] =
+        (result['paymentStatus'] ?? result['payment_status'] ?? 'pending')
+            .toString()
+            .toLowerCase();
+    result['paymentMethod'] =
+        (result['paymentMethod'] ?? result['method'] ?? '')
+            .toString()
+            .toLowerCase();
     result['totalAmount'] ??= result['total'] ?? result['amount'] ?? 0;
     result['createdAt'] ??= result['orderDate'] ?? result['date'];
     result['shippingAddress'] ??= result['address'] ?? '';
@@ -1147,4 +1171,3 @@ class _BuyingOrdersState extends State<BuyingOrders> {
     return '₹${amount.toInt()}';
   }
 }
-

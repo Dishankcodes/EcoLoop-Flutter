@@ -126,17 +126,21 @@ class _CheckoutState extends State<Checkout> {
           ..clear()
           ..addAll(rows);
         final selectedStillExists = rows.any(
-              (a) => (a['addressId'] ?? a['address_id'] ?? a['id']).toString() == _selectedAddressId,
+          (a) =>
+              (a['addressId'] ?? a['address_id'] ?? a['id']).toString() ==
+              _selectedAddressId,
         );
         _selectedAddressId = selectedStillExists
             ? _selectedAddressId
             : (defaultAddress?['addressId'] ??
-            defaultAddress?['address_id'] ??
-            defaultAddress?['id'] ??
-            (rows.isNotEmpty
-                ? rows.first['addressId'] ?? rows.first['address_id'] ?? rows.first['id']
-                : null))
-            ?.toString();
+                      defaultAddress?['address_id'] ??
+                      defaultAddress?['id'] ??
+                      (rows.isNotEmpty
+                          ? rows.first['addressId'] ??
+                                rows.first['address_id'] ??
+                                rows.first['id']
+                          : null))
+                  ?.toString();
         _isLoadingAddresses = false;
       });
     } catch (error) {
@@ -174,7 +178,7 @@ class _CheckoutState extends State<Checkout> {
           if (id == null || id <= 0) {
             throw Exception(
               'A product has an invalid ID. '
-                  'Remove it and add it again.',
+              'Remove it and add it again.',
             );
           }
 
@@ -193,7 +197,7 @@ class _CheckoutState extends State<Checkout> {
           if ((live['status'] ?? '').toString().toLowerCase() != 'published') {
             throw Exception(
               '${live['title'] ?? item['title'] ?? 'A product'} '
-                  'is no longer available.',
+              'is no longer available.',
             );
           }
 
@@ -207,7 +211,7 @@ class _CheckoutState extends State<Checkout> {
           if (available < quantity) {
             throw Exception(
               'Only $available item(s) remain for '
-                  '${live['title'] ?? item['title'] ?? 'this product'}.',
+              '${live['title'] ?? item['title'] ?? 'this product'}.',
             );
           }
 
@@ -281,45 +285,45 @@ class _CheckoutState extends State<Checkout> {
       final products = raw
           .whereType<Map>()
           .map((row) {
-        final item = Map<String, dynamic>.from(row);
-        item['productId'] = item['productId'] ?? item['id'];
-        item['id'] = item['productId'] ?? item['id'];
-        item['title'] = item['title'] ?? item['name'] ?? 'EcoLoop Product';
-        item['price'] = _toDouble(item['price']);
-        item['availableQuantity'] = _toInt(
-          item['availableQuantity'] ?? item['stock'],
-          fallback: 0,
-        );
-        item['seller'] =
-            item['sellerName'] ?? item['seller'] ?? 'EcoLoop Seller';
-        item['image'] = _productImage(item);
-        item['location'] = item['sellerCity'] ?? item['city'] ?? '';
-        return item;
-      })
+            final item = Map<String, dynamic>.from(row);
+            item['productId'] = item['productId'] ?? item['id'];
+            item['id'] = item['productId'] ?? item['id'];
+            item['title'] = item['title'] ?? item['name'] ?? 'EcoLoop Product';
+            item['price'] = _toDouble(item['price']);
+            item['availableQuantity'] = _toInt(
+              item['availableQuantity'] ?? item['stock'],
+              fallback: 0,
+            );
+            item['seller'] =
+                item['sellerName'] ?? item['seller'] ?? 'EcoLoop Seller';
+            item['image'] = _productImage(item);
+            item['location'] = item['sellerCity'] ?? item['city'] ?? '';
+            return item;
+          })
           .where((item) {
-        final id = (item['productId'] ?? item['id']).toString();
-        final available = _toInt(item['availableQuantity'], fallback: 0);
-        final status = (item['status'] ?? 'published')
-            .toString()
-            .toLowerCase();
-        final sellerId = _toInt(item['sellerId'], fallback: -2);
-        final sellerType = (item['sellerType'] ?? 'user')
-            .toString()
-            .toLowerCase();
-        final ownProduct =
-            _currentAccountId != null &&
+            final id = (item['productId'] ?? item['id']).toString();
+            final available = _toInt(item['availableQuantity'], fallback: 0);
+            final status = (item['status'] ?? 'published')
+                .toString()
+                .toLowerCase();
+            final sellerId = _toInt(item['sellerId'], fallback: -2);
+            final sellerType = (item['sellerType'] ?? 'user')
+                .toString()
+                .toLowerCase();
+            final ownProduct =
+                _currentAccountId != null &&
                 sellerId == _currentAccountId &&
                 sellerType == _currentAccountType;
-        return id.isNotEmpty &&
-            available > 0 &&
-            status == 'published' &&
-            !ownProduct &&
-            !_items.any(
+            return id.isNotEmpty &&
+                available > 0 &&
+                status == 'published' &&
+                !ownProduct &&
+                !_items.any(
                   (cartItem) =>
-              (cartItem['productId'] ?? cartItem['id']).toString() ==
-                  id,
-            );
-      })
+                      (cartItem['productId'] ?? cartItem['id']).toString() ==
+                      id,
+                );
+          })
           .toList();
       if (!mounted) return;
       setState(() {
@@ -573,16 +577,16 @@ class _CheckoutState extends State<Checkout> {
 
   bool _isFreeDeliveryProduct(Map<String, dynamic> item) {
     final method =
-    (item['deliveryMethod'] ??
-        item['delivery_method'] ??
-        item['shippingMethod'] ??
-        item['shipping_method'] ??
-        '')
-        .toString()
-        .trim()
-        .toLowerCase()
-        .replaceAll('_', ' ')
-        .replaceAll('-', ' ');
+        (item['deliveryMethod'] ??
+                item['delivery_method'] ??
+                item['shippingMethod'] ??
+                item['shipping_method'] ??
+                '')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replaceAll('_', ' ')
+            .replaceAll('-', ' ');
     return method == 'free delivery' ||
         method == 'free' ||
         method == 'free shipping';
@@ -601,8 +605,8 @@ class _CheckoutState extends State<Checkout> {
   }) {
     final sameCity =
         buyerCity.isNotEmpty &&
-            sellerCity.isNotEmpty &&
-            buyerCity == sellerCity;
+        sellerCity.isNotEmpty &&
+        buyerCity == sellerCity;
     if (express) return sameCity ? 69.0 : 99.0;
     return sameCity ? 40.0 : 59.0;
   }
@@ -620,16 +624,16 @@ class _CheckoutState extends State<Checkout> {
       if (!chargedSellers.add(key) || !_sellerHasPaidDelivery(key)) continue;
 
       final sellerCity =
-      (item['sellerCity'] ??
-          item['seller_city'] ??
-          (item['seller'] is Map
-              ? (item['seller'] as Map)['city']
-              : null) ??
-          item['city'] ??
-          '')
-          .toString()
-          .trim()
-          .toLowerCase();
+          (item['sellerCity'] ??
+                  item['seller_city'] ??
+                  (item['seller'] is Map
+                      ? (item['seller'] as Map)['city']
+                      : null) ??
+                  item['city'] ??
+                  '')
+              .toString()
+              .trim()
+              .toLowerCase();
 
       // If city data is missing, use the out-of-city rate instead of
       // showing a zero charge that may disagree with the backend.
@@ -665,10 +669,10 @@ class _CheckoutState extends State<Checkout> {
 
   double get _grandTotal =>
       (_subtotal +
-          _platformFee.roundToDouble() +
-          _taxAmount +
-          _deliveryFee -
-          _couponDiscount)
+              _platformFee.roundToDouble() +
+              _taxAmount +
+              _deliveryFee -
+              _couponDiscount)
           .clamp(0, double.infinity)
           .toDouble();
 
@@ -760,7 +764,7 @@ class _CheckoutState extends State<Checkout> {
                               final addressId =
                                   (address['addressId'] ?? address['id'])
                                       ?.toString() ??
-                                      '';
+                                  '';
                               final selected = addressId == _selectedAddressId;
 
                               return Padding(
@@ -768,11 +772,11 @@ class _CheckoutState extends State<Checkout> {
                                 child: _buildAddressOption(
                                   address,
                                   selected,
-                                      () {
+                                  () {
                                     setSheetState(() {
                                       _selectedAddressId =
                                           (address['addressId'] ??
-                                              address['id'])
+                                                  address['id'])
                                               .toString();
                                     });
 
@@ -798,10 +802,10 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _buildAddressOption(
-      Map<String, dynamic> address,
-      bool selected,
-      VoidCallback onTap,
-      ) {
+    Map<String, dynamic> address,
+    bool selected,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -841,7 +845,10 @@ class _CheckoutState extends State<Checkout> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 7,
+                    runSpacing: 4,
                     children: [
                       Text(
                         (address['label'] ?? address['type'] ?? 'Address')
@@ -852,11 +859,9 @@ class _CheckoutState extends State<Checkout> {
                           color: ArtistColors.textPrimary,
                         ),
                       ),
-                      if (address['isDefault'] == true ||
-                          address['isDefault'].toString().toLowerCase() ==
-                              'true' ||
-                          address['isDefault'].toString() == '1') ...[
-                        const SizedBox(width: 7),
+                      if (_isTrue(
+                        address['isDefault'] ?? address['is_default'],
+                      ))
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 7,
@@ -875,7 +880,6 @@ class _CheckoutState extends State<Checkout> {
                             ),
                           ),
                         ),
-                      ],
                     ],
                   ),
 
@@ -943,14 +947,14 @@ class _CheckoutState extends State<Checkout> {
 
       final returnedId = result is Map
           ? (result['addressId'] ?? result['address_id'] ?? result['id'])
-          ?.toString()
+                ?.toString()
           : null;
 
       if (returnedId != null && returnedId.isNotEmpty) {
         for (final address in _addresses) {
           final id =
-          (address['addressId'] ?? address['address_id'] ?? address['id'])
-              ?.toString();
+              (address['addressId'] ?? address['address_id'] ?? address['id'])
+                  ?.toString();
           if (id == returnedId) {
             newlySaved = address;
             break;
@@ -959,13 +963,13 @@ class _CheckoutState extends State<Checkout> {
       }
 
       newlySaved ??= _addresses.cast<Map<String, dynamic>?>().firstWhere((
-          address,
-          ) {
+        address,
+      ) {
         if (address == null) return false;
         final id =
             (address['addressId'] ?? address['address_id'] ?? address['id'])
                 ?.toString() ??
-                '';
+            '';
         return id.isNotEmpty && !existingIds.contains(id);
       }, orElse: () => null);
 
@@ -981,10 +985,10 @@ class _CheckoutState extends State<Checkout> {
 
     if (newlySaved != null) {
       final id =
-      (newlySaved!['addressId'] ??
-          newlySaved!['address_id'] ??
-          newlySaved!['id'])
-          ?.toString();
+          (newlySaved!['addressId'] ??
+                  newlySaved!['address_id'] ??
+                  newlySaved!['id'])
+              ?.toString();
       if (id != null && id.isNotEmpty) {
         setState(() => _selectedAddressId = id);
         _showMessage('New delivery address selected.');
@@ -1000,12 +1004,12 @@ class _CheckoutState extends State<Checkout> {
       final name = (returned['name'] ?? '').toString().trim();
       final city = (returned['city'] ?? '').toString().trim();
       final addressLine =
-      (returned['addressLine'] ??
-          returned['house'] ??
-          returned['address'] ??
-          '')
-          .toString()
-          .trim();
+          (returned['addressLine'] ??
+                  returned['house'] ??
+                  returned['address'] ??
+                  '')
+              .toString()
+              .trim();
       final pincode = (returned['pincode'] ?? returned['postalCode'] ?? '')
           .toString()
           .trim();
@@ -1014,17 +1018,17 @@ class _CheckoutState extends State<Checkout> {
       for (final address in _addresses) {
         final sameAddress =
             phone.isNotEmpty &&
-                (address['phone'] ?? '').toString().trim() == phone &&
-                (address['name'] ?? '').toString().trim() == name &&
-                (address['city'] ?? '').toString().trim() == city &&
-                (address['addressLine'] ??
-                    address['address'] ??
-                    address['house'] ??
-                    '')
+            (address['phone'] ?? '').toString().trim() == phone &&
+            (address['name'] ?? '').toString().trim() == name &&
+            (address['city'] ?? '').toString().trim() == city &&
+            (address['addressLine'] ??
+                        address['address'] ??
+                        address['house'] ??
+                        '')
                     .toString()
                     .trim() ==
-                    addressLine &&
-                (address['pincode'] ?? '').toString().trim() == pincode;
+                addressLine &&
+            (address['pincode'] ?? '').toString().trim() == pincode;
         if (sameAddress) {
           match = address;
           break;
@@ -1048,6 +1052,11 @@ class _CheckoutState extends State<Checkout> {
     );
   }
 
+  bool _isTrue(dynamic value) =>
+      value == true ||
+      value?.toString().toLowerCase() == 'true' ||
+      value?.toString() == '1';
+
   String _formatCheckoutAddress(Map<String, dynamic> address) {
     final parts = <String>[];
 
@@ -1055,7 +1064,7 @@ class _CheckoutState extends State<Checkout> {
         (address['addressLine'] ?? address['address'] ?? address['house'])
             ?.toString()
             .trim() ??
-            '';
+        '';
     final street = address['street']?.toString().trim() ?? '';
     final area = address['area']?.toString().trim() ?? '';
     final landmark = address['landmark']?.toString().trim() ?? '';
@@ -1141,13 +1150,13 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _deliveryOption(
-      BuildContext sheetContext, {
-        required String id,
-        required String title,
-        required String subtitle,
-        required String price,
-        required IconData icon,
-      }) {
+    BuildContext sheetContext, {
+    required String id,
+    required String title,
+    required String subtitle,
+    required String price,
+    required IconData icon,
+  }) {
     final selected = _selectedDelivery == id;
 
     return InkWell(
@@ -1299,14 +1308,14 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _checkoutCouponTile(
-      BuildContext sheetContext, {
-        required String code,
-        required String title,
-        required String subtitle,
-        required double minimumOrder,
-        double? discount,
-        double? percentage,
-      }) {
+    BuildContext sheetContext, {
+    required String code,
+    required String title,
+    required String subtitle,
+    required double minimumOrder,
+    double? discount,
+    double? percentage,
+  }) {
     final applied = _couponCode == code;
 
     return Container(
@@ -1389,24 +1398,24 @@ class _CheckoutState extends State<Checkout> {
             onPressed: applied
                 ? null
                 : () {
-              if (_subtotal < minimumOrder) {
-                _showMessage(
-                  'Add items worth ${_formatPrice(minimumOrder)} to use $code.',
-                );
-                return;
-              }
-              final amount = discount != null
-                  ? discount
-                  : (_subtotal * (percentage ?? 0)).roundToDouble();
-              setState(() {
-                _couponCode = code;
-                _couponDiscount = amount.clamp(0, _subtotal).toDouble();
-              });
-              Navigator.pop(sheetContext);
-              _showMessage(
-                '$code applied. You save ${_formatPrice(_couponDiscount)}.',
-              );
-            },
+                    if (_subtotal < minimumOrder) {
+                      _showMessage(
+                        'Add items worth ${_formatPrice(minimumOrder)} to use $code.',
+                      );
+                      return;
+                    }
+                    final amount = discount != null
+                        ? discount
+                        : (_subtotal * (percentage ?? 0)).roundToDouble();
+                    setState(() {
+                      _couponCode = code;
+                      _couponDiscount = amount.clamp(0, _subtotal).toDouble();
+                    });
+                    Navigator.pop(sheetContext);
+                    _showMessage(
+                      '$code applied. You save ${_formatPrice(_couponDiscount)}.',
+                    );
+                  },
             child: Text(
               applied
                   ? 'Applied'
@@ -1469,7 +1478,7 @@ class _CheckoutState extends State<Checkout> {
       _removeItem(
         index,
         message:
-        'This is the last item in your cart. Removing it will clear your cart. Are you sure?',
+            'This is the last item in your cart. Removing it will clear your cart. Are you sure?',
       );
       return;
     }
@@ -1482,21 +1491,21 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Future<void> _removeItem(
-      int index, {
-        String? message,
-        bool confirm = true,
-      }) async {
+    int index, {
+    String? message,
+    bool confirm = true,
+  }) async {
     if (index < 0 || index >= _items.length) return;
     final title = _items[index]['title'].toString();
     final confirmed =
         !confirm ||
-            await _confirmAction(
-              title: 'Remove item?',
-              message:
+        await _confirmAction(
+          title: 'Remove item?',
+          message:
               message ??
-                  'Are you sure you want to remove "$title" from your cart?',
-              confirmLabel: 'Remove',
-            );
+              'Are you sure you want to remove "$title" from your cart?',
+          confirmLabel: 'Remove',
+        );
     if (!confirmed || !mounted || index >= _items.length) return;
     setState(() {
       _items.removeAt(index);
@@ -1617,7 +1626,7 @@ class _CheckoutState extends State<Checkout> {
                               final confirmed = await _confirmAction(
                                 title: 'Remove last item?',
                                 message:
-                                'Quantity is 1. Removing this item will clear your cart. Are you sure?',
+                                    'Quantity is 1. Removing this item will clear your cart. Are you sure?',
                                 confirmLabel: 'Remove item',
                               );
                               if (confirmed && mounted) {
@@ -1846,7 +1855,7 @@ class _CheckoutState extends State<Checkout> {
     final productId = product['productId'] ?? product['id'];
 
     final existingIndex = _items.indexWhere(
-          (item) => item['productId'].toString() == productId.toString(),
+      (item) => item['productId'].toString() == productId.toString(),
     );
 
     if (existingIndex != -1) {
@@ -1968,77 +1977,77 @@ class _CheckoutState extends State<Checkout> {
                         ? const Center(child: CircularProgressIndicator())
                         : _moreItemsError != null
                         ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _moreItemsError!,
-                              textAlign: TextAlign.center,
-                              style: ArtistTextStyles.body,
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _moreItemsError!,
+                                    textAlign: TextAlign.center,
+                                    style: ArtistTextStyles.body,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  OutlinedButton.icon(
+                                    onPressed: _loadMoreItems,
+                                    icon: const Icon(Icons.refresh_rounded),
+                                    label: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 10),
-                            OutlinedButton.icon(
-                              onPressed: _loadMoreItems,
-                              icon: const Icon(Icons.refresh_rounded),
-                              label: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
+                          )
                         : _moreItems.isEmpty
                         ? Center(
-                      child: Text(
-                        'No other in-stock listings available right now.',
-                        style: ArtistTextStyles.body,
-                        textAlign: TextAlign.center,
-                      ),
-                    )
+                            child: Text(
+                              'No other in-stock listings available right now.',
+                              style: ArtistTextStyles.body,
+                              textAlign: TextAlign.center,
+                            ),
+                          )
                         : ListView.separated(
-                      itemCount: _moreItems.length,
-                      separatorBuilder: (_, __) =>
-                      const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        // The available-products list can refresh while this
-                        // bottom sheet is open. A sliver may briefly request
-                        // an old index, so guard against a stale index.
-                        if (index < 0 || index >= _moreItems.length) {
-                          return const SizedBox.shrink();
-                        }
+                            itemCount: _moreItems.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              // The available-products list can refresh while this
+                              // bottom sheet is open. A sliver may briefly request
+                              // an old index, so guard against a stale index.
+                              if (index < 0 || index >= _moreItems.length) {
+                                return const SizedBox.shrink();
+                              }
 
-                        final product = _moreItems[index];
+                              final product = _moreItems[index];
 
-                        final productId =
-                        (product['productId'] ?? product['id'] ?? '')
-                            .toString();
+                              final productId =
+                                  (product['productId'] ?? product['id'] ?? '')
+                                      .toString();
 
-                        final existingIndex = _items.indexWhere(
-                              (item) =>
-                          item['productId'].toString() == productId,
-                        );
+                              final existingIndex = _items.indexWhere(
+                                (item) =>
+                                    item['productId'].toString() == productId,
+                              );
 
-                        final alreadyAdded = existingIndex != -1;
+                              final alreadyAdded = existingIndex != -1;
 
-                        final existingQuantity = alreadyAdded
-                            ? _toInt(
-                          _items[existingIndex]['quantity'],
-                          fallback: 1,
-                        )
-                            : 0;
+                              final existingQuantity = alreadyAdded
+                                  ? _toInt(
+                                      _items[existingIndex]['quantity'],
+                                      fallback: 1,
+                                    )
+                                  : 0;
 
-                        return _buildAddMoreProductTile(
-                          product,
-                          alreadyAdded,
-                          existingQuantity,
-                          onAdd: () {
-                            _addProductToCheckout(product);
-                            setState(() {});
-                          },
-                        );
-                      },
-                    ),
+                              return _buildAddMoreProductTile(
+                                product,
+                                alreadyAdded,
+                                existingQuantity,
+                                onAdd: () {
+                                  _addProductToCheckout(product);
+                                  setState(() {});
+                                },
+                              );
+                            },
+                          ),
                   ),
 
                   const SizedBox(height: 10),
@@ -2075,11 +2084,11 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _buildAddMoreProductTile(
-      Map<String, dynamic> product,
-      bool alreadyAdded,
-      int existingQuantity, {
-        required VoidCallback onAdd,
-      }) {
+    Map<String, dynamic> product,
+    bool alreadyAdded,
+    int existingQuantity, {
+    required VoidCallback onAdd,
+  }) {
     final price = _toDouble(product['price']);
     final availableQuantity = _toInt(
       product['availableQuantity'] ?? product['stock'],
@@ -2636,12 +2645,12 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _priceRow(
-      String label,
-      String value, {
-        Color? valueColor,
-        bool bold = false,
-        double valueSize = 13,
-      }) {
+    String label,
+    String value, {
+    Color? valueColor,
+    bool bold = false,
+    double valueSize = 13,
+  }) {
     return Row(
       children: [
         Expanded(
@@ -2785,7 +2794,7 @@ class _CheckoutState extends State<Checkout> {
             savings: _couponDiscount,
             couponCode: _couponCode,
             clearCartAfterSuccess:
-            widget.product == null && widget.items != null,
+                widget.product == null && widget.items != null,
           ),
         ),
       );
@@ -3048,8 +3057,6 @@ class _CheckoutState extends State<Checkout> {
   // ADDRESS SECTION
 
   Widget _buildAddressSection() {
-    final address = _selectedAddress;
-
     return _sectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3057,18 +3064,17 @@ class _CheckoutState extends State<Checkout> {
           Row(
             children: [
               _sectionIcon(Icons.location_on_outlined),
-
               const SizedBox(width: 10),
-
               Expanded(
                 child: Text(
                   'Delivery Address',
                   style: ArtistTextStyles.title.copyWith(fontSize: 18),
                 ),
               ),
-
-              TextButton(
-                onPressed: _openAddressSelector,
+              TextButton.icon(
+                onPressed: _isLoadingAddresses ? null : _openAddAddress,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Add new'),
                 style: TextButton.styleFrom(
                   foregroundColor: ArtistColors.primary,
                   padding: const EdgeInsets.symmetric(
@@ -3078,24 +3084,111 @@ class _CheckoutState extends State<Checkout> {
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: Text(
-                  'Change',
-                  style: ArtistTextStyles.bodyMedium.copyWith(
-                    color: ArtistColors.primary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ),
             ],
           ),
-
           const SizedBox(height: 12),
+          if (_isLoadingAddresses && _addresses.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(18),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_addressError != null && _addresses.isEmpty)
+            _buildAddressEmptyState(
+              'Could not load saved addresses.',
+              actionLabel: 'Retry',
+              onAction: _loadAddresses,
+            )
+          else if (_addresses.isEmpty)
+            _buildAddressEmptyState(
+              'No saved address found. Add a delivery address to continue.',
+              actionLabel: 'Add address',
+              onAction: _openAddAddress,
+            )
+          else ...[
+            if (_addressError != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Could not refresh addresses. Your saved list is shown.',
+                        style: TextStyle(
+                          color: ArtistColors.error,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _loadAddresses,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ..._addresses.map((address) {
+              final addressId =
+                  (address['addressId'] ??
+                          address['address_id'] ??
+                          address['id'])
+                      .toString();
+              final selected = addressId == _selectedAddressId;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 9),
+                child: _buildAddressOption(address, selected, () {
+                  setState(() => _selectedAddressId = addressId);
+                }),
+              );
+            }),
+            if (_isLoadingAddresses)
+              const Padding(
+                padding: EdgeInsets.only(top: 2, bottom: 8),
+                child: LinearProgressIndicator(),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
 
-          if (address == null)
-            _buildNoAddress()
-          else
-            _buildSelectedAddress(address),
+  Widget _buildAddressEmptyState(
+    String message, {
+    required String actionLabel,
+    required VoidCallback onAction,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: ArtistColors.background,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            message,
+            style: ArtistTextStyles.body.copyWith(
+              color: ArtistColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: onAction,
+              icon: Icon(
+                actionLabel.toLowerCase().contains('retry')
+                    ? Icons.refresh_rounded
+                    : Icons.add_location_alt_outlined,
+              ),
+              label: Text(actionLabel),
+            ),
+          ),
         ],
       ),
     );
@@ -3433,34 +3526,34 @@ class _CheckoutState extends State<Checkout> {
                     ),
                     child: _isProcessing
                         ? const SizedBox(
-                      width: 21,
-                      height: 21,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                        : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Continue to Payment',
-                            overflow: TextOverflow.ellipsis,
-                            style: ArtistTextStyles.button.copyWith(
-                              fontSize: 14.5,
+                            width: 21,
+                            height: 21,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
                             ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Continue to Payment',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: ArtistTextStyles.button.copyWith(
+                                    fontSize: 14.5,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 7),
+                              const Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: 7),
-                        const Icon(
-                          Icons.arrow_forward_rounded,
-                          size: 18,
-                          color: Colors.white,
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               ),
@@ -3540,10 +3633,10 @@ class _CheckoutState extends State<Checkout> {
   }
 
   Widget _imagePlaceholder(
-      double width,
-      double height, {
-        bool loading = false,
-      }) {
+    double width,
+    double height, {
+    bool loading = false,
+  }) {
     return Container(
       width: width,
       height: height,
@@ -3554,20 +3647,19 @@ class _CheckoutState extends State<Checkout> {
       child: Center(
         child: loading
             ? const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: ArtistColors.primary,
-          ),
-        )
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: ArtistColors.primary,
+                ),
+              )
             : const Icon(
-          Icons.image_outlined,
-          size: 31,
-          color: ArtistColors.secondary,
-        ),
+                Icons.image_outlined,
+                size: 31,
+                color: ArtistColors.secondary,
+              ),
       ),
     );
   }
 }
-

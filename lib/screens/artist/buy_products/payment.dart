@@ -1,6 +1,8 @@
 import 'package:ecoloop/services/ecoloop_api.dart';
 import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:upi_payment_plugin/model/upi_app_model.dart';
+import 'package:upi_payment_plugin/upi_payment_plugin.dart';
 
 import '../../../app_theme/artist/artist_colors.dart';
 import '../../../app_theme/artist/artist_text_styles.dart';
@@ -44,16 +46,10 @@ class _PaymentState extends State<Payment> {
   List<int> _pendingPaymentIds = <int>[];
   String? _gatewayOrderId;
   bool _gatewayCallbackHandled = false;
-  String _checkoutRequestId = 'artist_${DateTime.now().microsecondsSinceEpoch}';
+  final String _checkoutRequestId =
+      'artist_${DateTime.now().microsecondsSinceEpoch}';
   String _selectedMethod = 'cod';
-  String? _selectedUpiApp;
-  String? _selectedBank;
   bool _isProcessing = false;
-  final TextEditingController _upiController = TextEditingController();
-  final TextEditingController _cardNumberController = TextEditingController();
-  final TextEditingController _cardNameController = TextEditingController();
-  final TextEditingController _expiryController = TextEditingController();
-  final TextEditingController _cvvController = TextEditingController();
 
   @override
   void initState() {
@@ -70,11 +66,6 @@ class _PaymentState extends State<Payment> {
   @override
   void dispose() {
     _razorpay.clear();
-    _upiController.dispose();
-    _cardNumberController.dispose();
-    _cardNameController.dispose();
-    _expiryController.dispose();
-    _cvvController.dispose();
     super.dispose();
   }
 
@@ -150,11 +141,11 @@ class _PaymentState extends State<Payment> {
 
   /// Selects an online payment option or Cash on Delivery.
   void _selectMethod(String method) {
+    if (!const {'upi', 'razorpay', 'cod'}.contains(method)) {
+      return;
+    }
     setState(() {
       _selectedMethod = method;
-      if (method != 'upi') {
-        _selectedUpiApp = null;
-      }
     });
   }
 
@@ -226,7 +217,17 @@ class _PaymentState extends State<Payment> {
   }
 
   Future<void> _payNow() async {
-    if (_isProcessing) return;
+    if (_isProcessing) {
+      return;
+    }
+
+    // UPI app intent is kept separate from the verified Razorpay flow.
+    // The test VPA below only demonstrates opening the selected app; it must
+    // not be treated as a successful EcoLoop order payment.
+    if (_selectedMethod == 'upi') {
+      await _chooseAndLaunchUpiApp();
+      return;
+    }
 
     final isExistingOrder = widget.existingOrder != null;
     final items = widget.items ?? const <Map<String, dynamic>>[];
@@ -257,7 +258,9 @@ class _PaymentState extends State<Payment> {
 
     setState(() => _isProcessing = true);
     await Future<void>.delayed(Duration.zero);
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     try {
       Map<String, dynamic> data = <String, dynamic>{};
@@ -343,12 +346,15 @@ class _PaymentState extends State<Payment> {
               .map((order) => '${order['orderId'] ?? ''}')
               .where((id) => id.isNotEmpty && id != 'null')
               .join(', ');
-          if (orderIds.isEmpty)
+          if (orderIds.isEmpty) {
             throw Exception(
               'The server did not return order IDs. Check Buying Orders before retrying.',
             );
+          }
           if (widget.clearCartAfterSuccess) CartPopup.clear();
-          if (!mounted) return;
+          if (!mounted) {
+            return;
+          }
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -373,15 +379,17 @@ class _PaymentState extends State<Payment> {
             .map((order) => '${order['orderId'] ?? ''}')
             .where((id) => id.isNotEmpty && id != 'null')
             .join(', ');
-        if (orderIds.isEmpty)
+        if (orderIds.isEmpty) {
           throw Exception(
             'The server did not return order IDs. Check Buying Orders before retrying.',
           );
+        }
         paymentIds = _readPaymentIds(data['payments']);
-        if (paymentIds.isEmpty)
+        if (paymentIds.isEmpty) {
           throw Exception(
             'The backend did not return payment IDs for Razorpay.',
           );
+        }
         _pendingOrders = orders;
         _pendingPaymentIds = paymentIds;
       }
@@ -401,7 +409,9 @@ class _PaymentState extends State<Payment> {
           amount <= 0) {
         throw Exception('Razorpay did not return a valid checkout order.');
       }
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() => _isProcessing = false);
       _razorpay.open({
         'key': keyId,
@@ -424,6 +434,116 @@ class _PaymentState extends State<Payment> {
       }
     } finally {
       if (mounted && _isProcessing) setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<void> _chooseAndLaunchUpiApp() async {
+    if (_isProcessing) return;
+
+    setState(() => _isProcessing = true);
+    try {
+      final apps = await UpiPaymentPlugin().getUpiApps();
+      if (!mounted) return;
+
+      if (apps.isEmpty) {
+        _showMessage('No supported UPI apps were found on this device.');
+        return;
+      }
+
+      final selectedApp = await showModalBottomSheet<UpiAppModel>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: ArtistColors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        builder: (sheetContext) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Choose a UPI app',
+                  style: ArtistTextStyles.title.copyWith(fontSize: 18),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Select the app you want to open.',
+                  style: ArtistTextStyles.caption,
+                ),
+                const SizedBox(height: 12),
+                ...apps.map(
+                  (app) => ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    leading: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: ArtistColors.light,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.account_balance_wallet_outlined,
+                        color: ArtistColors.primary,
+                      ),
+                    ),
+                    title: Text(
+                      app.appName,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.of(sheetContext).pop(app),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      if (selectedApp == null || !mounted) return;
+
+      // UI-test placeholder, matching the User-side app-launch behaviour.
+      // Replace this with EcoLoop's verified merchant UPI ID before production.
+      await UpiPaymentPlugin.initiateUPIPayment(
+        payeeUpiId: 'ecoloop-ui-test@invalid',
+        payeeName: 'EcoLoop',
+        amount: widget.totalAmount,
+        transactionId: 'ECO${DateTime.now().millisecondsSinceEpoch}',
+        transactionNote: 'EcoLoop order payment test',
+        merchantCode: '0000',
+        link: '',
+        transactionRefId: 'ECOREF${DateTime.now().millisecondsSinceEpoch}',
+        packageName: selectedApp.packageName,
+        secretKey: '',
+      );
+
+      if (mounted) {
+        _showMessage(
+          'UPI app opened in test mode. This does not confirm or record an EcoLoop payment.',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        _showMessage(
+          'Could not open the UPI app: ${error.toString().replaceFirst('Exception: ', '')}',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
 
@@ -521,11 +641,55 @@ class _PaymentState extends State<Payment> {
     if (mounted) {
       setState(() => _isProcessing = true);
     }
-    if (mounted) {
+
+    // Checkout currently creates pending order/payment rows before opening
+    // Razorpay. If the gateway is dismissed or payment fails, cancel those
+    // pending orders on the server so they cannot remain active in Buying Orders.
+    var cancellationConfirmed = true;
+    final orderIds = _pendingOrders
+        .map(
+          (order) => int.tryParse('${order['orderId'] ?? order['id'] ?? ''}'),
+        )
+        .whereType<int>()
+        .where((id) => id > 0)
+        .toSet();
+
+    for (final orderId in orderIds) {
+      try {
+        final result = await EcoLoopApi.instance.post(
+          '/orders/$orderId/cancel',
+          <String, dynamic>{},
+        );
+        final root = _asMap(result);
+        if (root['success'] == false) {
+          cancellationConfirmed = false;
+        }
+      } catch (_) {
+        cancellationConfirmed = false;
+      }
+    }
+
+    // Do not retain cancelled order/payment IDs for an accidental retry.
+    _pendingOrders = <Map<String, dynamic>>[];
+    _pendingPaymentIds = <int>[];
+    _gatewayOrderId = null;
+
+    if (!mounted) return;
+    setState(() => _isProcessing = false);
+
+    final userCancelled = response.code == 0;
+    if (cancellationConfirmed) {
       _showMessage(
-        'Payment was not completed. Your order has not been cancelled. You can retry payment or check Buying Orders.',
+        userCancelled
+            ? 'Payment cancelled. No order has been placed.'
+            : 'Payment failed. No order has been placed.',
       );
-      setState(() => _isProcessing = false);
+    } else {
+      _showMessage(
+        userCancelled
+            ? 'Payment cancelled. We could not confirm order cancellation with the server. Refresh Buying Orders before trying again.'
+            : 'Payment failed. We could not confirm order cancellation with the server. Refresh Buying Orders before trying again.',
+      );
     }
   }
 
@@ -816,30 +980,16 @@ class _PaymentState extends State<Payment> {
       children: [
         _paymentMethodTile(
           value: 'upi',
-          icon: Icons.account_balance_wallet_outlined,
+          icon: Icons.qr_code_2_rounded,
           title: 'UPI',
-          subtitle: 'Google Pay, PhonePe, Paytm & more',
+          subtitle: 'Google Pay, PhonePe, Paytm and other UPI apps',
         ),
         const SizedBox(height: 9),
         _paymentMethodTile(
-          value: 'card',
-          icon: Icons.credit_card_outlined,
-          title: 'Credit / Debit Card',
-          subtitle: 'Visa, Mastercard, RuPay & more',
-        ),
-        const SizedBox(height: 9),
-        _paymentMethodTile(
-          value: 'netbanking',
-          icon: Icons.account_balance_outlined,
-          title: 'Net Banking',
-          subtitle: 'Pay directly from your bank account',
-        ),
-        const SizedBox(height: 9),
-        _paymentMethodTile(
-          value: 'wallet',
-          icon: Icons.account_balance_wallet_rounded,
-          title: 'Wallets',
-          subtitle: 'Use your preferred digital wallet',
+          value: 'razorpay',
+          icon: Icons.account_balance_wallet_outlined,
+          title: 'Cards, Netbanking & Wallets',
+          subtitle: 'Secure online payment with Razorpay',
         ),
         const SizedBox(height: 9),
         _paymentMethodTile(
@@ -852,7 +1002,6 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  /// Selectable tile option for payment methods list.
   Widget _paymentMethodTile({
     required String value,
     required IconData icon,
@@ -922,289 +1071,45 @@ class _PaymentState extends State<Payment> {
   Widget _buildPaymentDetails() {
     switch (_selectedMethod) {
       case 'upi':
-        return _buildUpiSection();
-      case 'card':
-        return _buildCardSection();
-      case 'netbanking':
-        return _buildNetBankingSection();
-      case 'wallet':
-        return _buildWalletSection();
+        return _sectionCard(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.qr_code_2_rounded, color: ArtistColors.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Continue to Razorpay Checkout to complete your UPI payment securely. EcoLoop updates the order only after server-side verification.',
+                  style: ArtistTextStyles.body,
+                ),
+              ),
+            ],
+          ),
+        );
+      case 'razorpay':
+        return _sectionCard(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.lock_outline_rounded,
+                color: ArtistColors.primary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'You will securely choose UPI, card, net banking or an available wallet in Razorpay Checkout. EcoLoop confirms your order only after server-side payment verification.',
+                  style: ArtistTextStyles.body,
+                ),
+              ),
+            ],
+          ),
+        );
       case 'cod':
         return _buildCodSection();
       default:
         return const SizedBox.shrink();
     }
-  }
-
-  /// Render UPI app selector options and manual UPI ID text field.
-  Widget _buildUpiSection() {
-    return _sectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Pay using UPI',
-            style: ArtistTextStyles.body.copyWith(
-              color: ArtistColors.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _upiApp(
-                icon: Icons.g_mobiledata_rounded,
-                title: 'Google Pay',
-                value: 'gpay',
-              ),
-              const SizedBox(width: 10),
-              _upiApp(
-                icon: Icons.phone_android_rounded,
-                title: 'PhonePe',
-                value: 'phonepe',
-              ),
-              const SizedBox(width: 10),
-              _upiApp(
-                icon: Icons.account_balance_wallet_outlined,
-                title: 'Paytm',
-                value: 'paytm',
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(child: Divider(color: Colors.grey.shade300)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Text('OR', style: ArtistTextStyles.caption),
-              ),
-              Expanded(child: Divider(color: Colors.grey.shade300)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _upiController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'UPI ID',
-              hintText: 'example@upi',
-              prefixIcon: Icon(Icons.alternate_email_rounded),
-              suffixIcon: Icon(
-                Icons.verified_outlined,
-                color: ArtistColors.success,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// App icon selector tile component for UPI applications.
-  Widget _upiApp({
-    required IconData icon,
-    required String title,
-    required String value,
-  }) {
-    final selected = _selectedUpiApp == value;
-
-    return Expanded(
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _selectedUpiApp = value;
-            _upiController.clear();
-          });
-        },
-        borderRadius: BorderRadius.circular(14),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 5),
-          decoration: BoxDecoration(
-            color: selected ? ArtistColors.light : ArtistColors.background,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? ArtistColors.primary : Colors.grey.shade200,
-            ),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: ArtistColors.primary, size: 26),
-              const SizedBox(height: 5),
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: ArtistColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Card credentials form section.
-  Widget _buildCardSection() {
-    return _sectionCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(
-            Icons.credit_card_outlined,
-            color: ArtistColors.primary,
-            size: 28,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Your card details will be entered securely in Razorpay Checkout. EcoLoop does not collect or store your card number, expiry date, or CVV on this screen.',
-              style: ArtistTextStyles.caption.copyWith(height: 1.45),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Netbanking bank selection grid.
-  Widget _buildNetBankingSection() {
-    final banks = [
-      'HDFC Bank',
-      'State Bank of India',
-      'ICICI Bank',
-      'Axis Bank',
-      'Kotak Mahindra Bank',
-      'Other Bank',
-    ];
-
-    return _sectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Select your bank',
-            style: ArtistTextStyles.body.copyWith(
-              color: ArtistColors.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 9,
-            runSpacing: 9,
-            children: banks.map((bank) {
-              final selected = _selectedBank == bank;
-
-              return InkWell(
-                onTap: () {
-                  setState(() {
-                    _selectedBank = bank;
-                  });
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 11,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? ArtistColors.light
-                        : ArtistColors.background,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: selected
-                          ? ArtistColors.primary
-                          : Colors.grey.shade200,
-                    ),
-                  ),
-                  child: Text(
-                    bank,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      color: selected
-                          ? ArtistColors.primary
-                          : ArtistColors.textSecondary,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Digital wallet provider list.
-  Widget _buildWalletSection() {
-    return _sectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Choose wallet',
-            style: ArtistTextStyles.body.copyWith(
-              color: ArtistColors.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _walletOption('Paytm Wallet', Icons.account_balance_wallet_outlined),
-          const SizedBox(height: 9),
-          _walletOption('Amazon Pay', Icons.shopping_bag_outlined),
-          const SizedBox(height: 9),
-          _walletOption('Other Wallet', Icons.wallet_outlined),
-        ],
-      ),
-    );
-  }
-
-  /// Option item for wallet provider list.
-  Widget _walletOption(String title, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: ArtistColors.background,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: ArtistColors.light,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: ArtistColors.primary, size: 19),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: ArtistColors.textPrimary,
-              ),
-            ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: ArtistColors.textSecondary,
-          ),
-        ],
-      ),
-    );
   }
 
   /// Information card for Cash on Delivery option.
