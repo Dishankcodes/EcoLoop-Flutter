@@ -19,9 +19,7 @@ class SellingOrderDetails extends StatefulWidget {
 }
 
 class _SellingOrderDetailsState extends State<SellingOrderDetails> {
-  // ==========================================================
   // DATA
-  // ==========================================================
 
   String get productName {
     return widget.order['productTitle']?.toString() ??
@@ -43,9 +41,12 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   }
 
   String get buyerId {
-    return widget.order['buyerName']?.toString().trim().isNotEmpty == true
-        ? widget.order['buyerName'].toString()
-        : (widget.order['buyerId']?.toString() ?? '-');
+    final name = (widget.order['buyerName'] ?? '').toString().trim();
+    if (name.isNotEmpty) {
+      return name;
+    }
+    final id = (widget.order['buyerId'] ?? '').toString().trim();
+    return id.isEmpty ? '-' : id;
   }
 
   String get buyerName {
@@ -106,16 +107,18 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     }
     if (raw is String) {
       final value = raw.trim();
-      if (value.startsWith('https://') || value.startsWith('http://'))
+      if (value.startsWith('https://') || value.startsWith('http://')) {
         return value;
+      }
       if (value.startsWith('[') && value.endsWith(']')) {
         try {
           final decoded = jsonDecode(value);
           if (decoded is List) {
             for (final item in decoded) {
               final url = item.toString().trim();
-              if (url.startsWith('https://') || url.startsWith('http://'))
+              if (url.startsWith('https://') || url.startsWith('http://')) {
                 return url;
+              }
             }
           }
         } catch (_) {}
@@ -126,8 +129,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
           .trim()
           .replaceAll('"', '')
           .replaceAll("'", '');
-      if (first.startsWith('https://') || first.startsWith('http://'))
+      if (first.startsWith('https://') || first.startsWith('http://')) {
         return first;
+      }
     }
     return '';
   }
@@ -154,8 +158,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
 
   String get shippingAddress {
     final raw = widget.order['shippingAddress'] ?? widget.order['address'];
-    if (raw == null || raw.toString().trim().isEmpty)
+    if (raw == null || raw.toString().trim().isEmpty) {
       return 'Delivery address unavailable';
+    }
     dynamic value = raw;
     if (raw is String) {
       try {
@@ -204,9 +209,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     return currentStatus.toLowerCase() == 'delivered';
   }
 
-  // ==========================================================
   // BUILD
-  // ==========================================================
 
   @override
   Widget build(BuildContext context) {
@@ -248,9 +251,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // APP BAR
-  // ==========================================================
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -286,9 +287,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // SALE HEADER
-  // ==========================================================
 
   Widget _buildSaleHeader() {
     return Container(
@@ -369,9 +368,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // CANCELLED
-  // ==========================================================
 
   Widget _buildCancelledBanner() {
     return Container(
@@ -423,9 +420,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // STATUS SECTION
-  // ==========================================================
 
   Widget _buildStatusSection() {
     return _section(
@@ -538,9 +533,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // STATUS STEP
-  // ==========================================================
 
   bool _isStepCompleted(int step) {
     final index = _statusIndex(currentStatus);
@@ -688,9 +681,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // STATUS CHIP
-  // ==========================================================
 
   Widget _statusChip() {
     final Color color = _statusColor(currentStatus);
@@ -749,9 +740,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     }
   }
 
-  // ==========================================================
   // PRODUCT
-  // ==========================================================
 
   Widget _buildProductSection() {
     return _section(
@@ -846,9 +835,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // BUYER
-  // ==========================================================
 
   Widget _buildBuyerSection() {
     return _section(
@@ -938,9 +925,11 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _openSellerProfile,
+              onPressed: _openBuyerProfile,
               icon: const Icon(Icons.storefront_outlined, size: 18),
-              label: const Text('View Seller Profile'),
+              label: Text(
+                _isArtistBuyer ? 'View Artist Profile' : 'View Seller Profile',
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: ArtistColors.primary,
                 foregroundColor: Colors.white,
@@ -982,9 +971,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // DELIVERY
-  // ==========================================================
 
   Widget _buildDeliverySection() {
     return _section(
@@ -1067,9 +1054,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // EARNINGS
-  // ==========================================================
 
   Widget _buildEarningsSection() {
     final double serviceFee = totalAmountValue * 0.02;
@@ -1169,9 +1154,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // ORDER INFORMATION
-  // ==========================================================
 
   Widget _buildOrderInformation() {
     return _section(
@@ -1228,9 +1211,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // SELLER PROTECTION
-  // ==========================================================
 
   Widget _buildSellerProtection() {
     return _section(
@@ -1281,9 +1262,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // COMPLETED
-  // ==========================================================
 
   Widget _buildCompletedMessage() {
     return _section(
@@ -1324,9 +1303,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // HELP
-  // ==========================================================
 
   Widget _buildHelpSection() {
     return _section(
@@ -1390,9 +1367,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // BOTTOM BAR
-  // ==========================================================
 
   Widget _buildBottomBar() {
     return Container(
@@ -1453,9 +1428,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // OPEN STATUS PAGE
-  // ==========================================================
 
   void _openStatusPage() {
     Navigator.push(
@@ -1464,15 +1437,15 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
         builder: (_) => SellingOrderStatus(order: widget.order),
       ),
     ).then((_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {});
     });
   }
 
-  // ==========================================================
   // CONTACT BUYER
-  // ==========================================================
 
   Future<Map<String, dynamic>> _loadFreshOrderContact() async {
     final merged = Map<String, dynamic>.from(widget.order);
@@ -1494,13 +1467,17 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
             .toString()
             .trim()
             .isNotEmpty;
-    if (hasEmail && hasPhone) return merged;
+    if (hasEmail && hasPhone) {
+      return merged;
+    }
 
     // Order details are returned from Code.gs using the buyer's actual Users or
     // Artists sheet row. This avoids inventing or hardcoding contact details.
     try {
       final result = await EcoLoopApi.instance.get('/orders/$orderId');
-      if (result is Map) merged.addAll(Map<String, dynamic>.from(result));
+      if (result is Map) {
+        merged.addAll(Map<String, dynamic>.from(result));
+      }
     } catch (_) {
       // Keep the order data already on screen if this optional refresh fails.
     }
@@ -1513,7 +1490,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     String first(List<String> keys) {
       for (final key in keys) {
         final value = contact[key]?.toString().trim() ?? '';
-        if (value.isNotEmpty) return value;
+        if (value.isNotEmpty) {
+          return value;
+        }
       }
       return '';
     }
@@ -1596,107 +1575,127 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  Future<void> _openSellerProfile() async {
-    final sellerId =
-        (widget.order['sellerId'] ??
-                widget.order['artistId'] ??
-                widget.order['seller_id'] ??
+  /// The profile button in the "Purchased By" section belongs to the BUYER.
+  /// Do not use the order's sellerType here: this order may have been sold by
+  /// an artist while the buyer is an ordinary EcoLoop user.
+  bool get _isArtistBuyer {
+    final rawType =
+        (widget.order['buyerType'] ??
+                widget.order['buyer_type'] ??
+                widget.order['buyerRole'] ??
+                widget.order['buyer_role'] ??
+                widget.order['buyerAccountType'] ??
+                widget.order['buyer_account_type'] ??
                 '')
             .toString()
-            .trim();
-    final sellerType =
-        (widget.order['sellerType'] ?? widget.order['seller_type'] ?? 'artist')
-            .toString()
             .trim()
-            .toLowerCase();
-    if (sellerId.isEmpty || sellerId == '0' || sellerId == '-') {
+            .toLowerCase()
+            .replaceAll(RegExp(r'[\\s-]+'), '_');
+
+    return const {'artist', 'remaker', 're_maker'}.contains(rawType);
+  }
+
+  String get _buyerProfileId {
+    // buyerId is the Users.userId for a regular buyer. Only use artist-specific
+    // ID fields when the order explicitly identifies the buyer as an artist.
+    final dynamic rawId = _isArtistBuyer
+        ? (widget.order['buyerArtistId'] ??
+              widget.order['buyer_artist_id'] ??
+              widget.order['artistBuyerId'] ??
+              widget.order['artist_buyer_id'] ??
+              widget.order['buyerId'] ??
+              widget.order['buyer_id'])
+        : (widget.order['buyerUserId'] ??
+              widget.order['buyer_user_id'] ??
+              widget.order['buyerId'] ??
+              widget.order['buyer_id'] ??
+              widget.order['customerId'] ??
+              widget.order['customer_id']);
+
+    return (rawId ?? '').toString().trim();
+  }
+
+  Future<void> _openBuyerProfile() async {
+    final isArtist = _isArtistBuyer;
+    final profileId = _buyerProfileId;
+
+    if (profileId.isEmpty ||
+        profileId == '0' ||
+        profileId == '-' ||
+        profileId.toLowerCase() == 'null') {
       _showMessage(
-        'Seller profile is unavailable because the seller ID is missing from this order.',
+        isArtist
+            ? 'Artist profile is unavailable because the buyer artist ID is missing.'
+            : 'Seller profile is unavailable because the buyer user ID is missing.',
       );
       return;
     }
 
+    final profileType = isArtist ? 'artist' : 'user';
+
     try {
       final result = await EcoLoopApi.instance.get(
-        '/public/seller/$sellerType/$sellerId/profile',
+        '/public/seller/$profileType/$profileId/profile',
       );
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
+
       final root = result is Map
           ? Map<String, dynamic>.from(result)
           : <String, dynamic>{};
-      final sellerValue = root['seller'];
-      final seller = sellerValue is Map
-          ? Map<String, dynamic>.from(sellerValue)
+      final profileValue = root['seller'];
+      final profile = profileValue is Map
+          ? Map<String, dynamic>.from(profileValue)
           : root;
-      if (seller.isEmpty) {
-        _showMessage('Seller profile was not returned by the backend.');
+
+      if (profile.isEmpty) {
+        _showMessage(
+          isArtist
+              ? 'Artist profile was not returned by the backend.'
+              : 'Seller profile was not returned by the backend.',
+        );
         return;
       }
-      if (sellerType == 'artist' ||
-          sellerType == 'remaker' ||
-          sellerType == 're_maker') {
+
+      if (isArtist) {
         await Navigator.push<void>(
           context,
-          MaterialPageRoute(builder: (_) => ArtistProfile(artist: seller)),
+          MaterialPageRoute(builder: (_) => ArtistProfile(artist: profile)),
         );
       } else {
         await Navigator.push<void>(
           context,
-          MaterialPageRoute(builder: (_) => SellerProfile(seller: seller)),
+          MaterialPageRoute(builder: (_) => SellerProfile(seller: profile)),
         );
       }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         _showMessage(
-          'Could not open seller profile: ${error.toString().replaceFirst('Exception: ', '')}',
+          'Could not open ${isArtist ? 'artist' : 'seller'} profile: '
+          '${error.toString().replaceFirst('Exception: ', '')}',
         );
+      }
     }
   }
 
-  void _viewBuyerProfile() {
-    // Retained for any existing internal call sites; buyer details are shown
-    // from the order record, while the profile button opens the actual seller.
+  void _showSupportContact() {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: ArtistColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: Text(
-          'Buyer Profile',
+          'EcoLoop Support',
           style: ArtistTextStyles.title.copyWith(
             color: ArtistColors.textPrimary,
           ),
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircleAvatar(
-                radius: 34,
-                backgroundColor: ArtistColors.light,
-                backgroundImage: buyerImage.isNotEmpty
-                    ? NetworkImage(buyerImage)
-                    : null,
-                child: buyerImage.isEmpty
-                    ? const Icon(
-                        Icons.person_rounded,
-                        color: ArtistColors.primary,
-                        size: 34,
-                      )
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                buyerName,
-                textAlign: TextAlign.center,
-                style: ArtistTextStyles.title.copyWith(fontSize: 17),
-              ),
-              const SizedBox(height: 16),
-              _profileInfoRow('Buyer ID', buyerId),
-              if (buyerEmail.isNotEmpty) _profileInfoRow('Email', buyerEmail),
-              if (buyerPhone.isNotEmpty) _profileInfoRow('Phone', buyerPhone),
-            ],
-          ),
+        content: Text(
+          'Need help with sale #$orderId? Please contact EcoLoop support '
+          'through the support channel provided in the app. Keep your order '
+          'ID ready so the team can assist you.',
+          style: ArtistTextStyles.body.copyWith(height: 1.45),
         ),
         actions: [
           TextButton(
@@ -1707,82 +1706,6 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
       ),
     );
   }
-
-  Widget _profileInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 68,
-            child: Text(
-              label,
-              style: ArtistTextStyles.small.copyWith(
-                color: ArtistColors.textSecondary,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: SelectableText(value, style: ArtistTextStyles.bodyMedium),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSupportContact() {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: ArtistColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        icon: const Icon(
-          Icons.support_agent_rounded,
-          color: ArtistColors.primary,
-          size: 32,
-        ),
-        title: Text(
-          'Contact EcoLoop',
-          style: ArtistTextStyles.title.copyWith(
-            color: ArtistColors.textPrimary,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Need help with this sale? Reach our support team at:',
-              textAlign: TextAlign.center,
-              style: ArtistTextStyles.body.copyWith(
-                color: ArtistColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            SelectableText(
-              'ecoloopp2026@gmail.com',
-              textAlign: TextAlign.center,
-              style: ArtistTextStyles.bodyMedium.copyWith(
-                color: ArtistColors.primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================================
-  // MORE OPTIONS
-  // ==========================================================
 
   void _showMoreOptions() {
     showModalBottomSheet(
@@ -1858,9 +1781,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // COMMON SECTION TITLE
-  // ==========================================================
 
   Widget _sectionTitle(String title, IconData icon) {
     return Row(
@@ -1880,9 +1801,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // DETAIL ROW
-  // ==========================================================
 
   Widget _detailRow(IconData icon, String title, String value) {
     return Row(
@@ -1906,9 +1825,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // SECTION CONTAINER
-  // ==========================================================
 
   Widget _section({required Widget child}) {
     return Container(
@@ -1920,9 +1837,7 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     );
   }
 
-  // ==========================================================
   // HELPERS
-  // ==========================================================
 
   double _toDouble(dynamic value) {
     if (value is num) {
@@ -1941,7 +1856,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
   /// Sheet values already stored as 'yyyy-MM-dd HH:mm:ss' are treated as IST.
   String _formatSheetDateTime(dynamic value) {
     final raw = (value ?? '').toString().trim();
-    if (raw.isEmpty || raw == '-') return '-';
+    if (raw.isEmpty || raw == '-') {
+      return '-';
+    }
 
     DateTime? parsed;
     final sheetFormat = RegExp(
@@ -1971,7 +1888,9 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
       }
     }
 
-    if (parsed == null) return raw;
+    if (parsed == null) {
+      return raw;
+    }
 
     const months = <String>[
       'Jan',
@@ -1998,8 +1917,12 @@ class _SellingOrderDetailsState extends State<SellingOrderDetails> {
     final dateOnly = DateTime(parsed.year, parsed.month, parsed.day);
     final difference = today.difference(dateOnly).inDays;
 
-    if (difference == 0) return 'Today, $time';
-    if (difference == 1) return 'Yesterday, $time';
+    if (difference == 0) {
+      return 'Today, $time';
+    }
+    if (difference == 1) {
+      return 'Yesterday, $time';
+    }
 
     return '$day ${months[parsed.month - 1]} ${parsed.year}, $time';
   }
