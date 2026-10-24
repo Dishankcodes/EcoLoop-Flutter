@@ -53,7 +53,11 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       final dynamic response = await EcoLoopApi.instance.get('/orders/$id');
       dynamic raw = response;
       if (response is Map) {
-        raw = response['order'] ?? response['data'] ?? response['result'] ?? response;
+        raw =
+            response['order'] ??
+            response['data'] ??
+            response['result'] ??
+            response;
         if (raw is Map && raw['order'] is Map) raw = raw['order'];
       }
       if (!mounted || raw is! Map) return;
@@ -81,27 +85,40 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
     await _refreshOrderData();
     if (!mounted) return;
     if (!_lastOrderRefreshSucceeded) {
-      _showMessage('Could not refresh this order. Please refresh and try again before paying.');
+      _showMessage(
+        'Could not refresh this order. Please refresh and try again before paying.',
+      );
       return;
     }
-    if (_isPaidPaymentStatus(_orderData['paymentStatus'] ?? _orderData['payment'])) {
-      _showMessage('This order is already paid. The latest status has been refreshed.');
+    if (_isPaidPaymentStatus(
+      _orderData['paymentStatus'] ?? _orderData['payment'],
+    )) {
+      _showMessage(
+        'This order is already paid. The latest status has been refreshed.',
+      );
       return;
     }
     final id = _safeId(_orderData['orderId'] ?? _orderData['id']);
     if (id <= 0) {
-      _showMessage('This order has an invalid ID. Refresh My Orders and try again.');
+      _showMessage(
+        'This order has an invalid ID. Refresh My Orders and try again.',
+      );
       return;
     }
-    final rawAddress = _orderData['shippingAddress'] ?? _orderData['address'] ?? _orderData['deliveryAddress'];
+    final rawAddress =
+        _orderData['shippingAddress'] ??
+        _orderData['address'] ??
+        _orderData['deliveryAddress'];
     Map<String, dynamic> address = <String, dynamic>{};
     if (rawAddress is Map) {
       address = Map<String, dynamic>.from(rawAddress);
     } else if (rawAddress is String && rawAddress.trim().isNotEmpty) {
       try {
         final decoded = jsonDecode(rawAddress);
-        if (decoded is Map) address = Map<String, dynamic>.from(decoded);
-        else address = <String, dynamic>{'addressLine': rawAddress};
+        if (decoded is Map)
+          address = Map<String, dynamic>.from(decoded);
+        else
+          address = <String, dynamic>{'addressLine': rawAddress};
       } catch (_) {
         address = <String, dynamic>{'addressLine': rawAddress};
       }
@@ -110,7 +127,11 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       context,
       MaterialPageRoute<void>(
         builder: (_) => Payment(
-          totalAmount: _amount(_orderData['totalAmount'] ?? _orderData['grandTotal'] ?? _orderData['total']),
+          totalAmount: _amount(
+            _orderData['totalAmount'] ??
+                _orderData['grandTotal'] ??
+                _orderData['total'],
+          ),
           items: const <Map<String, dynamic>>[],
           address: address,
           existingOrder: Map<String, dynamic>.from(_orderData),
@@ -270,9 +291,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       _amount(_orderData['platformFee'] ?? _orderData['platform_fee']);
 
   double get _taxAmount => _amount(
-    _orderData['taxAmount'] ??
-        _orderData['gstAmount'] ??
-        _orderData['tax'],
+    _orderData['taxAmount'] ?? _orderData['gstAmount'] ?? _orderData['tax'],
   );
 
   double get _deliveryCharge => _amount(
@@ -299,9 +318,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
   }
 
   String get deliveryMethod {
-    final raw = (_orderData['deliveryMethod'] ?? 'Standard')
-        .toString()
-        .trim();
+    final raw = (_orderData['deliveryMethod'] ?? 'Standard').toString().trim();
     if (raw.isEmpty) return 'Standard';
     final normalized = raw.toLowerCase();
     if (normalized.contains('express')) return 'Express';
@@ -407,12 +424,11 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       _status.trim().toLowerCase().replaceAll('_', ' ');
 
   bool get _paymentPaid {
-    final value =
-        (_orderData['paymentStatus'] ?? _orderData['payment'] ?? '')
-            .toString()
-            .trim()
-            .toLowerCase()
-            .replaceAll('_', ' ');
+    final value = (_orderData['paymentStatus'] ?? _orderData['payment'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('_', ' ');
     return const {
       'paid',
       'completed',
@@ -662,8 +678,7 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
         'id': productId,
         'title': productName,
         'name': productName,
-        'imageUrls':
-            _orderData['imageUrls'] ?? _orderData['productImageUrls'],
+        'imageUrls': _orderData['imageUrls'] ?? _orderData['productImageUrls'],
         'imageUrl': _orderData['productImageUrl'] ?? _orderData['imageUrl'],
       };
       final submitted = await Navigator.push<bool>(
@@ -1752,7 +1767,9 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _refreshingOrder ? null : _startPaymentForExistingOrder,
+              onPressed: _refreshingOrder
+                  ? null
+                  : _startPaymentForExistingOrder,
               icon: const Icon(Icons.payment_rounded),
               label: const Text('Complete Payment'),
               style: ElevatedButton.styleFrom(
@@ -1769,7 +1786,6 @@ class _BuyingOrderDetailsState extends State<BuyingOrderDetails> {
       ),
     );
   }
-
 
   /// Bottom action bar: cancellation is available only until Packed.
   Widget _buildBottomBar() {

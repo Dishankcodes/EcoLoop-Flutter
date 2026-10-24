@@ -45,57 +45,98 @@ class _OrdersState extends State<Orders> {
     try {
       final dynamic data = await EcoLoopApi.instance.get('/orders');
       final List<Map<String, dynamic>> rows = data is List
-          ? data.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList()
+          ? data
+                .whereType<Map>()
+                .map((row) => Map<String, dynamic>.from(row))
+                .toList()
           : <Map<String, dynamic>>[];
 
       // Some API deployments return only the order's paymentStatus. Join the
       // authenticated payment list so method/status remain accurate in My Orders.
       List<Map<String, dynamic>> payments = <Map<String, dynamic>>[];
       try {
-        final dynamic paymentResponse = await EcoLoopApi.instance.get('/payments');
+        final dynamic paymentResponse = await EcoLoopApi.instance.get(
+          '/payments',
+        );
         final dynamic rawPayments = paymentResponse is Map
-            ? (paymentResponse['payments'] ?? paymentResponse['data'] ??
-                paymentResponse['items'] ?? paymentResponse['results'] ?? const <dynamic>[])
+            ? (paymentResponse['payments'] ??
+                  paymentResponse['data'] ??
+                  paymentResponse['items'] ??
+                  paymentResponse['results'] ??
+                  const <dynamic>[])
             : paymentResponse;
         if (rawPayments is List) {
-          payments = rawPayments.whereType<Map>()
-              .map((row) => Map<String, dynamic>.from(row)).toList();
+          payments = rawPayments
+              .whereType<Map>()
+              .map((row) => Map<String, dynamic>.from(row))
+              .toList();
         }
       } catch (_) {
         // Orders remain usable if payment history is temporarily unavailable.
       }
 
-      final paidStates = <String>{'paid', 'completed', 'success', 'successful', 'captured'};
+      final paidStates = <String>{
+        'paid',
+        'completed',
+        'success',
+        'successful',
+        'captured',
+      };
       for (final order in rows) {
         final id = int.tryParse('${order['orderId'] ?? order['id'] ?? ''}');
-        final related = payments.where((p) =>
-          int.tryParse('${p['orderId'] ?? p['order_id'] ?? ''}') == id).toList();
+        final related = payments
+            .where(
+              (p) =>
+                  int.tryParse('${p['orderId'] ?? p['order_id'] ?? ''}') == id,
+            )
+            .toList();
         if (related.isEmpty) continue;
         related.sort((a, b) {
-          final aPaid = paidStates.contains('${a['status'] ?? ''}'.toLowerCase()) ? 1 : 0;
-          final bPaid = paidStates.contains('${b['status'] ?? ''}'.toLowerCase()) ? 1 : 0;
+          final aPaid =
+              paidStates.contains('${a['status'] ?? ''}'.toLowerCase()) ? 1 : 0;
+          final bPaid =
+              paidStates.contains('${b['status'] ?? ''}'.toLowerCase()) ? 1 : 0;
           return bPaid.compareTo(aPaid);
         });
         final best = related.first;
-        final orderStatus = '${order['paymentStatus'] ?? ''}'.trim().toLowerCase();
+        final orderStatus = '${order['paymentStatus'] ?? ''}'
+            .trim()
+            .toLowerCase();
         final paymentStatus = '${best['status'] ?? ''}'.trim().toLowerCase();
-        if (paidStates.contains(paymentStatus) || orderStatus.isEmpty ||
-            const {'pending', 'unpaid', 'failed', 'payment pending'}.contains(orderStatus)) {
+        if (paidStates.contains(paymentStatus) ||
+            orderStatus.isEmpty ||
+            const {
+              'pending',
+              'unpaid',
+              'failed',
+              'payment pending',
+            }.contains(orderStatus)) {
           order['paymentStatus'] = paymentStatus.isEmpty
               ? order['paymentStatus']
               : paymentStatus;
         }
-        order['paymentMethod'] = best['method'] ?? order['paymentMethod'] ?? order['payment_method'];
+        order['paymentMethod'] =
+            best['method'] ?? order['paymentMethod'] ?? order['payment_method'];
         order['paymentGateway'] = best['gateway'] ?? order['paymentGateway'];
         order['payments'] = related;
       }
       // Hide abandoned unpaid attempts only when the order is already cancelled;
       // active unpaid orders stay visible so buyers can complete payment.
       final visibleRows = rows.where((order) {
-        final status = '${order['status'] ?? ''}'.trim().toLowerCase().replaceAll('_', ' ');
-        final payStatus = '${order['paymentStatus'] ?? ''}'.trim().toLowerCase().replaceAll('_', ' ');
-        final method = '${order['paymentMethod'] ?? order['payment_method'] ?? ''}'.trim().toLowerCase();
-        return !(status == 'cancelled' && method == 'razorpay' &&
+        final status = '${order['status'] ?? ''}'
+            .trim()
+            .toLowerCase()
+            .replaceAll('_', ' ');
+        final payStatus = '${order['paymentStatus'] ?? ''}'
+            .trim()
+            .toLowerCase()
+            .replaceAll('_', ' ');
+        final method =
+            '${order['paymentMethod'] ?? order['payment_method'] ?? ''}'
+                .trim()
+                .toLowerCase();
+        return !(status == 'cancelled' &&
+            method == 'razorpay' &&
             !paidStates.contains(payStatus));
       }).toList();
 
@@ -191,11 +232,12 @@ class _OrdersState extends State<Orders> {
   }
 
   bool _paymentPending(Map<String, dynamic> order) {
-    final String value = (order['paymentStatus'] ?? order['payment_status'] ?? '')
-        .toString()
-        .trim()
-        .toLowerCase()
-        .replaceAll('_', ' ');
+    final String value =
+        (order['paymentStatus'] ?? order['payment_status'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replaceAll('_', ' ');
 
     return value == 'pending' ||
         value == 'unpaid' ||

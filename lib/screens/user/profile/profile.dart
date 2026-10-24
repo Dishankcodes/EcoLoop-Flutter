@@ -167,8 +167,14 @@ class _ProfileState extends State<Profile> {
       final orders = _countRows(results[0]);
       final listings = _countRows(results[1]);
       final wishlist = _countRows(results[2]);
+
+      // Count real/active purchases only. Razorpay orders are created before
+      // the payment sheet opens, so a dismissed/failed payment must not inflate
+      // the profile's Orders statistic. COD orders can legitimately be unpaid.
+      final countableOrders = orders.where(_isCountablePurchaseOrder).length;
+
       setState(() {
-        _orderCount = orders.length;
+        _orderCount = countableOrders;
         _listingCount = listings
             .where(
               (p) => ![
@@ -182,6 +188,64 @@ class _ProfileState extends State<Profile> {
     } catch (_) {
       // Keep last known counts; retry when the profile is reopened/refreshed.
     }
+  }
+
+  String _normaliseOrderStatus(dynamic value) => (value ?? '')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[\s-]+'), '_');
+
+  bool _isCountablePurchaseOrder(Map<String, dynamic> order) {
+    final status = _normaliseOrderStatus(order['status']);
+    final paymentStatus = _normaliseOrderStatus(order['paymentStatus']);
+    final paymentMethod = _normaliseOrderStatus(order['paymentMethod']);
+    final paymentRecordStatus = _normaliseOrderStatus(
+      order['paymentRecordStatus'],
+    );
+
+    // Cancelled/failed orders should never count, regardless of payment state.
+    const excludedOrderStatuses = {
+      'cancelled',
+      'canceled',
+      'failed',
+      'payment_failed',
+      'payment_cancelled',
+      'cancelled_by_user',
+    };
+    if (excludedOrderStatuses.contains(status)) return false;
+
+    const excludedPaymentStatuses = {
+      'cancelled',
+      'canceled',
+      'failed',
+      'failure',
+      'payment_failed',
+      'payment_cancelled',
+      'unpaid',
+    };
+    if (excludedPaymentStatuses.contains(paymentStatus) ||
+        excludedPaymentStatuses.contains(paymentRecordStatus)) {
+      return false;
+    }
+
+    // Orders are persisted before Razorpay checkout opens. Count a Razorpay
+    // purchase only after the backend marks its payment as successful; unlike
+    // COD, an unpaid Razorpay order is not a completed/valid purchase.
+    if (paymentMethod == 'razorpay') {
+      const successfulStatuses = {
+        'paid',
+        'success',
+        'successful',
+        'captured',
+        'completed',
+      };
+      return successfulStatuses.contains(paymentStatus) ||
+          successfulStatuses.contains(paymentRecordStatus);
+    }
+
+    // Preserve COD and other non-Razorpay orders unless cancelled/failed.
+    return true;
   }
 
   String get _displayName {

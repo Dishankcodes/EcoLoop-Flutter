@@ -7,6 +7,51 @@ import '../../../app_theme/artist/artist_text_styles.dart';
 import '../../../services/ecoloop_api.dart';
 import '../buy_products/product_details.dart';
 import '../reviews/seller_reviews.dart';
+import '../reviews/write_seller_review.dart';
+
+/// Converts backend timestamps into readable local review dates.
+/// Examples: "Today, 3:02 PM", "Yesterday, 7:20 PM", "21 Oct, 9:19 AM".
+String _formatReviewDate(String rawValue) {
+  final raw = rawValue.trim();
+  if (raw.isEmpty) return '';
+
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return raw;
+
+  final local = parsed.toLocal();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final reviewDay = DateTime(local.year, local.month, local.day);
+  final dayDifference = today.difference(reviewDay).inDays;
+
+  const months = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  final hour24 = local.hour;
+  final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final period = hour24 >= 12 ? 'PM' : 'AM';
+  final time = '$hour12:$minute $period';
+
+  if (dayDifference == 0) return 'Today, $time';
+  if (dayDifference == 1) return 'Yesterday, $time';
+
+  final dayMonth = '${local.day} ${months[local.month - 1]}';
+  if (local.year == now.year) return '$dayMonth, $time';
+  return '$dayMonth ${local.year}, $time';
+}
 
 /// Public profile shown when a user opens an artist/ReMaker from a listing.
 /// Profile details are taken from the selected backend artist record; portfolio,
@@ -396,129 +441,40 @@ class _ArtistProfileState extends State<ArtistProfile> {
   }
 
   Future<void> _openWriteReview() async {
-    if (!_canReview || _eligibleOrderId == null) return;
-    final rating = ValueNotifier<int>(5);
-    final commentController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
+    final orderId = _eligibleOrderId;
+    if (!_canReview || orderId == null || orderId.trim().isEmpty) {
+      _message(
+        'A qualifying purchase is required before you can review this ReMaker.',
+      );
+      return;
+    }
 
-    final submitted = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Container(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          decoration: const BoxDecoration(
-            color: ArtistColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Review $_name',
-                    style: ArtistTextStyles.title.copyWith(fontSize: 20),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Share feedback about your purchase from this ReMaker.',
-                    style: ArtistTextStyles.caption,
-                  ),
-                  const SizedBox(height: 16),
-                  ValueListenableBuilder<int>(
-                    valueListenable: rating,
-                    builder: (context, value, child) => Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        5,
-                        (index) => IconButton(
-                          onPressed: () => rating.value = index + 1,
-                          icon: Icon(
-                            index < value
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
-                            color: ArtistColors.primary,
-                            size: 34,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: commentController,
-                    minLines: 3,
-                    maxLines: 5,
-                    maxLength: 1000,
-                    decoration: InputDecoration(
-                      labelText: 'Your review',
-                      hintText:
-                          'Tell others about the product and your experience...',
-                      filled: true,
-                      fillColor: ArtistColors.background,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    validator: (value) =>
-                        (value == null || value.trim().length < 5)
-                        ? 'Please write at least 5 characters.'
-                        : null,
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        if (!(formKey.currentState?.validate() ?? false)) {
-                          return;
-                        }
-                        Navigator.pop(sheetContext, true);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ArtistColors.primary,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(48),
-                      ),
-                      child: const Text('Submit Review'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+    final sellerId = _artistId.trim();
+    if (sellerId.isEmpty ||
+        sellerId == '0' ||
+        sellerId.toLowerCase() == 'null') {
+      _message(
+        'The ReMaker profile ID is unavailable. Please refresh and try again.',
+      );
+      return;
+    }
+
+    final submitted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => WriteSellerReview(
+          sellerName: _name,
+          sellerImage: _avatar.isEmpty ? null : _avatar,
+          sellerId: sellerId,
+          sellerType: 'artist',
+          orderId: orderId,
         ),
       ),
     );
 
-    if (submitted == true) {
-      try {
-        await _api.post('/reviews/artist', <String, dynamic>{
-          'artistId': _artistId,
-          'orderId': _eligibleOrderId,
-          'rating': rating.value,
-          'comment': commentController.text.trim(),
-          'review': commentController.text.trim(),
-        });
-        if (mounted) {
-          _message('Review submitted.');
-          await _loadProfileData(refresh: true);
-        }
-      } catch (e) {
-        _message('Could not submit review: $e');
-      }
-    }
-    rating.dispose();
-    commentController.dispose();
+    if (!mounted || submitted != true) return;
+
+    _message('Review submitted successfully.');
+    await _loadProfileData(refresh: true);
   }
 
   void _message(String message) {
@@ -1217,7 +1173,10 @@ class _ArtistProfileState extends State<ArtistProfile> {
           ),
           if (date.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Text(date, style: ArtistTextStyles.caption.copyWith(fontSize: 10)),
+            Text(
+              _formatReviewDate(date),
+              style: ArtistTextStyles.caption.copyWith(fontSize: 10),
+            ),
           ],
           if (comment.isNotEmpty) ...[
             const SizedBox(height: 7),
@@ -1457,7 +1416,7 @@ class _ArtistReviewsPage extends StatelessWidget {
                       if (date.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
-                          date,
+                          _formatReviewDate(date),
                           style: ArtistTextStyles.caption.copyWith(
                             fontSize: 10,
                           ),
